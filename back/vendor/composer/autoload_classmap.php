@@ -6,14 +6,18 @@ $vendorDir = dirname(__DIR__);
 $baseDir = dirname($vendorDir);
 
 return array(
+    'App\\Controllers\\AdminRealEstateController' => $baseDir . '/src/Controllers/AdminRealEstateController.php',
     'App\\Controllers\\AuthController' => $baseDir . '/src/Controllers/AuthController.php',
     'App\\Controllers\\LogoutController' => $baseDir . '/src/Controllers/LogoutController.php',
     'App\\Controllers\\MeController' => $baseDir . '/src/Controllers/MeController.php',
+    'App\\Controllers\\RealEstateController' => $baseDir . '/src/Controllers/RealEstateController.php',
     'App\\Controllers\\RefreshController' => $baseDir . '/src/Controllers/RefreshController.php',
     'App\\Helpers\\JwtHelper' => $baseDir . '/src/Helpers/JwtHelper.php',
     'App\\Helpers\\ResponseHelper' => $baseDir . '/src/Helpers/ResponseHelper.php',
     'App\\Middleware\\AuthMiddleware' => $baseDir . '/src/Middleware/AuthMiddleware.php',
+    'App\\Services\\AdminRealEstateService' => $baseDir . '/src/Services/AdminRealEstateService.php',
     'App\\Services\\AuthService' => $baseDir . '/src/Services/AuthService.php',
+    'App\\Services\\RealEstateService' => $baseDir . '/src/Services/RealEstateService.php',
     'App\\Services\\RefreshTokenService' => $baseDir . '/src/Services/RefreshTokenService.php',
     'Attribute' => $vendorDir . '/symfony/polyfill-php80/Resources/stubs/Attribute.php',
     'Composer\\InstalledVersions' => $vendorDir . '/composer/InstalledVersions.php',

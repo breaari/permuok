@@ -4,7 +4,7 @@
 
 namespace Composer\Autoload;
 
-class ComposerStaticInit108be68e4e2b97fed51d36a10eed0849
+class ComposerStaticInit96a7df23d7f5488c5d2406d623ff2bd6
 {
     public static $files = array (
         '320cde22f66dd4f5d3fd621d3e88b98f' => __DIR__ . '/..' . '/symfony/polyfill-ctype/bootstrap.php',
@@ -13,78 +13,82 @@ class ComposerStaticInit108be68e4e2b97fed51d36a10eed0849
     );
 
     public static $prefixLengthsPsr4 = array (
-        'S' => 
+        'S' =>
         array (
             'Symfony\\Polyfill\\Php80\\' => 23,
             'Symfony\\Polyfill\\Mbstring\\' => 26,
             'Symfony\\Polyfill\\Ctype\\' => 23,
         ),
-        'P' => 
+        'P' =>
         array (
             'PhpOption\\' => 10,
         ),
-        'G' => 
+        'G' =>
         array (
             'GrahamCampbell\\ResultType\\' => 26,
         ),
-        'F' => 
+        'F' =>
         array (
             'Firebase\\JWT\\' => 13,
         ),
-        'D' => 
+        'D' =>
         array (
             'Dotenv\\' => 7,
         ),
-        'A' => 
+        'A' =>
         array (
             'App\\' => 4,
         ),
     );
 
     public static $prefixDirsPsr4 = array (
-        'Symfony\\Polyfill\\Php80\\' => 
+        'Symfony\\Polyfill\\Php80\\' =>
         array (
             0 => __DIR__ . '/..' . '/symfony/polyfill-php80',
         ),
-        'Symfony\\Polyfill\\Mbstring\\' => 
+        'Symfony\\Polyfill\\Mbstring\\' =>
         array (
             0 => __DIR__ . '/..' . '/symfony/polyfill-mbstring',
         ),
-        'Symfony\\Polyfill\\Ctype\\' => 
+        'Symfony\\Polyfill\\Ctype\\' =>
         array (
             0 => __DIR__ . '/..' . '/symfony/polyfill-ctype',
         ),
-        'PhpOption\\' => 
+        'PhpOption\\' =>
         array (
             0 => __DIR__ . '/..' . '/phpoption/phpoption/src/PhpOption',
         ),
-        'GrahamCampbell\\ResultType\\' => 
+        'GrahamCampbell\\ResultType\\' =>
         array (
             0 => __DIR__ . '/..' . '/graham-campbell/result-type/src',
         ),
-        'Firebase\\JWT\\' => 
+        'Firebase\\JWT\\' =>
         array (
             0 => __DIR__ . '/..' . '/firebase/php-jwt/src',
         ),
-        'Dotenv\\' => 
+        'Dotenv\\' =>
         array (
             0 => __DIR__ . '/..' . '/vlucas/phpdotenv/src',
         ),
-        'App\\' => 
+        'App\\' =>
         array (
             0 => __DIR__ . '/../..' . '/src',
         ),
     );
 
     public static $classMap = array (
+        'App\\Controllers\\AdminRealEstateController' => __DIR__ . '/../..' . '/src/Controllers/AdminRealEstateController.php',
         'App\\Controllers\\AuthController' => __DIR__ . '/../..' . '/src/Controllers/AuthController.php',
         'App\\Controllers\\LogoutController' => __DIR__ . '/../..' . '/src/Controllers/LogoutController.php',
         'App\\Controllers\\MeController' => __DIR__ . '/../..' . '/src/Controllers/MeController.php',
+        'App\\Controllers\\RealEstateController' => __DIR__ . '/../..' . '/src/Controllers/RealEstateController.php',
         'App\\Controllers\\RefreshController' => __DIR__ . '/../..' . '/src/Controllers/RefreshController.php',
         'App\\Helpers\\JwtHelper' => __DIR__ . '/../..' . '/src/Helpers/JwtHelper.php',
         'App\\Helpers\\ResponseHelper' => __DIR__ . '/../..' . '/src/Helpers/ResponseHelper.php',
         'App\\Middleware\\AuthMiddleware' => __DIR__ . '/../..' . '/src/Middleware/AuthMiddleware.php',
+        'App\\Services\\AdminRealEstateService' => __DIR__ . '/../..' . '/src/Services/AdminRealEstateService.php',
         'App\\Services\\AuthService' => __DIR__ . '/../..' . '/src/Services/AuthService.php',
+        'App\\Services\\RealEstateService' => __DIR__ . '/../..' . '/src/Services/RealEstateService.php',
         'App\\Services\\RefreshTokenService' => __DIR__ . '/../..' . '/src/Services/RefreshTokenService.php',
         'Attribute' => __DIR__ . '/..' . '/symfony/polyfill-php80/Resources/stubs/Attribute.php',
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
@@ -157,9 +161,9 @@ class ComposerStaticInit108be68e4e2b97fed51d36a10eed0849
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->prefixLengthsPsr4 = ComposerStaticInit108be68e4e2b97fed51d36a10eed0849::$prefixLengthsPsr4;
-            $loader->prefixDirsPsr4 = ComposerStaticInit108be68e4e2b97fed51d36a10eed0849::$prefixDirsPsr4;
-            $loader->classMap = ComposerStaticInit108be68e4e2b97fed51d36a10eed0849::$classMap;
+            $loader->prefixLengthsPsr4 = ComposerStaticInit96a7df23d7f5488c5d2406d623ff2bd6::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInit96a7df23d7f5488c5d2406d623ff2bd6::$prefixDirsPsr4;
+            $loader->classMap = ComposerStaticInit96a7df23d7f5488c5d2406d623ff2bd6::$classMap;
 
         }, null, ClassLoader::class);
     }

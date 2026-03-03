@@ -153,12 +153,14 @@ class AuthService
         $pdo = self::db();
 
         $stmt = $pdo->prepare("
-            SELECT r.id, r.validation_status
-            FROM real_estates r
-            JOIN users u ON u.real_estate_id = r.id
-            WHERE u.id = :user_id
-            LIMIT 1
-        ");
+        SELECT r.id,
+               r.validation_status,
+               r.review_requested_at
+        FROM real_estates r
+        JOIN users u ON u.real_estate_id = r.id
+        WHERE u.id = :user_id
+        LIMIT 1
+    ");
         $stmt->execute(['user_id' => $userId]);
         $realEstate = $stmt->fetch();
 
@@ -166,38 +168,45 @@ class AuthService
             return [
                 'level' => 'real_estate_not_linked',
                 'limits' => null,
-                'features' => [],
+                'features' => []
             ];
         }
 
-        if ((int)$realEstate['validation_status'] !== self::REAL_ESTATE_APPROVED) {
+        $isApproved = ((int)$realEstate['validation_status'] === self::REAL_ESTATE_APPROVED);
+
+        // No aprobado -> draft o review según review_requested_at
+        if (!$isApproved) {
+            $isSubmitted = !empty($realEstate['review_requested_at']);
+
             return [
-                'level' => 'real_estate_review',
+                'level' => $isSubmitted ? 'real_estate_review' : 'real_estate_draft',
                 'limits' => null,
-                'features' => [],
+                'features' => []
             ];
         }
 
+        // Aprobado -> chequear membresía activa
         $membership = self::getActiveMembership((int)$realEstate['id']);
 
         if (!$membership) {
             return [
                 'level' => 'real_estate_unpaid',
                 'limits' => null,
-                'features' => [],
+                'features' => []
             ];
         }
 
         return [
             'level' => 'real_estate_active',
             'limits' => [
-                'agents'    => (int)($membership['max_agents'] ?? 0),
-                'investors' => (int)($membership['max_investors'] ?? 0),
+                'real_estate_users' => (int)($membership['max_users'] ?? 1), // normalmente 1
+                'agents'            => (int)$membership['max_agents'],
+                'investors'         => (int)$membership['max_investors'],
             ],
             'features' => [
-                'publish_projects' => (bool)($membership['can_publish_projects'] ?? false),
-                'view_projects'    => (bool)($membership['can_view_projects'] ?? false),
-            ],
+                'publish_projects' => (bool)$membership['can_publish_projects'],
+                'view_projects'    => (bool)$membership['can_view_projects'],
+            ]
         ];
     }
 
@@ -269,15 +278,17 @@ class AuthService
         $pdo = self::db();
 
         $stmt = $pdo->prepare("
-            SELECT *
-            FROM memberships
-            WHERE real_estate_id = :real_estate_id
-              AND status = 1
-              AND end_date >= CURDATE()
-            LIMIT 1
-        ");
-        $stmt->execute(['real_estate_id' => $realEstateId]);
+        SELECT *
+        FROM memberships
+        WHERE real_estate_id = :real_estate_id
+          AND status = 1
+          AND end_date >= CURDATE()
+          AND deleted_at IS NULL
+        ORDER BY id DESC
+        LIMIT 1
+    ");
 
+        $stmt->execute(['real_estate_id' => $realEstateId]);
         return $stmt->fetch();
     }
 
