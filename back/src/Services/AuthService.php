@@ -34,26 +34,41 @@ class AuthService
             return ['error' => 'Email requerido'];
         }
 
-        $check = $pdo->prepare("SELECT id FROM users WHERE email = :email LIMIT 1");
-        $check->execute(['email' => trim($email)]);
+        $password = (string)($data['password'] ?? '');
+        if (trim($password) === '' || strlen($password) < 6) {
+            return ['error' => 'Password inválida (mínimo 6 caracteres)'];
+        }
 
+        $first = trim((string)($data['first_name'] ?? ''));
+        $last  = trim((string)($data['last_name'] ?? ''));
+        $phone = trim((string)($data['phone'] ?? ''));
+
+        if ($first === '') return ['error' => 'first_name requerido'];
+        if ($last === '')  return ['error' => 'last_name requerido'];
+        if ($phone === '') return ['error' => 'phone requerido'];
+
+        $emailNorm = strtolower(trim($email));
+
+        $check = $pdo->prepare("SELECT id FROM users WHERE email = :email LIMIT 1");
+        $check->execute(['email' => $emailNorm]);
         if ($check->fetch()) {
             return ['error' => 'El email ya está registrado'];
         }
 
         $stmt = $pdo->prepare("
-            INSERT INTO users 
-            (role, first_name, last_name, email, password_hash, is_active, created_at)
-            VALUES 
-            (:role, :first_name, :last_name, :email, :password, 1, NOW())
-        ");
+        INSERT INTO users
+        (role, first_name, last_name, email, phone, password_hash, is_active, created_at)
+        VALUES
+        (:role, :first_name, :last_name, :email, :phone, :password, 1, NOW())
+    ");
 
         $stmt->execute([
             'role'       => self::ROLE_REAL_ESTATE,
-            'first_name' => $data['first_name'] ?? '',
-            'last_name'  => $data['last_name'] ?? '',
-            'email'      => trim($email),
-            'password'   => password_hash((string)($data['password'] ?? ''), PASSWORD_BCRYPT),
+            'first_name' => $first,
+            'last_name'  => $last,
+            'email'      => $emailNorm,
+            'phone'      => $phone,
+            'password'   => password_hash($password, PASSWORD_BCRYPT),
         ]);
 
         return ['success' => true];
@@ -91,15 +106,16 @@ class AuthService
             return false;
         }
 
-        // ✅ access token corto (15 min) con typ=access
+        // ✅ actualiza last_login
+        $upd = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = :id LIMIT 1");
+        $upd->execute(['id' => (int)$user['id']]);
+
         $accessToken = JwtHelper::generateAccessToken([
             'id'   => (int)$user['id'],
             'role' => (int)$user['role'],
         ]);
 
-        // ✅ refresh token en DB (hash) con rotación posterior en /refresh
         $refreshToken = RefreshTokenService::issue((int)$user['id']);
-
         $access = self::buildAccessFromMiddleware((int)$user['id'], (int)$user['role']);
 
         return [

@@ -5,13 +5,14 @@ import Register from "./pages/Register";
 import Gate from "./pages/Gate";
 import ProtectedRoute from "./auth/ProtectedRoute";
 
-import Onboarding from "./pages/Onboarding";
+import MyProfile from "./pages/MyProfile";
 import Review from "./pages/Review";
 import Billing from "./pages/Billing";
 import AppHome from "./pages/AppHome";
 
 import AdminPanel from "./pages/AdminPanel";
 import AdminRealEstates from "./pages/AdminRealEstates";
+import AdminRealEstateDetail from "./pages/AdminRealEstateDetail";
 
 import AppLayout from "./layout/AppLayout";
 
@@ -34,29 +35,28 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        {/* Gate decide qué hacer con "/" */}
         <Route path="/" element={<Gate />} />
 
         {/* Inmobiliaria */}
-        <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/status/review" element={<Review />} />
-        <Route path="/billing" element={<Billing />} />
-        <Route path="/billing/success" element={<BillingSuccess />} />
-        <Route path="/billing/pending" element={<BillingPending />} />
-        <Route path="/billing/failure" element={<BillingFailure />} />
+        <Route path="my-profile" element={<MyProfile />} />
+        <Route path="status/review" element={<Review />} />
+        <Route path="billing" element={<Billing />} />
+        <Route path="billing/success" element={<BillingSuccess />} />
+        <Route path="billing/pending" element={<BillingPending />} />
+        <Route path="billing/failure" element={<BillingFailure />} />
 
-        {/* Home app */}
-        <Route path="/app" element={<AppHome />} />
+        <Route path="app" element={<AppHome />} />
 
         {/* Admin */}
-        <Route path="/admin" element={<AdminPanel />} />
-        <Route path="/admin/real-estates" element={<AdminRealEstates />} />
+        <Route path="admin" element={<AdminPanel />}>
+          <Route index element={<Navigate to="real-estates" replace />} />
+          <Route path="real-estates" element={<AdminRealEstates />} />
+          <Route path="real-estates/:id" element={<AdminRealEstateDetail />} />
+        </Route>
 
-        {/* fallback (protegido): si no matchea nada, volvemos al gate */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
 
-      {/* fallback público (por si acaso): */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );

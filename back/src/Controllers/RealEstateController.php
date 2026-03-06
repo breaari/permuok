@@ -5,7 +5,6 @@ namespace App\Controllers;
 use App\Helpers\ResponseHelper;
 use App\Middleware\AuthMiddleware;
 use App\Services\RealEstateService;
-use App\Services\AdminRealEstateService;
 
 class RealEstateController
 {
@@ -40,7 +39,7 @@ class RealEstateController
             $payload = json_decode(file_get_contents('php://input'), true) ?? [];
 
             $result = RealEstateService::addLicense((int)$ctx['id'], $payload);
-            ResponseHelper::ok($result, 201);
+            ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             ResponseHelper::fail($e->getMessage(), 422);
         }
@@ -51,28 +50,6 @@ class RealEstateController
         try {
             $ctx = AuthMiddleware::handle();
             $result = RealEstateService::submitReview((int)$ctx['id']);
-            ResponseHelper::ok($result);
-        } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 422);
-        }
-    }
-
-      public static function approve(): void
-    {
-        try {
-            $ctx = AuthMiddleware::handle(); // debe ser super admin
-            if ((int)$ctx['role'] !== 1) {
-                ResponseHelper::fail('No autorizado', 403);
-            }
-
-            $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-            $realEstateId = (int)($payload['real_estate_id'] ?? 0);
-
-            if ($realEstateId <= 0) {
-                ResponseHelper::fail('real_estate_id requerido', 422);
-            }
-
-            $result = AdminRealEstateService::approve($realEstateId, (int)$ctx['id']);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             ResponseHelper::fail($e->getMessage(), 422);

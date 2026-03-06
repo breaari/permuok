@@ -40,6 +40,7 @@ use App\Controllers\AdminRealEstateController;
 use App\Controllers\BillingController;
 use App\Controllers\WebhookMercadoPagoController;
 use App\Controllers\DevBillingController;
+use App\Controllers\ProvinceController;
 
 
 
@@ -76,102 +77,54 @@ foreach ($baseCandidates as $base) {
 }
 
 $uri = $uri === '' ? '/' : $uri;
-/*
-|--------------------------------------------------------------------------
-| Routes
-|--------------------------------------------------------------------------
-*/
-if ($method === 'POST' && $uri === '/auth/register') {
-    AuthController::register();
+$routes = [
+    'POST /auth/register' => [AuthController::class, 'register'],
+    'POST /auth/login'    => [AuthController::class, 'login'],
+    'GET /me'             => [MeController::class, 'handle'],
+    'POST /refresh'       => [RefreshController::class, 'handle'],
+    'POST /logout'        => [LogoutController::class, 'handle'],
+
+    'GET /real-estate/me'             => [RealEstateController::class, 'me'],
+    'POST /real-estate/profile'       => [RealEstateController::class, 'saveProfile'],
+    'POST /real-estate/licenses'      => [RealEstateController::class, 'addLicense'],
+    'POST /real-estate/submit-review' => [RealEstateController::class, 'submitReview'],
+
+    // Admin nuevo
+    'GET /admin/real-estates/counts'    => [AdminRealEstateController::class, 'counts'],
+    'GET /admin/real-estates'           => [AdminRealEstateController::class, 'list'],
+    'GET /admin/real-estates/detail'    => [AdminRealEstateController::class, 'detail'],
+    'POST /admin/real-estates/validate' => [AdminRealEstateController::class, 'validate'],
+
+    // Legacy (si querés mantenerlos)
+    'POST /admin/real-estates/approve' => [AdminRealEstateController::class, 'approve'],
+    'GET /admin/real-estates/pending'  => [AdminRealEstateController::class, 'pending'],
+    'GET /admin/real-estates/approved' => [AdminRealEstateController::class, 'approved'],
+    'GET /admin/real-estates/rejected' => [AdminRealEstateController::class, 'rejected'],
+
+    'GET /plans'                      => [BillingController::class, 'listPlans'],
+    'POST /billing/create-preference' => [BillingController::class, 'createPreference'],
+    'GET /billing/status'             => [BillingController::class, 'status'],
+    'POST /webhooks/mercadopago'      => [WebhookMercadoPagoController::class, 'handle'],
+    'POST /dev/billing/approve'       => [DevBillingController::class, 'approve'],
+
+    'GET /provinces' => [ProvinceController::class, 'list'],
+];
+
+$key = $method . ' ' . $uri;
+
+if (isset($routes[$key])) {
+    [$cls, $fn] = $routes[$key];
+    $cls::$fn();
     exit;
 }
 
-if ($method === 'POST' && $uri === '/auth/login') {
-    AuthController::login();
+// Dynamic routes (regex)
+if ($method === 'GET' && preg_match('#^/admin/real-estates/(\d+)$#', $uri, $m)) {
+    // Reutilizamos el mismo handler, pasando id por $_GET para no reescribir controller
+    $_GET['id'] = (int)$m[1];
+    AdminRealEstateController::detail();
     exit;
 }
-
-if ($method === 'GET' && $uri === '/me') {
-    MeController::handle();
-    exit;
-}
-
-if ($method === 'POST' && $uri === '/refresh') {
-    RefreshController::handle();
-    exit;
-}
-
-if ($method === 'POST' && $uri === '/logout') {
-    LogoutController::handle();
-    exit;
-}
-
-if ($method === 'GET' && $uri === '/real-estate/me') {
-    RealEstateController::me();
-    exit;
-}
-
-if ($method === 'POST' && $uri === '/real-estate/profile') {
-    RealEstateController::saveProfile();
-    exit;
-}
-
-if ($method === 'POST' && $uri === '/real-estate/licenses') {
-    RealEstateController::addLicense();
-    exit;
-}
-
-if ($method === 'POST' && $uri === '/real-estate/submit-review') {
-    RealEstateController::submitReview();
-    exit;
-}
-
-if ($method === 'POST' && $uri === '/admin/real-estates/approve') {
-    AdminRealEstateController::approve();
-    exit;
-}
-
-if ($method === 'GET' && $uri === '/admin/real-estates/pending') {
-    AdminRealEstateController::pending();
-    exit;
-}
-
-if ($method === 'GET' && $uri === '/admin/real-estates/rejected') {
-    AdminRealEstateController::rejected();
-    exit;
-}
-
-if ($method === 'GET' && $uri === '/admin/real-estates/approved') {
-    AdminRealEstateController::approved();
-    exit;
-}
-
-
-if ($method === 'GET' && $uri === '/plans') {
-    BillingController::listPlans();
-    exit;
-}
-
-if ($method === 'POST' && $uri === '/billing/create-preference') {
-    BillingController::createPreference();
-    exit;
-}
-
-if ($method === 'GET' && $uri === '/billing/status') {
-    BillingController::status();
-    exit;
-}
-
-if ($method === 'POST' && $uri === '/webhooks/mercadopago') {
-    WebhookMercadoPagoController::handle();
-    exit;
-}
-if ($method === 'POST' && $uri === '/dev/billing/approve') {
-    DevBillingController::approve();
-    exit;
-}
-
 
 http_response_code(404);
 echo json_encode(['error' => 'Ruta no encontrada']);
-

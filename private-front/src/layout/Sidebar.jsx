@@ -1,28 +1,25 @@
-// src/layout/Sidebar.jsx
+// layout/Sidebar.jsx
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import LogoParaFondoAzul from "../assets/logoparafondoazul.png"; // ajustá el path según tu proyecto
+import { Icon } from "../ui/icons/Index";
 
-function Item({ to, children, disabled = false }) {
-  if (disabled) {
-    return (
-      <div className="block rounded-lg px-3 py-2 text-sm text-gray-400 cursor-not-allowed">
-        {children}
-      </div>
-    );
-  }
+function itemClass(isActive) {
+  return [
+    "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
+    isActive
+      ? "bg-white/10 text-white border-l-4 border-primary"
+      : "text-slate-300 hover:bg-white/5 hover:text-white",
+  ].join(" ");
+}
 
+function Item({ to, icon, children, end = false }) {
   return (
-    <NavLink
-      to={to}
-      className={({ isActive }) =>
-        [
-          "block rounded-lg px-3 py-2 text-sm",
-          isActive ? "bg-black text-white" : "text-gray-700 hover:bg-gray-100",
-        ].join(" ")
-      }
-      end
-    >
-      {children}
+    <NavLink to={to} end={end} className={({ isActive }) => itemClass(isActive)}>
+      <span className="text-slate-300">
+        {icon}
+      </span>
+      <span className="font-medium">{children}</span>
     </NavLink>
   );
 }
@@ -30,59 +27,94 @@ function Item({ to, children, disabled = false }) {
 export default function Sidebar() {
   const { user, access } = useAuth();
   const role = Number(user?.role || 0);
-  const isAdmin = role === 1;
-
   const level = access?.level;
 
-  const needsOnboarding =
-    level === "real_estate_not_linked" || level === "real_estate_draft";
+  const isAdmin = role === 1;
+  const isRealEstate = role === 2;
+  const isAgent = role === 3;
+  const isInvestor = role === 4;
 
-  const isReview = level === "real_estate_review";
-  const isUnpaid = level === "real_estate_unpaid";
+  // si querés “bloquear” algunas secciones según estado:
   const isActive = level === "real_estate_active";
+  const isUnpaid = level === "real_estate_unpaid";
+  const isReview = level === "real_estate_review";
+  const needsOnboarding = level === "real_estate_not_linked" || level === "real_estate_draft";
 
   return (
-    <aside className="w-64 shrink-0 border-r min-h-screen p-4">
-      <div className="text-lg font-semibold">permuok</div>
-      <div className="mt-1 text-xs text-gray-500">
-        {isAdmin ? "Admin" : "Inmobiliaria"} {level ? `• ${level}` : ""}
+    <aside className="hidden md:flex flex-col w-64 bg-slate-900 text-slate-300 border-r border-slate-800 min-h-screen">
+      {/* Header: SOLO LOGO */}
+      <div className="p-6 flex items-center justify-center border-b border-slate-800">
+        <div className="w-48 h-auto">
+          <img src={LogoParaFondoAzul} alt="Permuok" className="w-48 h-auto object-contain" />
+        </div>
       </div>
 
-      <nav className="mt-6 space-y-1">
-        {isAdmin ? (
+      <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
+        {isAdmin && (
           <>
-            <Item to="/admin">Panel</Item>
-            <Item to="/admin/real-estates">Revisiones</Item>
+            <Item to="/admin/real-estates" icon={<Icon name="layoutDashboard" />}>
+              Solicitudes de revisión
+            </Item>
+            {/* después */}
+            {/* <Item to="/admin/users" icon={<Icon name="users" />}>Usuarios</Item> */}
+            {/* <Item to="/admin/properties" icon={<Icon name="home" />}>Propiedades</Item> */}
+            {/* <Item to="/admin/searches" icon={<Icon name="search" />}>Búsquedas</Item> */}
+            {/* <Item to="/admin/payments" icon={<Icon name="creditCard" />}>Pagos</Item> */}
           </>
-        ) : (
+        )}
+
+        {isRealEstate && (
           <>
-            {/* Panel base */}
-            <Item to="/app">Panel</Item>
-
-            {/* Flujos */}
-            <Item to="/onboarding" disabled={!needsOnboarding}>
-              Onboarding
+            <Item to="/app" icon={<Icon name="dashboard" />}>
+              Panel
             </Item>
 
-            <Item to="/status/review" disabled={!isReview}>
-              Revisión
-            </Item>
+            {needsOnboarding && (
+              <Item to="/my-profile" icon={<Icon name="clipboardList" />}>
+                Mi perfil
+              </Item>
+            )}
 
-            <Item to="/billing" disabled={!isUnpaid}>
-              Membresía
-            </Item>
+            {isReview && (
+              <Item to="/status/review" icon={<Icon name="shieldCheck" />}>
+                Revisión
+              </Item>
+            )}
 
-            {/* Sección de “funcionalidades” reales (ruta distinta a /app) */}
-            <Item to="/app/features" disabled={!isActive}>
-              Funciones
-            </Item>
+            {isUnpaid && (
+              <Item to="/billing" icon={<Icon name="creditCard" />}>
+                Membresía
+              </Item>
+            )}
+
+            {/* cuando esté activa, acá van tus secciones reales */}
+            {isActive && (
+              <>
+                {/* <Item to="/properties" icon={<Icon name="home" />}>Propiedades</Item> */}
+                {/* <Item to="/searches" icon={<Icon name="search" />}>Búsquedas</Item> */}
+              </>
+            )}
+          </>
+        )}
+
+        {isAgent && (
+          <>
+            <Item to="/app" icon={<Icon name="layoutDashboard" />}>Panel</Item>
+            {/* <Item to="/properties" icon={<Icon name="home" />}>Propiedades</Item> */}
+            {/* <Item to="/searches" icon={<Icon name="search" />}>Búsquedas</Item> */}
+            {/* <Item to="/messages" icon={<Icon name="messagesSquare" />}>Mensajes</Item> */}
+          </>
+        )}
+
+        {isInvestor && (
+          <>
+            <Item to="/app" icon={<Icon name="layoutDashboard" />}>Panel</Item>
+            {/* <Item to="/searches" icon={<Icon name="search" />}>Búsquedas</Item> */}
+            {/* <Item to="/favorites" icon={<Icon name="heart" />}>Favoritos</Item> */}
+            {/* <Item to="/messages" icon={<Icon name="messagesSquare" />}>Mensajes</Item> */}
           </>
         )}
       </nav>
-
-      <div className="mt-8 border-t pt-4 text-xs text-gray-500">
-        {user?.email || "—"}
-      </div>
     </aside>
   );
 }

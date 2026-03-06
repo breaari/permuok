@@ -82,7 +82,9 @@ export default function Billing() {
     setErr("");
     setChecking(true);
     try {
-      const res = await api.post("/billing/create-preference", { plan_code: planCode });
+      const res = await api.post("/billing/create-preference", {
+        plan_code: planCode,
+      });
       const data = unwrap(res); // => {payment_id, preference_id, init_point, external_reference}
       setPayment(data);
 
@@ -101,18 +103,22 @@ export default function Billing() {
   }
 
   useEffect(() => {
-  if (!payment) {
-    const raw = localStorage.getItem("permuok_last_payment");
-    if (raw) {
-      try { setPayment(JSON.parse(raw)); } catch {}
+    if (!payment) {
+      const raw = localStorage.getItem("permuok_last_payment");
+      if (raw) {
+        try {
+          setPayment(JSON.parse(raw));
+        } catch {}
+      }
     }
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function reopenCheckout() {
     if (!payment?.init_point) {
-      setErr("No tengo el link (init_point) para reabrir. Iniciá un pago nuevamente.");
+      setErr(
+        "No tengo el link (init_point) para reabrir. Iniciá un pago nuevamente.",
+      );
       return;
     }
     window.open(payment.init_point, "_blank", "noopener,noreferrer");
@@ -142,7 +148,8 @@ export default function Billing() {
       const p = data?.payment ?? null;
 
       if (!p) {
-        if (!silent) setErr("No se encontró el pago. Probá iniciar nuevamente.");
+        if (!silent)
+          setErr("No se encontró el pago. Probá iniciar nuevamente.");
         return;
       }
 
@@ -157,11 +164,12 @@ export default function Billing() {
       // estados comunes: pending / created / rejected / cancelled
       if (!silent) {
         setErr(
-          `Estado del pago: ${p.status || "—"}${p.mp_status ? ` (MP: ${p.mp_status})` : ""}`
+          `Estado del pago: ${p.status || "—"}${p.mp_status ? ` (MP: ${p.mp_status})` : ""}`,
         );
       }
     } catch (e) {
-      if (!silent) setErr(getErrorMessage(e, "No se pudo consultar el estado del pago"));
+      if (!silent)
+        setErr(getErrorMessage(e, "No se pudo consultar el estado del pago"));
     } finally {
       setChecking(false);
     }
@@ -191,14 +199,18 @@ export default function Billing() {
           <div>
             <h1 className="text-2xl font-semibold">Membresía</h1>
             <p className="mt-1 text-sm text-gray-600">
-              Tu cuenta está aprobada, pero necesitás una membresía activa para usar la plataforma.
+              Tu cuenta está aprobada, pero necesitás una membresía activa para
+              usar la plataforma.
             </p>
             <p className="mt-1 text-xs text-gray-500">
               Estado actual: <b>{access?.level || "—"}</b>
             </p>
           </div>
 
-          <button className="rounded-lg border px-4 py-2 text-sm" onClick={logout}>
+          <button
+            className="rounded-lg border px-4 py-2 text-sm"
+            onClick={logout}
+          >
             Cerrar sesión
           </button>
         </div>
@@ -212,14 +224,17 @@ export default function Billing() {
         {loading ? (
           <div className="rounded-2xl border p-6">Cargando planes...</div>
         ) : plansSorted.length === 0 ? (
-          <div className="rounded-2xl border p-6">No hay planes disponibles.</div>
+          <div className="rounded-2xl border p-6">
+            No hay planes disponibles.
+          </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-3">
             {plansSorted.map((p) => (
               <div key={p.id} className="rounded-2xl border p-4 shadow-sm">
                 <div className="text-lg font-semibold">{p.name}</div>
                 <div className="mt-1 text-sm text-gray-600">
-                  ${Number(p.price_ars).toLocaleString("es-AR")} / {p.duration_days} días
+                  ${Number(p.price_ars).toLocaleString("es-AR")} /{" "}
+                  {p.duration_days} días
                 </div>
 
                 <div className="mt-3 text-sm">
@@ -253,7 +268,8 @@ export default function Billing() {
             <div>
               <div className="font-semibold">Pago en curso</div>
               <div className="text-sm text-gray-600">
-                Si ya abriste Mercado Pago y cerraste la pestaña, podés reabrirlo desde acá.
+                Si ya abriste Mercado Pago y cerraste la pestaña, podés
+                reabrirlo desde acá.
               </div>
             </div>
 
@@ -298,13 +314,17 @@ export default function Billing() {
             <div>
               <div className="font-semibold">Verificación de pago</div>
               <div className="text-sm text-gray-600">
-                Si pagaste en la pestaña de Mercado Pago, volvé acá y tocá “Verificar”.
+                Si pagaste en la pestaña de Mercado Pago, volvé acá y tocá
+                “Verificar”.
               </div>
             </div>
 
             <button
               className="rounded-lg border px-4 py-2 text-sm disabled:opacity-60"
-              disabled={checking || (!payment?.preference_id && !payment?.external_reference)}
+              disabled={
+                checking ||
+                (!payment?.preference_id && !payment?.external_reference)
+              }
               onClick={() => checkStatusNow()}
             >
               {checking ? "Verificando..." : "Verificar"}
