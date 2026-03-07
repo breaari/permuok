@@ -5,6 +5,15 @@ namespace App\Services;
 use PDO;
 use Exception;
 
+final class RealEstateProfileStatus
+{
+    public const DRAFT = 0;
+    public const INITIAL_REVIEW = 1;
+    public const APPROVED = 2;
+    public const REJECTED = 3;
+    public const CHANGES_PENDING = 4;
+}
+
 class RealEstateService
 {
     private static function db(): PDO
@@ -65,8 +74,11 @@ class RealEstateService
                 r.instagram,
                 r.facebook,
                 r.status,
+                r.profile_status,
                 r.validation_status,
+                r.validation_note,
                 r.review_requested_at,
+                r.changes_requested_at,
                 r.approved_at,
                 r.approved_by,
                 u.email AS approved_by_email,
@@ -130,7 +142,6 @@ class RealEstateService
             'facebook',
         ];
 
-        // CREATE
         if (!$u['real_estate_id']) {
             self::requireKeys($data, [
                 'name',
@@ -166,6 +177,7 @@ class RealEstateService
                         instagram,
                         facebook,
                         status,
+                        profile_status,
                         validation_status,
                         created_at
                     )
@@ -187,6 +199,7 @@ class RealEstateService
                         :instagram,
                         :facebook,
                         0,
+                        :profile_status,
                         0,
                         NOW()
                     )
@@ -208,6 +221,7 @@ class RealEstateService
                     'website' => $data['website'],
                     'instagram' => $data['instagram'] ?? null,
                     'facebook' => $data['facebook'] ?? null,
+                    'profile_status' => RealEstateProfileStatus::DRAFT,
                 ]);
 
                 $realEstateId = (int)$pdo->lastInsertId();
@@ -243,7 +257,6 @@ class RealEstateService
             }
         }
 
-        // UPDATE
         $realEstateId = (int)$u['real_estate_id'];
 
         $updates = self::pickUpdates($data, $allowed);
@@ -258,6 +271,7 @@ class RealEstateService
 
         $stCurrent = $pdo->prepare("
             SELECT
+                id,
                 name,
                 legal_name,
                 cuit,
@@ -272,7 +286,12 @@ class RealEstateService
                 email,
                 website,
                 instagram,
-                facebook
+                facebook,
+                status,
+                profile_status,
+                validation_status,
+                review_requested_at,
+                changes_requested_at
             FROM real_estates
             WHERE id = :id
               AND deleted_at IS NULL
@@ -288,12 +307,45 @@ class RealEstateService
         $merged = array_merge($current ?: [], $updates);
         self::validateProfilePayload($merged, true);
 
+        $sensitiveFields = [
+            'name',
+            'legal_name',
+            'cuit',
+            'address',
+            'address_place_id',
+            'address_lat',
+            'address_lng',
+            'address_locality',
+            'address_province',
+            'address_postal_code',
+            'phone',
+            'email',
+            'website',
+        ];
+
+        $hasSensitiveChanges = self::hasSensitiveChanges($current, $updates, $sensitiveFields);
+        $currentProfileStatus = (int)($current['profile_status'] ?? RealEstateProfileStatus::DRAFT);
+
         $sets = [];
         $params = ['id' => $realEstateId];
 
         foreach ($updates as $k => $v) {
             $sets[] = "{$k} = :{$k}";
             $params[$k] = $v;
+        }
+
+        if (
+            $hasSensitiveChanges &&
+            $currentProfileStatus === RealEstateProfileStatus::APPROVED
+        ) {
+            $sets[] = "profile_status = :profile_status";
+            $sets[] = "changes_requested_at = NOW()";
+            $sets[] = "review_requested_at = NULL";
+            $sets[] = "validation_note = NULL";
+            $params['profile_status'] = RealEstateProfileStatus::CHANGES_PENDING;
+
+            // compatibilidad temporal con lógica vieja
+            $sets[] = "validation_status = 0";
         }
 
         $sql = "
@@ -312,6 +364,12 @@ class RealEstateService
                 'real_estate_id' => $realEstateId,
                 'updated' => true,
                 'updated_fields' => array_keys($updates),
+                'profile_status' => (
+                    $hasSensitiveChanges &&
+                    $currentProfileStatus === RealEstateProfileStatus::APPROVED
+                )
+                    ? RealEstateProfileStatus::CHANGES_PENDING
+                    : $currentProfileStatus,
             ];
         } catch (\Throwable $e) {
             if (
@@ -356,6 +414,22 @@ class RealEstateService
             throw new Exception("Provincia inválida o inactiva");
         }
 
+        $stCurrent = $pdo->prepare("
+            SELECT profile_status
+            FROM real_estates
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+        ");
+        $stCurrent->execute(['id' => (int)$u['real_estate_id']]);
+        $current = $stCurrent->fetch();
+
+        if (!$current) {
+            throw new Exception("Inmobiliaria no encontrada");
+        }
+
+        $currentProfileStatus = (int)($current['profile_status'] ?? RealEstateProfileStatus::DRAFT);
+
         $pdo->beginTransaction();
 
         try {
@@ -392,6 +466,24 @@ class RealEstateService
                 'pid' => $provinceId,
                 'prim' => $isPrimary,
             ]);
+
+            if ($currentProfileStatus === RealEstateProfileStatus::APPROVED) {
+                $st = $pdo->prepare("
+        UPDATE real_estates
+        SET
+            profile_status = :profile_status,
+            changes_requested_at = NOW(),
+            review_requested_at = NULL,
+            validation_note = NULL,
+            validation_status = 0
+        WHERE id = :id
+        LIMIT 1
+    ");
+                $st->execute([
+                    'profile_status' => RealEstateProfileStatus::CHANGES_PENDING,
+                    'id' => (int)$u['real_estate_id'],
+                ]);
+            }
 
             $pdo->commit();
 
@@ -435,7 +527,8 @@ class RealEstateService
                 address_lng,
                 phone,
                 email,
-                website
+                website,
+                profile_status
             FROM real_estates
             WHERE id = :id
               AND deleted_at IS NULL
@@ -485,13 +578,19 @@ class RealEstateService
         }
 
         $st = $pdo->prepare("
-            SELECT COUNT(*) c
-            FROM real_estate_licenses
-            WHERE real_estate_id = :re
-              AND deleted_at IS NULL
-              AND province_id IS NOT NULL
-              AND license_number <> ''
-        ");
+    UPDATE real_estates
+    SET
+        review_requested_at = NOW(),
+        changes_requested_at = NULL,
+        profile_status = :profile_status,
+        validation_status = 0,
+        approved_at = NULL,
+        approved_by = NULL,
+        validation_note = NULL
+    WHERE id = :id
+      AND deleted_at IS NULL
+    LIMIT 1
+");
         $st->execute(['re' => (int)$u['real_estate_id']]);
         $count = (int)($st->fetch()['c'] ?? 0);
 
@@ -499,19 +598,45 @@ class RealEstateService
             throw new Exception("Tenés que cargar al menos una matrícula/licencia");
         }
 
-        $st = $pdo->prepare("
-            UPDATE real_estates
-            SET
-                review_requested_at = NOW(),
-                validation_status = 0,
-                approved_at = NULL,
-                approved_by = NULL,
-                validation_note = NULL
-            WHERE id = :id
-              AND deleted_at IS NULL
-            LIMIT 1
-        ");
-        $st->execute(['id' => (int)$u['real_estate_id']]);
+        $currentProfileStatus = (int)($re['profile_status'] ?? RealEstateProfileStatus::DRAFT);
+
+        if ($currentProfileStatus === RealEstateProfileStatus::APPROVED) {
+            $st = $pdo->prepare("
+        UPDATE real_estates
+        SET
+            profile_status = :profile_status,
+            validation_status = 0,
+            validation_note = NULL,
+            review_requested_at = NULL,
+            changes_requested_at = NOW()
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+            $st->execute([
+                'profile_status' => RealEstateProfileStatus::CHANGES_PENDING,
+                'id' => (int)$u['real_estate_id'],
+            ]);
+        } else {
+            $st = $pdo->prepare("
+        UPDATE real_estates
+        SET
+            review_requested_at = NOW(),
+            changes_requested_at = NULL,
+            profile_status = :profile_status,
+            validation_status = 0,
+            approved_at = NULL,
+            approved_by = NULL,
+            validation_note = NULL
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+            $st->execute([
+                'profile_status' => RealEstateProfileStatus::INITIAL_REVIEW,
+                'id' => (int)$u['real_estate_id'],
+            ]);
+        }
 
         return ['submitted' => true];
     }
@@ -534,16 +659,28 @@ class RealEstateService
                 continue;
             }
 
-            $v = $data[$k];
-
-            if (is_string($v) && trim($v) === '') {
-                continue;
-            }
-
-            $out[$k] = $v;
+            $out[$k] = $data[$k];
         }
 
         return $out;
+    }
+
+    private static function hasSensitiveChanges(array $current, array $updates, array $fields): bool
+    {
+        foreach ($fields as $field) {
+            if (!array_key_exists($field, $updates)) {
+                continue;
+            }
+
+            $currentValue = $current[$field] ?? null;
+            $newValue = $updates[$field];
+
+            if ((string)$currentValue !== (string)$newValue) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function normalizeAddressMapFields(array &$data): void

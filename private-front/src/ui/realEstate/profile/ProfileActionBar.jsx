@@ -1,17 +1,38 @@
-// ui/realEstate/profile/ProfileActionBar.jsx
 export function ProfileActionBar({
   isReview,
-  isApproved,
+  isRejected,
   isUnpaid,
+  isUnpaidChangesPending,
   isActive,
+  isActiveChangesPending,
   canSubmit,
   footerHint,
   submitBlockReason,
   onSubmitReview,
   onGoToBilling,
 }) {
-  const showBillingButton = isApproved && isUnpaid;
-  const showSubmitButton = !isReview && !showBillingButton && !isActive;
+  const showBillingButton = isUnpaid || isUnpaidChangesPending;
+
+  const showSubmitButton =
+    !isReview &&
+    !isUnpaid &&
+    !isUnpaidChangesPending &&
+    !isActive &&
+    !isActiveChangesPending;
+
+  const disabledStatusLabel = isReview
+    ? "En revisión"
+    : isActiveChangesPending
+    ? "Cambios en revisión"
+    : isActive
+    ? "Cuenta activa"
+    : isRejected
+    ? "Rechazada"
+    : "Enviar a Revisión";
+
+  const billingButtonLabel = isUnpaidChangesPending
+    ? "Activar membresía"
+    : "Ir a membresía";
 
   return (
     <footer className="fixed bottom-0 left-0 right-0 md:left-64 bg-white/80 backdrop-blur-md border-t border-slate-200 py-4 px-6 md:px-10 z-50">
@@ -22,8 +43,8 @@ export function ProfileActionBar({
               footerHint.tone === "success"
                 ? "text-emerald-600"
                 : footerHint.tone === "info"
-                  ? "text-primary"
-                  : "text-amber-500"
+                ? "text-primary"
+                : "text-amber-500"
             }
           >
             ●
@@ -47,7 +68,7 @@ export function ProfileActionBar({
               onClick={onGoToBilling}
               className="flex-1 md:flex-none px-8 py-3 rounded-lg font-bold flex items-center justify-center gap-2 bg-primary text-white hover:bg-primary/90"
             >
-              Ir a membresía
+              {billingButtonLabel}
             </button>
           ) : showSubmitButton ? (
             <button
@@ -69,11 +90,7 @@ export function ProfileActionBar({
               disabled
               className="flex-1 md:flex-none px-8 py-3 rounded-lg font-bold flex items-center justify-center gap-2 bg-slate-200 text-slate-400 cursor-not-allowed"
             >
-              {isReview
-                ? "En revisión"
-                : isActive
-                  ? "Cuenta activa"
-                  : "Enviar a Revisión"}
+              {disabledStatusLabel}
             </button>
           )}
         </div>

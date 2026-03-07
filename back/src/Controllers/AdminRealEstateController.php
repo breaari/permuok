@@ -17,7 +17,6 @@ class AdminRealEstateController
         return $ctx;
     }
 
-    // NUEVO: counts para tabs
     public static function counts(): void
     {
         try {
@@ -32,7 +31,6 @@ class AdminRealEstateController
         }
     }
 
-    // NUEVO: list paginada
     public static function list(): void
     {
         try {
@@ -50,32 +48,43 @@ class AdminRealEstateController
         }
     }
 
-    // NUEVO: validate (approve/reject)
     public static function validate(): void
     {
         try {
             $ctx = self::requireAdmin();
 
             $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+
             $realEstateId = (int)($payload['real_estate_id'] ?? 0);
-            $action = (string)($payload['action'] ?? '');
-            $note = isset($payload['note']) ? (string)$payload['note'] : null;
+            $action = trim((string)($payload['action'] ?? ''));
+            $validationNote = isset($payload['validation_note'])
+                ? trim((string)$payload['validation_note'])
+                : null;
 
             if ($realEstateId <= 0) {
                 ResponseHelper::fail('real_estate_id requerido', 422);
             }
 
-            $result = AdminRealEstateService::validate((int)$ctx['id'], $realEstateId, $action, $note);
+            if (!in_array($action, ['approve', 'reject'], true)) {
+                ResponseHelper::fail('action inválida', 422);
+            }
+
+            if ($action === 'reject' && $validationNote === '') {
+                ResponseHelper::fail('El motivo de rechazo es requerido', 422);
+            }
+
+            $result = AdminRealEstateService::validate(
+                (int)$ctx['id'],
+                $realEstateId,
+                $action,
+                $validationNote
+            );
+
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             ResponseHelper::fail($e->getMessage(), 422);
         }
     }
-
-    /*
-      LEGACY ENDPOINTS (compatibilidad con tu front actual)
-      Podés mantenerlos mientras migrás el front a /admin/real-estates (list) y /validate
-    */
 
     public static function pending(): void
     {
@@ -110,8 +119,6 @@ class AdminRealEstateController
         }
     }
 
-    // tu front hoy postea acá: /admin/real-estates/approve (approve o reject)
-    // lo mantenemos pero internamente llama validate()
     public static function approve(): void
     {
         self::validate();

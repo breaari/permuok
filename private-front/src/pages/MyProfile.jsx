@@ -1,4 +1,3 @@
-// pages/MyProfile.jsx
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -47,38 +46,37 @@ export default function MyProfile() {
   const [licenseOpen, setLicenseOpen] = useState(false);
 
   const level = access?.level;
+  const profileStatus = Number(realEstate?.profile_status ?? 0);
 
-  const validationStatus = Number(realEstate?.validation_status ?? 0);
-  const isValidationPending =
-    validationStatus === 0 && !!realEstate?.review_requested_at;
-  const isValidationApproved = validationStatus === 1;
-  const isValidationRejected = validationStatus === 2;
+  const isDraft =
+    level === "real_estate_not_linked" || level === "real_estate_draft";
 
+  const isReview = level === "real_estate_review";
+  const isRejected = level === "real_estate_rejected";
   const isUnpaid = level === "real_estate_unpaid";
+  const isUnpaidChangesPending = level === "real_estate_unpaid_changes_pending";
   const isActive = level === "real_estate_active";
-
-  const isReview = isValidationPending;
-  const isRejected = isValidationRejected;
-  const isApproved = isValidationApproved;
-
-  const needsOnboarding =
-    !isReview &&
-    !isApproved &&
-    !isRejected &&
-    (level === "real_estate_not_linked" || level === "real_estate_draft");
+  const isActiveChangesPending = level === "real_estate_active_changes_pending";
 
   const hasRealEstate = !!realEstate?.id;
 
   const canSubmit =
     !isReview &&
-    !isApproved &&
+    !isUnpaid &&
+    !isUnpaidChangesPending &&
     !isActive &&
+    !isActiveChangesPending &&
     profileOk &&
     hasLicenses;
 
   const requestedAt = useMemo(
-    () => formatDate(realEstate?.review_requested_at || realEstate?.created_at),
-    [realEstate]
+    () =>
+      formatDate(
+        realEstate?.changes_requested_at ||
+          realEstate?.review_requested_at ||
+          realEstate?.created_at,
+      ),
+    [realEstate],
   );
 
   const banner = useMemo(() => {
@@ -86,16 +84,34 @@ export default function MyProfile() {
       return {
         tone: "success",
         title: "Tu cuenta está activa",
-        desc: "Tu inmobiliaria ya está activa y podés operar normalmente en la plataforma.",
+        desc: "Tu inmobiliaria está aprobada y con membresía activa. Podés operar normalmente.",
         cta: { label: "Ir al panel", onClick: () => nav("/app") },
       };
     }
 
-    if (isUnpaid && isApproved) {
+    if (isActiveChangesPending) {
       return {
         tone: "warn",
-        title: "Tu perfil fue aprobado",
-        desc: "La revisión fue aprobada, pero todavía necesitás activar la membresía para comenzar a operar.",
+        title: "Cambios pendientes",
+        desc: "Realizaste modificaciones luego de la aprobación. Tu cuenta sigue activa, pero los cambios del perfil están pendientes de revisión.",
+        cta: { label: "Ir al panel", onClick: () => nav("/app") },
+      };
+    }
+
+    if (isUnpaidChangesPending) {
+      return {
+        tone: "warn",
+        title: "Cambios pendientes",
+        desc: "Realizaste modificaciones luego de la aprobación. Los cambios del perfil están pendientes de revisión y además necesitás una membresía activa para operar.",
+        cta: { label: "Ir a membresía", onClick: () => nav("/billing") },
+      };
+    }
+
+    if (isUnpaid) {
+      return {
+        tone: "warn",
+        title: "Perfil aprobado",
+        desc: "Tu perfil fue aprobado. Activá tu membresía para comenzar a operar.",
         cta: { label: "Ir a membresía", onClick: () => nav("/billing") },
       };
     }
@@ -113,16 +129,16 @@ export default function MyProfile() {
         tone: "warn",
         title: "Revisión rechazada",
         desc: realEstate?.validation_note
-          ? `Revisá el motivo indicado y corregí tu perfil para volver a enviarlo. Motivo: ${realEstate.validation_note}`
-          : "Tu revisión fue rechazada. Corregí la información necesaria para volver a enviarla.",
+          ? `Motivo: ${realEstate.validation_note}`
+          : "Tu perfil fue rechazado. Revisá la información y volvé a enviarlo.",
       };
     }
 
-    if (needsOnboarding) {
+    if (isDraft || profileStatus === 0) {
       return {
         tone: "info",
         title: "Completá tu perfil",
-        desc: "Completá tu perfil y agregá al menos una matrícula para poder solicitar revisión.",
+        desc: "Completá la información y agregá al menos una matrícula para solicitar revisión.",
       };
     }
 
@@ -133,18 +149,29 @@ export default function MyProfile() {
     };
   }, [
     isActive,
+    isActiveChangesPending,
     isUnpaid,
-    isApproved,
+    isUnpaidChangesPending,
     isReview,
     isRejected,
-    needsOnboarding,
+    isDraft,
+    profileStatus,
     realEstate,
     nav,
   ]);
 
   const footerHint = useMemo(() => {
+    if (isActiveChangesPending) {
+      return { label: "Cambios pendientes de revisión", tone: "warn" };
+    }
     if (isActive) return { label: "Cuenta activa", tone: "success" };
-    if (isUnpaid && isApproved) {
+    if (isUnpaidChangesPending) {
+      return {
+        label: "Cambios pendientes y membresía pendiente",
+        tone: "warn",
+      };
+    }
+    if (isUnpaid) {
       return { label: "Aprobada, pendiente de membresía", tone: "warn" };
     }
     if (isReview) return { label: "En revisión", tone: "info" };
@@ -153,13 +180,27 @@ export default function MyProfile() {
       return { label: "Pendiente de completar", tone: "warn" };
     }
     return { label: "Listo para enviar", tone: "success" };
-  }, [isActive, isUnpaid, isApproved, isReview, isRejected, profileOk, hasLicenses]);
+  }, [
+    isActive,
+    isActiveChangesPending,
+    isUnpaid,
+    isUnpaidChangesPending,
+    isReview,
+    isRejected,
+    profileOk,
+    hasLicenses,
+  ]);
 
   const submitBlockReason = useMemo(() => {
-    if (isActive) return "";
-    if (isUnpaid && isApproved) return "";
-    if (isReview) return "";
-    if (isRejected) return "";
+    if (
+      isActive ||
+      isActiveChangesPending ||
+      isUnpaid ||
+      isUnpaidChangesPending ||
+      isReview
+    ) {
+      return "";
+    }
 
     if (!profileValidation?.ok) return profileValidation.reason;
     if (!hasLicenses) return "Agregá al menos una matrícula.";
@@ -167,10 +208,10 @@ export default function MyProfile() {
     return "";
   }, [
     isActive,
+    isActiveChangesPending,
     isUnpaid,
-    isApproved,
+    isUnpaidChangesPending,
     isReview,
-    isRejected,
     profileValidation,
     hasLicenses,
   ]);
@@ -187,9 +228,9 @@ export default function MyProfile() {
         <ProfileHeader
           requestedAt={requestedAt}
           approvedAt={formatDate(realEstate?.approved_at)}
-          approvedByEmail={realEstate?.approved_by_email}
-          validationStatus={validationStatus}
+          profileStatus={profileStatus}
           validationNote={realEstate?.validation_note}
+          approvedByEmail={realEstate?.approved_by_email}
         />
 
         {err && (
@@ -208,6 +249,11 @@ export default function MyProfile() {
           profile={profile}
           setProfile={setProfile}
           isReview={isReview}
+          isRejected={isRejected}
+          isActiveChangesPending={
+            isActiveChangesPending || isUnpaidChangesPending
+          }
+          validationNote={realEstate?.validation_note}
           mapsLoaded={mapsLoaded}
           mapsError={mapsError}
           onSubmit={actions.saveProfile}
@@ -216,6 +262,10 @@ export default function MyProfile() {
         <ProfileLicensesSection
           licenses={licenses}
           isReview={isReview}
+          isRejected={isRejected}
+          isActiveChangesPending={
+            isActiveChangesPending || isUnpaidChangesPending
+          }
           hasRealEstate={hasRealEstate}
           onOpenModal={() => setLicenseOpen(true)}
         />
@@ -230,6 +280,10 @@ export default function MyProfile() {
       <LicenseModal
         open={licenseOpen}
         disabled={isReview}
+        isRejected={isRejected}
+        isActiveChangesPending={
+          isActiveChangesPending || isUnpaidChangesPending
+        }
         onClose={() => setLicenseOpen(false)}
         onSave={actions.addLicense}
         errorMessage={err}
@@ -238,9 +292,11 @@ export default function MyProfile() {
       {!licenseOpen && (
         <ProfileActionBar
           isReview={isReview}
-          isApproved={isApproved}
+          isRejected={isRejected}
           isUnpaid={isUnpaid}
+          isUnpaidChangesPending={isUnpaidChangesPending}
           isActive={isActive}
+          isActiveChangesPending={isActiveChangesPending}
           canSubmit={canSubmit}
           footerHint={footerHint}
           submitBlockReason={submitBlockReason}

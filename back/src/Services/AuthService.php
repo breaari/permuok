@@ -12,7 +12,11 @@ class AuthService
     private const ROLE_AGENT = 3;
     private const ROLE_INVESTOR = 4;
 
-    private const REAL_ESTATE_APPROVED = 1;
+    private const PROFILE_DRAFT = 0;
+    private const PROFILE_INITIAL_REVIEW = 1;
+    private const PROFILE_APPROVED = 2;
+    private const PROFILE_REJECTED = 3;
+    private const PROFILE_CHANGES_PENDING = 4;
 
     private static function db(): PDO
     {
@@ -56,11 +60,11 @@ class AuthService
         }
 
         $stmt = $pdo->prepare("
-        INSERT INTO users
-        (role, first_name, last_name, email, phone, password_hash, is_active, created_at)
-        VALUES
-        (:role, :first_name, :last_name, :email, :phone, :password, 1, NOW())
-    ");
+            INSERT INTO users
+            (role, first_name, last_name, email, phone, password_hash, is_active, created_at)
+            VALUES
+            (:role, :first_name, :last_name, :email, :phone, :password, 1, NOW())
+        ");
 
         $stmt->execute([
             'role'       => self::ROLE_REAL_ESTATE,
@@ -106,7 +110,6 @@ class AuthService
             return false;
         }
 
-        // ✅ actualiza last_login
         $upd = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = :id LIMIT 1");
         $upd->execute(['id' => (int)$user['id']]);
 
@@ -132,17 +135,17 @@ class AuthService
 
     /*
     |--------------------------------------------------------------------------
-    | ACCESS BUILDER (NÚCLEO DE PERMISOS)
+    | ACCESS BUILDER
     |--------------------------------------------------------------------------
     */
     private static function buildAccessData(array $user): array
     {
         switch ((int)$user['role']) {
-
             case self::ROLE_SUPER_ADMIN:
                 return [
                     'level' => 'super_admin',
                     'limits' => null,
+                    'usage' => null,
                     'features' => ['all' => true],
                 ];
 
@@ -159,6 +162,7 @@ class AuthService
                 return [
                     'level' => 'unknown',
                     'limits' => null,
+                    'usage' => null,
                     'features' => [],
                 ];
         }
@@ -169,14 +173,18 @@ class AuthService
         $pdo = self::db();
 
         $stmt = $pdo->prepare("
-        SELECT r.id,
-               r.validation_status,
-               r.review_requested_at
-        FROM real_estates r
-        JOIN users u ON u.real_estate_id = r.id
-        WHERE u.id = :user_id
-        LIMIT 1
-    ");
+            SELECT
+                r.id,
+                r.status,
+                r.profile_status,
+                r.validation_note,
+                r.review_requested_at,
+                r.changes_requested_at
+            FROM real_estates r
+            JOIN users u ON u.real_estate_id = r.id
+            WHERE u.id = :user_id
+            LIMIT 1
+        ");
         $stmt->execute(['user_id' => $userId]);
         $realEstate = $stmt->fetch();
 
@@ -184,45 +192,79 @@ class AuthService
             return [
                 'level' => 'real_estate_not_linked',
                 'limits' => null,
-                'features' => []
+                'usage' => null,
+                'features' => [],
             ];
         }
 
-        $isApproved = ((int)$realEstate['validation_status'] === self::REAL_ESTATE_APPROVED);
+        $profileStatus = (int)($realEstate['profile_status'] ?? self::PROFILE_DRAFT);
 
-        // No aprobado -> draft o review según review_requested_at
-        if (!$isApproved) {
-            $isSubmitted = !empty($realEstate['review_requested_at']);
-
+        if ($profileStatus === self::PROFILE_DRAFT) {
             return [
-                'level' => $isSubmitted ? 'real_estate_review' : 'real_estate_draft',
+                'level' => 'real_estate_draft',
                 'limits' => null,
-                'features' => []
+                'usage' => null,
+                'features' => [],
             ];
         }
 
-        // Aprobado -> chequear membresía activa
+        if ($profileStatus === self::PROFILE_INITIAL_REVIEW) {
+            return [
+                'level' => 'real_estate_review',
+                'limits' => null,
+                'usage' => null,
+                'features' => [],
+            ];
+        }
+
+        if ($profileStatus === self::PROFILE_REJECTED) {
+            return [
+                'level' => 'real_estate_rejected',
+                'limits' => null,
+                'usage' => null,
+                'features' => [],
+            ];
+        }
+
         $membership = self::getActiveMembership((int)$realEstate['id']);
 
         if (!$membership) {
             return [
-                'level' => 'real_estate_unpaid',
+                'level' => $profileStatus === self::PROFILE_CHANGES_PENDING
+                    ? 'real_estate_unpaid_changes_pending'
+                    : 'real_estate_unpaid',
                 'limits' => null,
-                'features' => []
+                'usage' => null,
+                'features' => [
+                    'profile_changes_pending' => $profileStatus === self::PROFILE_CHANGES_PENDING,
+                ],
             ];
         }
 
+        $usage = self::getRealEstateUsage((int)$realEstate['id']);
+
         return [
-            'level' => 'real_estate_active',
+            'level' => $profileStatus === self::PROFILE_CHANGES_PENDING
+                ? 'real_estate_active_changes_pending'
+                : 'real_estate_active',
             'limits' => [
-                'real_estate_users' => (int)($membership['max_users'] ?? 1), // normalmente 1
-                'agents'            => (int)$membership['max_agents'],
-                'investors'         => (int)$membership['max_investors'],
+                'real_estate_users' => (int)($membership['max_users'] ?? 1),
+                'agents' => (int)$membership['max_agents'],
+                'investors' => (int)$membership['max_investors'],
             ],
+            'usage' => $usage,
             'features' => [
                 'publish_projects' => (bool)$membership['can_publish_projects'],
-                'view_projects'    => (bool)$membership['can_view_projects'],
-            ]
+                'view_projects' => (bool)$membership['can_view_projects'],
+                'profile_changes_pending' => $profileStatus === self::PROFILE_CHANGES_PENDING,
+            ],
+            'membership' => [
+                'id' => (int)$membership['id'],
+                'plan_id' => isset($membership['plan_id']) ? (int)$membership['plan_id'] : null,
+                'start_date' => $membership['start_date'] ?? null,
+                'end_date' => $membership['end_date'] ?? null,
+                'status' => (int)($membership['status'] ?? 0),
+            ],
         ];
     }
 
@@ -234,6 +276,7 @@ class AuthService
             return [
                 'level' => 'agent_unlinked',
                 'limits' => null,
+                'usage' => null,
                 'features' => [],
             ];
         }
@@ -244,6 +287,7 @@ class AuthService
             return [
                 'level' => 'agent_restricted',
                 'limits' => null,
+                'usage' => null,
                 'features' => [],
             ];
         }
@@ -251,6 +295,7 @@ class AuthService
         return [
             'level' => 'agent_active',
             'limits' => null,
+            'usage' => null,
             'features' => [
                 'publish_projects' => (bool)($membership['can_publish_projects'] ?? false),
                 'view_projects'    => (bool)($membership['can_view_projects'] ?? false),
@@ -266,6 +311,7 @@ class AuthService
             return [
                 'level' => 'investor_unlinked',
                 'limits' => null,
+                'usage' => null,
                 'features' => [],
             ];
         }
@@ -276,6 +322,7 @@ class AuthService
             return [
                 'level' => 'investor_restricted',
                 'limits' => null,
+                'usage' => null,
                 'features' => [],
             ];
         }
@@ -283,6 +330,7 @@ class AuthService
         return [
             'level' => 'investor_active',
             'limits' => null,
+            'usage' => null,
             'features' => [
                 'view_projects' => (bool)($membership['can_view_projects'] ?? false),
             ],
@@ -294,18 +342,68 @@ class AuthService
         $pdo = self::db();
 
         $stmt = $pdo->prepare("
-        SELECT *
-        FROM memberships
-        WHERE real_estate_id = :real_estate_id
-          AND status = 1
-          AND end_date >= CURDATE()
-          AND deleted_at IS NULL
-        ORDER BY id DESC
-        LIMIT 1
-    ");
+            SELECT *
+            FROM memberships
+            WHERE real_estate_id = :real_estate_id
+              AND status = 1
+              AND end_date >= CURDATE()
+              AND deleted_at IS NULL
+            ORDER BY id DESC
+            LIMIT 1
+        ");
 
         $stmt->execute(['real_estate_id' => $realEstateId]);
         return $stmt->fetch();
+    }
+
+    private static function getRealEstateUsage(int $realEstateId): array
+    {
+        $pdo = self::db();
+
+        $stAgents = $pdo->prepare("
+            SELECT COUNT(*) AS total
+            FROM users
+            WHERE real_estate_id = :real_estate_id
+              AND role = :role
+              AND deleted_at IS NULL
+        ");
+        $stAgents->execute([
+            'real_estate_id' => $realEstateId,
+            'role' => self::ROLE_AGENT,
+        ]);
+        $agents = (int)($stAgents->fetch()['total'] ?? 0);
+
+        $stInvestors = $pdo->prepare("
+            SELECT COUNT(*) AS total
+            FROM users
+            WHERE real_estate_id = :real_estate_id
+              AND role = :role
+              AND deleted_at IS NULL
+        ");
+        $stInvestors->execute([
+            'real_estate_id' => $realEstateId,
+            'role' => self::ROLE_INVESTOR,
+        ]);
+        $investors = (int)($stInvestors->fetch()['total'] ?? 0);
+
+        $stRealEstateUsers = $pdo->prepare("
+            SELECT COUNT(*) AS total
+            FROM users
+            WHERE real_estate_id = :real_estate_id
+              AND role = :role
+              AND deleted_at IS NULL
+        ");
+        $stRealEstateUsers->execute([
+            'real_estate_id' => $realEstateId,
+            'role' => self::ROLE_REAL_ESTATE,
+        ]);
+        $realEstateUsers = (int)($stRealEstateUsers->fetch()['total'] ?? 0);
+
+        return [
+            'real_estate_users' => $realEstateUsers,
+            'agents' => $agents,
+            'investors' => $investors,
+        ];
     }
 
     public static function buildAccessFromMiddleware(int $userId, int $role): array

@@ -8,7 +8,11 @@ export function LicenseModal({
   onClose,
   onSave,
   errorMessage,
+  isRejected = false,
+  isActiveChangesPending = false,
 }) {
+  const isLocked = !!disabled;
+
   const [busy, setBusy] = useState(false);
   const [saveErr, setSaveErr] = useState("");
   const [provLoading, setProvLoading] = useState(false);
@@ -26,6 +30,11 @@ export function LicenseModal({
 
     setSaveErr("");
     setProvErr("");
+    setForm({
+      license_number: "",
+      province_id: "",
+      is_primary: true,
+    });
 
     if (provinces.length > 0) return;
 
@@ -37,20 +46,18 @@ export function LicenseModal({
       .then(unwrap)
       .then((data) => {
         if (!alive) return;
+
         const items = Array.isArray(data?.items)
           ? data.items
           : Array.isArray(data)
-            ? data
-            : [];
+          ? data
+          : [];
+
         setProvinces(items);
       })
       .catch((e) => {
         if (!alive) return;
-        setProvErr(
-          getErrorMessage
-            ? getErrorMessage(e, "No se pudieron cargar las provincias.")
-            : "No se pudieron cargar las provincias."
-        );
+        setProvErr(getErrorMessage(e, "No se pudieron cargar las provincias."));
       })
       .finally(() => {
         if (!alive) return;
@@ -65,8 +72,9 @@ export function LicenseModal({
   const canSubmit = useMemo(() => {
     const lnOk = String(form.license_number || "").trim().length > 0;
     const provOk = String(form.province_id || "").trim().length > 0;
-    return !disabled && !busy && lnOk && provOk;
-  }, [disabled, busy, form]);
+
+    return !isLocked && !busy && lnOk && provOk;
+  }, [isLocked, busy, form]);
 
   if (!open) return null;
 
@@ -85,7 +93,7 @@ export function LicenseModal({
     setBusy(true);
 
     const payload = {
-      license_number: form.license_number.trim(),
+      license_number: String(form.license_number || "").trim(),
       province_id: Number(form.province_id),
       is_primary: !!form.is_primary,
     };
@@ -94,24 +102,12 @@ export function LicenseModal({
       const ok = await onSave(payload);
 
       if (ok) {
-        setForm({
-          license_number: "",
-          province_id: "",
-          is_primary: false,
-        });
-
-        setTimeout(() => {
-          onClose?.();
-        }, 0);
+        onClose?.();
       } else {
         setSaveErr("No se pudo guardar la matrícula. Revisá los datos.");
       }
     } catch (e2) {
-      setSaveErr(
-        getErrorMessage
-          ? getErrorMessage(e2, "No se pudo guardar la matrícula.")
-          : "No se pudo guardar la matrícula."
-      );
+      setSaveErr(getErrorMessage(e2, "No se pudo guardar la matrícula."));
     } finally {
       setBusy(false);
     }
@@ -137,10 +133,26 @@ export function LicenseModal({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <Icon name="badge" size={20} className="text-primary" />
-            Nueva Matrícula
-          </h2>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <Icon name="badge" size={20} className="text-primary" />
+              Nueva Matrícula
+            </h2>
+
+            {isActiveChangesPending ? (
+              <p className="text-xs text-amber-700 mt-1">
+                Esta modificación quedará pendiente de revisión.
+              </p>
+            ) : isRejected ? (
+              <p className="text-xs text-rose-700 mt-1">
+                Revisá cuidadosamente los datos antes de reenviar el perfil.
+              </p>
+            ) : isLocked ? (
+              <p className="text-xs text-slate-500 mt-1">
+                No podés modificar matrículas mientras el perfil está en revisión.
+              </p>
+            ) : null}
+          </div>
 
           <button
             type="button"
@@ -177,11 +189,17 @@ export function LicenseModal({
 
               <input
                 value={form.license_number}
+                disabled={isLocked}
                 onChange={(e) =>
-                  setForm((s) => ({ ...s, license_number: e.target.value }))
+                  setForm((s) => ({
+                    ...s,
+                    license_number: e.target.value
+                      .replace(/[^A-Za-z0-9\-/. ]/g, "")
+                      .slice(0, 50),
+                  }))
                 }
                 placeholder="Ej: 123456"
-                className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+                className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all disabled:opacity-60"
               />
             </div>
           </div>
@@ -201,7 +219,7 @@ export function LicenseModal({
                 onChange={(e) =>
                   setForm((s) => ({ ...s, province_id: e.target.value }))
                 }
-                disabled={provLoading}
+                disabled={provLoading || isLocked}
                 className="w-full pl-11 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none appearance-none transition-all disabled:opacity-60"
               >
                 <option value="">
@@ -209,6 +227,7 @@ export function LicenseModal({
                     ? "Cargando provincias..."
                     : "Seleccione una provincia"}
                 </option>
+
                 {provinces.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -238,12 +257,13 @@ export function LicenseModal({
               <input
                 type="checkbox"
                 checked={form.is_primary}
+                disabled={isLocked}
                 onChange={(e) =>
                   setForm((s) => ({ ...s, is_primary: e.target.checked }))
                 }
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-slate-300 rounded-full peer-checked:bg-primary after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full" />
+              <div className="w-11 h-6 bg-slate-300 rounded-full peer-checked:bg-primary after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full peer-disabled:opacity-60" />
             </label>
           </div>
 

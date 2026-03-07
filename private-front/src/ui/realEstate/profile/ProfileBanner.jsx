@@ -1,4 +1,3 @@
-// ui/realEstate/profile/ProfileBanner.jsx
 import { Icon } from "../../icons/Index";
 
 const bannerToneClasses = {
@@ -7,24 +6,33 @@ const bannerToneClasses = {
   success: "border-emerald-300/40 bg-emerald-50",
 };
 
+const bannerIconClasses = {
+  info: "text-primary",
+  warn: "text-amber-600",
+  success: "text-emerald-600",
+};
+
 export function ProfileBanner({ banner }) {
+  const tone = banner?.tone ?? "info";
+
   return (
     <div
       className={`mb-8 p-4 md:p-5 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
-        bannerToneClasses[banner.tone] ?? bannerToneClasses.info
+        bannerToneClasses[tone] ?? bannerToneClasses.info
       }`}
     >
       <div className="flex gap-3">
-        <span className="text-primary mt-0.5">
+        <span className={`${bannerIconClasses[tone] ?? bannerIconClasses.info} mt-0.5`}>
           <Icon name="info" size={18} />
         </span>
+
         <div>
-          <p className="text-slate-900 font-bold text-base">{banner.title}</p>
-          <p className="text-slate-600 text-sm">{banner.desc}</p>
+          <p className="text-slate-900 font-bold text-base">{banner?.title}</p>
+          <p className="text-slate-600 text-sm">{banner?.desc}</p>
         </div>
       </div>
 
-      {banner.cta && (
+      {banner?.cta && (
         <button
           type="button"
           onClick={banner.cta.onClick}

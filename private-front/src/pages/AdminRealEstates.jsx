@@ -1,13 +1,4 @@
 // pages/AdminRealEstates.jsx
-// - Lista + tabs + counts + paginación
-// - Navega al detalle en /admin/real-estates/:id
-// NOTAS IMPORTANTES:
-// 1) NO uses useParams acá (no hay :id en esta ruta).
-// 2) No navegues con navigate(`${re.id}`) porque depende de rutas relativas.
-//    Usá navigate(`/admin/real-estates/${re.id}`) y listo.
-// 3) En loadList, si querés seguir usando los endpoints legacy (/pending, /approved, /rejected),
-//    dejalo como está. Si migrás al nuevo /admin/real-estates?status=..., te dejo comentario.
-
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { api, unwrap } from "../api/http";
@@ -17,15 +8,16 @@ import RealEstateTabs from "../ui/admin/RealEstateTabs";
 import RealEstateRequestsList from "../ui/admin/RealEstateRequestsList";
 
 const TABS = [
-  { key: "pending", label: "Pendientes", path: "/admin/real-estates/pending" },
-  { key: "approved", label: "Aprobadas", path: "/admin/real-estates/approved" },
-  { key: "rejected", label: "Rechazadas", path: "/admin/real-estates/rejected" },
+  { key: "pending", label: "Pendientes" },
+  { key: "approved", label: "Aprobadas" },
+  { key: "rejected", label: "Rechazadas" },
 ];
 
 const DEFAULT_PER_PAGE = 10;
 
 function getPaginationRange({ totalPages, currentPage, siblingCount = 1 }) {
   const totalPageNumbers = siblingCount * 2 + 5;
+
   if (totalPages <= totalPageNumbers) {
     return Array.from({ length: totalPages }, (_, i) => i + 1);
   }
@@ -48,7 +40,10 @@ function getPaginationRange({ totalPages, currentPage, siblingCount = 1 }) {
   if (showLeftDots && !showRightDots) {
     const rightItemCount = 3 + siblingCount * 2;
     const start = totalPages - rightItemCount + 1;
-    const rightRange = Array.from({ length: rightItemCount }, (_, i) => start + i);
+    const rightRange = Array.from(
+      { length: rightItemCount },
+      (_, i) => start + i
+    );
     return [firstPageIndex, "…", ...rightRange];
   }
 
@@ -56,6 +51,7 @@ function getPaginationRange({ totalPages, currentPage, siblingCount = 1 }) {
     { length: rightSiblingIndex - leftSiblingIndex + 1 },
     (_, i) => leftSiblingIndex + i
   );
+
   return [firstPageIndex, "…", ...middleRange, "…", lastPageIndex];
 }
 
@@ -138,11 +134,10 @@ export default function AdminRealEstates() {
   const { user } = useAuth();
   const isAdmin = Number(user?.role) === 1;
   const navigate = useNavigate();
+
   if (!isAdmin) return <Navigate to="/" replace />;
 
   const [tab, setTab] = useState("pending");
-  const currentTab = useMemo(() => TABS.find((t) => t.key === tab), [tab]);
-
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -150,19 +145,22 @@ export default function AdminRealEstates() {
   const [page, setPage] = useState(1);
   const [perPage] = useState(DEFAULT_PER_PAGE);
 
-  // meta backend opcional: { page, per_page, total }
   const [meta, setMeta] = useState(null);
-
-  // counts siempre visibles en tabs
-  const [counts, setCounts] = useState({ pending: 0, approved: 0, rejected: 0 });
+  const [counts, setCounts] = useState({
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+  });
 
   const loadCounts = useCallback(async () => {
     try {
       const res = await api.get("/admin/real-estates/counts");
       const data = unwrap(res);
-      setCounts(data?.counts ?? { pending: 0, approved: 0, rejected: 0 });
+      setCounts(
+        data?.counts ?? { pending: 0, approved: 0, rejected: 0 }
+      );
     } catch {
-      // no rompas UI
+      // no romper UI
     }
   }, []);
 
@@ -172,36 +170,28 @@ export default function AdminRealEstates() {
       setLoading(true);
 
       try {
-        // LEGACY (tu setup actual):
-        const res = await api.get(currentTab.path, {
-          params: { page: nextPage, per_page: perPage },
+        const res = await api.get("/admin/real-estates", {
+          params: {
+            status: tab,
+            page: nextPage,
+            per_page: perPage,
+          },
         });
 
-        // NUEVO (si migrás al endpoint unificado):
-        // const res = await api.get("/admin/real-estates", {
-        //   params: { status: tab, page: nextPage, per_page: perPage },
-        // });
-
         const data = unwrap(res);
-        setItems(data?.items ?? []);
 
-        if (data?.meta?.total != null) {
-          setMeta(data.meta);
-          setPage(Number(data.meta.page || nextPage));
-        } else {
-          setMeta(null);
-          setPage(nextPage);
-        }
+        setItems(Array.isArray(data?.items) ? data.items : []);
+        setMeta(data?.meta ?? null);
+        setPage(Number(data?.meta?.page || nextPage));
       } catch (e) {
         setErr(e?.data?.message || e?.message || "Error al cargar");
       } finally {
         setLoading(false);
       }
     },
-    [currentTab.path, perPage]
+    [tab, perPage]
   );
 
-  // init + tab changes
   useEffect(() => {
     setPage(1);
     loadCounts();
@@ -213,27 +203,15 @@ export default function AdminRealEstates() {
     setTab(nextTab);
   }
 
-  const { visibleItems, totalForPagination, effectivePage, effectivePerPage } = useMemo(() => {
-    if (meta?.total != null) {
+  const { visibleItems, totalForPagination, effectivePage, effectivePerPage } =
+    useMemo(() => {
       return {
         visibleItems: items,
-        totalForPagination: Number(meta.total),
-        effectivePage: Number(meta.page || page),
-        effectivePerPage: Number(meta.per_page || perPage),
+        totalForPagination: Number(meta?.total || 0),
+        effectivePage: Number(meta?.page || page),
+        effectivePerPage: Number(meta?.per_page || perPage),
       };
-    }
-
-    const total = items.length;
-    const start = (page - 1) * perPage;
-    const end = start + perPage;
-
-    return {
-      visibleItems: items.slice(start, end),
-      totalForPagination: total,
-      effectivePage: page,
-      effectivePerPage: perPage,
-    };
-  }, [items, meta, page, perPage]);
+    }, [items, meta, page, perPage]);
 
   return (
     <div className="space-y-8">
@@ -242,7 +220,8 @@ export default function AdminRealEstates() {
           Solicitudes de Revisión
         </h1>
         <p className="text-slate-500">
-          Gestioná las peticiones de registro y aprobación de nuevas agencias inmobiliarias.
+          Gestioná las solicitudes iniciales y las revisiones de cambios de las
+          inmobiliarias.
         </p>
       </div>
 
@@ -252,16 +231,18 @@ export default function AdminRealEstates() {
         </div>
       )}
 
-      <RealEstateTabs tabs={TABS} value={tab} onChange={onChangeTab} counts={counts} />
+      <RealEstateTabs
+        tabs={TABS}
+        value={tab}
+        onChange={onChangeTab}
+        counts={counts}
+      />
 
       <RealEstateRequestsList
         loading={loading}
         items={visibleItems}
         tab={tab}
-        // IMPORTANTE: la lista devuelve el id directo
         onOpenDetail={(id) => navigate(`/admin/real-estates/${id}`)}
-        // Si quisieras relativa (solo si estás seguro que la ruta base es /admin/real-estates):
-        // onOpenDetail={(re) => navigate(`${re.id}`)}
       />
 
       {!loading && totalForPagination > 0 && (
@@ -269,10 +250,7 @@ export default function AdminRealEstates() {
           page={effectivePage}
           perPage={effectivePerPage}
           total={totalForPagination}
-          onPageChange={(p) => {
-            if (meta?.total != null) loadList({ nextPage: p });
-            else setPage(p);
-          }}
+          onPageChange={(p) => loadList({ nextPage: p })}
         />
       )}
     </div>

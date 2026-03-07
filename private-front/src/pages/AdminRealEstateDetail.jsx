@@ -18,52 +18,63 @@ function formatDate(value) {
   }
 }
 
-function ReviewStatusPill({ status }) {
-  // status: 0 pending, 1 approved, 2 rejected (según tu BD)
-  if (Number(status) === 1) {
-    return (
-      <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-wider">
-        Aprobada
-      </span>
-    );
+function getProfileStatusMeta(profileStatus) {
+  switch (Number(profileStatus)) {
+    case 1:
+      return {
+        label: "Revisión inicial",
+        pillClass:
+          "px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold uppercase tracking-wider",
+        dotClass: "bg-amber-500 animate-pulse",
+        footerLabel: "Pendiente de revisión inicial",
+      };
+    case 2:
+      return {
+        label: "Aprobada",
+        pillClass:
+          "px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-wider",
+        dotClass: "bg-emerald-500",
+        footerLabel: "Aprobada",
+      };
+    case 3:
+      return {
+        label: "Rechazada",
+        pillClass:
+          "px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-xs font-bold uppercase tracking-wider",
+        dotClass: "bg-rose-500",
+        footerLabel: "Rechazada",
+      };
+    case 4:
+      return {
+        label: "Cambios pendientes",
+        pillClass:
+          "px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold uppercase tracking-wider",
+        dotClass: "bg-blue-500 animate-pulse",
+        footerLabel: "Cambios pendientes de revisión",
+      };
+    default:
+      return {
+        label: "Borrador",
+        pillClass:
+          "px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-bold uppercase tracking-wider",
+        dotClass: "bg-slate-400",
+        footerLabel: "Borrador",
+      };
   }
-  if (Number(status) === 2) {
-    return (
-      <span className="px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-xs font-bold uppercase tracking-wider">
-        Rechazada
-      </span>
-    );
-  }
-  return (
-    <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold uppercase tracking-wider">
-      Pendiente
-    </span>
-  );
 }
 
-function FooterStatus({ status }) {
-  if (Number(status) === 1) {
-    return (
-      <div className="flex items-center gap-2">
-        <span className="size-2 rounded-full bg-emerald-500" />
-        <p className="text-sm font-bold text-slate-700">Aprobada</p>
-      </div>
-    );
-  }
-  if (Number(status) === 2) {
-    return (
-      <div className="flex items-center gap-2">
-        <span className="size-2 rounded-full bg-rose-500" />
-        <p className="text-sm font-bold text-slate-700">Rechazada</p>
-      </div>
-    );
-  }
+function ReviewStatusPill({ profileStatus }) {
+  const meta = getProfileStatusMeta(profileStatus);
+  return <span className={meta.pillClass}>{meta.label}</span>;
+}
+
+function FooterStatus({ profileStatus }) {
+  const meta = getProfileStatusMeta(profileStatus);
+
   return (
     <div className="flex items-center gap-2">
-      <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
-      <p className="text-sm font-bold text-slate-700">
-        Pendiente de aprobación
-      </p>
+      <span className={`size-2 rounded-full ${meta.dotClass}`} />
+      <p className="text-sm font-bold text-slate-700">{meta.footerLabel}</p>
     </div>
   );
 }
@@ -134,12 +145,19 @@ export default function AdminRealEstateDetail() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const [data, setData] = useState(null); // { real_estate, licenses }
+  const [data, setData] = useState(null);
   const re = data?.real_estate;
   const licenses = data?.licenses ?? [];
 
+  const profileStatus = Number(re?.profile_status ?? 0);
+  const isPendingReview = profileStatus === 1 || profileStatus === 4;
+  const isChangesPending = profileStatus === 4;
+
   const requestedAt = useMemo(
-    () => formatDate(re?.review_requested_at || re?.created_at),
+    () =>
+      formatDate(
+        re?.changes_requested_at || re?.review_requested_at || re?.created_at,
+      ),
     [re],
   );
 
@@ -149,9 +167,9 @@ export default function AdminRealEstateDetail() {
     setErr("");
     setLoading(true);
     try {
-      // Opción recomendada: GET /admin/real-estates/{id}
       const res = await api.get(`/admin/real-estates/${id}`);
       const d = unwrap(res);
+
       setData({
         real_estate: d?.real_estate ?? d,
         licenses: d?.licenses ?? [],
@@ -170,8 +188,10 @@ export default function AdminRealEstateDetail() {
 
   async function approve() {
     if (!re?.id) return;
+
     setBusy(true);
     setErr("");
+
     try {
       await api.post("/admin/real-estates/approve", {
         real_estate_id: re.id,
@@ -187,14 +207,23 @@ export default function AdminRealEstateDetail() {
 
   async function rejectConfirm(note) {
     if (!re?.id) return;
+
+    const cleanNote = String(note || "").trim();
+    if (!cleanNote) {
+      setErr("Completá el motivo del rechazo.");
+      return;
+    }
+
     setBusy(true);
     setErr("");
+
     try {
       await api.post("/admin/real-estates/approve", {
         real_estate_id: re.id,
         action: "reject",
-        note: note.trim(),
+        validation_note: cleanNote,
       });
+
       setRejectOpen(false);
       await load();
     } catch (e) {
@@ -208,62 +237,60 @@ export default function AdminRealEstateDetail() {
     <div className="bg-background-light min-h-[calc(100vh-64px)]">
       <div className="w-full py-8 pb-32">
         <div className="max-w-7xl mx-auto w-full px-6 md:px-10">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 text-slate-400 text-xs mb-3">
-            <span className="hover:text-primary transition-colors cursor-default">
-              Panel de Control
-            </span>
-            <span className="opacity-60">›</span>
-            <span className="hover:text-primary transition-colors cursor-default">
-              Solicitudes
-            </span>
-            <span className="opacity-60">›</span>
-            <span className="text-slate-900 font-semibold uppercase tracking-wider">
-              Revisión Detallada
-            </span>
-          </div>
+          <div className="mb-8">
+            <div className="flex items-center gap-2 text-slate-400 text-xs mb-3">
+              <span className="hover:text-primary transition-colors cursor-default">
+                Panel de Control
+              </span>
+              <span className="opacity-60">›</span>
+              <span className="hover:text-primary transition-colors cursor-default">
+                Solicitudes
+              </span>
+              <span className="opacity-60">›</span>
+              <span className="text-slate-900 font-semibold uppercase tracking-wider">
+                Revisión Detallada
+              </span>
+            </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="flex items-center justify-center size-10 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all"
-              >
-                <Icon name="arrowLeft" size={18} />
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  className="flex items-center justify-center size-10 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all"
+                >
+                  <Icon name="arrowLeft" size={18} />
+                </button>
 
-              <div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
-                    {loading ? "Cargando..." : re?.name || "—"}
-                  </h1>
-                  {!loading && (
-                    <ReviewStatusPill status={re?.validation_status} />
-                  )}
+                <div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
+                      {loading ? "Cargando..." : re?.name || "—"}
+                    </h1>
+                    {!loading && (
+                      <ReviewStatusPill profileStatus={re?.profile_status} />
+                    )}
+                  </div>
+                  <p className="text-slate-500 text-sm">
+                    {isChangesPending
+                      ? "Revisión de cambios realizados sobre un perfil ya aprobado"
+                      : "Revisión de solicitud de alta de cuenta profesional"}
+                  </p>
                 </div>
-                <p className="text-slate-500 text-sm">
-                  Revisión de solicitud de alta de cuenta profesional
-                </p>
               </div>
             </div>
           </div>
-        </div>
 
-        {err && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            {err}
-          </div>
-        )}
+          {err && (
+            <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              {err}
+            </div>
+          )}
 
           {loading ? (
             <div className="text-sm text-slate-500">Cargando detalle...</div>
           ) : (
-            <>
-              {/* Body */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start pb-32">
-              {/* Left */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start pb-32">
               <div className="lg:col-span-8 space-y-6">
                 <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
                   <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
@@ -276,6 +303,13 @@ export default function AdminRealEstateDetail() {
                   </div>
 
                   <div className="p-6">
+                    {!!re?.validation_note && (
+                      <div className="mb-6 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+                        <p className="font-bold mb-1">Motivo informado</p>
+                        <p>{re.validation_note}</p>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
                       <div className="space-y-1">
                         <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
@@ -368,7 +402,7 @@ export default function AdminRealEstateDetail() {
                   <div className="flex items-center gap-2 text-slate-500">
                     <Icon name="calendar" size={16} />
                     <span className="text-xs">
-                      Solicitado:{" "}
+                      {isChangesPending ? "Solicitado cambio:" : "Solicitado:"}{" "}
                       <strong className="text-slate-700">{requestedAt}</strong>
                     </span>
                   </div>
@@ -382,10 +416,21 @@ export default function AdminRealEstateDetail() {
                       </strong>
                     </span>
                   </div>
+
+                  {!!re?.approved_at && (
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <Icon name="checkCircle" size={16} />
+                      <span className="text-xs">
+                        Aprobado anterior:{" "}
+                        <strong className="text-slate-700">
+                          {formatDate(re.approved_at)}
+                        </strong>
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Right */}
               <div className="lg:col-span-4 space-y-6">
                 <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden sticky top-24">
                   <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -411,6 +456,7 @@ export default function AdminRealEstateDetail() {
                     ) : (
                       licenses.map((lic, idx) => {
                         const isPrimary = !!lic?.is_primary || idx === 0;
+
                         return (
                           <div
                             key={lic?.id ?? idx}
@@ -451,7 +497,7 @@ export default function AdminRealEstateDetail() {
                                   Provincia
                                 </p>
                                 <p className="text-sm font-bold text-slate-800">
-                                  {lic?.province || "—"}
+                                  {lic?.province_name || "—"}
                                 </p>
                               </div>
 
@@ -478,14 +524,11 @@ export default function AdminRealEstateDetail() {
                 </div>
               </div>
             </div>
-
-            </>
           )}
         </div>
 
         {!loading && (
           <>
-            {/* Footer dentro del layout (no fixed global) */}
             <div className="sticky bottom-0 z-10 -mx-6 w-[calc(100%+3rem)] bg-white/90 backdrop-blur-md border-t border-slate-200 shadow-sm">
               <div className="px-6 py-4">
                 <div className="flex items-center justify-between gap-6">
@@ -493,33 +536,37 @@ export default function AdminRealEstateDetail() {
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                       Estado de Revisión
                     </p>
-                    <FooterStatus status={re?.validation_status} />
+                    <FooterStatus profileStatus={re?.profile_status} />
                   </div>
 
                   <div className="flex items-center gap-3 w-full md:w-auto">
                     <button
                       type="button"
-                      disabled={busy || Number(re?.validation_status) !== 0}
+                      disabled={busy || !isPendingReview}
                       onClick={() => setRejectOpen(true)}
                       className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 border-red-500 text-red-600 font-bold hover:bg-red-50 transition-all text-sm uppercase tracking-wide disabled:opacity-60"
                     >
                       <Icon name="block" size={18} />
-                      Rechazar solicitud
+                      {isChangesPending
+                        ? "Rechazar cambios"
+                        : "Rechazar solicitud"}
                     </button>
 
                     <button
                       type="button"
-                      disabled={busy || Number(re?.validation_status) !== 0}
+                      disabled={busy || !isPendingReview}
                       onClick={approve}
                       className="flex-1 md:flex-none flex items-center justify-center gap-2 px-10 py-3 rounded-lg bg-primary text-white font-bold hover:bg-primary/90 shadow-md shadow-primary/20 transition-all text-sm uppercase tracking-wide disabled:opacity-60"
                     >
                       <Icon name="checkCircle" size={18} />
-                      Aprobar inmobiliaria
+                      {isChangesPending
+                        ? "Aprobar cambios"
+                        : "Aprobar inmobiliaria"}
                     </button>
                   </div>
                 </div>
 
-                {Number(re?.validation_status) !== 0 && (
+                {(profileStatus === 2 || profileStatus === 3) && (
                   <div className="mt-2 text-xs text-slate-500">
                     Esta solicitud ya fue procesada.
                   </div>
@@ -529,10 +576,24 @@ export default function AdminRealEstateDetail() {
 
             <RejectModal
               open={rejectOpen}
-              title="Rechazar solicitud"
+              title={
+                isChangesPending
+                  ? "Rechazar cambios del perfil"
+                  : "Rechazar solicitud"
+              }
               subtitle={re?.name ? `Inmobiliaria: ${re.name}` : ""}
               confirmLabel={busy ? "Procesando..." : "Confirmar rechazo"}
               busy={busy}
+              noteLabel={
+                isChangesPending
+                  ? "Motivo del rechazo de los cambios"
+                  : "Motivo del rechazo"
+              }
+              notePlaceholder={
+                isChangesPending
+                  ? "Indicá qué cambios deben corregirse..."
+                  : "Indicá el motivo del rechazo..."
+              }
               onClose={() => {
                 if (busy) return;
                 setRejectOpen(false);

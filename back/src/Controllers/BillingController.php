@@ -73,4 +73,77 @@ class BillingController
             ResponseHelper::fail($e->getMessage(), 422);
         }
     }
+
+    public static function previewPlanChange(): void
+    {
+        try {
+            $ctx = AuthMiddleware::handle();
+
+            if ((int)$ctx['role'] !== 2) {
+                ResponseHelper::fail('No autorizado', 403);
+            }
+
+            $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+            $planCode = trim((string)($payload['target_plan_code'] ?? ''));
+
+            if ($planCode === '') {
+                ResponseHelper::fail('target_plan_code requerido', 422);
+            }
+
+            $result = BillingService::previewPlanChange((int)$ctx['id'], $planCode);
+            ResponseHelper::ok($result);
+        } catch (\Throwable $e) {
+            ResponseHelper::fail($e->getMessage(), 422);
+        }
+    }
+
+    public static function confirmPlanChange(): void
+    {
+        try {
+            $ctx = AuthMiddleware::handle();
+
+            if ((int)$ctx['role'] !== 2) {
+                ResponseHelper::fail('No autorizado', 403);
+            }
+
+            $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+            $planCode = trim((string)($payload['target_plan_code'] ?? ''));
+            $mode = trim((string)($payload['mode'] ?? ''));
+
+            if ($planCode === '') {
+                ResponseHelper::fail('target_plan_code requerido', 422);
+            }
+
+            if (!in_array($mode, ['immediate', 'next_cycle'], true)) {
+                ResponseHelper::fail('mode inválido', 422);
+            }
+
+            $result = BillingService::confirmPlanChange((int)$ctx['id'], $planCode, $mode);
+            ResponseHelper::ok($result, 201);
+        } catch (\Throwable $e) {
+            $msg = $e->getMessage() ?: 'Error';
+
+            if (str_contains($msg, 'no configurado')) {
+                ResponseHelper::fail($msg, 500);
+            }
+
+            ResponseHelper::fail($msg, 422);
+        }
+    }
+
+    public static function cancelMembership(): void
+    {
+        try {
+            $ctx = AuthMiddleware::handle();
+
+            if ((int)$ctx['role'] !== 2) {
+                ResponseHelper::fail('No autorizado', 403);
+            }
+
+            $result = BillingService::cancelMembership((int)$ctx['id']);
+            ResponseHelper::ok($result);
+        } catch (\Throwable $e) {
+            ResponseHelper::fail($e->getMessage(), 422);
+        }
+    }
 }

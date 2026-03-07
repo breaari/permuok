@@ -37,8 +37,6 @@ export default function Sidebar() {
   // si querés “bloquear” algunas secciones según estado:
   const isActive = level === "real_estate_active";
   const isUnpaid = level === "real_estate_unpaid";
-  const isReview = level === "real_estate_review";
-  const needsOnboarding = level === "real_estate_not_linked" || level === "real_estate_draft";
 
   return (
     <aside className="hidden md:flex flex-col w-64 bg-slate-900 text-slate-300 border-r border-slate-800 min-h-screen">
@@ -69,31 +67,15 @@ export default function Sidebar() {
               Panel
             </Item>
 
-            {needsOnboarding && (
-              <Item to="/my-profile" icon={<Icon name="clipboardList" />}>
+            <Item to="/my-profile" icon={<Icon name="clipboardList" />}>
                 Mi perfil
-              </Item>
-            )}
+            </Item>
 
-            {isReview && (
-              <Item to="/status/review" icon={<Icon name="shieldCheck" />}>
-                Revisión
-              </Item>
-            )}
-
-            {isUnpaid && (
               <Item to="/billing" icon={<Icon name="creditCard" />}>
                 Membresía
               </Item>
-            )}
+           
 
-            {/* cuando esté activa, acá van tus secciones reales */}
-            {isActive && (
-              <>
-                {/* <Item to="/properties" icon={<Icon name="home" />}>Propiedades</Item> */}
-                {/* <Item to="/searches" icon={<Icon name="search" />}>Búsquedas</Item> */}
-              </>
-            )}
           </>
         )}
 

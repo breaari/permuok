@@ -1,4 +1,3 @@
-// ui/realEstate/profile/ProfileFormSection.jsx
 import { Field } from "../../form/Field";
 import PhoneField from "../../components/PhoneField";
 import AddressField from "../../form/AddressField";
@@ -7,25 +6,58 @@ export function ProfileFormSection({
   profile,
   setProfile,
   isReview,
+  isRejected,
+  isActiveChangesPending,
+  validationNote,
   mapsLoaded,
   mapsError,
   onSubmit,
 }) {
+  const isLocked = isReview;
+
   return (
     <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-8">
       <div className="p-6 border-b border-slate-100 flex items-center justify-between">
         <h2 className="text-xl font-bold">Datos de la Inmobiliaria</h2>
-        {isReview && (
+
+        {isLocked ? (
           <span className="text-xs font-semibold text-slate-500">Bloqueado</span>
-        )}
+        ) : isActiveChangesPending ? (
+          <span className="text-xs font-semibold text-amber-700">
+            Cambios pendientes
+          </span>
+        ) : isRejected ? (
+          <span className="text-xs font-semibold text-rose-700">
+            Revisión rechazada
+          </span>
+        ) : null}
       </div>
+
+      {isRejected && (
+        <div className="mx-6 mt-6 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+          <p className="font-bold mb-1">Tu perfil fue rechazado</p>
+          <p>Corregí la información observada y volvé a enviarlo a revisión.</p>
+          {!!validationNote && (
+            <p className="mt-2">
+              <b>Motivo:</b> {validationNote}
+            </p>
+          )}
+        </div>
+      )}
+
+      {isActiveChangesPending && (
+        <div className="mx-6 mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Guardá los cambios que necesites. Tu cuenta sigue disponible, pero las
+          modificaciones del perfil quedarán pendientes de revisión.
+        </div>
+      )}
 
       <form
         id="profileForm"
         onSubmit={onSubmit}
-        className={isReview ? "opacity-60" : ""}
+        className={isLocked ? "opacity-60" : ""}
       >
-        <fieldset disabled={isReview} className="p-6">
+        <fieldset disabled={isLocked} className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Field
               label="Nombre comercial"
@@ -78,7 +110,7 @@ export function ProfileFormSection({
               <AddressField
                 label="Dirección"
                 value={profile.address}
-                disabled={isReview}
+                disabled={isLocked}
                 isLoaded={mapsLoaded}
                 onChangeAddress={(data) =>
                   setProfile((p) => ({
@@ -106,7 +138,7 @@ export function ProfileFormSection({
               onChange={(v) =>
                 setProfile((p) => ({ ...p, phone: v || "" }))
               }
-              disabled={isReview}
+              disabled={isLocked}
               defaultCountry="AR"
               variant="profile"
             />

@@ -41,6 +41,7 @@ use App\Controllers\BillingController;
 use App\Controllers\WebhookMercadoPagoController;
 use App\Controllers\DevBillingController;
 use App\Controllers\ProvinceController;
+use App\Controllers\BillingCycleController;
 
 
 
@@ -92,7 +93,7 @@ $routes = [
     // Admin nuevo
     'GET /admin/real-estates/counts'    => [AdminRealEstateController::class, 'counts'],
     'GET /admin/real-estates'           => [AdminRealEstateController::class, 'list'],
-    'GET /admin/real-estates/detail'    => [AdminRealEstateController::class, 'detail'],
+    // 'GET /admin/real-estates/detail'    => [AdminRealEstateController::class, 'detail'],
     'POST /admin/real-estates/validate' => [AdminRealEstateController::class, 'validate'],
 
     // Legacy (si querés mantenerlos)
@@ -108,6 +109,11 @@ $routes = [
     'POST /dev/billing/approve'       => [DevBillingController::class, 'approve'],
 
     'GET /provinces' => [ProvinceController::class, 'list'],
+
+    'POST /billing/change-plan/preview' => [BillingController::class, 'previewPlanChange'],
+    'POST /billing/change-plan/confirm' => [BillingController::class, 'confirmPlanChange'],
+    'POST /billing/cancel'              => [BillingController::class, 'cancelMembership'],
+    'POST /dev/billing/process-cycle' => [BillingCycleController::class, 'process'],
 ];
 
 $key = $method . ' ' . $uri;
