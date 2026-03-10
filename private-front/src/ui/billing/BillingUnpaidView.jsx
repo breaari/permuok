@@ -8,18 +8,13 @@ export function BillingUnpaidView({
   paymentStarted,
   processingPlanCode,
   onStartPayment,
+  onRefreshStatus,
   isChangesPending = false,
 }) {
   return (
     <div className="bg-background-light min-h-[calc(100vh-64px)]">
       <main className="max-w-7xl mx-auto w-full px-4 md:px-6 py-8 pb-20 space-y-8">
-        <div
-          className={`rounded-xl border p-4 md:p-5 flex items-start gap-3 ${
-            isChangesPending
-              ? "border-amber-200 bg-amber-50"
-              : "border-amber-200 bg-amber-50"
-          }`}
-        >
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 md:p-5 flex items-start gap-3">
           <span className="text-amber-600 mt-0.5">
             <Icon name="info" size={18} />
           </span>
@@ -39,21 +34,32 @@ export function BillingUnpaidView({
         </div>
 
         {paymentStarted && (
-          <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 md:p-5 flex items-start gap-3">
-            <span className="text-primary mt-0.5">
-              <Icon name="checkCircle" size={18} />
-            </span>
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 md:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <span className="text-primary mt-0.5">
+                <Icon name="checkCircle" size={18} />
+              </span>
 
-            <div>
-              <p className="text-slate-900 font-bold text-base">
-                Redirección a Mercado Pago iniciada
-              </p>
-              <p className="text-sm text-slate-700">
-                Se abrió una nueva pestaña para completar el pago. Una vez
-                acreditado, tu membresía se activará y tu acceso a la plataforma
-                quedará habilitado.
-              </p>
+              <div>
+                <p className="text-slate-900 font-bold text-base">
+                  Pago iniciado
+                </p>
+                <p className="text-sm text-slate-700">
+                  Se abrió una nueva pestaña para completar el pago. Cuando la
+                  acreditación impacte, esta pantalla se actualizará
+                  automáticamente.
+                </p>
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={onRefreshStatus}
+              className="text-sm font-bold text-primary flex items-center gap-1 hover:underline underline-offset-4"
+            >
+              Actualizar ahora
+              <span className="text-primary">→</span>
+            </button>
           </div>
         )}
 

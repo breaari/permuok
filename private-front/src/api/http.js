@@ -1,4 +1,3 @@
-// src/api/http.js
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") ||
   "http://localhost/permuok/public";
@@ -6,11 +5,6 @@ const API_BASE_URL =
 const ACCESS_KEY = "permuok_access_token";
 const REFRESH_KEY = "permuok_refresh_token";
 
-/**
- * Opción B:
- * - Si backend responde { success, status, data }, devolvemos data
- * - Si responde data directo, devolvemos tal cual
- */
 export function unwrap(res) {
   if (res && typeof res === "object" && "success" in res && "data" in res) {
     return res.data;
@@ -40,11 +34,6 @@ export function clearTokens() {
   localStorage.removeItem(REFRESH_KEY);
 }
 
-/**
- * Para mostrar errores en UI de forma consistente:
- * - usa err.data.message / err.data.error si existe
- * - si no, usa err.message
- */
 export function getErrorMessage(err, fallback = "Ocurrió un error") {
   const d = err?.data;
   return (
@@ -54,24 +43,40 @@ export function getErrorMessage(err, fallback = "Ocurrió un error") {
   );
 }
 
+function buildUrl(path, params) {
+  const baseUrl = `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+
+  if (!params || typeof params !== "object") {
+    return baseUrl;
+  }
+
+  const search = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    search.append(key, String(value));
+  });
+
+  const qs = search.toString();
+  return qs ? `${baseUrl}?${qs}` : baseUrl;
+}
+
 async function request(
   path,
-  { method = "GET", body, headers } = {},
+  { method = "GET", body, headers, params } = {},
   { retry = true } = {}
 ) {
-  const url = `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  const url = buildUrl(path, params);
 
   const finalHeaders = { ...(headers || {}) };
 
   const hasBody = body !== undefined && body !== null;
 
-  // JSON body helper
   if (hasBody && !(body instanceof FormData)) {
     finalHeaders["Content-Type"] =
       finalHeaders["Content-Type"] || "application/json";
   }
 
-  // Auth header
   const access = getAccessToken();
   if (access) {
     finalHeaders["Authorization"] = `Bearer ${access}`;
@@ -87,24 +92,22 @@ async function request(
       : undefined,
   });
 
-  // Si access expiró, intentamos refresh una sola vez
   if (res.status === 401 && retry) {
     const refreshed = await tryRefresh();
     if (refreshed) {
-      return request(path, { method, body, headers }, { retry: false });
+      return request(path, { method, body, headers, params }, { retry: false });
     }
   }
 
-  // parse response
   const text = await res.text();
   let data = null;
+
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
     data = text || null;
   }
 
-  // error
   if (!res.ok) {
     const message =
       (data && typeof data === "object" && (data.message || data.error)) ||
@@ -150,12 +153,39 @@ async function tryRefresh() {
 }
 
 export const api = {
-  get: (path) => request(path, { method: "GET" }),
-  post: (path, body) => request(path, { method: "POST", body }),
-  patch: (path, body) => request(path, { method: "PATCH", body }),
-  put: (path, body) => request(path, { method: "PUT", body }),
-  del: (path) => request(path, { method: "DELETE" }),
+  get: (path, options = {}) =>
+    request(path, {
+      method: "GET",
+      params: options.params,
+      headers: options.headers,
+    }),
+  post: (path, body, options = {}) =>
+    request(path, {
+      method: "POST",
+      body,
+      headers: options.headers,
+      params: options.params,
+    }),
+  patch: (path, body, options = {}) =>
+    request(path, {
+      method: "PATCH",
+      body,
+      headers: options.headers,
+      params: options.params,
+    }),
+  put: (path, body, options = {}) =>
+    request(path, {
+      method: "PUT",
+      body,
+      headers: options.headers,
+      params: options.params,
+    }),
+  del: (path, options = {}) =>
+    request(path, {
+      method: "DELETE",
+      headers: options.headers,
+      params: options.params,
+    }),
 };
 
-// compat
 export const http = api;

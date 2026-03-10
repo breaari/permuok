@@ -14,12 +14,12 @@ export default function AppLayout() {
         <Sidebar />
 
         <MobileSidebar open={mobileOpen} onClose={() => setMobileOpen(false)}>
-          <Sidebar />
+          <Sidebar mobile onNavigate={() => setMobileOpen(false)} />
         </MobileSidebar>
 
         <div className="flex-1 min-w-0">
           <Navbar title="Panel" onOpenSidebar={() => setMobileOpen(true)} />
-          <main className="p-6">
+          <main className="p-4 md:p-6">
             <Outlet />
           </main>
         </div>

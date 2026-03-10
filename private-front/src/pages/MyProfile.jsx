@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useGoogleMaps } from "../ui/maps/UseGoogleMaps";
 import { useRealEstateProfile } from "../hooks/useRealEstateProfile";
@@ -10,6 +10,7 @@ import { ProfileHeader } from "../ui/realEstate/profile/ProfileHeader";
 import { ProfileFormSection } from "../ui/realEstate/profile/ProfileFormSection";
 import { ProfileLicensesSection } from "../ui/realEstate/profile/ProfileLicensesSection";
 import { ProfileActionBar } from "../ui/realEstate/profile/ProfileActionBar";
+import MyUserProfile from "./MyUserProfile";
 
 function formatDate(value) {
   if (!value) return "—";
@@ -25,8 +26,19 @@ function formatDate(value) {
 }
 
 export default function MyProfile() {
-  const { access, loadMe } = useAuth();
+  const { user, access, loadMe } = useAuth();
   const nav = useNavigate();
+
+  const role = Number(user?.role || 0);
+
+  if (![2, 3, 4].includes(role)) {
+    return <Navigate to="/app" replace />;
+  }
+
+  if (role === 3 || role === 4) {
+    return <MyUserProfile />;
+  }
+
   const { isLoaded: mapsLoaded, loadError: mapsError } = useGoogleMaps();
 
   const {

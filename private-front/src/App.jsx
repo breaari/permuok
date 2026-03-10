@@ -15,6 +15,7 @@ import AdminRealEstateDetail from "./pages/AdminRealEstateDetail";
 
 import AppLayout from "./layout/AppLayout";
 import ChangePlan from "./pages/ChangePlan";
+import Users from "./pages/Users";
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="billing" element={<Billing />} />
         <Route path="/billing/change-plan" element={<ChangePlan />} />
         <Route path="app" element={<AppHome />} />
+        <Route path="/users" element={<Users />} />
 
         {/* Admin */}
         <Route path="admin" element={<AdminPanel />}>
