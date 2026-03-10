@@ -40,10 +40,17 @@ class AuthMiddleware
             ResponseHelper::fail('Token inválido', 401);
         }
 
-        // Cargar usuario real (no confiar solo en el token)
         $pdo = self::db();
         $stmt = $pdo->prepare("
-            SELECT id, role, email, is_active, real_estate_id
+            SELECT
+                id,
+                role,
+                email,
+                first_name,
+                last_name,
+                phone,
+                is_active,
+                real_estate_id
             FROM users
             WHERE id = :id
               AND deleted_at IS NULL
@@ -64,6 +71,9 @@ class AuthMiddleware
             'id' => (int)$user['id'],
             'role' => (int)$user['role'],
             'email' => (string)$user['email'],
+            'first_name' => $user['first_name'] ?? null,
+            'last_name' => $user['last_name'] ?? null,
+            'phone' => $user['phone'] ?? null,
             'real_estate_id' => $user['real_estate_id'] !== null ? (int)$user['real_estate_id'] : null,
         ];
     }

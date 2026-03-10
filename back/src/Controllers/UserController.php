@@ -4,9 +4,9 @@ namespace App\Controllers;
 
 use App\Helpers\ResponseHelper;
 use App\Middleware\AuthMiddleware;
-use App\Services\RealEstateService;
+use App\Services\UserService;
 
-class RealEstateController
+class UserController
 {
     private static function requireRealEstate(): array
     {
@@ -19,49 +19,38 @@ class RealEstateController
         return $ctx;
     }
 
-    public static function me(): void
+    public static function list(): void
     {
         try {
             $ctx = self::requireRealEstate();
-            $data = RealEstateService::getMyRealEstate((int)$ctx['id']);
+            $data = UserService::listForRealEstate((int)$ctx['id']);
             ResponseHelper::ok($data);
         } catch (\Throwable $e) {
             ResponseHelper::fail($e->getMessage(), 422);
         }
     }
 
-    public static function saveProfile(): void
+    public static function create(): void
     {
         try {
             $ctx = self::requireRealEstate();
             $payload = json_decode(file_get_contents('php://input'), true) ?? [];
 
-            $result = RealEstateService::saveProfile((int)$ctx['id'], $payload);
-            ResponseHelper::ok($result);
+            $data = UserService::createForRealEstate((int)$ctx['id'], $payload);
+            ResponseHelper::ok($data, 201);
         } catch (\Throwable $e) {
             ResponseHelper::fail($e->getMessage(), 422);
         }
     }
 
-    public static function addLicense(): void
+    public static function updateStatus(): void
     {
         try {
             $ctx = self::requireRealEstate();
             $payload = json_decode(file_get_contents('php://input'), true) ?? [];
 
-            $result = RealEstateService::addLicense((int)$ctx['id'], $payload);
-            ResponseHelper::ok($result);
-        } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 422);
-        }
-    }
-
-    public static function submitReview(): void
-    {
-        try {
-            $ctx = self::requireRealEstate();
-            $result = RealEstateService::submitReview((int)$ctx['id']);
-            ResponseHelper::ok($result);
+            $data = UserService::updateStatusForRealEstate((int)$ctx['id'], $payload);
+            ResponseHelper::ok($data);
         } catch (\Throwable $e) {
             ResponseHelper::fail($e->getMessage(), 422);
         }

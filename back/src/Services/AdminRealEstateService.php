@@ -17,9 +17,12 @@ class AdminRealEstateService
         $s = strtolower(trim((string)$status));
 
         return match ($s) {
+            'draft' => 'draft',
+            'initial_review' => 'initial_review',
+            'changes_pending' => 'changes_pending',
             'approved' => 'approved',
             'rejected' => 'rejected',
-            default => 'pending',
+            default => 'initial_review',
         };
     }
 
@@ -43,9 +46,11 @@ class AdminRealEstateService
 
         $sql = "
             SELECT
-              SUM(CASE WHEN r.profile_status IN (" . RealEstateProfileStatus::INITIAL_REVIEW . ", " . RealEstateProfileStatus::CHANGES_PENDING . ") THEN 1 ELSE 0 END) AS pending,
-              SUM(CASE WHEN r.profile_status = " . RealEstateProfileStatus::APPROVED . " THEN 1 ELSE 0 END) AS approved,
-              SUM(CASE WHEN r.profile_status = " . RealEstateProfileStatus::REJECTED . " THEN 1 ELSE 0 END) AS rejected
+              COALESCE(SUM(CASE WHEN r.profile_status = " . RealEstateProfileStatus::DRAFT . " THEN 1 ELSE 0 END), 0) AS draft,
+              COALESCE(SUM(CASE WHEN r.profile_status = " . RealEstateProfileStatus::INITIAL_REVIEW . " THEN 1 ELSE 0 END), 0) AS initial_review,
+              COALESCE(SUM(CASE WHEN r.profile_status = " . RealEstateProfileStatus::CHANGES_PENDING . " THEN 1 ELSE 0 END), 0) AS changes_pending,
+              COALESCE(SUM(CASE WHEN r.profile_status = " . RealEstateProfileStatus::APPROVED . " THEN 1 ELSE 0 END), 0) AS approved,
+              COALESCE(SUM(CASE WHEN r.profile_status = " . RealEstateProfileStatus::REJECTED . " THEN 1 ELSE 0 END), 0) AS rejected
             FROM real_estates r
             WHERE r.deleted_at IS NULL
             {$whereQ}
@@ -53,10 +58,18 @@ class AdminRealEstateService
 
         $st = $pdo->prepare($sql);
         $st->execute($params);
-        $row = $st->fetch() ?: ['pending' => 0, 'approved' => 0, 'rejected' => 0];
+        $row = $st->fetch() ?: [
+            'draft' => 0,
+            'initial_review' => 0,
+            'changes_pending' => 0,
+            'approved' => 0,
+            'rejected' => 0,
+        ];
 
         return [
-            'pending' => (int)($row['pending'] ?? 0),
+            'draft' => (int)($row['draft'] ?? 0),
+            'initial_review' => (int)($row['initial_review'] ?? 0),
+            'changes_pending' => (int)($row['changes_pending'] ?? 0),
             'approved' => (int)($row['approved'] ?? 0),
             'rejected' => (int)($row['rejected'] ?? 0),
         ];
@@ -75,14 +88,36 @@ class AdminRealEstateService
         $where = " r.deleted_at IS NULL ";
         $params = [];
 
-        if ($normalizedStatus === 'pending') {
-            $where .= " AND r.profile_status IN (" . RealEstateProfileStatus::INITIAL_REVIEW . ", " . RealEstateProfileStatus::CHANGES_PENDING . ") ";
-        } elseif ($normalizedStatus === 'approved') {
-            $where .= " AND r.profile_status = :profile_status ";
-            $params['profile_status'] = RealEstateProfileStatus::APPROVED;
-        } else {
-            $where .= " AND r.profile_status = :profile_status ";
-            $params['profile_status'] = RealEstateProfileStatus::REJECTED;
+        switch ($normalizedStatus) {
+            case 'draft':
+                $where .= " AND r.profile_status = :profile_status ";
+                $params['profile_status'] = RealEstateProfileStatus::DRAFT;
+                break;
+
+            case 'initial_review':
+                $where .= " AND r.profile_status = :profile_status ";
+                $params['profile_status'] = RealEstateProfileStatus::INITIAL_REVIEW;
+                break;
+
+            case 'changes_pending':
+                $where .= " AND r.profile_status = :profile_status ";
+                $params['profile_status'] = RealEstateProfileStatus::CHANGES_PENDING;
+                break;
+
+            case 'approved':
+                $where .= " AND r.profile_status = :profile_status ";
+                $params['profile_status'] = RealEstateProfileStatus::APPROVED;
+                break;
+
+            case 'rejected':
+                $where .= " AND r.profile_status = :profile_status ";
+                $params['profile_status'] = RealEstateProfileStatus::REJECTED;
+                break;
+
+            default:
+                $where .= " AND r.profile_status = :profile_status ";
+                $params['profile_status'] = RealEstateProfileStatus::INITIAL_REVIEW;
+                break;
         }
 
         $q = trim((string)$q);
@@ -110,9 +145,12 @@ class AdminRealEstateService
         $total = (int)($stCount->fetch()['total'] ?? 0);
 
         $orderBy = match ($normalizedStatus) {
-            'approved' => " r.approved_at DESC, r.id DESC ",
+            'draft' => " r.created_at DESC, r.id DESC ",
+            'initial_review' => " COALESCE(r.review_requested_at, r.created_at) DESC, r.id DESC ",
+            'changes_pending' => " COALESCE(r.changes_requested_at, r.created_at) DESC, r.id DESC ",
+            'approved' => " COALESCE(r.approved_at, r.validated_at, r.created_at) DESC, r.id DESC ",
             'rejected' => " COALESCE(r.validated_at, r.review_requested_at, r.created_at) DESC, r.id DESC ",
-            default => " COALESCE(r.changes_requested_at, r.review_requested_at, r.created_at) DESC, r.id DESC ",
+            default => " r.id DESC ",
         };
 
         $sql = "

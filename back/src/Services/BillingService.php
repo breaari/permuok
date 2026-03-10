@@ -47,7 +47,7 @@ class BillingService
         }
 
         $user = self::getValidRealEstateUser($userId);
-        $realEstate = self::getApprovedRealEstate((int)$user['real_estate_id']);
+        self::getApprovedRealEstate((int)$user['real_estate_id']);
 
         $activeMembership = self::getActiveMembership((int)$user['real_estate_id']);
         if ($activeMembership) {
@@ -206,7 +206,9 @@ class BillingService
                 UPDATE memberships
                 SET
                     scheduled_plan_id = :scheduled_plan_id,
-                    scheduled_change_at = :scheduled_change_at
+                    scheduled_change_at = :scheduled_change_at,
+                    cancel_at_period_end = 0,
+                    cancelled_at = NULL
                 WHERE id = :id
                 LIMIT 1
             ");
@@ -306,7 +308,9 @@ class BillingService
             UPDATE memberships
             SET
                 cancel_at_period_end = 1,
-                cancelled_at = NOW()
+                cancelled_at = NOW(),
+                scheduled_plan_id = NULL,
+                scheduled_change_at = NULL
             WHERE id = :id
             LIMIT 1
         ");

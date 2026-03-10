@@ -42,6 +42,7 @@ use App\Controllers\WebhookMercadoPagoController;
 use App\Controllers\DevBillingController;
 use App\Controllers\ProvinceController;
 use App\Controllers\BillingCycleController;
+use App\Controllers\UserController;
 
 
 
@@ -114,6 +115,10 @@ $routes = [
     'POST /billing/change-plan/confirm' => [BillingController::class, 'confirmPlanChange'],
     'POST /billing/cancel'              => [BillingController::class, 'cancelMembership'],
     'POST /dev/billing/process-cycle' => [BillingCycleController::class, 'process'],
+
+    'GET /users'          => [UserController::class, 'list'],
+    'POST /users'         => [UserController::class, 'create'],
+    'PATCH /users/status' => [UserController::class, 'updateStatus'],
 ];
 
 $key = $method . ' ' . $uri;

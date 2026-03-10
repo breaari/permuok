@@ -38,6 +38,9 @@ class RealEstateService
         if (!$u) {
             throw new Exception("Usuario no encontrado");
         }
+        if ((int)$u['role'] !== 2) {
+            throw new Exception("No autorizado");
+        }
 
         return $u;
     }
@@ -516,24 +519,24 @@ class RealEstateService
         $pdo = self::db();
 
         $stRe = $pdo->prepare("
-            SELECT
-                id,
-                name,
-                legal_name,
-                cuit,
-                address,
-                address_place_id,
-                address_lat,
-                address_lng,
-                phone,
-                email,
-                website,
-                profile_status
-            FROM real_estates
-            WHERE id = :id
-              AND deleted_at IS NULL
-            LIMIT 1
-        ");
+        SELECT
+            id,
+            name,
+            legal_name,
+            cuit,
+            address,
+            address_place_id,
+            address_lat,
+            address_lng,
+            phone,
+            email,
+            website,
+            profile_status
+        FROM real_estates
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
         $stRe->execute(['id' => (int)$u['real_estate_id']]);
         $re = $stRe->fetch();
 
@@ -577,22 +580,15 @@ class RealEstateService
             throw new Exception("Seleccioná una dirección válida desde Google Maps");
         }
 
-        $st = $pdo->prepare("
-    UPDATE real_estates
-    SET
-        review_requested_at = NOW(),
-        changes_requested_at = NULL,
-        profile_status = :profile_status,
-        validation_status = 0,
-        approved_at = NULL,
-        approved_by = NULL,
-        validation_note = NULL
-    WHERE id = :id
-      AND deleted_at IS NULL
-    LIMIT 1
-");
-        $st->execute(['re' => (int)$u['real_estate_id']]);
-        $count = (int)($st->fetch()['c'] ?? 0);
+        // Validar que tenga al menos una matrícula/licencia
+        $stLic = $pdo->prepare("
+        SELECT COUNT(*) AS c
+        FROM real_estate_licenses
+        WHERE real_estate_id = :id
+          AND deleted_at IS NULL
+    ");
+        $stLic->execute(['id' => (int)$u['real_estate_id']]);
+        $count = (int)($stLic->fetch()['c'] ?? 0);
 
         if ($count <= 0) {
             throw new Exception("Tenés que cargar al menos una matrícula/licencia");
@@ -602,36 +598,36 @@ class RealEstateService
 
         if ($currentProfileStatus === RealEstateProfileStatus::APPROVED) {
             $st = $pdo->prepare("
-        UPDATE real_estates
-        SET
-            profile_status = :profile_status,
-            validation_status = 0,
-            validation_note = NULL,
-            review_requested_at = NULL,
-            changes_requested_at = NOW()
-        WHERE id = :id
-          AND deleted_at IS NULL
-        LIMIT 1
-    ");
+            UPDATE real_estates
+            SET
+                profile_status = :profile_status,
+                validation_status = 0,
+                validation_note = NULL,
+                review_requested_at = NULL,
+                changes_requested_at = NOW()
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+        ");
             $st->execute([
                 'profile_status' => RealEstateProfileStatus::CHANGES_PENDING,
                 'id' => (int)$u['real_estate_id'],
             ]);
         } else {
             $st = $pdo->prepare("
-        UPDATE real_estates
-        SET
-            review_requested_at = NOW(),
-            changes_requested_at = NULL,
-            profile_status = :profile_status,
-            validation_status = 0,
-            approved_at = NULL,
-            approved_by = NULL,
-            validation_note = NULL
-        WHERE id = :id
-          AND deleted_at IS NULL
-        LIMIT 1
-    ");
+            UPDATE real_estates
+            SET
+                review_requested_at = NOW(),
+                changes_requested_at = NULL,
+                profile_status = :profile_status,
+                validation_status = 0,
+                approved_at = NULL,
+                approved_by = NULL,
+                validation_note = NULL
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+        ");
             $st->execute([
                 'profile_status' => RealEstateProfileStatus::INITIAL_REVIEW,
                 'id' => (int)$u['real_estate_id'],
