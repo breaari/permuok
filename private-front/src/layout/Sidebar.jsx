@@ -66,13 +66,29 @@ export default function Sidebar({ mobile = false, onNavigate }) {
         }
       >
         {isAdmin && (
-          <Item
-            to="/admin/real-estates"
-            icon={<Icon name="layoutDashboard" />}
-            onClick={onNavigate}
-          >
-            Solicitudes de revisión
-          </Item>
+          <>
+            <Item
+              to="/admin/real-estates"
+              icon={<Icon name="layoutDashboard" />}
+              onClick={onNavigate}
+            >
+              Solicitudes de revisión
+            </Item>
+            <Item
+              to="/admin/users"
+              icon={<Icon name="users" />}
+              onClick={onNavigate}
+            >
+              Usuarios
+            </Item>
+            <Item
+              to="/admin/billing"
+              icon={<Icon name="creditCard" />}
+              onClick={onNavigate}
+            >
+              Membresías
+            </Item>
+          </>
         )}
 
         {isRealEstate && (
@@ -109,45 +125,43 @@ export default function Sidebar({ mobile = false, onNavigate }) {
 
         {isAgent && (
           <>
-          <Item
-            to="/app"
-            icon={<Icon name="layoutDashboard" />}
-            onClick={onNavigate}
-          >
-            Panel
-          </Item>
+            <Item
+              to="/app"
+              icon={<Icon name="layoutDashboard" />}
+              onClick={onNavigate}
+            >
+              Panel
+            </Item>
 
-          <Item
+            <Item
               to="/my-profile"
               icon={<Icon name="clipboardList" />}
               onClick={onNavigate}
             >
               Mi perfil
             </Item>
-            </>
+          </>
         )}
 
         {isInvestor && (
           <>
-          <Item
-            to="/app"
-            icon={<Icon name="layoutDashboard" />}
-            onClick={onNavigate}
-          >
-            Panel
-          </Item>
+            <Item
+              to="/app"
+              icon={<Icon name="layoutDashboard" />}
+              onClick={onNavigate}
+            >
+              Panel
+            </Item>
 
-          <Item
+            <Item
               to="/my-profile"
               icon={<Icon name="clipboardList" />}
               onClick={onNavigate}
             >
               Mi perfil
             </Item>
-            </>
+          </>
         )}
-
-        
       </nav>
     </aside>
   );

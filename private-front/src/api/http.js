@@ -93,11 +93,25 @@ async function request(
   });
 
   if (res.status === 401 && retry) {
-    const refreshed = await tryRefresh();
-    if (refreshed) {
-      return request(path, { method, body, headers, params }, { retry: false });
-    }
+  console.log("[request] 401 detectado", {
+    path,
+    method,
+    retry,
+  });
+
+  const refreshed = await tryRefresh();
+
+  console.log("[request] resultado tryRefresh:", refreshed);
+
+  if (refreshed) {
+    console.log("[request] reintentando request original", {
+      path,
+      method,
+    });
+
+    return request(path, { method, body, headers, params }, { retry: false });
   }
+}
 
   const text = await res.text();
   let data = null;
@@ -125,28 +139,51 @@ async function request(
 
 async function tryRefresh() {
   const refreshToken = getRefreshToken();
-  if (!refreshToken) return false;
+
+  console.log("[refresh] token en LS:", refreshToken);
+
+  if (!refreshToken) {
+    console.log("[refresh] no hay refresh token");
+    return false;
+  }
 
   try {
+    console.log("[refresh] llamando POST /refresh");
+
     const data = await request(
       "/refresh",
       { method: "POST", body: { refresh_token: refreshToken } },
       { retry: false }
     );
 
+    console.log("[refresh] response raw:", data);
+
     const payload = unwrap(data);
+
+    console.log("[refresh] payload unwrap:", payload);
 
     if (payload?.access_token && payload?.refresh_token) {
       setTokens({
         access_token: payload.access_token,
         refresh_token: payload.refresh_token,
       });
+
+      console.log("[refresh] nuevos tokens guardados", {
+        access_token: payload.access_token,
+        refresh_token: payload.refresh_token,
+      });
+
+      console.log("[refresh] access en LS:", localStorage.getItem("permuok_access_token"));
+      console.log("[refresh] refresh en LS:", localStorage.getItem("permuok_refresh_token"));
+
       return true;
     }
 
+    console.log("[refresh] payload inválido, limpiando tokens");
     clearTokens();
     return false;
-  } catch {
+  } catch (e) {
+    console.log("[refresh] error:", e);
     clearTokens();
     return false;
   }

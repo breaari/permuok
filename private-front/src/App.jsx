@@ -16,6 +16,10 @@ import AdminRealEstateDetail from "./pages/AdminRealEstateDetail";
 import AppLayout from "./layout/AppLayout";
 import ChangePlan from "./pages/ChangePlan";
 import Users from "./pages/Users";
+import AdminUsers from "./pages/AdminUsers";
+import AdminUserDetail from "./pages/AdminUserDetail";
+import AdminBilling from "./pages/AdminBilling";
+import AdminBillingDetail from "./pages/AdminBillingDetail";
 
 export default function App() {
   return (
@@ -37,15 +41,19 @@ export default function App() {
         {/* Inmobiliaria */}
         <Route path="my-profile" element={<MyProfile />} />
         <Route path="billing" element={<Billing />} />
-        <Route path="/billing/change-plan" element={<ChangePlan />} />
+        <Route path="billing/change-plan" element={<ChangePlan />} />
         <Route path="app" element={<AppHome />} />
-        <Route path="/users" element={<Users />} />
+        <Route path="users" element={<Users />} />
 
         {/* Admin */}
         <Route path="admin" element={<AdminPanel />}>
           <Route index element={<Navigate to="real-estates" replace />} />
           <Route path="real-estates" element={<AdminRealEstates />} />
           <Route path="real-estates/:id" element={<AdminRealEstateDetail />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="users/:id" element={<AdminUserDetail />} />
+          <Route path="/admin/billing" element={<AdminBilling />} />
+          <Route path="/admin/billing/:id" element={<AdminBillingDetail />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

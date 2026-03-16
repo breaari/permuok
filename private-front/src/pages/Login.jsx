@@ -20,20 +20,30 @@ export default function Login() {
   const [err, setErr] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  async function onSubmit(e) {
-    e.preventDefault();
-    setErr("");
+async function onSubmit(e) {
+  e.preventDefault();
+  setErr("");
 
-    try {
-      setSubmitting(true);
-      await login(email.trim().toLowerCase(), password);
-      nav("/", { replace: true });
-    } catch (e) {
-      setErr(getErrorMessage(e, "No se pudo iniciar sesión"));
-    } finally {
-      setSubmitting(false);
-    }
+  try {
+    setSubmitting(true);
+
+    console.log("LOGIN attempt", {
+      email: email.trim().toLowerCase()
+    });
+
+    const result = await login(email.trim().toLowerCase(), password);
+
+    console.log("LOGIN response", result);
+
+    nav("/", { replace: true });
+
+  } catch (e) {
+    console.error("LOGIN error", e);
+    setErr(getErrorMessage(e, "No se pudo iniciar sesión"));
+  } finally {
+    setSubmitting(false);
   }
+}
 
   return (
     <AuthLayout title="Bienvenido de nuevo" subtitle="Ingresá tus credenciales para acceder">

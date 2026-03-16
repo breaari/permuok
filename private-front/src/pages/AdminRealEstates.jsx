@@ -1,14 +1,15 @@
 // pages/AdminRealEstates.jsx
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { api, unwrap } from "../api/http";
+import { api, unwrap, getErrorMessage } from "../api/http";
 import { useAuth } from "../auth/AuthContext";
 
 import RealEstateTabs from "../ui/admin/RealEstateTabs";
 import RealEstateRequestsList from "../ui/admin/RealEstateRequestsList";
 
 const TABS = [
-  { key: "draft", label: "Borradores" },
+  { key: "incomplete", label: "Incompletas" },
+  { key: "ready_for_review", label: "Listas para revisión" },
   { key: "initial_review", label: "Revisión inicial" },
   { key: "changes_pending", label: "Cambios" },
   { key: "approved", label: "Aprobadas" },
@@ -44,14 +45,14 @@ function getPaginationRange({ totalPages, currentPage, siblingCount = 1 }) {
     const start = totalPages - rightItemCount + 1;
     const rightRange = Array.from(
       { length: rightItemCount },
-      (_, i) => start + i
+      (_, i) => start + i,
     );
     return [firstPageIndex, "…", ...rightRange];
   }
 
   const middleRange = Array.from(
     { length: rightSiblingIndex - leftSiblingIndex + 1 },
-    (_, i) => leftSiblingIndex + i
+    (_, i) => leftSiblingIndex + i,
   );
 
   return [firstPageIndex, "…", ...middleRange, "…", lastPageIndex];
@@ -71,8 +72,10 @@ function PaginationPro({ page, perPage, total, onPageChange }) {
         currentPage: page,
         siblingCount: 1,
       }),
-    [totalPages, page]
+    [totalPages, page],
   );
+
+
 
   return (
     <div className="mt-6 md:mt-8 border-t border-slate-200 pt-5 md:pt-6">
@@ -82,7 +85,8 @@ function PaginationPro({ page, perPage, total, onPageChange }) {
           <span className="font-bold text-slate-900">
             {start} - {end}
           </span>{" "}
-          de <span className="font-bold text-slate-900">{total}</span> solicitudes
+          de <span className="font-bold text-slate-900">{total}</span>{" "}
+          solicitudes
         </p>
 
         <div className="flex items-center justify-between gap-3 md:hidden">
@@ -173,12 +177,16 @@ export default function AdminRealEstates() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
+  const [q, setQ] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+
   const [page, setPage] = useState(1);
   const [perPage] = useState(DEFAULT_PER_PAGE);
 
   const [meta, setMeta] = useState(null);
   const [counts, setCounts] = useState({
-    draft: 0,
+    incomplete: 0,
+    ready_for_review: 0,
     initial_review: 0,
     changes_pending: 0,
     approved: 0,
@@ -187,19 +195,29 @@ export default function AdminRealEstates() {
 
   const requestIdRef = useRef(0);
 
-  const loadCounts = useCallback(async () => {
+  const loadCounts = useCallback(async (query = "") => {
     try {
-      const res = await api.get("/admin/real-estates/counts");
+      const params = new URLSearchParams();
+
+      if (query?.trim()) {
+        params.set("q", query.trim());
+      }
+
+      const qs = params.toString();
+      const res = await api.get(
+        `/admin/real-estates/counts${qs ? `?${qs}` : ""}`,
+      );
       const data = unwrap(res);
 
       setCounts(
         data?.counts ?? {
-          draft: 0,
+          incomplete: 0,
+          ready_for_review: 0,
           initial_review: 0,
           changes_pending: 0,
           approved: 0,
           rejected: 0,
-        }
+        },
       );
     } catch {
       // no romper UI
@@ -207,7 +225,7 @@ export default function AdminRealEstates() {
   }, []);
 
   const loadList = useCallback(
-    async ({ nextPage = 1 } = {}) => {
+    async ({ nextPage = 1, nextQuery = q, nextTab = tab } = {}) => {
       const currentRequestId = ++requestIdRef.current;
 
       setErr("");
@@ -216,15 +234,21 @@ export default function AdminRealEstates() {
       setMeta(null);
 
       try {
-        const res = await api.get("/admin/real-estates", {
-          params: {
-            status: tab,
-            page: nextPage,
-            per_page: perPage,
-          },
+        const params = new URLSearchParams({
+          status: nextTab,
+          page: String(nextPage),
+          per_page: String(perPage),
         });
 
+        if (nextQuery?.trim()) {
+          params.set("q", nextQuery.trim());
+        }
+
+        const res = await api.get(`/admin/real-estates?${params.toString()}`);
+        console.log("RAW REAL ESTATES RESPONSE", res);
+        
         const data = unwrap(res);
+        console.log("UNWRAPPED REAL ESTATES RESPONSE", data);
 
         if (currentRequestId !== requestIdRef.current) return;
 
@@ -236,25 +260,30 @@ export default function AdminRealEstates() {
 
         setItems([]);
         setMeta(null);
-        setErr(e?.data?.message || e?.message || "Error al cargar");
+        setErr(getErrorMessage(e, "Error al cargar"));
       } finally {
         if (currentRequestId === requestIdRef.current) {
           setLoading(false);
         }
       }
     },
-    [tab, perPage]
+    [tab, q, perPage],
   );
 
   useEffect(() => {
     setPage(1);
-    loadCounts();
-    loadList({ nextPage: 1 });
-  }, [tab, loadCounts, loadList]);
+    loadCounts(q);
+    loadList({ nextPage: 1, nextQuery: q, nextTab: tab });
+  }, [tab, q, loadCounts, loadList]);
 
   function onChangeTab(nextTab) {
     if (nextTab === tab) return;
     setTab(nextTab);
+  }
+
+  function onSearchSubmit(e) {
+    e.preventDefault();
+    setQ(searchInput.trim());
   }
 
   const { visibleItems, totalForPagination, effectivePage, effectivePerPage } =
@@ -267,15 +296,21 @@ export default function AdminRealEstates() {
       };
     }, [items, meta, page, perPage]);
 
+      console.log("ADMIN REAL ESTATES ITEMS", items);
+console.log("ADMIN REAL ESTATES META", meta);
+console.log("ADMIN REAL ESTATES TAB", tab);
+  console.log("ADMIN REAL ESTATES COUNTS", counts);
+
   return (
-    <div className="space-y-6 md:space-y-8 px-4 md:px-0">
+    <div className="space-y-8">
       <div className="space-y-2">
-        <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">
-          Solicitudes de Revisión
+        <h1 className="text-3xl md:text-4xl font-black tracking-tight text-slate-900">
+          Solicitudes de revisión
         </h1>
-        <p className="text-sm md:text-base text-slate-500 max-w-3xl">
-          Gestioná borradores, revisiones iniciales, cambios pendientes y
-          estados finales de las inmobiliarias.
+        <p className="text-slate-500 text-base max-w-3xl">
+          Gestioná perfiles incompletos, solicitudes listas para revisión,
+          revisiones iniciales, cambios pendientes y estados finales de las
+          inmobiliarias.
         </p>
       </div>
 
@@ -285,34 +320,58 @@ export default function AdminRealEstates() {
         </div>
       )}
 
-      <div className="md:hidden">
-        <label
-          htmlFor="real-estate-status"
-          className="block text-sm font-semibold text-slate-700 mb-2"
-        >
-          Estado
-        </label>
-        <select
-          id="real-estate-status"
-          value={tab}
-          onChange={(e) => onChangeTab(e.target.value)}
-          className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none focus:border-primary"
-        >
-          {TABS.map((t) => (
-            <option key={t.key} value={t.key}>
-              {t.label} ({counts?.[t.key] ?? 0})
-            </option>
-          ))}
-        </select>
-      </div>
+      <div className="space-y-6">
+        <div className="hidden md:block">
+          <RealEstateTabs
+            tabs={TABS}
+            value={tab}
+            onChange={onChangeTab}
+            counts={counts}
+          />
+        </div>
 
-      <div className="hidden md:block">
-        <RealEstateTabs
-          tabs={TABS}
-          value={tab}
-          onChange={onChangeTab}
-          counts={counts}
-        />
+        <div className="md:hidden">
+          <label
+            htmlFor="real-estate-status"
+            className="block text-sm font-semibold text-slate-700 mb-2"
+          >
+            Estado
+          </label>
+          <select
+            id="real-estate-status"
+            value={tab}
+            onChange={(e) => onChangeTab(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none focus:border-primary"
+          >
+            {TABS.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.label} ({counts?.[t.key] ?? 0})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col lg:flex-row gap-4 lg:items-center">
+          <form
+            onSubmit={onSearchSubmit}
+            className="flex w-full lg:w-auto lg:min-w-[420px] gap-2"
+          >
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Buscar por nombre, email, teléfono o CUIT..."
+              className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-primary"
+            />
+
+            <button
+              type="submit"
+              className="rounded-lg bg-primary px-5 py-3 text-sm font-bold text-white hover:bg-primary/90 transition-colors"
+            >
+              Buscar
+            </button>
+          </form>
+        </div>
       </div>
 
       <RealEstateRequestsList
@@ -327,7 +386,13 @@ export default function AdminRealEstates() {
           page={effectivePage}
           perPage={effectivePerPage}
           total={totalForPagination}
-          onPageChange={(p) => loadList({ nextPage: p })}
+          onPageChange={(p) =>
+            loadList({
+              nextPage: p,
+              nextQuery: q,
+              nextTab: tab,
+            })
+          }
         />
       )}
     </div>

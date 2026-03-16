@@ -50,6 +50,10 @@ export function AuthProvider({ children }) {
 
       console.log("[login] payload:", payload); // <-- DEBUG
 
+      if (!payload || typeof payload !== 'object') {
+        throw new Error('Respuesta inválida del servidor');
+      }
+
       setTokens({
         access_token: payload?.access_token,
         refresh_token: payload?.refresh_token,

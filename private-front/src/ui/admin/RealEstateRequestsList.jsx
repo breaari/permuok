@@ -15,16 +15,30 @@ function formatDate(value) {
   }
 }
 
-function StatusBadge({ tab }) {
-  if (tab === "draft") {
+function resolveStage(item, tab) {
+  return item?.admin_profile_stage || tab;
+}
+
+function StatusBadge({ item, tab }) {
+  const stage = resolveStage(item, tab);
+
+  if (stage === "incomplete") {
     return (
       <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-bold uppercase tracking-wider">
-        Borrador
+        Incompleta
       </span>
     );
   }
 
-  if (tab === "initial_review") {
+  if (stage === "ready_for_review") {
+    return (
+      <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold uppercase tracking-wider">
+        Lista para revisión
+      </span>
+    );
+  }
+
+  if (stage === "initial_review") {
     return (
       <span className="px-3 py-1 bg-sky-100 text-sky-700 rounded-full text-xs font-bold uppercase tracking-wider">
         Revisión inicial
@@ -32,7 +46,7 @@ function StatusBadge({ tab }) {
     );
   }
 
-  if (tab === "changes_pending") {
+  if (stage === "changes_pending") {
     return (
       <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold uppercase tracking-wider">
         Cambios pendientes
@@ -40,7 +54,7 @@ function StatusBadge({ tab }) {
     );
   }
 
-  if (tab === "approved") {
+  if (stage === "approved") {
     return (
       <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-wider">
         Aprobada
@@ -55,31 +69,41 @@ function StatusBadge({ tab }) {
   );
 }
 
-function getReceivedLabel(tab) {
-  if (tab === "draft") return "Creado";
-  if (tab === "initial_review") return "Solicitado";
-  if (tab === "changes_pending") return "Cambios solicitados";
-  if (tab === "approved") return "Aprobada";
-  if (tab === "rejected") return "Rechazada";
+function getReceivedLabel(item, tab) {
+  const stage = resolveStage(item, tab);
+
+  if (stage === "incomplete") return "Creada";
+  if (stage === "ready_for_review") return "Lista desde";
+  if (stage === "initial_review") return "Solicitado";
+  if (stage === "changes_pending") return "Cambios solicitados";
+  if (stage === "approved") return "Aprobada";
+  if (stage === "rejected") return "Rechazada";
+
   return "Fecha";
 }
 
 function getReceivedDate(item, tab) {
-  if (tab === "draft") {
+  const stage = resolveStage(item, tab);
+
+  if (stage === "incomplete") {
     return item?.created_at;
   }
 
-  if (tab === "initial_review") {
+  if (stage === "ready_for_review") {
+    return item?.created_at;
+  }
+
+  if (stage === "initial_review") {
     return item?.review_requested_at || item?.created_at;
   }
 
-  if (tab === "changes_pending") {
+  if (stage === "changes_pending") {
     return (
       item?.changes_requested_at || item?.review_requested_at || item?.created_at
     );
   }
 
-  if (tab === "approved") {
+  if (stage === "approved") {
     return (
       item?.approved_at ||
       item?.validated_at ||
@@ -88,11 +112,35 @@ function getReceivedDate(item, tab) {
     );
   }
 
-  if (tab === "rejected") {
+  if (stage === "rejected") {
     return item?.validated_at || item?.review_requested_at || item?.created_at;
   }
 
   return item?.created_at;
+}
+
+function StageHint({ item, tab }) {
+  const stage = resolveStage(item, tab);
+
+  if (stage === "incomplete") {
+    return (
+      <p className="mt-3 text-sm text-slate-500">
+        Perfil en borrador. Todavía faltan datos o una matrícula para poder
+        enviarlo a revisión.
+      </p>
+    );
+  }
+
+  if (stage === "ready_for_review") {
+    return (
+      <p className="mt-3 text-sm text-indigo-700">
+        El perfil ya está completo y con matrícula cargada, pero todavía no fue
+        enviado a revisión.
+      </p>
+    );
+  }
+
+  return null;
 }
 
 export default function RealEstateRequestsList({
@@ -112,7 +160,7 @@ export default function RealEstateRequestsList({
   return (
     <div className="space-y-4">
       {items.map((re) => {
-        const receivedLabel = getReceivedLabel(tab);
+        const receivedLabel = getReceivedLabel(re, tab);
         const receivedDate = getReceivedDate(re, tab);
 
         return (
@@ -128,9 +176,15 @@ export default function RealEstateRequestsList({
                 </h3>
 
                 <div className="mt-2 flex items-start gap-1.5 text-sm text-slate-500">
-                  <Icon name="mail" size={16} className="opacity-70 mt-0.5 shrink-0" />
+                  <Icon
+                    name="mail"
+                    size={16}
+                    className="opacity-70 mt-0.5 shrink-0"
+                  />
                   <span className="break-all">{re.email || "—"}</span>
                 </div>
+
+                <StageHint item={re} tab={tab} />
 
                 {tab === "rejected" && re.validation_note && (
                   <p className="mt-3 text-sm text-rose-700">
@@ -141,7 +195,7 @@ export default function RealEstateRequestsList({
               </div>
 
               <div className="flex flex-col items-start gap-3">
-                <StatusBadge tab={tab} />
+                <StatusBadge item={re} tab={tab} />
 
                 <div className="space-y-2 text-sm text-slate-500 w-full">
                   <div className="flex items-start gap-2">
@@ -179,7 +233,11 @@ export default function RealEstateRequestsList({
 
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
                   <span className="flex items-center gap-1.5 text-sm text-slate-500 min-w-0">
-                    <Icon name="mail" size={16} className="opacity-70 shrink-0" />
+                    <Icon
+                      name="mail"
+                      size={16}
+                      className="opacity-70 shrink-0"
+                    />
                     <span className="truncate">{re.email || "—"}</span>
                   </span>
 
@@ -196,6 +254,8 @@ export default function RealEstateRequestsList({
                   )}
                 </div>
 
+                <StageHint item={re} tab={tab} />
+
                 {tab === "rejected" && re.validation_note && (
                   <p className="mt-3 text-sm text-rose-700 line-clamp-2">
                     <span className="font-semibold">Motivo:</span>{" "}
@@ -205,7 +265,7 @@ export default function RealEstateRequestsList({
               </div>
 
               <div className="flex items-center gap-4 shrink-0">
-                <StatusBadge tab={tab} />
+                <StatusBadge item={re} tab={tab} />
 
                 <button
                   type="button"
