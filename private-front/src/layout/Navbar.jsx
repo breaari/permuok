@@ -1,7 +1,7 @@
 // layout/Navbar.jsx
 import { useMemo, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../auth/AuthContext";
+import { useAuth } from "../features/auth/components/AuthContext";
 import { Icon } from "../ui/icons/Index";
 
 function roleLabel(role) {

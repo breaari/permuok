@@ -139,3 +139,82 @@ gmp-place-autocomplete input:focus {
   box-shadow: 0 0 0 2px var(--color-primary);
   border-color: transparent;
 }
+
+/* Oculta flechas en inputs number */
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.no-spinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+gmp-place-autocomplete {
+  width: 100%;
+}
+
+gmp-place-autocomplete::part(text-field) {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  height: 100%;
+  font-size: 14px;
+  padding: 0;
+}
+
+gmp-place-autocomplete::part(input) {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.permuok-place-autocomplete {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.permuok-place-autocomplete:focus,
+.permuok-place-autocomplete:focus-visible,
+.permuok-place-autocomplete:active {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.permuok-place-autocomplete::part(container),
+.permuok-place-autocomplete::part(text-field),
+.permuok-place-autocomplete::part(input-field),
+.permuok-place-autocomplete::part(input),
+.permuok-place-autocomplete::part(field),
+.permuok-place-autocomplete::part(content) {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  min-height: 46px !important;
+  height: 46px !important;
+}
+
+.permuok-place-autocomplete::part(input) {
+  font-size: 14px !important;
+  line-height: 1.25rem !important;
+}
+
+.permuok-place-autocomplete::part(input):focus,
+.permuok-place-autocomplete::part(input-field):focus,
+.permuok-place-autocomplete::part(text-field):focus {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}

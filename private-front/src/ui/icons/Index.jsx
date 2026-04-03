@@ -35,6 +35,23 @@ import {
   ShieldCheck,
   X,
   MapPin,
+  PlusCircle,
+  Pencil,
+  Bed,
+  Bath,
+  Car,
+  Ruler,
+  RefreshCcw,
+  BarChart3,
+  Building2Icon,
+  ImageIcon,
+  EditIcon,
+  Rocket,
+  Archive,
+  ArrowRight,
+  TriangleAlert,
+  Pause,
+  Trash
 } from "lucide-react";
 
 export const Icons = {
@@ -83,6 +100,25 @@ export const Icons = {
   clipboardList: ClipboardList,
   close: X,
   mapPin: MapPin,
+  plusCircle: PlusCircle,
+
+  edit: Pencil,
+  bed: Bed,
+  bath: Bath,
+  car: Car,
+  ruler: Ruler,
+  refresh: RefreshCcw,
+  chart: BarChart3,
+  building2: Building2Icon,
+  image: ImageIcon,
+  editNote: EditIcon,
+  rocket: Rocket,
+  archive: Archive,
+  arrowRight: ArrowRight,
+  warning: TriangleAlert,
+  pause: Pause,
+  trash: Trash
+
 };
 
 export function Icon({ name, size = 18, className = "" }) {

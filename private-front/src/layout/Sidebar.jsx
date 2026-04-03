@@ -1,6 +1,6 @@
 // layout/Sidebar.jsx
 import { NavLink } from "react-router-dom";
-import { useAuth } from "../auth/AuthContext";
+import { useAuth } from "../features/auth/components/AuthContext";
 import LogoParaFondoAzul from "../assets/logoparafondoazul.png";
 import { Icon } from "../ui/icons/Index";
 
@@ -74,6 +74,7 @@ export default function Sidebar({ mobile = false, onNavigate }) {
             >
               Solicitudes de revisión
             </Item>
+
             <Item
               to="/admin/users"
               icon={<Icon name="users" />}
@@ -81,6 +82,7 @@ export default function Sidebar({ mobile = false, onNavigate }) {
             >
               Usuarios
             </Item>
+
             <Item
               to="/admin/billing"
               icon={<Icon name="creditCard" />}
@@ -102,6 +104,22 @@ export default function Sidebar({ mobile = false, onNavigate }) {
             </Item>
 
             <Item
+              to="/properties"
+              icon={<Icon name="building2" />}
+              onClick={onNavigate}
+            >
+              Mis publicaciones
+            </Item>
+
+            <Item
+              to="/search-requests"
+              icon={<Icon name="search" />}
+              onClick={onNavigate}
+            >
+              Mis búsquedas
+            </Item>
+
+            <Item
               to="/my-profile"
               icon={<Icon name="clipboardList" />}
               onClick={onNavigate}
@@ -117,7 +135,11 @@ export default function Sidebar({ mobile = false, onNavigate }) {
               Membresía
             </Item>
 
-            <Item to="/users" icon={<Icon name="users" />} onClick={onNavigate}>
+            <Item
+              to="/users"
+              icon={<Icon name="users" />}
+              onClick={onNavigate}
+            >
               Mis usuarios
             </Item>
           </>
@@ -131,6 +153,22 @@ export default function Sidebar({ mobile = false, onNavigate }) {
               onClick={onNavigate}
             >
               Panel
+            </Item>
+
+            <Item
+              to="/properties"
+              icon={<Icon name="building2" />}
+              onClick={onNavigate}
+            >
+              Mis publicaciones
+            </Item>
+
+            <Item
+              to="/search-requests"
+              icon={<Icon name="search" />}
+              onClick={onNavigate}
+            >
+              Mis búsquedas
             </Item>
 
             <Item
