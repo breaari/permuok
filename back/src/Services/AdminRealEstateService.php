@@ -17,7 +17,8 @@ class AdminRealEstateService
         $s = strtolower(trim((string)$status));
 
         return match ($s) {
-            'draft' => 'draft',
+            'incomplete' => 'incomplete',
+            'ready_for_review' => 'ready_for_review',
             'initial_review' => 'initial_review',
             'changes_pending' => 'changes_pending',
             'approved' => 'approved',
@@ -26,132 +27,37 @@ class AdminRealEstateService
         };
     }
 
+    private static function buildSearchWhere(?string $q, array &$params): string
+    {
+        $q = trim((string)$q);
+
+        if ($q === '') {
+            return '';
+        }
+
+        $params['q'] = '%' . $q . '%';
+
+        return " AND (
+            r.name LIKE :q
+            OR r.legal_name LIKE :q
+            OR r.email LIKE :q
+            OR r.phone LIKE :q
+            OR r.cuit LIKE :q
+        ) ";
+    }
+
+    private static function mapItem(array $row): array
+    {
+        $row['admin_profile_stage'] = RealEstateService::resolveAdminProfileStage($row);
+        return $row;
+    }
+
     public static function counts(?string $q = null): array
     {
         $pdo = self::db();
 
-        $whereQ = '';
         $params = [];
-
-        $q = trim((string)$q);
-        if ($q !== '') {
-            $whereQ = " AND (
-                r.name LIKE :q
-                OR r.legal_name LIKE :q
-                OR r.email LIKE :q
-                OR r.cuit LIKE :q
-            )";
-            $params['q'] = '%' . $q . '%';
-        }
-
-        $sql = "
-            SELECT
-              COALESCE(SUM(CASE WHEN r.profile_status = " . RealEstateProfileStatus::DRAFT . " THEN 1 ELSE 0 END), 0) AS draft,
-              COALESCE(SUM(CASE WHEN r.profile_status = " . RealEstateProfileStatus::INITIAL_REVIEW . " THEN 1 ELSE 0 END), 0) AS initial_review,
-              COALESCE(SUM(CASE WHEN r.profile_status = " . RealEstateProfileStatus::CHANGES_PENDING . " THEN 1 ELSE 0 END), 0) AS changes_pending,
-              COALESCE(SUM(CASE WHEN r.profile_status = " . RealEstateProfileStatus::APPROVED . " THEN 1 ELSE 0 END), 0) AS approved,
-              COALESCE(SUM(CASE WHEN r.profile_status = " . RealEstateProfileStatus::REJECTED . " THEN 1 ELSE 0 END), 0) AS rejected
-            FROM real_estates r
-            WHERE r.deleted_at IS NULL
-            {$whereQ}
-        ";
-
-        $st = $pdo->prepare($sql);
-        $st->execute($params);
-        $row = $st->fetch() ?: [
-            'draft' => 0,
-            'initial_review' => 0,
-            'changes_pending' => 0,
-            'approved' => 0,
-            'rejected' => 0,
-        ];
-
-        return [
-            'draft' => (int)($row['draft'] ?? 0),
-            'initial_review' => (int)($row['initial_review'] ?? 0),
-            'changes_pending' => (int)($row['changes_pending'] ?? 0),
-            'approved' => (int)($row['approved'] ?? 0),
-            'rejected' => (int)($row['rejected'] ?? 0),
-        ];
-    }
-
-    public static function list(string $status, int $page, int $perPage, ?string $q = null): array
-    {
-        $pdo = self::db();
-
-        $page = max(1, $page);
-        $perPage = min(max(1, $perPage), 50);
-        $offset = ($page - 1) * $perPage;
-
-        $normalizedStatus = self::normStatus($status);
-
-        $where = " r.deleted_at IS NULL ";
-        $params = [];
-
-        switch ($normalizedStatus) {
-            case 'draft':
-                $where .= " AND r.profile_status = :profile_status ";
-                $params['profile_status'] = RealEstateProfileStatus::DRAFT;
-                break;
-
-            case 'initial_review':
-                $where .= " AND r.profile_status = :profile_status ";
-                $params['profile_status'] = RealEstateProfileStatus::INITIAL_REVIEW;
-                break;
-
-            case 'changes_pending':
-                $where .= " AND r.profile_status = :profile_status ";
-                $params['profile_status'] = RealEstateProfileStatus::CHANGES_PENDING;
-                break;
-
-            case 'approved':
-                $where .= " AND r.profile_status = :profile_status ";
-                $params['profile_status'] = RealEstateProfileStatus::APPROVED;
-                break;
-
-            case 'rejected':
-                $where .= " AND r.profile_status = :profile_status ";
-                $params['profile_status'] = RealEstateProfileStatus::REJECTED;
-                break;
-
-            default:
-                $where .= " AND r.profile_status = :profile_status ";
-                $params['profile_status'] = RealEstateProfileStatus::INITIAL_REVIEW;
-                break;
-        }
-
-        $q = trim((string)$q);
-        if ($q !== '') {
-            $where .= " AND (
-                r.name LIKE :q
-                OR r.legal_name LIKE :q
-                OR r.email LIKE :q
-                OR r.cuit LIKE :q
-            ) ";
-            $params['q'] = '%' . $q . '%';
-        }
-
-        $countSql = "
-            SELECT COUNT(*) AS total
-            FROM real_estates r
-            WHERE {$where}
-        ";
-
-        $stCount = $pdo->prepare($countSql);
-        foreach ($params as $k => $v) {
-            $stCount->bindValue(':' . $k, $v);
-        }
-        $stCount->execute();
-        $total = (int)($stCount->fetch()['total'] ?? 0);
-
-        $orderBy = match ($normalizedStatus) {
-            'draft' => " r.created_at DESC, r.id DESC ",
-            'initial_review' => " COALESCE(r.review_requested_at, r.created_at) DESC, r.id DESC ",
-            'changes_pending' => " COALESCE(r.changes_requested_at, r.created_at) DESC, r.id DESC ",
-            'approved' => " COALESCE(r.approved_at, r.validated_at, r.created_at) DESC, r.id DESC ",
-            'rejected' => " COALESCE(r.validated_at, r.review_requested_at, r.created_at) DESC, r.id DESC ",
-            default => " r.id DESC ",
-        };
+        $whereQ = self::buildSearchWhere($q, $params);
 
         $sql = "
             SELECT
@@ -162,6 +68,116 @@ class AdminRealEstateService
               r.email,
               r.phone,
               r.address,
+              r.address_place_id,
+              r.address_lat,
+              r.address_lng,
+              r.website,
+              r.instagram,
+              r.facebook,
+              r.status,
+              r.profile_status,
+              r.validation_status,
+              r.validation_note,
+              r.review_requested_at,
+              r.changes_requested_at,
+              r.approved_at,
+              r.approved_by,
+              r.created_at,
+              r.validated_at
+            FROM real_estates r
+            WHERE r.deleted_at IS NULL
+            {$whereQ}
+        ";
+
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        $rows = $st->fetchAll() ?: [];
+
+        $counts = [
+            'incomplete' => 0,
+            'ready_for_review' => 0,
+            'initial_review' => 0,
+            'changes_pending' => 0,
+            'approved' => 0,
+            'rejected' => 0,
+        ];
+
+        foreach ($rows as $row) {
+            $stage = RealEstateService::resolveAdminProfileStage($row);
+
+            if (isset($counts[$stage])) {
+                $counts[$stage]++;
+            }
+        }
+
+        return $counts;
+    }
+
+    public static function list(string $status, int $page, int $perPage, ?string $q = null): array
+    {
+        $pdo = self::db();
+
+        $page = max(1, $page);
+        $perPage = min(max(1, $perPage), 50);
+
+        $normalizedStatus = self::normStatus($status);
+
+        $params = [];
+        $where = " r.deleted_at IS NULL ";
+        $where .= self::buildSearchWhere($q, $params);
+
+        $orderBy = " r.id DESC ";
+
+        if (in_array($normalizedStatus, ['incomplete', 'ready_for_review'], true)) {
+            $where .= " AND r.profile_status = :profile_status ";
+            $params['profile_status'] = RealEstateProfileStatus::DRAFT;
+            $orderBy = " r.created_at DESC, r.id DESC ";
+        } else {
+            switch ($normalizedStatus) {
+                case 'initial_review':
+                    $where .= " AND r.profile_status = :profile_status ";
+                    $params['profile_status'] = RealEstateProfileStatus::INITIAL_REVIEW;
+                    $orderBy = " COALESCE(r.review_requested_at, r.created_at) DESC, r.id DESC ";
+                    break;
+
+                case 'changes_pending':
+                    $where .= " AND r.profile_status = :profile_status ";
+                    $params['profile_status'] = RealEstateProfileStatus::CHANGES_PENDING;
+                    $orderBy = " COALESCE(r.changes_requested_at, r.created_at) DESC, r.id DESC ";
+                    break;
+
+                case 'approved':
+                    $where .= " AND r.profile_status = :profile_status ";
+                    $params['profile_status'] = RealEstateProfileStatus::APPROVED;
+                    $orderBy = " COALESCE(r.approved_at, r.validated_at, r.created_at) DESC, r.id DESC ";
+                    break;
+
+                case 'rejected':
+                    $where .= " AND r.profile_status = :profile_status ";
+                    $params['profile_status'] = RealEstateProfileStatus::REJECTED;
+                    $orderBy = " COALESCE(r.validated_at, r.review_requested_at, r.created_at) DESC, r.id DESC ";
+                    break;
+
+                default:
+                    $where .= " AND r.profile_status = :profile_status ";
+                    $params['profile_status'] = RealEstateProfileStatus::INITIAL_REVIEW;
+                    $orderBy = " COALESCE(r.review_requested_at, r.created_at) DESC, r.id DESC ";
+                    break;
+            }
+        }
+
+        $sql = "
+            SELECT
+              r.id,
+              r.name,
+              r.legal_name,
+              r.cuit,
+              r.email,
+              r.phone,
+              r.address,
+              r.address_place_id,
+              r.address_lat,
+              r.address_lng,
               r.website,
               r.instagram,
               r.facebook,
@@ -180,7 +196,6 @@ class AdminRealEstateService
             LEFT JOIN users u ON u.id = r.approved_by
             WHERE {$where}
             ORDER BY {$orderBy}
-            LIMIT :limit OFFSET :offset
         ";
 
         $st = $pdo->prepare($sql);
@@ -189,17 +204,27 @@ class AdminRealEstateService
             $st->bindValue(':' . $k, $v);
         }
 
-        $st->bindValue(':limit', $perPage, PDO::PARAM_INT);
-        $st->bindValue(':offset', $offset, PDO::PARAM_INT);
-
         $st->execute();
-        $items = $st->fetchAll() ?: [];
+        $rows = $st->fetchAll() ?: [];
+
+        $items = array_map(fn($row) => self::mapItem($row), $rows);
+
+        if (in_array($normalizedStatus, ['incomplete', 'ready_for_review'], true)) {
+            $items = array_values(array_filter(
+                $items,
+                fn($item) => ($item['admin_profile_stage'] ?? null) === $normalizedStatus
+            ));
+        }
+
+        $total = count($items);
+        $offset = ($page - 1) * $perPage;
+        $pagedItems = array_slice($items, $offset, $perPage);
 
         $from = $total === 0 ? 0 : ($offset + 1);
         $to = min($offset + $perPage, $total);
 
         return [
-            'items' => $items,
+            'items' => $pagedItems,
             'meta' => [
                 'status' => $normalizedStatus,
                 'page' => $page,
@@ -348,7 +373,10 @@ class AdminRealEstateService
                 r.approved_by,
                 u.email AS approved_by_email,
                 r.created_at,
-                r.validated_at
+                r.validated_at,
+                r.address_place_id,
+                r.address_lat,
+                r.address_lng
             FROM real_estates r
             LEFT JOIN users u ON u.id = r.approved_by
             WHERE r.deleted_at IS NULL
@@ -361,6 +389,8 @@ class AdminRealEstateService
         if (!$re) {
             throw new \Exception("Inmobiliaria no encontrada");
         }
+
+        $re['admin_profile_stage'] = RealEstateService::resolveAdminProfileStage($re);
 
         return [
             'real_estate' => $re,

@@ -1,8 +1,10 @@
 <?php
 require_once __DIR__ . '/config.php';
 
-function pdo(): PDO {
+function pdo(): PDO
+{
     static $pdo = null;
+
     if ($pdo !== null) {
         return $pdo;
     }

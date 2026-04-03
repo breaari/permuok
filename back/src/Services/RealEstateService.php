@@ -5,15 +5,6 @@ namespace App\Services;
 use PDO;
 use Exception;
 
-final class RealEstateProfileStatus
-{
-    public const DRAFT = 0;
-    public const INITIAL_REVIEW = 1;
-    public const APPROVED = 2;
-    public const REJECTED = 3;
-    public const CHANGES_PENDING = 4;
-}
-
 class RealEstateService
 {
     private static function db(): PDO
@@ -778,5 +769,99 @@ class RealEstateService
         if ($requireWebsite && !self::validateWebsite((string)($data['website'] ?? ''))) {
             throw new Exception("Ingresá un sitio web válido");
         }
+    }
+
+    public static function isProfileComplete(?array $realEstate): bool
+    {
+        if (!$realEstate) {
+            return false;
+        }
+
+        $requiredFields = [
+            'name',
+            'legal_name',
+            'cuit',
+            'address',
+            'phone',
+            'email',
+            'website',
+        ];
+
+        foreach ($requiredFields as $field) {
+            if (!isset($realEstate[$field]) || trim((string)$realEstate[$field]) === '') {
+                return false;
+            }
+        }
+
+        if (!self::validateCuit((string)$realEstate['cuit'])) {
+            return false;
+        }
+
+        if (!self::validatePhone((string)$realEstate['phone'])) {
+            return false;
+        }
+
+        if (!self::validateWebsite((string)$realEstate['website'])) {
+            return false;
+        }
+
+        if (
+            empty($realEstate['address_place_id']) ||
+            $realEstate['address_lat'] === null ||
+            $realEstate['address_lng'] === null
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public static function hasAtLeastOneLicense(int $realEstateId): bool
+    {
+        $pdo = self::db();
+
+        $st = $pdo->prepare("
+        SELECT COUNT(*) AS c
+        FROM real_estate_licenses
+        WHERE real_estate_id = :id
+          AND deleted_at IS NULL
+    ");
+        $st->execute(['id' => $realEstateId]);
+
+        return (int)($st->fetch()['c'] ?? 0) > 0;
+    }
+
+    public static function resolveDraftStage(?array $realEstate): string
+    {
+        if (!$realEstate || empty($realEstate['id'])) {
+            return 'not_started';
+        }
+
+        $isComplete = self::isProfileComplete($realEstate);
+        $hasLicenses = self::hasAtLeastOneLicense((int)$realEstate['id']);
+
+        if ($isComplete && $hasLicenses) {
+            return 'ready_for_review';
+        }
+
+        return 'incomplete';
+    }
+
+    public static function resolveAdminProfileStage(?array $realEstate): string
+    {
+        if (!$realEstate || empty($realEstate['id'])) {
+            return 'not_started';
+        }
+
+        $profileStatus = (int)($realEstate['profile_status'] ?? RealEstateProfileStatus::DRAFT);
+
+        return match ($profileStatus) {
+            RealEstateProfileStatus::INITIAL_REVIEW => 'initial_review',
+            RealEstateProfileStatus::APPROVED => 'approved',
+            RealEstateProfileStatus::REJECTED => 'rejected',
+            RealEstateProfileStatus::CHANGES_PENDING => 'changes_pending',
+            RealEstateProfileStatus::DRAFT => self::resolveDraftStage($realEstate),
+            default => 'incomplete',
+        };
     }
 }
