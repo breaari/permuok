@@ -1151,4 +1151,305 @@ class PropertyService
             throw $e;
         }
     }
+
+    public static function listExploreProperties(int $userId, array $filters = []): array
+    {
+        $pdo = self::db();
+        $user = self::getValidPublisherUser($userId);
+
+        $where = [
+            "p.deleted_at IS NULL",
+            "p.status = 'published'",
+            "p.is_visible = 1",
+            "p.real_estate_id <> :real_estate_id",
+        ];
+
+        $params = [
+            'real_estate_id' => (int)$user['real_estate_id'],
+        ];
+
+        if (!empty($filters['q'])) {
+            $where[] = "(
+            p.title LIKE :q
+            OR p.city LIKE :q
+            OR p.zone LIKE :q
+            OR p.province LIKE :q
+            OR CAST(p.id AS CHAR) LIKE :q
+        )";
+            $params['q'] = '%' . trim((string)$filters['q']) . '%';
+        }
+
+        if (!empty($filters['property_type'])) {
+            $where[] = "p.property_type = :property_type";
+            $params['property_type'] = trim((string)$filters['property_type']);
+        }
+
+        $limit = (int)($filters['limit'] ?? 6);
+        if ($limit <= 0) $limit = 6;
+        if ($limit > 50) $limit = 50;
+
+        $page = (int)($filters['page'] ?? 1);
+        if ($page <= 0) $page = 1;
+
+        $offset = ($page - 1) * $limit;
+
+        $countSql = "
+        SELECT COUNT(*) AS total
+        FROM properties p
+        WHERE " . implode(" AND ", $where);
+
+        $stCount = $pdo->prepare($countSql);
+        foreach ($params as $key => $value) {
+            $stCount->bindValue(':' . $key, $value);
+        }
+        $stCount->execute();
+
+        $total = (int)($stCount->fetch()['total'] ?? 0);
+        $pages = max(1, (int)ceil($total / $limit));
+
+        if ($page > $pages) {
+            $page = $pages;
+            $offset = ($page - 1) * $limit;
+        }
+
+        $sql = "
+        SELECT
+            p.id,
+            p.real_estate_id,
+            p.title,
+            p.description,
+            p.property_type,
+            p.price,
+            p.currency,
+            p.country,
+            p.province,
+            p.city,
+            p.zone,
+            p.total_area,
+            p.covered_area,
+            p.bedrooms,
+            p.bathrooms,
+            p.garages,
+            p.status,
+            p.created_at,
+            p.published_at,
+
+            pr.criteria_mode,
+            pr.accepts_total_swap,
+            pr.accepts_swap_plus_cash,
+            pr.accepts_multiple_swap,
+            pr.accepts_open_proposals,
+            pr.accepts_cash_only,
+            pr.notes AS requirement_notes,
+
+            (
+                SELECT pi.id
+                FROM property_images pi
+                WHERE pi.property_id = p.id
+                  AND pi.deleted_at IS NULL
+                ORDER BY pi.is_cover DESC, pi.sort_order ASC, pi.id ASC
+                LIMIT 1
+            ) AS cover_image_id
+
+        FROM properties p
+        LEFT JOIN property_requirements pr
+            ON pr.property_id = p.id
+           AND pr.deleted_at IS NULL
+        WHERE " . implode(" AND ", $where) . "
+        ORDER BY p.published_at DESC, p.created_at DESC
+        LIMIT :limit OFFSET :offset
+    ";
+
+        $st = $pdo->prepare($sql);
+
+        foreach ($params as $key => $value) {
+            $st->bindValue(':' . $key, $value);
+        }
+
+        $st->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $st->bindValue(':offset', $offset, PDO::PARAM_INT);
+
+        $st->execute();
+        $rows = $st->fetchAll() ?: [];
+
+        if (!$rows) {
+            return [
+                'items' => [],
+                'meta' => [
+                    'page' => $page,
+                    'pages' => $pages,
+                    'from' => 0,
+                    'to' => 0,
+                    'total' => $total,
+                    'limit' => $limit,
+                ],
+            ];
+        }
+
+        $propertyIds = array_map(fn($row) => (int)$row['id'], $rows);
+
+        $placeholders = [];
+        $imageParams = [];
+        foreach ($propertyIds as $index => $propertyId) {
+            $ph = ":property_id_$index";
+            $placeholders[] = $ph;
+            $imageParams[$ph] = $propertyId;
+        }
+
+        $imagesSql = "
+        SELECT
+            pi.id,
+            pi.property_id,
+            pi.sort_order,
+            pi.is_cover,
+            pi.created_at
+        FROM property_images pi
+        WHERE pi.deleted_at IS NULL
+          AND pi.property_id IN (" . implode(", ", $placeholders) . ")
+        ORDER BY pi.property_id ASC, pi.is_cover DESC, pi.sort_order ASC, pi.id ASC
+    ";
+
+        $stImages = $pdo->prepare($imagesSql);
+        foreach ($imageParams as $ph => $value) {
+            $stImages->bindValue($ph, $value, PDO::PARAM_INT);
+        }
+        $stImages->execute();
+
+        $imageRows = $stImages->fetchAll() ?: [];
+
+        $imagesByProperty = [];
+        foreach ($imageRows as $img) {
+            $propertyId = (int)$img['property_id'];
+            $imageId = (int)$img['id'];
+
+            $imagesByProperty[$propertyId][] = [
+                'id' => $imageId,
+                'property_id' => $propertyId,
+                'sort_order' => (int)($img['sort_order'] ?? 0),
+                'is_cover' => (int)($img['is_cover'] ?? 0),
+                'created_at' => $img['created_at'] ?? null,
+                'view_url' => self::imageViewUrl($imageId),
+            ];
+        }
+
+        $items = array_map(function ($row) use ($imagesByProperty) {
+            $propertyId = (int)$row['id'];
+
+            $row['cover_image_id'] = !empty($row['cover_image_id'])
+                ? (int)$row['cover_image_id']
+                : null;
+
+            $row['cover_image_url'] = self::imageViewUrl($row['cover_image_id']);
+            $row['images'] = $imagesByProperty[$propertyId] ?? [];
+
+            return $row;
+        }, $rows);
+
+        $from = $total > 0 ? $offset + 1 : 0;
+        $to = $total > 0 ? min($offset + $limit, $total) : 0;
+
+        return [
+            'items' => $items,
+            'meta' => [
+                'page' => $page,
+                'pages' => $pages,
+                'from' => $from,
+                'to' => $to,
+                'total' => $total,
+                'limit' => $limit,
+            ],
+        ];
+    }
+    public static function getExploreDetail(int $userId, int $propertyId): array
+    {
+        $pdo = self::db();
+        $user = self::getValidPublisherUser($userId);
+
+        $st = $pdo->prepare("
+        SELECT *
+        FROM properties
+        WHERE id = :id
+          AND real_estate_id <> :real_estate_id
+          AND status = 'published'
+          AND is_visible = 1
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+        $st->execute([
+            'id' => $propertyId,
+            'real_estate_id' => (int)$user['real_estate_id'],
+        ]);
+
+        $property = $st->fetch();
+
+        if (!$property) {
+            throw new Exception("Propiedad no encontrada");
+        }
+
+        $stImages = $pdo->prepare("
+        SELECT id, property_id, file_path, sort_order, is_cover, created_at
+        FROM property_images
+        WHERE property_id = :property_id
+          AND deleted_at IS NULL
+        ORDER BY sort_order ASC, id ASC
+    ");
+        $stImages->execute(['property_id' => $propertyId]);
+        $images = $stImages->fetchAll() ?: [];
+
+        $images = array_map(function ($img) {
+            $img['view_url'] = self::imageViewUrl(isset($img['id']) ? (int)$img['id'] : null);
+            return $img;
+        }, $images);
+
+        $stReq = $pdo->prepare("
+        SELECT *
+        FROM property_requirements
+        WHERE property_id = :property_id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+        $stReq->execute(['property_id' => $propertyId]);
+        $requirements = $stReq->fetch() ?: null;
+
+        $requirementPropertyTypes = [];
+        $requirementLocations = [];
+
+        if ($requirements && !empty($requirements['id'])) {
+            $requirementId = (int)$requirements['id'];
+
+            $stTypes = $pdo->prepare("
+            SELECT property_type
+            FROM property_requirement_property_types
+            WHERE property_requirement_id = :property_requirement_id
+            ORDER BY id ASC
+        ");
+            $stTypes->execute(['property_requirement_id' => $requirementId]);
+            $requirementPropertyTypes = $stTypes->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+            $stLocations = $pdo->prepare("
+            SELECT id, country_code, country, province, city, zone
+            FROM property_requirement_locations
+            WHERE property_requirement_id = :property_requirement_id
+            ORDER BY id ASC
+        ");
+            $stLocations->execute(['property_requirement_id' => $requirementId]);
+            $requirementLocations = $stLocations->fetchAll() ?: [];
+        }
+
+        return [
+            'property' => $property,
+            'images' => $images,
+            'requirements' => $requirements,
+            'requirement_property_types' => $requirementPropertyTypes,
+            'requirement_locations' => $requirementLocations,
+            'access' => [
+                'can_edit' => false,
+                'can_publish' => false,
+                'can_pause' => false,
+                'can_archive' => false,
+                'can_close' => false,
+                'can_delete' => false,
+            ],
+        ];
+    }
 }

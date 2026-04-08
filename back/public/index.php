@@ -136,13 +136,19 @@ $routes = [
     'GET /admin/billing/counts' => [AdminBillingController::class, 'counts'],
     'GET /admin/billing'        => [AdminBillingController::class, 'list'],
 
-    // Properties
+    // Properties - propias
     'GET /properties'  => [PropertyController::class, 'list'],
     'POST /properties' => [PropertyController::class, 'create'],
 
-    // Search requests
+    // Properties - explorar
+    'GET /explore/properties' => [PropertyController::class, 'explore'],
+
+    // Search requests - propias
     'GET /search-requests'  => [SearchRequestController::class, 'list'],
     'POST /search-requests' => [SearchRequestController::class, 'create'],
+
+    // Search requests - explorar
+    'GET /explore/search-requests' => [SearchRequestController::class, 'explore'],
 ];
 
 $key = $method . ' ' . $uri;
@@ -274,6 +280,18 @@ if ($method === 'POST' && preg_match('#^/search-requests/(\d+)/archive$#', $uri,
 if ($method === 'POST' && preg_match('#^/search-requests/(\d+)/delete$#', $uri, $m)) {
     $_GET['id'] = (int)$m[1];
     SearchRequestController::delete();
+    exit;
+}
+
+if ($method === 'GET' && preg_match('#^/explore/properties/(\d+)$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    PropertyController::exploreDetail();
+    exit;
+}
+
+if ($method === 'GET' && preg_match('#^/explore/search-requests/(\d+)$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    SearchRequestController::exploreDetail();
     exit;
 }
 

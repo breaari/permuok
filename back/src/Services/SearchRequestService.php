@@ -698,4 +698,166 @@ class SearchRequestService
         if ($value === null || $value === '') return null;
         return (int)$value;
     }
+
+    public static function listExploreSearchRequests(int $userId, array $filters = []): array
+    {
+        $pdo = self::db();
+        $user = self::getValidPublisherUser($userId);
+
+        $where = [
+            "sr.deleted_at IS NULL",
+            "sr.status = 'published'",
+            "sr.is_visible = 1",
+            "sr.real_estate_id <> :real_estate_id",
+        ];
+
+        $params = [
+            'real_estate_id' => (int)$user['real_estate_id'],
+        ];
+
+        if (!empty($filters['q'])) {
+            $where[] = "(
+            sr.title LIKE :q
+            OR sr.description LIKE :q
+            OR sr.country LIKE :q
+            OR sr.province LIKE :q
+            OR sr.city LIKE :q
+            OR sr.zone LIKE :q
+            OR CAST(sr.id AS CHAR) LIKE :q
+        )";
+            $params['q'] = '%' . trim((string)$filters['q']) . '%';
+        }
+
+        if (!empty($filters['property_type'])) {
+            $where[] = "EXISTS (
+            SELECT 1
+            FROM search_request_property_types srpt_filter
+            WHERE srpt_filter.search_request_id = sr.id
+              AND srpt_filter.property_type = :property_type
+        )";
+            $params['property_type'] = trim((string)$filters['property_type']);
+        }
+
+        $limit = (int)($filters['limit'] ?? 20);
+        if ($limit <= 0) $limit = 20;
+        if ($limit > 100) $limit = 100;
+
+        $page = (int)($filters['page'] ?? 1);
+        if ($page <= 0) $page = 1;
+
+        $offset = ($page - 1) * $limit;
+
+        $countSql = "
+        SELECT COUNT(*) AS total
+        FROM search_requests sr
+        WHERE " . implode(" AND ", $where);
+
+        $stCount = $pdo->prepare($countSql);
+        foreach ($params as $k => $v) {
+            $stCount->bindValue(":$k", $v);
+        }
+        $stCount->execute();
+
+        $total = (int)($stCount->fetch()['total'] ?? 0);
+        $pages = max(1, (int)ceil($total / $limit));
+
+        if ($page > $pages) {
+            $page = $pages;
+            $offset = ($page - 1) * $limit;
+        }
+
+        $sql = "
+        SELECT
+            sr.*,
+            (
+                SELECT GROUP_CONCAT(DISTINCT srpt.property_type ORDER BY srpt.property_type SEPARATOR ',')
+                FROM search_request_property_types srpt
+                WHERE srpt.search_request_id = sr.id
+            ) AS property_types,
+            (
+                SELECT COUNT(*)
+                FROM search_request_property_types srpt
+                WHERE srpt.search_request_id = sr.id
+            ) AS property_types_count,
+            (
+                SELECT COUNT(*)
+                FROM search_request_amenities sra
+                WHERE sra.search_request_id = sr.id
+            ) AS amenities_count
+        FROM search_requests sr
+        WHERE " . implode(" AND ", $where) . "
+        ORDER BY sr.published_at DESC, sr.created_at DESC
+        LIMIT :limit OFFSET :offset
+    ";
+
+        $stmt = $pdo->prepare($sql);
+
+        foreach ($params as $k => $v) {
+            $stmt->bindValue(":$k", $v);
+        }
+
+        $stmt->bindValue(":limit", $limit, PDO::PARAM_INT);
+        $stmt->bindValue(":offset", $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $items = $stmt->fetchAll() ?: [];
+
+        $from = $total > 0 ? $offset + 1 : 0;
+        $to = $total > 0 ? min($offset + $limit, $total) : 0;
+
+        return [
+            'items' => $items,
+            'meta' => [
+                'page' => $page,
+                'pages' => $pages,
+                'from' => $from,
+                'to' => $to,
+                'total' => $total,
+                'limit' => $limit,
+            ],
+        ];
+    }
+
+    public static function getExploreDetail(int $userId, int $id): array
+{
+    $pdo = self::db();
+    $user = self::getValidPublisherUser($userId);
+
+    $st = $pdo->prepare("
+        SELECT *
+        FROM search_requests
+        WHERE id = :id
+          AND real_estate_id <> :real_estate_id
+          AND status = 'published'
+          AND is_visible = 1
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+    $st->execute([
+        'id' => $id,
+        'real_estate_id' => (int)$user['real_estate_id'],
+    ]);
+
+    $item = $st->fetch();
+
+    if (!$item) {
+        throw new Exception("Búsqueda no encontrada");
+    }
+
+    $item['property_types'] = self::getPropertyTypes($pdo, (int)$item['id']);
+    $item['amenities'] = self::getAmenities($pdo, (int)$item['id']);
+
+    return [
+        'search_request' => $item,
+        'property_types' => $item['property_types'],
+        'amenities' => $item['amenities'],
+        'access' => [
+            'can_edit' => false,
+            'can_publish' => false,
+            'can_pause' => false,
+            'can_archive' => false,
+            'can_delete' => false,
+        ],
+    ];
+}
 }
