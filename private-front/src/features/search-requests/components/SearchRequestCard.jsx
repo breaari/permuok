@@ -128,6 +128,8 @@ export default function SearchRequestCard({
   onEdit,
   onManage,
   onDelete,
+  onView,
+  variant = "owned",
 }) {
   const status = getStatusMeta(item?.status);
   const location = formatLocation(item);
@@ -135,19 +137,22 @@ export default function SearchRequestCard({
   const payment = formatPaymentLabel(item);
   const budget = formatMoneyRange(item);
 
+  const isDashboard = variant === "dashboard";
+
   return (
     <article className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
       <div className="p-5 sm:p-6">
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(290px,1.3fr)_minmax(190px,0.9fr)_minmax(180px,0.75fr)_minmax(220px,0.9fr)] gap-6 items-start">
-          {/* IZQUIERDA */}
           <div className="min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
-              <span
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-bold tracking-wide ${status.className}`}
-              >
-                <span className={`w-2 h-2 rounded-full ${status.dotClassName}`} />
-                {status.label}
-              </span>
+              {!isDashboard && (
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-bold tracking-wide ${status.className}`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${status.dotClassName}`} />
+                  {status.label}
+                </span>
+              )}
 
               <span className="text-xs text-slate-400 font-medium">
                 #{item?.id || "—"}
@@ -165,7 +170,6 @@ export default function SearchRequestCard({
             </div>
           </div>
 
-          {/* UBICACIÓN */}
           <div className="min-w-0 xl:border-l xl:border-slate-200 xl:pl-6">
             <InfoBlock
               label="Ubicación"
@@ -194,7 +198,6 @@ export default function SearchRequestCard({
             </div>
           </div>
 
-          {/* TIPO + MODALIDAD */}
           <div className="min-w-0 xl:border-l xl:border-slate-200 xl:pl-6">
             <InfoBlock
               label="Tipo buscado"
@@ -211,49 +214,56 @@ export default function SearchRequestCard({
             </div>
           </div>
 
-          {/* DERECHA */}
-         
-         <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-left">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                Rango de valor
+              </p>
+              <p className="mt-1 text-xl font-extrabold text-primary leading-tight">
+                {budget}
+              </p>
+            </div>
 
-  {/* PRECIO */}
-  <div className="text-left">
-    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-      Rango de valor
-    </p>
-    <p className="mt-1 text-xl font-extrabold text-primary leading-tight">
-      {budget}
-    </p>
-  </div>
+            <div className="flex items-center gap-2">
+              {isDashboard ? (
+                <button
+                  type="button"
+                  onClick={onView}
+                  className="px-4 py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:opacity-90 transition-all inline-flex items-center gap-2"
+                >
+                  Ver más
+                  <Icon name="arrowRight" size={16} />
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={onManage}
+                    className="px-4 py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:opacity-90 transition-all"
+                  >
+                    Gestionar
+                  </button>
 
-  {/* BOTONES */}
-  <div className="flex items-center gap-2">
-    <button
-      type="button"
-      onClick={onManage}
-      className="px-4 py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:opacity-90 transition-all"
-    >
-      Gestionar
-    </button>
+                  <button
+                    type="button"
+                    onClick={onEdit}
+                    className="px-4 py-2.5 border border-slate-200 rounded-xl font-bold text-sm text-slate-700 hover:bg-slate-50 transition-all"
+                  >
+                    Editar
+                  </button>
 
-    <button
-      type="button"
-      onClick={onEdit}
-      className="px-4 py-2.5 border border-slate-200 rounded-xl font-bold text-sm text-slate-700 hover:bg-slate-50 transition-all"
-    >
-      Editar
-    </button>
-
-    <button
-      type="button"
-      onClick={onDelete}
-      title="Eliminar"
-      className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
-    >
-      <Icon name="trash" size={16} />
-    </button>
-  </div>
-
-</div>
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    title="Eliminar"
+                    className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
+                  >
+                    <Icon name="trash" size={16} />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </article>

@@ -87,6 +87,23 @@ export default function PropertyExchangeSection({
                 <input
                   className="w-5 h-5 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
                   type="checkbox"
+                  checked={requirements.accepts_open_proposals}
+                  onChange={(e) =>
+                    setRequirementField(
+                      "accepts_open_proposals",
+                      e.target.checked,
+                    )
+                  }
+                />
+                <span className="ml-3 text-sm text-slate-600 group-hover:text-slate-900">
+                  Abierto a propuestas
+                </span>
+              </label>
+
+              <label className="flex items-center group cursor-pointer">
+                <input
+                  className="w-5 h-5 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                  type="checkbox"
                   checked={requirements.accepts_total_swap}
                   onChange={(e) =>
                     setRequirementField("accepts_total_swap", e.target.checked)
@@ -135,23 +152,6 @@ export default function PropertyExchangeSection({
                 <input
                   className="w-5 h-5 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
                   type="checkbox"
-                  checked={requirements.accepts_open_proposals}
-                  onChange={(e) =>
-                    setRequirementField(
-                      "accepts_open_proposals",
-                      e.target.checked,
-                    )
-                  }
-                />
-                <span className="ml-3 text-sm text-slate-600 group-hover:text-slate-900">
-                  Escucha propuestas
-                </span>
-              </label>
-
-              <label className="flex items-center group cursor-pointer">
-                <input
-                  className="w-5 h-5 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                  type="checkbox"
                   checked={requirements.accepts_cash_only}
                   onChange={(e) =>
                     setRequirementField("accepts_cash_only", e.target.checked)
@@ -159,20 +159,6 @@ export default function PropertyExchangeSection({
                 />
                 <span className="ml-3 text-sm text-slate-600 group-hover:text-slate-900">
                   Solo efectivo
-                </span>
-              </label>
-
-              <label className="flex items-center group cursor-pointer">
-                <input
-                  className="w-5 h-5 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                  type="checkbox"
-                  checked={requirements.open_to_other_zones}
-                  onChange={(e) =>
-                    setRequirementField("open_to_other_zones", e.target.checked)
-                  }
-                />
-                <span className="ml-3 text-sm text-slate-600 group-hover:text-slate-900">
-                  Abierto a otras zonas
                 </span>
               </label>
             </div>
@@ -278,7 +264,7 @@ export default function PropertyExchangeSection({
       </section>
 
       {/* Qué propiedad está buscando */}
-      {requirements.criteria_mode === "criteria" && (
+      {isCriteriaMode && (
         <section className="bg-white p-6 sm:p-8 rounded-lg shadow-sm border border-slate-200 space-y-8">
           <div className="flex items-center gap-3">
             <Icon name="search" size={18} className="text-slate-400" />
@@ -478,6 +464,22 @@ export default function PropertyExchangeSection({
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="md:w-1/2">
+              <label className="flex items-center group cursor-pointer">
+                <input
+                  className="w-5 h-5 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                  type="checkbox"
+                  checked={requirements.open_to_other_zones}
+                  onChange={(e) =>
+                    setRequirementField("open_to_other_zones", e.target.checked)
+                  }
+                />
+                <span className="ml-3 text-sm text-slate-600 group-hover:text-slate-900">
+                  Abierto a otras zonas
+                </span>
+              </label>
             </div>
           </div>
         </section>

@@ -25,11 +25,17 @@ export function getRefreshToken() {
 }
 
 export function setTokens({ access_token, refresh_token }) {
+  console.log("[AUTH] setTokens()", {
+    hasAccessToken: !!access_token,
+    hasRefreshToken: !!refresh_token,
+  });
+
   if (access_token) localStorage.setItem(ACCESS_KEY, access_token);
   if (refresh_token) localStorage.setItem(REFRESH_KEY, refresh_token);
 }
 
 export function clearTokens() {
+  console.log("[AUTH] clearTokens()");
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
 }
@@ -63,7 +69,7 @@ function buildUrl(path, params) {
 
 async function request(
   path,
-  { method = "GET", body, headers, params } = {},
+  { method = "GET", body, headers, params, skipAuth = false } = {},
   { retry = true } = {}
 ) {
   const url = buildUrl(path, params);
@@ -77,9 +83,19 @@ async function request(
   }
 
   const access = getAccessToken();
-  if (access) {
+
+  if (!skipAuth && access) {
     finalHeaders["Authorization"] = `Bearer ${access}`;
   }
+
+  console.log("[HTTP] request", {
+    url,
+    method,
+    retry,
+    skipAuth,
+    hasAccessToken: !!access,
+    hasRefreshToken: !!getRefreshToken(),
+  });
 
   const res = await fetch(url, {
     method,
@@ -91,11 +107,26 @@ async function request(
       : undefined,
   });
 
-  if (res.status === 401 && retry) {
+  console.log("[HTTP] response", {
+    url,
+    method,
+    status: res.status,
+    ok: res.ok,
+  });
+
+  if (res.status === 401 && retry && path !== "/refresh") {
+    console.log("[HTTP] 401 detected, trying refresh...", { url });
+
     const refreshed = await tryRefresh();
 
+    console.log("[HTTP] refresh result", { refreshed });
+
     if (refreshed) {
-      return request(path, { method, body, headers, params }, { retry: false });
+      return request(
+        path,
+        { method, body, headers, params, skipAuth },
+        { retry: false }
+      );
     }
   }
 
@@ -126,30 +157,53 @@ async function request(
 export async function tryRefresh() {
   const refreshToken = getRefreshToken();
 
+  console.log("[AUTH] tryRefresh()", {
+    hasRefreshToken: !!refreshToken,
+    refreshTokenPreview: refreshToken ? `${refreshToken.slice(0, 16)}...` : null,
+  });
+
   if (!refreshToken) {
+    console.log("[AUTH] No refresh token found");
     return false;
   }
 
   try {
     const data = await request(
       "/refresh",
-      { method: "POST", body: { refresh_token: refreshToken } },
+      {
+        method: "POST",
+        body: { refresh_token: refreshToken },
+        skipAuth: true,
+      },
       { retry: false }
     );
 
+    console.log("[AUTH] /refresh raw response", data);
+
     const payload = unwrap(data);
 
-    if (payload?.access_token && payload?.refresh_token) {
+    console.log("[AUTH] /refresh unwrapped payload", payload);
+
+    if (payload?.access_token) {
       setTokens({
         access_token: payload.access_token,
-        refresh_token: payload.refresh_token,
+        refresh_token: payload.refresh_token || refreshToken,
       });
+
+      console.log("[AUTH] Tokens refreshed successfully");
       return true;
     }
 
+    console.log("[AUTH] Refresh response missing access_token");
     clearTokens();
     return false;
-  } catch {
+  } catch (error) {
+    console.log("[AUTH] Refresh failed", {
+      status: error?.status,
+      message: error?.message,
+      data: error?.data,
+    });
+
     clearTokens();
     return false;
   }
@@ -161,6 +215,7 @@ export const api = {
       method: "GET",
       params: options.params,
       headers: options.headers,
+      skipAuth: options.skipAuth,
     }),
 
   post: (path, body, options = {}) =>
@@ -169,6 +224,7 @@ export const api = {
       body,
       headers: options.headers,
       params: options.params,
+      skipAuth: options.skipAuth,
     }),
 
   patch: (path, body, options = {}) =>
@@ -177,6 +233,7 @@ export const api = {
       body,
       headers: options.headers,
       params: options.params,
+      skipAuth: options.skipAuth,
     }),
 
   put: (path, body, options = {}) =>
@@ -185,6 +242,7 @@ export const api = {
       body,
       headers: options.headers,
       params: options.params,
+      skipAuth: options.skipAuth,
     }),
 
   del: (path, options = {}) =>
@@ -192,6 +250,7 @@ export const api = {
       method: "DELETE",
       headers: options.headers,
       params: options.params,
+      skipAuth: options.skipAuth,
     }),
 };
 

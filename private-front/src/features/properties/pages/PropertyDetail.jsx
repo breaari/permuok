@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import {
+  Navigate,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import {
   api,
   unwrap,
@@ -82,6 +87,7 @@ function propertyTypeLabel(value) {
     garage: "Cochera",
     hotel: "Hotel",
     development: "Desarrollo",
+    other: "Otro",
   };
 
   return map[value] || value || "—";
@@ -93,27 +99,177 @@ function exchangeModeLabel(requirements) {
   return "Escucho propuestas";
 }
 
-function yesNo(value) {
-  return Number(value) === 1 ? "Sí" : "No";
-}
-
 function joinLocation(parts) {
   return parts.filter(Boolean).join(", ");
 }
 
+function resolveImageUrl(rawUrl) {
+  if (!rawUrl) return null;
+
+  const value = String(rawUrl).trim();
+  if (!value) return null;
+
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  const base = getApiBaseUrl().replace(/\/+$/, "");
+
+  if (value.startsWith("/")) {
+    return `${base}${value}`;
+  }
+
+  return `${base}/${value}`;
+}
+
+function normalizeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function extractProperty(detail) {
+  if (!detail || typeof detail !== "object") return null;
+
+  if (detail.property && typeof detail.property === "object") {
+    return detail.property;
+  }
+
+  if (detail.item && typeof detail.item === "object") {
+    return detail.item;
+  }
+
+  if (
+    detail.id ||
+    detail.title ||
+    detail.description ||
+    detail.property_type ||
+    detail.city ||
+    detail.province ||
+    detail.country
+  ) {
+    return detail;
+  }
+
+  return null;
+}
+
+function extractImages(detail, property) {
+  const candidates = [
+    detail?.images,
+    detail?.property_images,
+    property?.images,
+    property?.property_images,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+
+  return [];
+}
+
+function extractRequirements(detail, property) {
+  if (detail?.requirements && typeof detail.requirements === "object") {
+    return detail.requirements;
+  }
+
+  if (
+    detail?.criteria_mode ||
+    detail?.accepts_total_swap !== undefined ||
+    detail?.accepts_swap_plus_cash !== undefined ||
+    detail?.accepts_multiple_swap !== undefined ||
+    detail?.accepts_open_proposals !== undefined ||
+    detail?.accepts_cash_only !== undefined
+  ) {
+    return detail;
+  }
+
+  if (property?.requirements && typeof property.requirements === "object") {
+    return property.requirements;
+  }
+
+  return null;
+}
+
+function extractRequirementTypes(detail, requirements) {
+  const candidates = [
+    detail?.requirement_property_types,
+    detail?.property_requirement_property_types,
+    requirements?.property_types,
+    requirements?.requirement_property_types,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+
+  return [];
+}
+
+function extractRequirementLocations(detail, requirements) {
+  const candidates = [
+    detail?.requirement_locations,
+    detail?.property_requirement_locations,
+    requirements?.locations,
+    requirements?.requirement_locations,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+
+  return [];
+}
+
+function extractAmenities(detail, property) {
+  const candidates = [
+    detail?.amenities,
+    detail?.property_amenities,
+    property?.amenities,
+    property?.property_amenities,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+
+  return [];
+}
+
 function getPropertyImages(images) {
-  return images
+  return normalizeArray(images)
     .map((image) => {
-      const url = image?.view_url
-        ? `${getApiBaseUrl()}${image.view_url}`
-        : image?.url || null;
+      const rawUrl =
+        image?.view_url ||
+        image?.image_url ||
+        image?.web_path ||
+        image?.url ||
+        image?.path ||
+        image?.file_path ||
+        image?.archive_path ||
+        null;
 
       return {
         ...image,
-        url,
+        url: resolveImageUrl(rawUrl),
       };
     })
     .filter((image) => !!image.url);
+}
+
+function normalizeAmenityLabel(amenity) {
+  if (typeof amenity === "string") return amenity;
+  if (amenity && typeof amenity === "object") {
+    return amenity.label || amenity.code || amenity.name || "Amenity";
+  }
+  return "Amenity";
+}
+
+function normalizeRequirementType(type) {
+  if (typeof type === "string") return type;
+  if (type && typeof type === "object") {
+    return type.property_type || type.value || type.code || type.name || "";
+  }
+  return "";
 }
 
 function InfoItem({ label, value, dark = false }) {
@@ -126,7 +282,11 @@ function InfoItem({ label, value, dark = false }) {
       >
         {label}
       </p>
-      <p className={`text-sm font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
+      <p
+        className={`text-sm font-semibold ${
+          dark ? "text-white" : "text-slate-900"
+        }`}
+      >
         {value || "—"}
       </p>
     </div>
@@ -142,9 +302,24 @@ function AmenityItem({ children }) {
   );
 }
 
+function SoftTag({ children, dark = false }) {
+  return (
+    <span
+      className={
+        dark
+          ? "inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90"
+          : "inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700"
+      }
+    >
+      {children}
+    </span>
+  );
+}
+
 export default function PropertyDetail() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
 
   const role = Number(user?.role || 0);
@@ -154,39 +329,78 @@ export default function PropertyDetail() {
   const [err, setErr] = useState("");
   const [data, setData] = useState(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-
-  async function loadDetail() {
-    setLoading(true);
-    setErr("");
-
-    try {
-      const res = await api.get(`/properties/${id}`);
-      const payload = unwrap(res);
-      setData(payload);
-    } catch (e) {
-      setErr(getErrorMessage(e, "No se pudo cargar la publicación"));
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [detailMode, setDetailMode] = useState(
+    location.pathname.startsWith("/explore/properties/") ? "explore" : "owned"
+  );
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadDetail() {
+      setLoading(true);
+      setErr("");
+
+      try {
+        let payload = null;
+        let mode = "owned";
+
+        try {
+          const ownedRes = await api.get(`/properties/${id}`);
+          payload = unwrap(ownedRes);
+          mode = "owned";
+          console.log("OWNED PROPERTY DETAIL", payload);
+        } catch (ownedError) {
+          console.log("OWNED PROPERTY DETAIL ERROR", ownedError);
+
+          const exploreRes = await api.get(`/explore/properties/${id}`);
+          payload = unwrap(exploreRes);
+          mode = "explore";
+          console.log("EXPLORE PROPERTY DETAIL", payload);
+        }
+
+        if (cancelled) return;
+
+        setData(payload);
+        setDetailMode(mode);
+        setActiveImageIndex(0);
+      } catch (e) {
+        if (cancelled) return;
+        console.log("PROPERTY DETAIL FINAL ERROR", e);
+        setErr(getErrorMessage(e, "No se pudo cargar la publicación"));
+        setData(null);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
     loadDetail();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   if (!canAccess) return <Navigate to="/" replace />;
 
-  const property = data?.property || null;
-  const images = Array.isArray(data?.images) ? data.images : [];
-  const requirements = data?.requirements || null;
-  const requirementTypes = Array.isArray(data?.requirement_property_types)
-    ? data.requirement_property_types
-    : [];
-  const requirementLocations = Array.isArray(data?.requirement_locations)
-    ? data.requirement_locations
-    : [];
-  const amenities = Array.isArray(data?.amenities) ? data.amenities : [];
+  const property = extractProperty(data);
+  const images = extractImages(data, property);
+  const requirements = extractRequirements(data, property);
+  const requirementTypes = extractRequirementTypes(data, requirements);
+  const requirementLocations = extractRequirementLocations(data, requirements);
+  const amenities = extractAmenities(data, property);
+
+  console.log("PROPERTY DETAIL NORMALIZED", {
+    raw: data,
+    property,
+    images,
+    requirements,
+    requirementTypes,
+    requirementLocations,
+    amenities,
+    detailMode,
+  });
 
   const meta = statusMeta(property?.status);
   const gallery = getPropertyImages(images);
@@ -198,6 +412,25 @@ export default function PropertyDetail() {
     property?.province,
     property?.country,
   ]);
+
+  const backPath =
+    detailMode === "explore" ? "/explore/properties" : "/properties";
+
+  const from = location.state?.from || null;
+
+  function handleBack() {
+    if (from) {
+      navigate(from);
+      return;
+    }
+
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate(backPath);
+  }
 
   const summarySpecs = useMemo(
     () => [
@@ -229,45 +462,44 @@ export default function PropertyDetail() {
     [property]
   );
 
+  const acceptedModes = requirements
+    ? [
+        requirements.accepts_open_proposals ? "Abierto a propuestas" : null,
+        requirements.accepts_total_swap ? "Permuta total" : null,
+        requirements.accepts_swap_plus_cash ? "Permuta + diferencia" : null,
+        requirements.accepts_multiple_swap ? "Permuta múltiple" : null,
+        requirements.accepts_cash_only ? "Acepta dinero" : null,
+      ].filter(Boolean)
+    : [];
+
+  const hasRequirementNotes = !!String(requirements?.notes || "").trim();
+
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-40 border-b border-white/60 bg-white/70 px-4 py-4 backdrop-blur-md sm:px-6 lg:px-10">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-4 min-w-0">
-            <button
-              type="button"
-              onClick={() => navigate("/properties")}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
-            >
-              <Icon name="arrowLeft" size={18} className="text-slate-700" />
-            </button>
-
-            <div className="min-w-0">
-              <h1 className="truncate text-xl font-black tracking-tight text-slate-900 md:text-2xl">
-                {property?.title || "Detalle de publicación"}
-              </h1>
-
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                {property?.status && (
-                  <span
-                    className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${meta.badgeClass}`}
-                  >
-                    {meta.label}
-                  </span>
-                )}
-
-                <span className="text-xs font-medium text-slate-500">
-                  Ref: #{property?.id || id}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-            permuok.com
-          </div>
+      <header className="border-b border-slate-200/70 bg-white px-4 py-6 sm:px-6 lg:px-10">
+        <div className="mx-auto max-w-7xl">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="inline-flex items-center gap-2 text-primary hover:text-emerald-700 transition-colors font-semibold text-sm w-fit"
+          >
+            <Icon name="arrowLeft" size={16} />
+            Volver
+          </button>
         </div>
       </header>
+
+      <section className="bg-slate-900 px-4 py-12 sm:px-6 lg:px-10">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-xs uppercase tracking-widest text-emerald-300 mb-3 font-semibold">
+            Ref #{property?.id || id}
+          </p>
+
+          <h1 className="text-3xl md:text-5xl font-black text-white leading-tight tracking-tighter max-w-4xl">
+            {property?.title || "Sin título"}
+          </h1>
+        </div>
+      </section>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
         {err && (
@@ -304,7 +536,11 @@ export default function PropertyDetail() {
                   {requirements && (
                     <div className="absolute right-4 top-4 rounded-full border border-white/20 bg-white/70 px-4 py-2 backdrop-blur-md">
                       <div className="flex items-center gap-2">
-                        <Icon name="syncAlt" size={16} className="text-emerald-700" />
+                        <Icon
+                          name="syncAlt"
+                          size={16}
+                          className="text-emerald-700"
+                        />
                         <span className="text-xs font-bold uppercase tracking-wider text-slate-900">
                           {exchangeModeLabel(requirements)}
                         </span>
@@ -360,7 +596,11 @@ export default function PropertyDetail() {
                   <div className="pt-6 space-y-4">
                     <div className="flex items-start gap-3">
                       <div className="rounded-lg bg-slate-100 p-2">
-                        <Icon name="building2" size={18} className="text-slate-900" />
+                        <Icon
+                          name="building2"
+                          size={18}
+                          className="text-slate-900"
+                        />
                       </div>
                       <div>
                         <p className="text-xs font-medium text-slate-500">
@@ -374,7 +614,11 @@ export default function PropertyDetail() {
 
                     <div className="flex items-start gap-3">
                       <div className="rounded-lg bg-slate-100 p-2">
-                        <Icon name="mapPin" size={18} className="text-slate-900" />
+                        <Icon
+                          name="mapPin"
+                          size={18}
+                          className="text-slate-900"
+                        />
                       </div>
                       <div>
                         <p className="text-xs font-medium text-slate-500">
@@ -391,7 +635,9 @@ export default function PropertyDetail() {
                     type="button"
                     className="mt-6 w-full rounded-xl bg-slate-900 py-4 text-sm font-bold tracking-tight text-white shadow-lg transition-all hover:opacity-90"
                   >
-                    Iniciar propuesta de permuta
+                    {detailMode === "explore"
+                      ? "Iniciar propuesta de permuta"
+                      : "Ver oportunidad de intercambio"}
                   </button>
                 </div>
 
@@ -432,8 +678,10 @@ export default function PropertyDetail() {
                 {!!amenities.length && (
                   <section className="grid grid-cols-2 gap-6 md:grid-cols-3">
                     {amenities.map((amenity, index) => (
-                      <AmenityItem key={`${amenity.code || amenity}-${index}`}>
-                        {amenity.label || amenity.code || amenity}
+                      <AmenityItem
+                        key={`${normalizeAmenityLabel(amenity)}-${index}`}
+                      >
+                        {normalizeAmenityLabel(amenity)}
                       </AmenityItem>
                     ))}
                   </section>
@@ -451,10 +699,13 @@ export default function PropertyDetail() {
                     <InfoItem label="Zona" value={property?.zone} />
                     <InfoItem label="Dirección" value={property?.address} />
                     <InfoItem label="Estado" value={meta.label} />
-                    <InfoItem label="Creada" value={formatDate(property?.created_at)} />
                     <InfoItem
                       label="Publicada"
                       value={formatDate(property?.published_at)}
+                    />
+                    <InfoItem
+                      label="Última modificación"
+                      value={formatDate(property?.updated_at)}
                     />
                   </div>
                 </section>
@@ -467,7 +718,11 @@ export default function PropertyDetail() {
                       <h2 className="text-xl font-bold tracking-tight">
                         Criterios de Permuta
                       </h2>
-                      <Icon name="syncAlt" size={28} className="text-emerald-300" />
+                      <Icon
+                        name="syncAlt"
+                        size={28}
+                        className="text-emerald-300"
+                      />
                     </div>
 
                     {!requirements ? (
@@ -485,80 +740,24 @@ export default function PropertyDetail() {
                           </p>
                         </div>
 
-                        <div className="space-y-4">
-                          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white/60">
-                            Modalidades aceptadas
-                          </p>
+                        {acceptedModes.length > 0 && (
+                          <div className="space-y-4">
+                            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white/60">
+                              Modalidades aceptadas
+                            </p>
 
-                          <div className="space-y-3 text-sm">
-                            <div className="flex items-center justify-between">
-                              <span className="text-white/80">Abierto a propuestas</span>
-                              <span
-                                className={`font-bold ${
-                                  Number(requirements.accepts_open_proposals) === 1
-                                    ? "text-emerald-300"
-                                    : "text-white/40"
-                                }`}
-                              >
-                                {yesNo(requirements.accepts_open_proposals)}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                              <span className="text-white/80">Permuta total</span>
-                              <span
-                                className={`font-bold ${
-                                  Number(requirements.accepts_total_swap) === 1
-                                    ? "text-emerald-300"
-                                    : "text-white/40"
-                                }`}
-                              >
-                                {yesNo(requirements.accepts_total_swap)}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                              <span className="text-white/80">Permuta + diferencia</span>
-                              <span
-                                className={`font-bold ${
-                                  Number(requirements.accepts_swap_plus_cash) === 1
-                                    ? "text-emerald-300"
-                                    : "text-white/40"
-                                }`}
-                              >
-                                {yesNo(requirements.accepts_swap_plus_cash)}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                              <span className="text-white/80">Permuta múltiple</span>
-                              <span
-                                className={`font-bold ${
-                                  Number(requirements.accepts_multiple_swap) === 1
-                                    ? "text-emerald-300"
-                                    : "text-white/40"
-                                }`}
-                              >
-                                {yesNo(requirements.accepts_multiple_swap)}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                              <span className="text-white/80">Acepta dinero</span>
-                              <span
-                                className={`font-bold ${
-                                  Number(requirements.accepts_cash_only) === 1
-                                    ? "text-emerald-300"
-                                    : "text-white/40"
-                                }`}
-                              >
-                                {yesNo(requirements.accepts_cash_only)}
-                              </span>
+                            <div className="flex flex-wrap gap-2">
+                              {acceptedModes.map((mode) => (
+                                <SoftTag key={mode} dark>
+                                  {mode}
+                                </SoftTag>
+                              ))}
                             </div>
                           </div>
-                        </div>
+                        )}
 
-                        {(requirementTypes.length > 0 || requirementLocations.length > 0) && (
+                        {(requirementTypes.length > 0 ||
+                          requirementLocations.length > 0) && (
                           <div className="space-y-4">
                             <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white/60">
                               Interés específico
@@ -569,12 +768,14 @@ export default function PropertyDetail() {
                                 <SoftTag dark>
                                   Tipos deseados:{" "}
                                   {requirementTypes
-                                    .map((type) => propertyTypeLabel(type))
+                                    .map((type) =>
+                                      propertyTypeLabel(
+                                        normalizeRequirementType(type)
+                                      )
+                                    )
                                     .join(", ")}
                                 </SoftTag>
-                              ) : (
-                                <SoftTag dark>Tipos deseados: Sin tipos específicos</SoftTag>
-                              )}
+                              ) : null}
 
                               {requirementLocations.length > 0 ? (
                                 <SoftTag dark>
@@ -582,32 +783,30 @@ export default function PropertyDetail() {
                                   {requirementLocations
                                     .map((loc) =>
                                       joinLocation([
-                                        loc.city,
-                                        loc.zone,
-                                        loc.province,
-                                        loc.country,
+                                        loc?.city,
+                                        loc?.zone,
+                                        loc?.province,
+                                        loc?.country,
                                       ])
                                     )
                                     .filter(Boolean)
                                     .join(" · ")}
                                 </SoftTag>
-                              ) : (
-                                <SoftTag dark>
-                                  Ubicaciones deseadas: Sin ubicaciones específicas
-                                </SoftTag>
-                              )}
+                              ) : null}
                             </div>
                           </div>
                         )}
 
-                        <div className="border-t border-white/10 pt-4">
-                          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white/60">
-                            Notas del propietario
-                          </p>
-                          <p className="text-sm italic text-white/70">
-                            {requirements.notes || "—"}
-                          </p>
-                        </div>
+                        {hasRequirementNotes && (
+                          <div className="border-t border-white/10 pt-4">
+                            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white/60">
+                              Notas del propietario
+                            </p>
+                            <p className="text-sm italic text-white/70">
+                              {requirements.notes}
+                            </p>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -619,12 +818,6 @@ export default function PropertyDetail() {
           </>
         )}
       </main>
-
-      <footer className="mt-20 border-t border-slate-200 px-6 py-12 text-center">
-        <p className="text-xs font-medium uppercase tracking-widest text-slate-400">
-          permuok.com © 2026 — Intercambios inmobiliarios
-        </p>
-      </footer>
     </div>
   );
 }

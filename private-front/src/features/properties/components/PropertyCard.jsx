@@ -1,3 +1,5 @@
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getApiBaseUrl } from "../../../api/http";
 import { Icon } from "../../../ui/icons/Index";
 import { PROPERTY_TYPES } from "../utils/PropertyFormHelpers";
@@ -182,6 +184,61 @@ function buildExchangeSummary(item) {
   };
 }
 
+function resolveImageUrl(rawUrl) {
+  if (!rawUrl) return null;
+
+  const value = String(rawUrl).trim();
+  if (!value) return null;
+
+  if (/^https?:\/\//i.test(value)) return value;
+
+  const base = getApiBaseUrl().replace(/\/+$/, "");
+  return value.startsWith("/") ? `${base}${value}` : `${base}/${value}`;
+}
+
+function getGallery(item) {
+  const base = getBaseProperty(item);
+
+  const rawImages = [
+    ...(Array.isArray(item?.images) ? item.images : []),
+    ...(Array.isArray(base?.images) ? base.images : []),
+    ...(Array.isArray(item?.property_images) ? item.property_images : []),
+    ...(Array.isArray(base?.property_images) ? base.property_images : []),
+  ];
+
+  const normalized = rawImages
+    .map((img) => {
+      if (typeof img === "string") {
+        return resolveImageUrl(img);
+      }
+
+      return resolveImageUrl(
+        img?.view_url ||
+          img?.image_url ||
+          img?.web_path ||
+          img?.url ||
+          img?.path ||
+          img?.file_path ||
+          img?.archive_path
+      );
+    })
+    .filter(Boolean);
+
+  const cover =
+    resolveImageUrl(item?.cover_image_url) ||
+    resolveImageUrl(base?.cover_image_url);
+
+  const result = [];
+
+  if (cover) result.push(cover);
+
+  normalized.forEach((url) => {
+    if (!result.includes(url)) result.push(url);
+  });
+
+  return result;
+}
+
 function StatusBadge({ status }) {
   const meta = getStatusMeta(status);
 
@@ -211,14 +268,12 @@ export default function PropertyCard({
   onOpenDetail,
   onEdit,
   onDelete,
+  variant = "owned",
+  detailHref,
+  detailState,
 }) {
+  const navigate = useNavigate();
   const base = getBaseProperty(item);
-
-  const imageUrl = item?.cover_image_url
-    ? `${getApiBaseUrl()}${item.cover_image_url}`
-    : base?.cover_image_url
-      ? `${getApiBaseUrl()}${base.cover_image_url}`
-      : null;
 
   const typeLabel = formatPropertyType(base?.property_type);
   const location = buildLocation(item);
@@ -227,12 +282,69 @@ export default function PropertyCard({
   const price = formatMoney(base?.price, base?.currency || "USD");
   const propertyId = base?.id ? `#${base.id}` : "—";
 
+  const isDashboard = variant === "dashboard";
+  const canOpen = isDashboard && !!detailHref;
+
+  const gallery = useMemo(() => getGallery(item), [item]);
+  const [imageIndex, setImageIndex] = useState(0);
+
+  const currentImage = gallery[imageIndex] || null;
+  const hasMultipleImages = gallery.length > 1;
+
+  function goToDetail() {
+    if (!canOpen) return;
+    navigate(detailHref, {
+      state: detailState,
+    });
+  }
+
+  function handlePrevImage(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!hasMultipleImages) return;
+
+    setImageIndex((prev) => (prev === 0 ? gallery.length - 1 : prev - 1));
+  }
+
+  function handleNextImage(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!hasMultipleImages) {
+      goToDetail();
+      return;
+    }
+
+    if (imageIndex >= gallery.length - 1) {
+      goToDetail();
+      return;
+    }
+
+    setImageIndex((prev) => prev + 1);
+  }
+
+  console.log("PROPERTY CARD GALLERY", {
+  id: base?.id,
+  cover_image_url: item?.cover_image_url || base?.cover_image_url,
+  images: item?.images,
+  property_images: item?.property_images,
+  gallery,
+  galleryLength: gallery.length,
+  isDashboard,
+});
+
   return (
     <article className="group bg-white rounded-xl overflow-hidden flex flex-col md:flex-row shadow-sm hover:shadow-md transition-all duration-300 border border-slate-200 md:h-[336px]">
-      <div className="md:w-80 h-52 sm:h-60 md:h-full relative overflow-hidden shrink-0 bg-slate-100">
-        {imageUrl ? (
+      <div
+        className={`md:w-80 h-52 sm:h-60 md:h-full relative overflow-hidden shrink-0 bg-slate-100 ${
+          canOpen ? "cursor-pointer" : ""
+        }`}
+        onClick={canOpen ? goToDetail : undefined}
+      >
+        {currentImage ? (
           <img
-            src={imageUrl}
+            src={currentImage}
             alt={base?.title || "Propiedad"}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
           />
@@ -242,7 +354,37 @@ export default function PropertyCard({
           </div>
         )}
 
-        <StatusBadge status={base?.status || item?.status} />
+        {!isDashboard && (
+          <StatusBadge status={base?.status || item?.status} />
+        )}
+
+        {isDashboard && hasMultipleImages && (
+          <>
+            <button
+              type="button"
+              onClick={handlePrevImage}
+              className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/85 text-slate-900 shadow-sm backdrop-blur hover:bg-white"
+              aria-label="Imagen anterior"
+            >
+              <Icon name="chevronLeft" size={18} />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleNextImage}
+              className="absolute right-3 top-1/2 -translate-y-1/2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/85 text-slate-900 shadow-sm backdrop-blur hover:bg-white"
+              aria-label="Siguiente imagen"
+            >
+              <Icon name="chevronRight" size={18} />
+            </button>
+
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 inline-flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur">
+              <span>{imageIndex + 1}</span>
+              <span>/</span>
+              <span>{gallery.length}</span>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="flex-1 p-4 sm:p-5 md:p-5 flex flex-col min-h-0 h-full">
@@ -253,9 +395,21 @@ export default function PropertyCard({
                 {typeLabel}
               </span>
 
-              <h3 className="text-lg sm:text-[20px] font-extrabold text-slate-900 leading-tight break-words line-clamp-2">
-                {base?.title || "Sin título"}
-              </h3>
+              {canOpen ? (
+                <button
+                  type="button"
+                  onClick={goToDetail}
+                  className="block text-left"
+                >
+                  <h3 className="text-lg sm:text-[20px] font-extrabold text-slate-900 leading-tight break-words line-clamp-2 hover:text-primary transition-colors">
+                    {base?.title || "Sin título"}
+                  </h3>
+                </button>
+              ) : (
+                <h3 className="text-lg sm:text-[20px] font-extrabold text-slate-900 leading-tight break-words line-clamp-2">
+                  {base?.title || "Sin título"}
+                </h3>
+              )}
             </div>
 
             <div className="text-left sm:text-right shrink-0">
@@ -315,32 +469,47 @@ export default function PropertyCard({
         </div>
 
         <div className="flex flex-wrap justify-end gap-x-4 gap-y-2 mt-3 pt-3 border-t border-slate-100 shrink-0">
-          <button
-            type="button"
-            onClick={onEdit}
-            className="text-blue-900 font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 hover:underline underline-offset-4"
-          >
-            <Icon name="edit" size={15} />
-            Editar
-          </button>
+          {isDashboard ? (
+            canOpen ? (
+              <button
+                type="button"
+                onClick={goToDetail}
+                className="text-blue-900 font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 hover:underline underline-offset-4"
+              >
+                <Icon name="arrowRight" size={15} />
+                Ver más
+              </button>
+            ) : null
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={onEdit}
+                className="text-blue-900 font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 hover:underline underline-offset-4"
+              >
+                <Icon name="edit" size={15} />
+                Editar
+              </button>
 
-          <button
-            type="button"
-            onClick={onOpenDetail}
-            className="text-blue-900 font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 hover:underline underline-offset-4"
-          >
-            <Icon name="chart" size={15} />
-            Gestionar
-          </button>
+              <button
+                type="button"
+                onClick={onOpenDetail}
+                className="text-blue-900 font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 hover:underline underline-offset-4"
+              >
+                <Icon name="chart" size={15} />
+                Gestionar
+              </button>
 
-          <button
-            type="button"
-            onClick={onDelete}
-            className="text-rose-700 font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 hover:underline underline-offset-4"
-          >
-            <Icon name="close" size={15} />
-            Eliminar
-          </button>
+              <button
+                type="button"
+                onClick={onDelete}
+                className="text-rose-700 font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 hover:underline underline-offset-4"
+              >
+                <Icon name="close" size={15} />
+                Eliminar
+              </button>
+            </>
+          )}
         </div>
       </div>
     </article>

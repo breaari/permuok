@@ -55,6 +55,9 @@ export default function App() {
         <Route path="properties/:id/edit" element={<PropertyForm />} />
         <Route path="properties/:id" element={<PropertyDetail />} />
 
+        <Route path="explore/properties" element={<Properties />} />
+        <Route path="explore/properties/:id" element={<PropertyDetail />} />
+
         <Route path="search-requests" element={<SearchRequests />} />
         <Route path="search-requests/new" element={<SearchRequestForm />} />
         <Route
@@ -62,6 +65,12 @@ export default function App() {
           element={<SearchRequestForm />}
         />
         <Route path="search-requests/:id" element={<SearchRequestDetail />} />
+
+        <Route path="explore/search-requests" element={<SearchRequests />} />
+        <Route
+          path="explore/search-requests/:id"
+          element={<SearchRequestDetail />}
+        />
 
         <Route path="admin" element={<AdminPanel />}>
           <Route index element={<Navigate to="real-estates" replace />} />

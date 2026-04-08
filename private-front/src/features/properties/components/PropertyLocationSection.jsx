@@ -15,13 +15,12 @@ function normalizeProvinceName(value) {
 }
 
 export default function PropertyLocationSection({
-  form,
-  setField,
+  form = {},
+  setField = () => {},
   onLocationValidityChange,
   googleMapsLoaded,
 }) {
-  console.log("biribi:" + form.address);
-  const [inputValue, setInputValue] = useState(form.address || "");
+  const [inputValue, setInputValue] = useState(form?.address || "");
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -34,8 +33,8 @@ export default function PropertyLocationSection({
   const placesLibRef = useRef(null);
 
   useEffect(() => {
-    setInputValue(form.address || "");
-  }, [form.address]);
+    setInputValue(form?.address || "");
+  }, [form?.address]);
 
   useEffect(() => {
     if (!googleMapsLoaded || !window.google) return;
@@ -240,10 +239,10 @@ export default function PropertyLocationSection({
   }
 
   const hasValidatedAddress =
-    !!form.place_id &&
-    form.latitude !== "" &&
-    form.longitude !== "" &&
-    !!form.formatted_address;
+    !!form?.place_id &&
+    form?.latitude !== "" &&
+    form?.longitude !== "" &&
+    !!form?.formatted_address;
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
@@ -362,7 +361,7 @@ export default function PropertyLocationSection({
             </label>
             <input
               placeholder="País"
-              value={form.country || ""}
+              value={form?.country || ""}
               onChange={(e) => setField("country", e.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
             />
@@ -374,7 +373,7 @@ export default function PropertyLocationSection({
             </label>
             <input
               placeholder="Provincia"
-              value={form.province || ""}
+              value={form?.province || ""}
               onChange={(e) => setField("province", e.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
             />
@@ -386,7 +385,7 @@ export default function PropertyLocationSection({
             </label>
             <input
               placeholder="Ciudad"
-              value={form.city || ""}
+              value={form?.city || ""}
               onChange={(e) => setField("city", e.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
             />
@@ -398,7 +397,7 @@ export default function PropertyLocationSection({
             </label>
             <input
               placeholder="Zona / Barrio"
-              value={form.zone || ""}
+              value={form?.zone || ""}
               onChange={(e) => setField("zone", e.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
             />

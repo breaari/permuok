@@ -1,7 +1,7 @@
 // src/pages/Login.jsx
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../components/AuthContext.jsx";
+import { useAuth } from "../components/AuthContext";
 import { getErrorMessage } from "../../../api/http.js";
 
 import AuthLayout from "../../../layout/AuthLayout.jsx";
