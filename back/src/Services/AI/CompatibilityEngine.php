@@ -9,7 +9,7 @@ use Throwable;
 class CompatibilityEngine
 {
     private const MIN_SCORE_TO_SAVE = 25.0;
-
+    private const BATCH_SIZE = 500;
     /**
      * Recalcula las compatibilidades de una búsqueda
      * contra propiedades publicadas de otras inmobiliarias.
@@ -151,110 +151,113 @@ class CompatibilityEngine
         PDO $pdo,
         array $propertyIds
     ): array {
-        if ($propertyIds === []) {
-            return [];
-        }
-
-        $params = [];
-        $placeholders = [];
-
-        foreach (
-            array_values(array_unique($propertyIds))
-            as $index => $propertyId
-        ) {
-            $key = 'property_id_' . $index;
-
-            $placeholders[] = ':' . $key;
-            $params[$key] = (int)$propertyId;
-        }
-
-        $st = $pdo->prepare("
-        SELECT
-            property_id,
-            amenity_code
-
-        FROM property_amenities
-
-        WHERE property_id IN (
-            " . implode(', ', $placeholders) . "
-        )
-
-          AND deleted_at IS NULL
-
-        ORDER BY
-            property_id ASC,
-            amenity_code ASC
-    ");
-
-        $st->execute($params);
-
         $map = [];
 
-        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
-            $propertyId =
-                (int)$row['property_id'];
+        foreach (
+            self::chunkIds($propertyIds)
+            as $chunk
+        ) {
+            $bindings =
+                self::buildIdPlaceholders(
+                    $chunk,
+                    'property_id'
+                );
 
-            $map[$propertyId][] =
-                (string)$row['amenity_code'];
+            $st = $pdo->prepare("
+            SELECT
+                property_id,
+                amenity_code
+            FROM property_amenities
+            WHERE property_id IN (
+                " .
+                implode(
+                    ', ',
+                    $bindings['placeholders']
+                ) .
+                "
+            )
+              AND deleted_at IS NULL
+            ORDER BY
+                property_id ASC,
+                amenity_code ASC
+        ");
+
+            $st->execute(
+                $bindings['params']
+            );
+
+            while (
+                $row =
+                $st->fetch(PDO::FETCH_ASSOC)
+            ) {
+                $propertyId =
+                    (int)$row['property_id'];
+
+                $map[$propertyId][] =
+                    (string)$row['amenity_code'];
+            }
         }
 
         return $map;
     }
 
     private static function getPropertyRequirementsBatch(
-    PDO $pdo,
-    array $propertyIds
-): array {
-    if ($propertyIds === []) {
-        return [];
-    }
+        PDO $pdo,
+        array $propertyIds
+    ): array {
+        $map = [];
 
-    $params = [];
-    $placeholders = [];
+        foreach (
+            self::chunkIds($propertyIds)
+            as $chunk
+        ) {
+            $bindings =
+                self::buildIdPlaceholders(
+                    $chunk,
+                    'property_id'
+                );
 
-    foreach (
-        array_values(array_unique($propertyIds))
-        as $index => $propertyId
-    ) {
-        $key = 'property_id_' . $index;
+            $st = $pdo->prepare("
+            SELECT *
+            FROM property_requirements
+            WHERE property_id IN (
+                " .
+                implode(
+                    ', ',
+                    $bindings['placeholders']
+                ) .
+                "
+            )
+              AND deleted_at IS NULL
+            ORDER BY
+                property_id ASC,
+                id ASC
+        ");
 
-        $placeholders[] = ':' . $key;
-        $params[$key] = (int)$propertyId;
-    }
+            $st->execute(
+                $bindings['params']
+            );
 
-    $st = $pdo->prepare("
-        SELECT *
+            while (
+                $row =
+                $st->fetch(PDO::FETCH_ASSOC)
+            ) {
+                $propertyId =
+                    (int)$row['property_id'];
 
-        FROM property_requirements
-
-        WHERE property_id IN (
-            " . implode(', ', $placeholders) . "
-        )
-
-          AND deleted_at IS NULL
-
-        ORDER BY property_id ASC, id ASC
-    ");
-
-    $st->execute($params);
-
-    $map = [];
-
-    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
-        $propertyId =
-            (int)$row['property_id'];
-
-        /*
-         * El modelo actual contempla un único
-         * requerimiento activo por propiedad.
-         */
-        if (!isset($map[$propertyId])) {
-            $map[$propertyId] = $row;
+                if (
+                    !isset(
+                        $map[$propertyId]
+                    )
+                ) {
+                    $map[$propertyId] =
+                        $row;
+                }
+            }
         }
-    }
 
-    return $map;
-}
+        return $map;
+    }
 
     public static function calculateForProperty(
         int $propertyId
@@ -816,49 +819,50 @@ class CompatibilityEngine
         PDO $pdo,
         array $searchRequestIds
     ): array {
-        if ($searchRequestIds === []) {
-            return [];
-        }
-
-        $params = [];
-        $placeholders = [];
-
-        foreach (
-            array_values(array_unique($searchRequestIds))
-            as $index => $searchRequestId
-        ) {
-            $key = 'search_id_' . $index;
-
-            $placeholders[] = ':' . $key;
-            $params[$key] = (int)$searchRequestId;
-        }
-
-        $st = $pdo->prepare("
-        SELECT
-            search_request_id,
-            property_type
-
-        FROM search_request_property_types
-
-        WHERE search_request_id IN (
-            " . implode(', ', $placeholders) . "
-        )
-
-        ORDER BY
-            search_request_id ASC,
-            property_type ASC
-    ");
-
-        $st->execute($params);
-
         $map = [];
 
-        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
-            $searchRequestId =
-                (int)$row['search_request_id'];
+        foreach (
+            self::chunkIds($searchRequestIds)
+            as $chunk
+        ) {
+            $bindings =
+                self::buildIdPlaceholders(
+                    $chunk,
+                    'search_id'
+                );
 
-            $map[$searchRequestId][] =
-                (string)$row['property_type'];
+            $st = $pdo->prepare("
+            SELECT
+                search_request_id,
+                property_type
+            FROM search_request_property_types
+            WHERE search_request_id IN (
+                " .
+                implode(
+                    ', ',
+                    $bindings['placeholders']
+                ) .
+                "
+            )
+            ORDER BY
+                search_request_id ASC,
+                property_type ASC
+        ");
+
+            $st->execute(
+                $bindings['params']
+            );
+
+            while (
+                $row =
+                $st->fetch(PDO::FETCH_ASSOC)
+            ) {
+                $searchRequestId =
+                    (int)$row['search_request_id'];
+
+                $map[$searchRequestId][] =
+                    (string)$row['property_type'];
+            }
         }
 
         return $map;
@@ -868,51 +872,51 @@ class CompatibilityEngine
         PDO $pdo,
         array $searchRequestIds
     ): array {
-        if ($searchRequestIds === []) {
-            return [];
-        }
-
-        $params = [];
-        $placeholders = [];
-
-        foreach (
-            array_values(array_unique($searchRequestIds))
-            as $index => $searchRequestId
-        ) {
-            $key = 'search_id_' . $index;
-
-            $placeholders[] = ':' . $key;
-            $params[$key] = (int)$searchRequestId;
-        }
-
-        $st = $pdo->prepare("
-        SELECT
-            search_request_id,
-            amenity_code
-
-        FROM search_request_amenities
-
-        WHERE search_request_id IN (
-            " . implode(', ', $placeholders) . "
-        )
-
-          AND deleted_at IS NULL
-
-        ORDER BY
-            search_request_id ASC,
-            amenity_code ASC
-    ");
-
-        $st->execute($params);
-
         $map = [];
 
-        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
-            $searchRequestId =
-                (int)$row['search_request_id'];
+        foreach (
+            self::chunkIds($searchRequestIds)
+            as $chunk
+        ) {
+            $bindings =
+                self::buildIdPlaceholders(
+                    $chunk,
+                    'search_id'
+                );
 
-            $map[$searchRequestId][] =
-                (string)$row['amenity_code'];
+            $st = $pdo->prepare("
+            SELECT
+                search_request_id,
+                amenity_code
+            FROM search_request_amenities
+            WHERE search_request_id IN (
+                " .
+                implode(
+                    ', ',
+                    $bindings['placeholders']
+                ) .
+                "
+            )
+              AND deleted_at IS NULL
+            ORDER BY
+                search_request_id ASC,
+                amenity_code ASC
+        ");
+
+            $st->execute(
+                $bindings['params']
+            );
+
+            while (
+                $row =
+                $st->fetch(PDO::FETCH_ASSOC)
+            ) {
+                $searchRequestId =
+                    (int)$row['search_request_id'];
+
+                $map[$searchRequestId][] =
+                    (string)$row['amenity_code'];
+            }
         }
 
         return $map;
@@ -922,72 +926,71 @@ class CompatibilityEngine
         PDO $pdo,
         array $searchRequestIds
     ): array {
-        if ($searchRequestIds === []) {
-            return [];
-        }
-
-        $params = [];
-        $placeholders = [];
-
-        foreach (
-            array_values(array_unique($searchRequestIds))
-            as $index => $searchRequestId
-        ) {
-            $key = 'search_id_' . $index;
-
-            $placeholders[] = ':' . $key;
-            $params[$key] = (int)$searchRequestId;
-        }
-
-        $st = $pdo->prepare("
-        SELECT
-            id,
-            search_request_id,
-            title,
-            property_type,
-            estimated_price,
-            currency,
-            country_code,
-            country,
-            province,
-            city,
-            zone,
-            total_area,
-            covered_area,
-            bedrooms,
-            bathrooms,
-            garages,
-            antiquity
-
-        FROM search_request_exchange_offers
-
-        WHERE search_request_id IN (
-            " . implode(', ', $placeholders) . "
-        )
-
-          AND deleted_at IS NULL
-
-        ORDER BY
-            search_request_id ASC,
-            estimated_price DESC,
-            id ASC
-    ");
-
-        $st->execute($params);
-
         $map = [];
 
-        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
-            $searchRequestId =
-                (int)$row['search_request_id'];
+        foreach (
+            self::chunkIds($searchRequestIds)
+            as $chunk
+        ) {
+            $bindings =
+                self::buildIdPlaceholders(
+                    $chunk,
+                    'search_id'
+                );
 
-            $map[$searchRequestId][] =
-                $row;
+            $st = $pdo->prepare("
+            SELECT
+                id,
+                search_request_id,
+                title,
+                property_type,
+                estimated_price,
+                currency,
+                country_code,
+                country,
+                province,
+                city,
+                zone,
+                total_area,
+                covered_area,
+                bedrooms,
+                bathrooms,
+                garages,
+                antiquity
+            FROM search_request_exchange_offers
+            WHERE search_request_id IN (
+                " .
+                implode(
+                    ', ',
+                    $bindings['placeholders']
+                ) .
+                "
+            )
+              AND deleted_at IS NULL
+            ORDER BY
+                search_request_id ASC,
+                estimated_price DESC,
+                id ASC
+        ");
+
+            $st->execute(
+                $bindings['params']
+            );
+
+            while (
+                $row =
+                $st->fetch(PDO::FETCH_ASSOC)
+            ) {
+                $searchRequestId =
+                    (int)$row['search_request_id'];
+
+                $map[$searchRequestId][] =
+                    $row;
+            }
         }
 
         return $map;
     }
-
 
     private static function getSearchRequestPropertyTypes(
         PDO $pdo,
@@ -2349,7 +2352,59 @@ updated_at = CURRENT_TIMESTAMP
 
         return (float)$value;
     }
+    private static function chunkIds(
+        array $ids
+    ): array {
+        $normalizedIds = array_values(
+            array_unique(
+                array_filter(
+                    array_map(
+                        static fn($id): int =>
+                        (int)$id,
+                        $ids
+                    ),
+                    static fn(int $id): bool =>
+                    $id > 0
+                )
+            )
+        );
 
+        if ($normalizedIds === []) {
+            return [];
+        }
+
+        return array_chunk(
+            $normalizedIds,
+            self::BATCH_SIZE
+        );
+    }
+
+    private static function buildIdPlaceholders(
+        array $ids,
+        string $prefix
+    ): array {
+        $params = [];
+        $placeholders = [];
+
+        foreach (
+            array_values($ids)
+            as $index => $id
+        ) {
+            $key =
+                $prefix . '_' . $index;
+
+            $placeholders[] =
+                ':' . $key;
+
+            $params[$key] =
+                (int)$id;
+        }
+
+        return [
+            'placeholders' => $placeholders,
+            'params' => $params,
+        ];
+    }
     private static function db(): PDO
     {
         require_once __DIR__ . '/../../../db.php';
