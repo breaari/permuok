@@ -12,13 +12,13 @@ import {
   SearchRequestDeleteModal,
   SearchRequestFilters,
 } from "../components";
-
+import { useToast } from "../../../ui/toast/ToastProvider";
 const PAGE_SIZE = 5;
 
 export default function SearchRequests() {
   const { user } = useAuth();
   const navigate = useNavigate();
-
+  const toast = useToast();
   const role = Number(user?.role || 0);
   const canAccess = role === 2 || role === 3;
 
@@ -116,6 +116,8 @@ export default function SearchRequests() {
 
       await deleteSearchRequest(selectedRequest.id);
 
+      toast.success("Búsqueda eliminada correctamente.");
+
       const willCurrentPageBeEmpty = items.length === 1 && page > 1;
       const targetPage = willCurrentPageBeEmpty ? page - 1 : page;
 
@@ -128,12 +130,11 @@ export default function SearchRequests() {
       setDeleteModalOpen(false);
       setSelectedRequest(null);
     } catch (e) {
-      setErr(getErrorMessage(e, "No se pudo eliminar la búsqueda"));
+      toast.error(getErrorMessage(e, "No se pudo eliminar la búsqueda"));
     } finally {
       setDeleteLoading(false);
     }
   }
-
   const title = useMemo(() => {
     if (role === 3) return "Búsquedas";
     return "Mis búsquedas";

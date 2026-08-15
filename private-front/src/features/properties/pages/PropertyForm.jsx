@@ -4,7 +4,7 @@ import PropertyBasicSection from "../components/PropertyBasicSection";
 import PropertyLocationSection from "../components/PropertyLocationSection";
 import PropertyFeaturesSection from "../components/PropertyFeaturesSection";
 import PropertyExchangeSection from "../components/PropertyExchangeSection";
-import ImagesSection from "../components/ImagesSection";
+import PropertyImagesSection from "../components/PropertyImagesSection";
 import PropertyPublishChoiceModal from "../components/PropertyPublishChoiceModal";
 import PropertyDeleteModal from "../components/PropertyDeleteModal";
 import PropertyFormHeaderActions from "../components/PropertyFormHeaderActions";
@@ -42,10 +42,6 @@ export default function PropertyForm() {
 
     setIsLocationValid,
     isSubmitting,
-    submitMessage,
-    submitError,
-    setSubmitMessage,
-    setSubmitError,
 
     initialLoading,
     initialError,
@@ -64,6 +60,9 @@ export default function PropertyForm() {
 
     submitProperty,
     navigate,
+
+    showError,
+    showSuccess,
   } = usePropertyForm({ googleMapsLoaded });
 
   function handleOpenDeleteModal() {
@@ -150,18 +149,6 @@ export default function PropertyForm() {
               onPreview={handlePreview}
             />
 
-            {(submitError || submitMessage) && (
-              <div
-                className={`rounded-xl border px-4 py-3 text-sm ${
-                  submitError
-                    ? "border-rose-200 bg-rose-50 text-rose-700"
-                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                }`}
-              >
-                {submitError || submitMessage}
-              </div>
-            )}
-
             <PropertyBasicSection form={form} setField={setField} />
 
             <PropertyLocationSection
@@ -173,27 +160,13 @@ export default function PropertyForm() {
 
             <PropertyFeaturesSection form={form} setField={setField} />
 
-            <ImagesSection
+            <PropertyImagesSection
               images={images}
               setImages={setImages}
               existingImages={existingImages}
               setExistingImages={setExistingImages}
-              onError={(msg) => {
-                if (msg) {
-                  setSubmitMessage("");
-                  setSubmitError(msg);
-                } else {
-                  setSubmitError("");
-                }
-              }}
-              onSuccess={(msg) => {
-                if (msg) {
-                  setSubmitError("");
-                  setSubmitMessage(msg);
-                } else {
-                  setSubmitMessage("");
-                }
-              }}
+              onError={showError}
+              onSuccess={showSuccess}
             />
 
             <div className="pt-2 flex flex-col sm:flex-row gap-3">
@@ -240,18 +213,6 @@ export default function PropertyForm() {
               onDelete={handleOpenDeleteModal}
               onPreview={handlePreview}
             />
-
-            {(submitError || submitMessage) && (
-              <div
-                className={`rounded-xl border px-4 py-3 text-sm ${
-                  submitError
-                    ? "border-rose-200 bg-rose-50 text-rose-700"
-                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                }`}
-              >
-                {submitError || submitMessage}
-              </div>
-            )}
 
             <PropertyExchangeSection
               requirements={requirements}

@@ -17,7 +17,7 @@ class PropertyImageViewController
         $base = rtrim((string)($_ENV['UPLOADS_DIR'] ?? ''), '/');
 
         if ($base === '') {
-            throw new \Exception("UPLOADS_DIR no configurado");
+            $base = dirname(__DIR__, 2) . '/uploads';
         }
 
         return $base;
@@ -50,12 +50,11 @@ class PropertyImageViewController
         }
 
         $fullPath = self::getUploadsDir() . '/' . ltrim($image['file_path'], '/');
-
         if (!is_file($fullPath)) {
+            error_log('PROPERTY IMAGE NOT FOUND: ' . $fullPath);
             http_response_code(404);
             exit;
         }
-
         $mime = mime_content_type($fullPath) ?: 'application/octet-stream';
 
         header('Content-Type: ' . $mime);

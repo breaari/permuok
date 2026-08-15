@@ -14,7 +14,17 @@ import {
   getRefreshToken,
   tryRefresh,
   unwrap,
+  getErrorMessage,
 } from "../../../api/http";
+import {
+  canExploreDevelopments,
+  canPublishDevelopments,
+  canUseDevelopments,
+  isAdmin,
+  isAgent,
+  isInvestor,
+  isRealEstate,
+} from "../utils/access";
 
 const AuthContext = createContext(null);
 
@@ -39,7 +49,7 @@ export function AuthProvider({ children }) {
 
         setMe(payload);
         return payload;
-      } catch (e) {
+      } catch {
         clearTokens();
         setMe(null);
         return null;
@@ -58,40 +68,28 @@ export function AuthProvider({ children }) {
 
     try {
       const res = await api.post("/auth/login", { email, password });
-
-      // DEBUG útil
-      console.log("[AUTH LOGIN] raw response:", res);
-
       const payload = unwrap(res);
 
-      console.log("[AUTH LOGIN] payload:", payload);
-
-      // 👉 Caso 1: backend devolvió string (ej: error PHP)
       if (typeof payload === "string") {
-        const clean = payload.replace(/<[^>]+>/g, "").trim(); // limpia HTML
+        const clean = payload.replace(/<[^>]+>/g, "").trim();
         throw new Error(clean || "Error inesperado del servidor");
       }
 
-      // 👉 Caso 2: payload inválido
       if (!payload || typeof payload !== "object") {
         throw new Error("Respuesta inválida del servidor");
       }
 
-      // 👉 Caso 3: backend respondió pero sin tokens
       if (!payload.access_token || !payload.refresh_token) {
-        console.error("[AUTH LOGIN] payload sin tokens:", payload);
         throw new Error(
-          payload?.message || "El servidor no devolvió credenciales válidas"
+          payload?.message || "El servidor no devolvió credenciales válidas",
         );
       }
 
-      // guardar tokens
       setTokens({
         access_token: payload.access_token,
         refresh_token: payload.refresh_token,
       });
 
-      // cargar usuario
       const current = await loadMe({ force: true });
 
       if (!current) {
@@ -100,9 +98,9 @@ export function AuthProvider({ children }) {
 
       return current;
     } catch (e) {
-      console.error("[AUTH LOGIN ERROR]", e);
-      setError(e?.message || "No se pudo iniciar sesión");
-      throw e;
+      const message = getErrorMessage(e, "No se pudo iniciar sesión");
+      setError(message);
+      throw new Error(message);
     } finally {
       setLoading(false);
     }
@@ -117,8 +115,9 @@ export function AuthProvider({ children }) {
       unwrap(res);
       return true;
     } catch (e) {
-      setError(e?.message || "No se pudo registrar la cuenta");
-      throw e;
+      const message = getErrorMessage(e, "No se pudo registrar la cuenta");
+      setError(message);
+      throw new Error(message);
     } finally {
       setLoading(false);
     }
@@ -168,12 +167,30 @@ export function AuthProvider({ children }) {
     })();
   }, []);
 
+  const user = me?.user ?? null;
+  const access = me?.access ?? null;
+
+  const permissions = useMemo(
+    () => ({
+      isAdmin: isAdmin(user),
+      isRealEstate: isRealEstate(user),
+      isAgent: isAgent(user),
+      isInvestor: isInvestor(user),
+
+      canPublishDevelopments: canPublishDevelopments(user, access),
+      canViewDevelopments: canExploreDevelopments(user, access),
+      canUseDevelopments: canUseDevelopments(user, access),
+    }),
+    [user, access],
+  );
+
   const value = useMemo(
     () => ({
       loading,
       me,
-      user: me?.user ?? null,
-      access: me?.access ?? null,
+      user,
+      access,
+      permissions,
       error,
       setError,
       loadMe,
@@ -181,7 +198,7 @@ export function AuthProvider({ children }) {
       register,
       logout,
     }),
-    [loading, me, error]
+    [loading, me, user, access, permissions, error],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -189,8 +206,10 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
+
   if (!ctx) {
     throw new Error("useAuth debe usarse dentro de <AuthProvider>");
   }
+
   return ctx;
 }

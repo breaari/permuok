@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../auth/components/AuthContext";
 import { getErrorMessage } from "../../../api/http.js";
+import { useToast } from "../../../ui/toast/ToastProvider";
 
 import AuthLayout from "../../../layout/AuthLayout.jsx";
 import Input from "../../../ui/components/Input.jsx";
@@ -14,40 +15,32 @@ import { isValidPhoneNumber } from "react-phone-number-input";
 export default function Register() {
   const nav = useNavigate();
   const { register } = useAuth();
+  const toast = useToast();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-
-  // ✅ ahora guardamos el teléfono como E.164: +549...
   const [phone, setPhone] = useState("");
-
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
-
   const [terms, setTerms] = useState(false);
-
-  const [err, setErr] = useState("");
-  const [ok, setOk] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function onSubmit(e) {
     e.preventDefault();
-    setErr("");
-    setOk("");
 
     if (!terms) {
-      setErr("Debés aceptar los términos para registrarte.");
+      toast.error("Debés aceptar los términos para registrarte.");
       return;
     }
 
     if (!phone) {
-      setErr("Ingresá un número de teléfono.");
+      toast.error("Ingresá un número de teléfono.");
       return;
     }
 
     if (!isValidPhoneNumber(phone)) {
-      setErr("El número de teléfono no es válido.");
+      toast.error("El número de teléfono no es válido.");
       return;
     }
 
@@ -58,34 +51,29 @@ export default function Register() {
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         email: email.trim().toLowerCase(),
-        phone, // ✅ ya viene con prefijo + bandera
+        phone,
         password,
       });
 
-      setOk("Cuenta creada. Ahora iniciá sesión.");
-      setTimeout(() => nav("/login", { replace: true }), 700);
+      toast.success("Cuenta creada correctamente. Ahora iniciá sesión.");
+
+      setTimeout(() => {
+        nav("/login", { replace: true });
+      }, 700);
     } catch (e) {
-      setErr(getErrorMessage(e, "No se pudo crear la cuenta"));
+      toast.error(getErrorMessage(e, "No se pudo crear la cuenta"));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <AuthLayout title="Creá tu cuenta" subtitle="Empezá tu camino en el intercambio inmobiliario">
-      {err && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-          {err}
-        </div>
-      )}
-      {ok && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-          {ok}
-        </div>
-      )}
-
+    <AuthLayout
+      title="Creá tu cuenta"
+      subtitle="Empezá tu camino en el intercambio inmobiliario"
+    >
       <form onSubmit={onSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input
             label="Nombre"
             value={firstName}
@@ -119,7 +107,6 @@ export default function Register() {
           disabled={submitting}
         />
 
-        {/* ✅ Teléfono profesional con banderas */}
         <PhoneField
           label="Teléfono"
           value={phone}
@@ -145,7 +132,9 @@ export default function Register() {
               className="text-slate-400 hover:text-slate-600"
               onClick={() => setShowPass((s) => !s)}
               tabIndex={-1}
-              aria-label={showPass ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-label={
+                showPass ? "Ocultar contraseña" : "Mostrar contraseña"
+              }
             >
               <Icon name={showPass ? "eyeOff" : "eye"} />
             </button>
@@ -163,20 +152,25 @@ export default function Register() {
             onChange={(e) => setTerms(e.target.checked)}
             disabled={submitting}
           />
+
           <span>
             Acepto los{" "}
             <button
               type="button"
-              className="text-primary font-semibold hover:underline"
-              onClick={() => setErr("Pendiente: página de Términos")}
+              className="font-semibold text-primary hover:underline"
+              onClick={() =>
+                toast.info("Pendiente: página de Términos de Servicio")
+              }
             >
               Términos de Servicio
             </button>{" "}
             y la{" "}
             <button
               type="button"
-              className="text-primary font-semibold hover:underline"
-              onClick={() => setErr("Pendiente: página de Privacidad")}
+              className="font-semibold text-primary hover:underline"
+              onClick={() =>
+                toast.info("Pendiente: página de Política de Privacidad")
+              }
             >
               Política de Privacidad
             </button>
@@ -189,10 +183,13 @@ export default function Register() {
         </Button>
       </form>
 
-      <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+      <div className="mt-8 border-t border-slate-100 pt-6 text-center">
         <p className="text-sm text-slate-600">
           ¿Ya tenés una cuenta?
-          <Link className="font-bold text-primary hover:underline ml-1" to="/login">
+          <Link
+            className="ml-1 font-bold text-primary hover:underline"
+            to="/login"
+          >
             Iniciá sesión
           </Link>
         </p>

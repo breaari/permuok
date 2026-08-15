@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getApiBaseUrl } from "../../../api/http";
+import { resolveImageUrl } from "../detail/propertyDetail.helpers";
 import { Icon } from "../../../ui/icons/Index";
 import { PROPERTY_TYPES } from "../utils/PropertyFormHelpers";
 
@@ -130,19 +130,19 @@ function buildExchangeSummary(item) {
   const mode = req?.criteria_mode || item?.criteria_mode || "";
 
   const acceptsTotalSwap = isTrueFlag(
-    req?.accepts_total_swap ?? item?.accepts_total_swap
+    req?.accepts_total_swap ?? item?.accepts_total_swap,
   );
 
   const acceptsSwapPlusCash = isTrueFlag(
-    req?.accepts_swap_plus_cash ?? item?.accepts_swap_plus_cash
+    req?.accepts_swap_plus_cash ?? item?.accepts_swap_plus_cash,
   );
 
   const acceptsCashOnly = isTrueFlag(
-    req?.accepts_cash_only ?? item?.accepts_cash_only
+    req?.accepts_cash_only ?? item?.accepts_cash_only,
   );
 
   const acceptsOpenProposals = isTrueFlag(
-    req?.accepts_open_proposals ?? item?.accepts_open_proposals
+    req?.accepts_open_proposals ?? item?.accepts_open_proposals,
   );
 
   let eyebrow = "Condiciones de permuta";
@@ -184,18 +184,6 @@ function buildExchangeSummary(item) {
   };
 }
 
-function resolveImageUrl(rawUrl) {
-  if (!rawUrl) return null;
-
-  const value = String(rawUrl).trim();
-  if (!value) return null;
-
-  if (/^https?:\/\//i.test(value)) return value;
-
-  const base = getApiBaseUrl().replace(/\/+$/, "");
-  return value.startsWith("/") ? `${base}${value}` : `${base}/${value}`;
-}
-
 function getGallery(item) {
   const base = getBaseProperty(item);
 
@@ -219,7 +207,7 @@ function getGallery(item) {
           img?.url ||
           img?.path ||
           img?.file_path ||
-          img?.archive_path
+          img?.archive_path,
       );
     })
     .filter(Boolean);
@@ -287,12 +275,18 @@ export default function PropertyCard({
 
   const gallery = useMemo(() => getGallery(item), [item]);
   const [imageIndex, setImageIndex] = useState(0);
-
+  const [touchStartX, setTouchStartX] = useState(null);
   const currentImage = gallery[imageIndex] || null;
   const hasMultipleImages = gallery.length > 1;
 
-  function goToDetail() {
+  function goToDetail(e) {
     if (!canOpen) return;
+
+    if (e?.ctrlKey || e?.metaKey || e?.button === 1) {
+      window.open(detailHref, "_blank", "noopener,noreferrer");
+      return;
+    }
+
     navigate(detailHref, {
       state: detailState,
     });
@@ -324,15 +318,32 @@ export default function PropertyCard({
     setImageIndex((prev) => prev + 1);
   }
 
-  console.log("PROPERTY CARD GALLERY", {
-  id: base?.id,
-  cover_image_url: item?.cover_image_url || base?.cover_image_url,
-  images: item?.images,
-  property_images: item?.property_images,
-  gallery,
-  galleryLength: gallery.length,
-  isDashboard,
-});
+  function handleTouchStart(e) {
+    setTouchStartX(e.touches?.[0]?.clientX ?? null);
+  }
+
+  function handleTouchEnd(e) {
+    if (touchStartX === null) return;
+
+    const touchEndX = e.changedTouches?.[0]?.clientX ?? null;
+    if (touchEndX === null) return;
+
+    const diff = touchStartX - touchEndX;
+
+    if (Math.abs(diff) > 45) {
+      if (diff > 0) {
+        if (imageIndex >= gallery.length - 1) {
+          goToDetail();
+        } else {
+          setImageIndex((prev) => prev + 1);
+        }
+      } else {
+        setImageIndex((prev) => (prev <= 0 ? 0 : prev - 1));
+      }
+    }
+
+    setTouchStartX(null);
+  }
 
   return (
     <article className="group bg-white rounded-xl overflow-hidden flex flex-col md:flex-row shadow-sm hover:shadow-md transition-all duration-300 border border-slate-200 md:h-[336px]">
@@ -340,7 +351,9 @@ export default function PropertyCard({
         className={`md:w-80 h-52 sm:h-60 md:h-full relative overflow-hidden shrink-0 bg-slate-100 ${
           canOpen ? "cursor-pointer" : ""
         }`}
-        onClick={canOpen ? goToDetail : undefined}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onClick={canOpen ? (e) => goToDetail(e) : undefined}
       >
         {currentImage ? (
           <img
@@ -354,9 +367,7 @@ export default function PropertyCard({
           </div>
         )}
 
-        {!isDashboard && (
-          <StatusBadge status={base?.status || item?.status} />
-        )}
+        {!isDashboard && <StatusBadge status={base?.status || item?.status} />}
 
         {isDashboard && hasMultipleImages && (
           <>
@@ -396,15 +407,18 @@ export default function PropertyCard({
               </span>
 
               {canOpen ? (
-                <button
-                  type="button"
-                  onClick={goToDetail}
+                <a
+                  href={detailHref}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    goToDetail(e);
+                  }}
                   className="block text-left"
                 >
                   <h3 className="text-lg sm:text-[20px] font-extrabold text-slate-900 leading-tight break-words line-clamp-2 hover:text-primary transition-colors">
                     {base?.title || "Sin título"}
                   </h3>
-                </button>
+                </a>
               ) : (
                 <h3 className="text-lg sm:text-[20px] font-extrabold text-slate-900 leading-tight break-words line-clamp-2">
                   {base?.title || "Sin título"}
@@ -471,14 +485,17 @@ export default function PropertyCard({
         <div className="flex flex-wrap justify-end gap-x-4 gap-y-2 mt-3 pt-3 border-t border-slate-100 shrink-0">
           {isDashboard ? (
             canOpen ? (
-              <button
-                type="button"
-                onClick={goToDetail}
+              <a
+                href={detailHref}
+                onClick={(e) => {
+                  e.preventDefault();
+                  goToDetail(e);
+                }}
                 className="text-blue-900 font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 hover:underline underline-offset-4"
               >
                 <Icon name="arrowRight" size={15} />
                 Ver más
-              </button>
+              </a>
             ) : null
           ) : (
             <>
@@ -490,16 +507,6 @@ export default function PropertyCard({
                 <Icon name="edit" size={15} />
                 Editar
               </button>
-
-              <button
-                type="button"
-                onClick={onOpenDetail}
-                className="text-blue-900 font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 hover:underline underline-offset-4"
-              >
-                <Icon name="chart" size={15} />
-                Gestionar
-              </button>
-
               <button
                 type="button"
                 onClick={onDelete}

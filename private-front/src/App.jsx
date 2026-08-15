@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 
+import HomePage from "./public-site/pages/HomePage";
+
 import Login from "./features/auth/pages/Login";
 import Register from "./features/auth/pages/Register";
 import Gate from "./features/gate/pages/Gate";
@@ -29,12 +31,28 @@ import SearchRequests from "./features/search-requests/pages/SearchRequests";
 import SearchRequestForm from "./features/search-requests/pages/SearchRequestForm";
 import SearchRequestDetail from "./features/search-requests/pages/SearchRequestDetail";
 
+import Developments from "./features/developments/pages/Developments";
+import DevelopmentForm from "./features/developments/pages/DevelopmentForm";
+import DevelopmentDetail from "./features/developments/pages/DevelopmentDetail";
+import RequireDevelopmentAccess from "./features/developments/components/RequireDevelopmentAccess";
+
+import Explore from "./features/explore/pages/Explore";
+
+import Inbox from "./features/conversations/pages/Inbox";
+import ConversationDetail from "./features/conversations/pages/ConversationDetail";
+import AdminDashboard from "./features/admin/pages/AdminDashboard";
+
 export default function App() {
   return (
     <Routes>
+      {/* Página pública corporativa */}
+      <Route path="/" element={<HomePage />} />
+
+      {/* Auth público */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
+      {/* App privada */}
       <Route
         element={
           <ProtectedRoute>
@@ -42,7 +60,7 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<Gate />} />
+        <Route path="gate" element={<Gate />} />
 
         <Route path="my-profile" element={<MyProfile />} />
         <Route path="billing" element={<Billing />} />
@@ -55,9 +73,6 @@ export default function App() {
         <Route path="properties/:id/edit" element={<PropertyForm />} />
         <Route path="properties/:id" element={<PropertyDetail />} />
 
-        <Route path="explore/properties" element={<Properties />} />
-        <Route path="explore/properties/:id" element={<PropertyDetail />} />
-
         <Route path="search-requests" element={<SearchRequests />} />
         <Route path="search-requests/new" element={<SearchRequestForm />} />
         <Route
@@ -66,14 +81,77 @@ export default function App() {
         />
         <Route path="search-requests/:id" element={<SearchRequestDetail />} />
 
-        <Route path="explore/search-requests" element={<SearchRequests />} />
+        <Route
+          path="developments"
+          element={
+            <RequireDevelopmentAccess mode="publish">
+              <Developments />
+            </RequireDevelopmentAccess>
+          }
+        />
+        <Route
+          path="developments/new"
+          element={
+            <RequireDevelopmentAccess mode="publish">
+              <DevelopmentForm />
+            </RequireDevelopmentAccess>
+          }
+        />
+        <Route
+          path="developments/:id/edit"
+          element={
+            <RequireDevelopmentAccess mode="publish">
+              <DevelopmentForm />
+            </RequireDevelopmentAccess>
+          }
+        />
+        <Route
+          path="developments/:id"
+          element={
+            <RequireDevelopmentAccess mode="publish">
+              <DevelopmentDetail />
+            </RequireDevelopmentAccess>
+          }
+        />
+
+        <Route path="explore" element={<Explore />} />
+        <Route
+          path="explore/properties"
+          element={<Explore defaultType="property" />}
+        />
+        <Route path="explore/properties/:id" element={<PropertyDetail />} />
+
+        <Route
+          path="explore/search-requests"
+          element={<Explore defaultType="search_request" />}
+        />
         <Route
           path="explore/search-requests/:id"
           element={<SearchRequestDetail />}
         />
 
+        <Route
+          path="explore/developments"
+          element={
+            <RequireDevelopmentAccess mode="view">
+              <Explore defaultType="development" />
+            </RequireDevelopmentAccess>
+          }
+        />
+        <Route
+          path="explore/developments/:id"
+          element={
+            <RequireDevelopmentAccess mode="view">
+              <DevelopmentDetail />
+            </RequireDevelopmentAccess>
+          }
+        />
+
+        <Route path="conversations" element={<Inbox />} />
+        <Route path="conversations/:id" element={<ConversationDetail />} />
+
         <Route path="admin" element={<AdminPanel />}>
-          <Route index element={<Navigate to="real-estates" replace />} />
+          <Route index element={<AdminDashboard />} />
           <Route path="real-estates" element={<AdminRealEstates />} />
           <Route path="real-estates/:id" element={<AdminRealEstateDetail />} />
           <Route path="users" element={<AdminUsers />} />
@@ -82,10 +160,11 @@ export default function App() {
           <Route path="billing/:id" element={<AdminBillingDetail />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/app" replace />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      {/* Cualquier ruta inexistente fuera de la app vuelve a la landing */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

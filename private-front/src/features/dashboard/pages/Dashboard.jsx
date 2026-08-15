@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Icon } from "../../../ui/icons/Index";
-import { api, getErrorMessage, unwrap } from "../../../api/http";
+import { getErrorMessage } from "../../../api/http";
 import SearchRequestCard from "../../search-requests/components/SearchRequestCard";
 import PropertyCard from "../../properties/components/PropertyCard";
+import DevelopmentCard from "../../developments/components/DevelopmentCard";
+import { getExplore } from "../../explore/api/explore.api";
 
 function HeroCard({
   propertiesCount = 0,
   searchesCount = 0,
+  developmentsCount = 0,
   onExploreProperties,
   onExploreSearches,
+  onExploreDevelopments,
 }) {
   return (
     <section className="rounded-[28px] border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
@@ -20,12 +24,13 @@ function HeroCard({
           </p>
 
           <h1 className="mt-3 text-2xl sm:text-2xl lg:text-4xl font-black tracking-tight text-slate-900 leading-tight">
-            Explorá publicaciones y búsquedas activas en la red.
+            Explorá publicaciones, búsquedas y desarrollos activos en la red.
           </h1>
 
           <p className="mt-4 max-w-2xl text-base sm:text-lg text-slate-500 leading-relaxed">
             Descubrí propiedades disponibles para intercambio, oportunidades
-            abiertas y pedidos de búsqueda cargados por otras inmobiliarias.
+            abiertas, pedidos de búsqueda y desarrollos cargados por otras
+            inmobiliarias.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
@@ -46,10 +51,19 @@ function HeroCard({
               <Icon name="search" size={18} />
               Ver búsquedas activas
             </button>
+
+            <button
+              type="button"
+              onClick={onExploreDevelopments}
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            >
+              <Icon name="layoutGrid" size={18} />
+              Ver desarrollos
+            </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-4">
           <MiniStat
             label="Publicaciones activas"
             value={propertiesCount}
@@ -59,6 +73,11 @@ function HeroCard({
             label="Búsquedas activas"
             value={searchesCount}
             icon="search"
+          />
+          <MiniStat
+            label="Desarrollos activos"
+            value={developmentsCount}
+            icon="layoutGrid"
           />
         </div>
       </div>
@@ -112,28 +131,31 @@ function SegmentTabs({ value, onChange }) {
     { key: "all", label: "Todo" },
     { key: "properties", label: "Publicaciones" },
     { key: "searches", label: "Búsquedas" },
+    { key: "developments", label: "Desarrollos" },
   ];
 
   return (
-    <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-1">
-      {tabs.map((tab) => {
-        const active = value === tab.key;
+    <div className="w-full lg:w-auto">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {tabs.map((tab) => {
+          const active = value === tab.key;
 
-        return (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => onChange(tab.key)}
-            className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
-              active
-                ? "bg-slate-900 text-white"
-                : "text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            {tab.label}
-          </button>
-        );
-      })}
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => onChange(tab.key)}
+              className={`rounded-xl px-4 py-2.5 text-xs font-bold transition sm:text-sm ${
+                active
+                  ? "bg-slate-900 text-white"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -154,6 +176,7 @@ export default function Dashboard() {
 
   const [properties, setProperties] = useState([]);
   const [searches, setSearches] = useState([]);
+  const [developments, setDevelopments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -167,43 +190,40 @@ export default function Dashboard() {
         setLoading(true);
         setError("");
 
-        const [propertiesRes, searchesRes] = await Promise.all([
-          api.get("/explore/properties", {
-            params: {
-              page: 1,
-              limit: 6,
-            },
-          }),
-          api.get("/explore/search-requests", {
-            params: {
-              page: 1,
-              limit: 6,
-            },
-          }),
-        ]);
+        const data = await getExplore({
+          opportunity_type: "all",
+          page: 1,
+          limit: 18,
+        });
 
-        const propertiesData = unwrap(propertiesRes);
-        const searchesData = unwrap(searchesRes);
+        const results = Array.isArray(data?.items) ? data.items : [];
 
-        const propertyItems = Array.isArray(propertiesData?.items)
-          ? propertiesData.items
-          : Array.isArray(propertiesData?.properties)
-            ? propertiesData.properties
-            : [];
+        const propertyItems = results
+          .filter((result) => result?.opportunity_type === "property")
+          .map((result) => result?.item || result)
+          .filter(Boolean);
 
-        const searchItems = Array.isArray(searchesData?.items)
-          ? searchesData.items
-          : Array.isArray(searchesData?.search_requests)
-            ? searchesData.search_requests
-            : [];
+        const searchItems = results
+          .filter((result) => result?.opportunity_type === "search_request")
+          .map((result) => result?.item || result)
+          .filter(Boolean);
+
+        const developmentItems = results
+          .filter((result) => result?.opportunity_type === "development")
+          .map((result) => result?.item || result)
+          .filter(Boolean);
 
         if (cancelled) return;
 
         setProperties(propertyItems);
         setSearches(searchItems);
+        setDevelopments(developmentItems);
       } catch (err) {
         if (cancelled) return;
         setError(getErrorMessage(err, "No se pudo cargar el inicio."));
+        setProperties([]);
+        setSearches([]);
+        setDevelopments([]);
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -219,32 +239,39 @@ export default function Dashboard() {
   }, []);
 
   const visibleProperties = useMemo(() => {
-    if (segment === "searches") return [];
+    if (segment === "searches" || segment === "developments") return [];
     return properties.slice(0, 3);
   }, [segment, properties]);
 
   const visibleSearches = useMemo(() => {
-    if (segment === "properties") return [];
+    if (segment === "properties" || segment === "developments") return [];
     return searches.slice(0, 4);
   }, [segment, searches]);
 
+  const visibleDevelopments = useMemo(() => {
+    if (segment === "properties" || segment === "searches") return [];
+    return developments.slice(0, 3);
+  }, [segment, developments]);
+
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
+    <main className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 sm:py-8 lg:px-10">
       <HeroCard
         propertiesCount={properties.length}
         searchesCount={searches.length}
+        developmentsCount={developments.length}
         onExploreProperties={() => navigate("/explore/properties")}
         onExploreSearches={() => navigate("/explore/search-requests")}
+        onExploreDevelopments={() => navigate("/explore/developments")}
       />
 
-      <section className="mt-8 flex flex-wrap items-center justify-between gap-4">
+      <section className="mt-6 flex flex-col gap-4 sm:mt-8 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">
+          <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
             Explorar oportunidades
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Descubrí publicaciones destacadas y búsquedas activas dentro de la
-            red.
+            Descubrí publicaciones destacadas, búsquedas activas y desarrollos
+            dentro de la red.
           </p>
         </div>
 
@@ -312,14 +339,39 @@ export default function Dashboard() {
             </section>
           )}
 
-          {!visibleProperties.length && !visibleSearches.length && (
-            <section className="mt-8">
-              <EmptyState
-                title="Todavía no hay oportunidades para mostrar"
-                description="Cuando existan publicaciones o búsquedas activas dentro de la red, las vas a ver acá."
+          {visibleDevelopments.length > 0 && (
+            <section className="mt-10">
+              <SectionHeader
+                title="Desarrollos destacados"
+                description="Proyectos activos cargados por otras inmobiliarias."
+                actionLabel="Ver desarrollos"
+                onAction={() => navigate("/explore/developments")}
               />
+
+              <div className="space-y-4">
+                {visibleDevelopments.map((item) => (
+                  <DevelopmentCard
+                    key={item.id}
+                    item={item}
+                    variant="dashboard"
+                    detailHref={`/explore/developments/${item.id}`}
+                    detailState={{ from: currentPathWithSearch }}
+                  />
+                ))}
+              </div>
             </section>
           )}
+
+          {!visibleProperties.length &&
+            !visibleSearches.length &&
+            !visibleDevelopments.length && (
+              <section className="mt-8">
+                <EmptyState
+                  title="Todavía no hay oportunidades para mostrar"
+                  description="Cuando existan publicaciones, búsquedas o desarrollos activos dentro de la red, los vas a ver acá."
+                />
+              </section>
+            )}
         </>
       )}
     </main>

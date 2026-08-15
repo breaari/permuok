@@ -4,12 +4,14 @@ namespace App\Services;
 
 use PDO;
 use Exception;
+use Throwable;
+use App\Services\AI\CompatibilityEngine;
 
 class PropertyService
 {
     private const ROLE_REAL_ESTATE = 2;
     private const ROLE_AGENT = 3;
-
+    private const ROLE_INVESTOR = 4;
     private static function db(): PDO
     {
         require_once __DIR__ . '/../../db.php';
@@ -23,6 +25,72 @@ class PropertyService
         }
 
         return '/property-images/' . $imageId . '/view';
+    }
+
+    private static function getPropertyAmenities(int $propertyId): array
+    {
+        $pdo = self::db();
+
+        $st = $pdo->prepare("
+        SELECT amenity_code
+        FROM property_amenities
+        WHERE property_id = :property_id
+          AND deleted_at IS NULL
+        ORDER BY id ASC
+    ");
+
+        $st->execute([
+            'property_id' => $propertyId,
+        ]);
+
+        return $st->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    private static function replacePropertyAmenities(
+        int $propertyId,
+        array $amenities
+    ): void {
+        $pdo = self::db();
+
+        $stDelete = $pdo->prepare("
+        UPDATE property_amenities
+        SET deleted_at = NOW()
+        WHERE property_id = :property_id
+          AND deleted_at IS NULL
+    ");
+
+        $stDelete->execute([
+            'property_id' => $propertyId,
+        ]);
+
+        $amenities = array_values(array_unique(array_filter(
+            array_map(
+                fn($item) => trim((string)$item),
+                $amenities
+            )
+        )));
+
+        if (!$amenities) {
+            return;
+        }
+
+        $stInsert = $pdo->prepare("
+        INSERT INTO property_amenities (
+            property_id,
+            amenity_code
+        )
+        VALUES (
+            :property_id,
+            :amenity_code
+        )
+    ");
+
+        foreach ($amenities as $amenity) {
+            $stInsert->execute([
+                'property_id' => $propertyId,
+                'amenity_code' => $amenity,
+            ]);
+        }
     }
 
     private static function getValidPublisherUser(int $userId): array
@@ -58,6 +126,36 @@ class PropertyService
         return $user;
     }
 
+    private static function getValidViewerUser(int $userId): array
+    {
+        $pdo = self::db();
+
+        $st = $pdo->prepare("
+        SELECT id, role, real_estate_id, is_active
+        FROM users
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $st->execute(['id' => $userId]);
+        $user = $st->fetch();
+
+        if (!$user) {
+            throw new Exception("Usuario no encontrado");
+        }
+
+        if (!in_array((int)$user['role'], [self::ROLE_REAL_ESTATE, self::ROLE_AGENT, self::ROLE_INVESTOR], true)) {
+            throw new Exception("No tenés permisos para ver propiedades");
+        }
+
+        if ((int)$user['is_active'] !== 1) {
+            throw new Exception("Tu cuenta está inactiva");
+        }
+
+        return $user;
+    }
+
     private static function getOwnedProperty(int $userId, int $propertyId): array
     {
         $pdo = self::db();
@@ -84,7 +182,38 @@ class PropertyService
 
         return [$user, $property];
     }
+    private static function recalculateCompatibilitiesSafely(
+        int $propertyId
+    ): void {
+        try {
+            CompatibilityEngine::calculateForProperty(
+                $propertyId
+            );
+        } catch (Throwable $e) {
+            error_log(
+                '[PROPERTY COMPATIBILITY] No se pudo recalcular ' .
+                    'la propiedad ' . $propertyId . ': ' .
+                    $e->getMessage()
+            );
+        }
+    }
 
+    private static function archiveCompatibilitiesSafely(
+        int $propertyId
+    ): void {
+        try {
+            CompatibilityEngine::archiveForProperty(
+                $propertyId
+            );
+        } catch (Throwable $e) {
+            error_log(
+                '[PROPERTY COMPATIBILITY] No se pudieron archivar ' .
+                    'las compatibilidades de la propiedad ' .
+                    $propertyId . ': ' .
+                    $e->getMessage()
+            );
+        }
+    }
     private static function validatePropertyPayload(array $data, bool $partial = false): array
     {
         $payload = [
@@ -250,6 +379,11 @@ class PropertyService
 
         $id = (int)$pdo->lastInsertId();
 
+        self::replacePropertyAmenities(
+            $id,
+            $data['amenities'] ?? []
+        );
+
         return self::getDetail($userId, $id);
     }
 
@@ -285,6 +419,7 @@ class PropertyService
 
         $requirementPropertyTypes = [];
         $requirementLocations = [];
+        $amenities = self::getPropertyAmenities($propertyId);
 
         if ($requirements && !empty($requirements['id'])) {
             $requirementId = (int)$requirements['id'];
@@ -314,24 +449,52 @@ class PropertyService
             'requirements' => $requirements,
             'requirement_property_types' => $requirementPropertyTypes,
             'requirement_locations' => $requirementLocations,
+            'amenities' => $amenities,
         ];
     }
 
-    public static function updateDraft(int $userId, int $propertyId, array $data): array
-    {
-        [$user, $property] = self::getOwnedProperty($userId, $propertyId);
+    public static function updateDraft(
+        int $userId,
+        int $propertyId,
+        array $data
+    ): array {
+        [$user, $property] = self::getOwnedProperty(
+            $userId,
+            $propertyId
+        );
 
-        if (!in_array($property['status'], ['draft', 'paused', 'archived'], true)) {
-            throw new Exception("La propiedad no puede editarse en su estado actual");
+        if (
+            !in_array(
+                $property['status'],
+                [
+                    'draft',
+                    'paused',
+                    'archived',
+                    'published',
+                ],
+                true
+            )
+        ) {
+            throw new Exception(
+                "La propiedad no puede editarse en su estado actual"
+            );
         }
 
-        $payload = self::validatePropertyPayload($data, true);
+        $payload = self::validatePropertyPayload(
+            $data,
+            true
+        );
+
         $pdo = self::db();
 
         $fields = [];
+
         $params = [
             'id' => $propertyId,
-            'updated_by_user_id' => (int)$user['id'],
+            'real_estate_id' =>
+            (int)$user['real_estate_id'],
+            'updated_by_user_id' =>
+            (int)$user['id'],
         ];
 
         $map = [
@@ -356,307 +519,607 @@ class PropertyService
             'bedrooms',
             'bathrooms',
             'garages',
-            'antiquity'
+            'antiquity',
         ];
 
         foreach ($map as $field) {
-            if (array_key_exists($field, $data)) {
-                $fields[] = "{$field} = :{$field}";
-                $value = $payload[$field];
-                $params[$field] = $value === '' ? null : $value;
+            if (!array_key_exists($field, $data)) {
+                continue;
             }
+
+            $fields[] = "{$field} = :{$field}";
+
+            $value = $payload[$field];
+
+            $params[$field] =
+                $value === ''
+                ? null
+                : $value;
         }
 
-        $fields[] = "updated_by_user_id = :updated_by_user_id";
+        $fields[] =
+            "updated_by_user_id = :updated_by_user_id";
 
-        $sql = "
+        $pdo->beginTransaction();
+
+        try {
+            $sql = "
             UPDATE properties
-            SET " . implode(", ", $fields) . "
+            SET " . implode(', ', $fields) . "
             WHERE id = :id
+              AND real_estate_id = :real_estate_id
+              AND deleted_at IS NULL
             LIMIT 1
         ";
 
-        $st = $pdo->prepare($sql);
-        $st->execute($params);
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
 
-        return self::getDetail($userId, $propertyId);
+            if (array_key_exists('amenities', $data)) {
+                self::replacePropertyAmenities(
+                    $propertyId,
+                    $data['amenities'] ?? []
+                );
+            }
+
+            $pdo->commit();
+
+            /*
+         * Si ya estaba publicada, cualquier cambio en precio,
+         * ubicación, características o amenities puede modificar
+         * sus compatibilidades.
+         */
+            if ($property['status'] === 'published') {
+                self::recalculateCompatibilitiesSafely(
+                    $propertyId
+                );
+            }
+
+            return self::getDetail(
+                $userId,
+                $propertyId
+            );
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $e;
+        }
     }
 
-    public static function replaceRequirements(int $userId, int $propertyId, array $data): array
-    {
-        [, $property] = self::getOwnedProperty($userId, $propertyId);
+    public static function replaceRequirements(
+        int $userId,
+        int $propertyId,
+        array $data
+    ): array {
+        [, $property] = self::getOwnedProperty(
+            $userId,
+            $propertyId
+        );
+
         $pdo = self::db();
 
         $validCurrencies = ['ARS', 'USD'];
-        $validTypes = ['house', 'apartment', 'land', 'commercial', 'office', 'warehouse', 'other'];
-        $criteriaMode = trim((string)($data['criteria_mode'] ?? 'open'));
 
-        if (!in_array($criteriaMode, ['open', 'criteria'], true)) {
-            throw new Exception("criteria_mode inválido");
+        $validTypes = [
+            'house',
+            'apartment',
+            'land',
+            'commercial',
+            'office',
+            'warehouse',
+            'other',
+        ];
+
+        $validDifferenceDirections = [
+            'a_favor',
+            'en_contra',
+            'indistinto',
+        ];
+
+        $validConditions = [
+            'nuevo',
+            'bueno',
+            'regular',
+            'a_refaccionar',
+        ];
+
+        $criteriaMode = trim(
+            (string)($data['criteria_mode'] ?? 'open')
+        );
+
+        if (
+            !in_array(
+                $criteriaMode,
+                ['open', 'criteria'],
+                true
+            )
+        ) {
+            throw new Exception(
+                "criteria_mode inválido"
+            );
         }
 
-        $propertyTypes = $data['property_types'] ?? [];
+        $cashDifferenceDirection =
+            isset($data['cash_difference_direction']) &&
+            $data['cash_difference_direction'] !== ''
+            ? trim(
+                (string)$data['cash_difference_direction']
+            )
+            : null;
+
+        if (
+            $cashDifferenceDirection !== null &&
+            !in_array(
+                $cashDifferenceDirection,
+                $validDifferenceDirections,
+                true
+            )
+        ) {
+            throw new Exception(
+                "Dirección de diferencia inválida"
+            );
+        }
+
+        $propertyCondition =
+            isset($data['property_condition']) &&
+            $data['property_condition'] !== ''
+            ? trim(
+                (string)$data['property_condition']
+            )
+            : null;
+
+        if (
+            $propertyCondition !== null &&
+            !in_array(
+                $propertyCondition,
+                $validConditions,
+                true
+            )
+        ) {
+            throw new Exception(
+                "Condición de propiedad inválida"
+            );
+        }
+
+        $propertyTypes =
+            $data['property_types'] ?? [];
+
         if (!is_array($propertyTypes)) {
-            throw new Exception("property_types debe ser un array");
+            throw new Exception(
+                "property_types debe ser un array"
+            );
         }
+
+        $propertyTypes = array_values(
+            array_unique(
+                array_filter(
+                    array_map(
+                        static fn($type) =>
+                        trim((string)$type),
+                        $propertyTypes
+                    )
+                )
+            )
+        );
 
         foreach ($propertyTypes as $type) {
             if (!in_array($type, $validTypes, true)) {
-                throw new Exception("Uno de los tipos de propiedad deseada es inválido");
+                throw new Exception(
+                    "Uno de los tipos de propiedad deseada es inválido"
+                );
             }
         }
 
         $locations = $data['locations'] ?? [];
+
         if (!is_array($locations)) {
-            throw new Exception("locations debe ser un array");
+            throw new Exception(
+                "locations debe ser un array"
+            );
         }
 
-        foreach ($locations as $loc) {
-            if (!is_array($loc)) {
-                throw new Exception("Cada location debe ser un objeto");
+        foreach ($locations as $location) {
+            if (!is_array($location)) {
+                throw new Exception(
+                    "Cada location debe ser un objeto"
+                );
             }
 
-            $countryCode = trim((string)($loc['country_code'] ?? ''));
-            $country = trim((string)($loc['country'] ?? ''));
-            $province = trim((string)($loc['province'] ?? ''));
+            $countryCode = trim(
+                (string)($location['country_code'] ?? '')
+            );
 
-            if ($criteriaMode === 'criteria') {
-                if ($countryCode === '' || $country === '' || $province === '') {
-                    throw new Exception("Cada ubicación debe incluir país, código de país y provincia");
-                }
+            $country = trim(
+                (string)($location['country'] ?? '')
+            );
+
+            $province = trim(
+                (string)($location['province'] ?? '')
+            );
+
+            if (
+                $criteriaMode === 'criteria' &&
+                (
+                    $countryCode === '' ||
+                    $country === '' ||
+                    $province === ''
+                )
+            ) {
+                throw new Exception(
+                    "Cada ubicación debe incluir país, código de país y provincia"
+                );
             }
         }
 
-        $cashDifferenceCurrency = (string)($data['cash_difference_currency'] ?? 'USD');
-        $priceCurrency = (string)($data['price_currency'] ?? 'USD');
+        $cashDifferenceCurrency = trim(
+            (string)(
+                $data['cash_difference_currency']
+                ?? 'USD'
+            )
+        );
 
-        if (!in_array($cashDifferenceCurrency, $validCurrencies, true)) {
-            throw new Exception("Moneda de diferencia inválida");
+        $priceCurrency = trim(
+            (string)(
+                $data['price_currency']
+                ?? 'USD'
+            )
+        );
+
+        if (
+            !in_array(
+                $cashDifferenceCurrency,
+                $validCurrencies,
+                true
+            )
+        ) {
+            throw new Exception(
+                "Moneda de diferencia inválida"
+            );
         }
 
-        if (!in_array($priceCurrency, $validCurrencies, true)) {
-            throw new Exception("Moneda de búsqueda inválida");
+        if (
+            !in_array(
+                $priceCurrency,
+                $validCurrencies,
+                true
+            )
+        ) {
+            throw new Exception(
+                "Moneda de búsqueda inválida"
+            );
         }
+
+        $values = [
+            'criteria_mode' => $criteriaMode,
+            'accepts_total_swap' =>
+            !empty($data['accepts_total_swap']) ? 1 : 0,
+            'accepts_swap_plus_cash' =>
+            !empty($data['accepts_swap_plus_cash']) ? 1 : 0,
+            'accepts_multiple_swap' =>
+            !empty($data['accepts_multiple_swap']) ? 1 : 0,
+            'accepts_open_proposals' =>
+            !empty($data['accepts_open_proposals']) ? 1 : 0,
+            'accepts_cash_only' =>
+            !empty($data['accepts_cash_only']) ? 1 : 0,
+            'cash_difference_direction' =>
+            $cashDifferenceDirection,
+            'cash_difference_min' =>
+            $data['cash_difference_min'] ?? null,
+            'cash_difference_max' =>
+            $data['cash_difference_max'] ?? null,
+            'cash_difference_currency' =>
+            $cashDifferenceCurrency,
+            'price_min' =>
+            $data['price_min'] ?? null,
+            'price_max' =>
+            $data['price_max'] ?? null,
+            'price_currency' =>
+            $priceCurrency,
+            'min_total_area' =>
+            $data['min_total_area'] ?? null,
+            'max_total_area' =>
+            $data['max_total_area'] ?? null,
+            'min_covered_area' =>
+            $data['min_covered_area'] ?? null,
+            'max_covered_area' =>
+            $data['max_covered_area'] ?? null,
+            'min_bedrooms' =>
+            $data['min_bedrooms'] ?? null,
+            'min_bathrooms' =>
+            $data['min_bathrooms'] ?? null,
+            'min_garages' =>
+            $data['min_garages'] ?? null,
+            'max_antiquity' =>
+            $data['max_antiquity'] ?? null,
+            'open_to_other_zones' =>
+            !empty($data['open_to_other_zones']) ? 1 : 0,
+            'notes' =>
+            trim((string)($data['notes'] ?? '')) ?: null,
+            'property_condition' =>
+            $propertyCondition,
+        ];
 
         $pdo->beginTransaction();
 
         try {
             $stCurrent = $pdo->prepare("
-                SELECT id
-                FROM property_requirements
-                WHERE property_id = :property_id
-                  AND deleted_at IS NULL
-                LIMIT 1
-            ");
-            $stCurrent->execute(['property_id' => $propertyId]);
-            $current = $stCurrent->fetch();
+            SELECT id
+            FROM property_requirements
+            WHERE property_id = :property_id
+              AND deleted_at IS NULL
+            LIMIT 1
+        ");
+
+            $stCurrent->execute([
+                'property_id' => $propertyId,
+            ]);
+
+            $current = $stCurrent->fetch(
+                PDO::FETCH_ASSOC
+            );
 
             if ($current) {
-                $requirementId = (int)$current['id'];
+                $requirementId =
+                    (int)$current['id'];
 
                 $stUpdate = $pdo->prepare("
-    UPDATE property_requirements
-    SET
-        criteria_mode = :criteria_mode,
-        accepts_total_swap = :accepts_total_swap,
-        accepts_swap_plus_cash = :accepts_swap_plus_cash,
-        accepts_multiple_swap = :accepts_multiple_swap,
-        accepts_open_proposals = :accepts_open_proposals,
-        accepts_cash_only = :accepts_cash_only,
-        cash_difference_min = :cash_difference_min,
-        cash_difference_max = :cash_difference_max,
-        cash_difference_currency = :cash_difference_currency,
-        price_min = :price_min,
-        price_max = :price_max,
-        price_currency = :price_currency,
-        min_total_area = :min_total_area,
-        max_total_area = :max_total_area,
-        min_covered_area = :min_covered_area,
-        max_covered_area = :max_covered_area,
-        min_bedrooms = :min_bedrooms,
-        min_bathrooms = :min_bathrooms,
-        min_garages = :min_garages,
-        max_antiquity = :max_antiquity,
-        open_to_other_zones = :open_to_other_zones,
-        notes = :notes
-    WHERE id = :id
-    LIMIT 1
-");
-                $stUpdate->execute([
-                    'criteria_mode' => $criteriaMode,
-                    'accepts_total_swap' => !empty($data['accepts_total_swap']) ? 1 : 0,
-                    'accepts_swap_plus_cash' => !empty($data['accepts_swap_plus_cash']) ? 1 : 0,
-                    'accepts_multiple_swap' => !empty($data['accepts_multiple_swap']) ? 1 : 0,
-                    'accepts_open_proposals' => !empty($data['accepts_open_proposals']) ? 1 : 0,
-                    'accepts_cash_only' => !empty($data['accepts_cash_only']) ? 1 : 0,
-                    'cash_difference_min' => $data['cash_difference_min'] ?? null,
-                    'cash_difference_max' => $data['cash_difference_max'] ?? null,
-                    'cash_difference_currency' => $cashDifferenceCurrency,
-                    'price_min' => $data['price_min'] ?? null,
-                    'price_max' => $data['price_max'] ?? null,
-                    'price_currency' => $priceCurrency,
-                    'min_total_area' => $data['min_total_area'] ?? null,
-                    'max_total_area' => $data['max_total_area'] ?? null,
-                    'min_covered_area' => $data['min_covered_area'] ?? null,
-                    'max_covered_area' => $data['max_covered_area'] ?? null,
-                    'min_bedrooms' => $data['min_bedrooms'] ?? null,
-                    'min_bathrooms' => $data['min_bathrooms'] ?? null,
-                    'min_garages' => $data['min_garages'] ?? null,
-                    'max_antiquity' => $data['max_antiquity'] ?? null,
-                    'open_to_other_zones' => !empty($data['open_to_other_zones']) ? 1 : 0,
-                    'notes' => trim((string)($data['notes'] ?? '')) ?: null,
-                    'id' => $requirementId,
-                ]);
+                UPDATE property_requirements
+                SET
+                    criteria_mode = :criteria_mode,
+                    accepts_total_swap =
+                        :accepts_total_swap,
+                    accepts_swap_plus_cash =
+                        :accepts_swap_plus_cash,
+                    accepts_multiple_swap =
+                        :accepts_multiple_swap,
+                    accepts_open_proposals =
+                        :accepts_open_proposals,
+                    accepts_cash_only =
+                        :accepts_cash_only,
+                    cash_difference_direction =
+                        :cash_difference_direction,
+                    cash_difference_min =
+                        :cash_difference_min,
+                    cash_difference_max =
+                        :cash_difference_max,
+                    cash_difference_currency =
+                        :cash_difference_currency,
+                    price_min = :price_min,
+                    price_max = :price_max,
+                    price_currency = :price_currency,
+                    min_total_area = :min_total_area,
+                    max_total_area = :max_total_area,
+                    min_covered_area =
+                        :min_covered_area,
+                    max_covered_area =
+                        :max_covered_area,
+                    min_bedrooms = :min_bedrooms,
+                    min_bathrooms = :min_bathrooms,
+                    min_garages = :min_garages,
+                    max_antiquity = :max_antiquity,
+                    open_to_other_zones =
+                        :open_to_other_zones,
+                    notes = :notes,
+                    property_condition =
+                        :property_condition
+                WHERE id = :id
+                LIMIT 1
+            ");
+
+                $stUpdate->execute(
+                    array_merge(
+                        $values,
+                        ['id' => $requirementId]
+                    )
+                );
             } else {
                 $stInsert = $pdo->prepare("
-    INSERT INTO property_requirements (
-        property_id,
-        criteria_mode,
-        accepts_total_swap,
-        accepts_swap_plus_cash,
-        accepts_multiple_swap,
-        accepts_open_proposals,
-        accepts_cash_only,
-        cash_difference_min,
-        cash_difference_max,
-        cash_difference_currency,
-        price_min,
-        price_max,
-        price_currency,
-        min_total_area,
-        max_total_area,
-        min_covered_area,
-        max_covered_area,
-        min_bedrooms,
-        min_bathrooms,
-        min_garages,
-        max_antiquity,
-        open_to_other_zones,
-        notes
-    ) VALUES (
-        :property_id,
-        :criteria_mode,
-        :accepts_total_swap,
-        :accepts_swap_plus_cash,
-        :accepts_multiple_swap,
-        :accepts_open_proposals,
-        :accepts_cash_only,
-        :cash_difference_min,
-        :cash_difference_max,
-        :cash_difference_currency,
-        :price_min,
-        :price_max,
-        :price_currency,
-        :min_total_area,
-        :max_total_area,
-        :min_covered_area,
-        :max_covered_area,
-        :min_bedrooms,
-        :min_bathrooms,
-        :min_garages,
-        :max_antiquity,
-        :open_to_other_zones,
-        :notes
-    )
-");
+                INSERT INTO property_requirements (
+                    property_id,
+                    criteria_mode,
+                    accepts_total_swap,
+                    accepts_swap_plus_cash,
+                    accepts_multiple_swap,
+                    accepts_open_proposals,
+                    accepts_cash_only,
+                    cash_difference_direction,
+                    cash_difference_min,
+                    cash_difference_max,
+                    cash_difference_currency,
+                    price_min,
+                    price_max,
+                    price_currency,
+                    min_total_area,
+                    max_total_area,
+                    min_covered_area,
+                    max_covered_area,
+                    min_bedrooms,
+                    min_bathrooms,
+                    min_garages,
+                    max_antiquity,
+                    open_to_other_zones,
+                    notes,
+                    property_condition
+                ) VALUES (
+                    :property_id,
+                    :criteria_mode,
+                    :accepts_total_swap,
+                    :accepts_swap_plus_cash,
+                    :accepts_multiple_swap,
+                    :accepts_open_proposals,
+                    :accepts_cash_only,
+                    :cash_difference_direction,
+                    :cash_difference_min,
+                    :cash_difference_max,
+                    :cash_difference_currency,
+                    :price_min,
+                    :price_max,
+                    :price_currency,
+                    :min_total_area,
+                    :max_total_area,
+                    :min_covered_area,
+                    :max_covered_area,
+                    :min_bedrooms,
+                    :min_bathrooms,
+                    :min_garages,
+                    :max_antiquity,
+                    :open_to_other_zones,
+                    :notes,
+                    :property_condition
+                )
+            ");
 
-                $stInsert->execute([
-                    'property_id' => $propertyId,
-                    'criteria_mode' => $criteriaMode,
-                    'accepts_total_swap' => !empty($data['accepts_total_swap']) ? 1 : 0,
-                    'accepts_swap_plus_cash' => !empty($data['accepts_swap_plus_cash']) ? 1 : 0,
-                    'accepts_multiple_swap' => !empty($data['accepts_multiple_swap']) ? 1 : 0,
-                    'accepts_open_proposals' => !empty($data['accepts_open_proposals']) ? 1 : 0,
-                    'accepts_cash_only' => !empty($data['accepts_cash_only']) ? 1 : 0,
-                    'cash_difference_min' => $data['cash_difference_min'] ?? null,
-                    'cash_difference_max' => $data['cash_difference_max'] ?? null,
-                    'cash_difference_currency' => $cashDifferenceCurrency,
-                    'price_min' => $data['price_min'] ?? null,
-                    'price_max' => $data['price_max'] ?? null,
-                    'price_currency' => $priceCurrency,
-                    'min_total_area' => $data['min_total_area'] ?? null,
-                    'max_total_area' => $data['max_total_area'] ?? null,
-                    'min_covered_area' => $data['min_covered_area'] ?? null,
-                    'max_covered_area' => $data['max_covered_area'] ?? null,
-                    'min_bedrooms' => $data['min_bedrooms'] ?? null,
-                    'min_bathrooms' => $data['min_bathrooms'] ?? null,
-                    'min_garages' => $data['min_garages'] ?? null,
-                    'max_antiquity' => $data['max_antiquity'] ?? null,
-                    'open_to_other_zones' => !empty($data['open_to_other_zones']) ? 1 : 0,
-                    'notes' => trim((string)($data['notes'] ?? '')) ?: null,
-                ]);
+                $stInsert->execute(
+                    array_merge(
+                        $values,
+                        ['property_id' => $propertyId]
+                    )
+                );
 
-                $requirementId = (int)$pdo->lastInsertId();
-                $requirementId = (int)$pdo->lastInsertId();
+                $requirementId =
+                    (int)$pdo->lastInsertId();
             }
 
-            $pdo->prepare("DELETE FROM property_requirement_locations WHERE property_requirement_id = :id")
-                ->execute(['id' => $requirementId]);
+            $pdo->prepare("
+            DELETE FROM property_requirement_locations
+            WHERE property_requirement_id = :id
+        ")->execute([
+                'id' => $requirementId,
+            ]);
 
-            $pdo->prepare("DELETE FROM property_requirement_property_types WHERE property_requirement_id = :id")
-                ->execute(['id' => $requirementId]);
+            $pdo->prepare("
+            DELETE FROM property_requirement_property_types
+            WHERE property_requirement_id = :id
+        ")->execute([
+                'id' => $requirementId,
+            ]);
 
             if ($criteriaMode === 'criteria') {
-                foreach ($locations as $loc) {
-                    $stLoc = $pdo->prepare("
-                        INSERT INTO property_requirement_locations (
-                            property_requirement_id,
-                            country_code,
-                            country,
-                            province,
-                            city,
-                            zone
-                        ) VALUES (
-                            :property_requirement_id,
-                            :country_code,
-                            :country,
-                            :province,
-                            :city,
-                            :zone
-                        )
-                    ");
-                    $stLoc->execute([
-                        'property_requirement_id' => $requirementId,
-                        'country_code' => trim((string)($loc['country_code'] ?? '')),
-                        'country' => trim((string)($loc['country'] ?? '')),
-                        'province' => trim((string)($loc['province'] ?? '')),
-                        'city' => trim((string)($loc['city'] ?? '')) ?: null,
-                        'zone' => trim((string)($loc['zone'] ?? '')) ?: null,
+                $stLocation = $pdo->prepare("
+                INSERT INTO property_requirement_locations (
+                    property_requirement_id,
+                    country_code,
+                    country,
+                    province,
+                    city,
+                    zone
+                ) VALUES (
+                    :property_requirement_id,
+                    :country_code,
+                    :country,
+                    :province,
+                    :city,
+                    :zone
+                )
+            ");
+
+                foreach ($locations as $location) {
+                    $stLocation->execute([
+                        'property_requirement_id' =>
+                        $requirementId,
+                        'country_code' =>
+                        trim(
+                            (string)(
+                                $location['country_code']
+                                ?? ''
+                            )
+                        ),
+                        'country' =>
+                        trim(
+                            (string)(
+                                $location['country']
+                                ?? ''
+                            )
+                        ),
+                        'province' =>
+                        trim(
+                            (string)(
+                                $location['province']
+                                ?? ''
+                            )
+                        ),
+                        'city' =>
+                        trim(
+                            (string)(
+                                $location['city']
+                                ?? ''
+                            )
+                        ) ?: null,
+                        'zone' =>
+                        trim(
+                            (string)(
+                                $location['zone']
+                                ?? ''
+                            )
+                        ) ?: null,
                     ]);
                 }
 
+                $stType = $pdo->prepare("
+                INSERT INTO
+                    property_requirement_property_types (
+                        property_requirement_id,
+                        property_type
+                    )
+                VALUES (
+                    :property_requirement_id,
+                    :property_type
+                )
+            ");
+
                 foreach ($propertyTypes as $type) {
-                    $stType = $pdo->prepare("
-                        INSERT INTO property_requirement_property_types (
-                            property_requirement_id,
-                            property_type
-                        ) VALUES (
-                            :property_requirement_id,
-                            :property_type
-                        )
-                    ");
                     $stType->execute([
-                        'property_requirement_id' => $requirementId,
+                        'property_requirement_id' =>
+                        $requirementId,
                         'property_type' => $type,
                     ]);
                 }
             }
 
             $pdo->commit();
-            return self::getDetail($userId, $propertyId);
-        } catch (\Throwable $e) {
-            $pdo->rollBack();
+
+            if ($property['status'] === 'published') {
+                self::recalculateCompatibilitiesSafely(
+                    $propertyId
+                );
+            }
+
+            return self::getDetail(
+                $userId,
+                $propertyId
+            );
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
 
-    public static function publish(int $userId, int $propertyId): array
-    {
-        [$user, $property] = self::getOwnedProperty($userId, $propertyId);
+    public static function publish(
+        int $userId,
+        int $propertyId
+    ): array {
+        [$user, $property] = self::getOwnedProperty(
+            $userId,
+            $propertyId
+        );
+
         $pdo = self::db();
 
-        if (!in_array($property['status'], ['draft', 'paused', 'archived'], true)) {
-            throw new Exception("La propiedad no puede publicarse en su estado actual");
+        if (
+            !in_array(
+                $property['status'],
+                ['draft', 'paused', 'archived'],
+                true
+            )
+        ) {
+            throw new Exception(
+                "La propiedad no puede publicarse en su estado actual"
+            );
         }
 
         $requiredFields = [
@@ -667,51 +1130,74 @@ class PropertyService
             'country_code',
             'country',
             'province',
-            'city'
+            'city',
         ];
 
         foreach ($requiredFields as $field) {
-            if (empty($property[$field]) && $property[$field] !== '0') {
-                throw new Exception("Faltan datos obligatorios para publicar");
+            if (
+                empty($property[$field]) &&
+                $property[$field] !== '0'
+            ) {
+                throw new Exception(
+                    "Faltan datos obligatorios para publicar"
+                );
             }
         }
 
         $stImages = $pdo->prepare("
-            SELECT COUNT(*) AS total
-            FROM property_images
-            WHERE property_id = :property_id
-              AND deleted_at IS NULL
-        ");
-        $stImages->execute(['property_id' => $propertyId]);
-        $imageCount = (int)($stImages->fetch()['total'] ?? 0);
+        SELECT COUNT(*) AS total
+        FROM property_images
+        WHERE property_id = :property_id
+          AND deleted_at IS NULL
+    ");
+
+        $stImages->execute([
+            'property_id' => $propertyId,
+        ]);
+
+        $imageCount = (int)(
+            $stImages->fetchColumn() ?: 0
+        );
 
         if ($imageCount < 1) {
-            throw new Exception("Debés subir al menos una imagen para publicar");
+            throw new Exception(
+                "Debés subir al menos una imagen para publicar"
+            );
         }
 
-        $stReq = $pdo->prepare("
-            SELECT *
-            FROM property_requirements
-            WHERE property_id = :property_id
-              AND deleted_at IS NULL
-            LIMIT 1
-        ");
-        $stReq->execute(['property_id' => $propertyId]);
-        $req = $stReq->fetch();
+        $stRequirements = $pdo->prepare("
+        SELECT *
+        FROM property_requirements
+        WHERE property_id = :property_id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
 
-        if (!$req) {
-            throw new Exception("Debés completar los criterios de intercambio");
+        $stRequirements->execute([
+            'property_id' => $propertyId,
+        ]);
+
+        $requirements = $stRequirements->fetch(
+            PDO::FETCH_ASSOC
+        );
+
+        if (!$requirements) {
+            throw new Exception(
+                "Debés completar los criterios de intercambio"
+            );
         }
 
         $hasAnyMode =
-            (int)$req['accepts_total_swap'] === 1 ||
-            (int)$req['accepts_swap_plus_cash'] === 1 ||
-            (int)$req['accepts_multiple_swap'] === 1 ||
-            (int)$req['accepts_open_proposals'] === 1 ||
-            (int)$req['accepts_cash_only'] === 1;
+            (int)$requirements['accepts_total_swap'] === 1 ||
+            (int)$requirements['accepts_swap_plus_cash'] === 1 ||
+            (int)$requirements['accepts_multiple_swap'] === 1 ||
+            (int)$requirements['accepts_open_proposals'] === 1 ||
+            (int)$requirements['accepts_cash_only'] === 1;
 
         if (!$hasAnyMode) {
-            throw new Exception("Debés definir al menos una modalidad de intercambio");
+            throw new Exception(
+                "Debés definir al menos una modalidad de intercambio"
+            );
         }
 
         $pdo->beginTransaction();
@@ -720,118 +1206,182 @@ class PropertyService
             $oldStatus = $property['status'];
 
             $st = $pdo->prepare("
-                UPDATE properties
-                SET
-                    status = 'published',
-                    is_visible = 1,
-                    published_at = CASE
-                        WHEN published_at IS NULL THEN NOW()
-                        ELSE published_at
-                    END,
-                    updated_by_user_id = :updated_by_user_id
-                WHERE id = :id
-                LIMIT 1
-            ");
+            UPDATE properties
+            SET
+                status = 'published',
+                is_visible = 1,
+                published_at = CASE
+                    WHEN published_at IS NULL
+                        THEN NOW()
+                    ELSE published_at
+                END,
+                paused_at = NULL,
+                archived_at = NULL,
+                updated_by_user_id =
+                    :updated_by_user_id
+            WHERE id = :id
+              AND real_estate_id = :real_estate_id
+              AND deleted_at IS NULL
+            LIMIT 1
+        ");
+
             $st->execute([
-                'updated_by_user_id' => (int)$user['id'],
+                'updated_by_user_id' =>
+                (int)$user['id'],
                 'id' => $propertyId,
+                'real_estate_id' =>
+                (int)$user['real_estate_id'],
             ]);
 
             $hist = $pdo->prepare("
-                INSERT INTO property_status_history (
-                    property_id,
-                    old_status,
-                    new_status,
-                    changed_by_user_id,
-                    change_reason,
-                    change_source
-                ) VALUES (
-                    :property_id,
-                    :old_status,
-                    'published',
-                    :changed_by_user_id,
-                    NULL,
-                    'user'
-                )
-            ");
+            INSERT INTO property_status_history (
+                property_id,
+                old_status,
+                new_status,
+                changed_by_user_id,
+                change_reason,
+                change_source
+            ) VALUES (
+                :property_id,
+                :old_status,
+                'published',
+                :changed_by_user_id,
+                NULL,
+                'user'
+            )
+        ");
+
             $hist->execute([
                 'property_id' => $propertyId,
                 'old_status' => $oldStatus,
-                'changed_by_user_id' => (int)$user['id'],
+                'changed_by_user_id' =>
+                (int)$user['id'],
             ]);
 
             $pdo->commit();
-            return self::getDetail($userId, $propertyId);
-        } catch (\Throwable $e) {
-            $pdo->rollBack();
+
+            self::recalculateCompatibilitiesSafely(
+                $propertyId
+            );
+
+            return self::getDetail(
+                $userId,
+                $propertyId
+            );
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
+    public static function pause(
+        int $userId,
+        int $propertyId
+    ): array {
+        [$user, $property] = self::getOwnedProperty(
+            $userId,
+            $propertyId
+        );
 
-    public static function pause(int $userId, int $propertyId): array
-    {
-        [$user, $property] = self::getOwnedProperty($userId, $propertyId);
         $pdo = self::db();
 
         if ($property['status'] !== 'published') {
-            throw new Exception("Solo se pueden pausar propiedades publicadas");
+            throw new Exception(
+                "Solo se pueden pausar propiedades publicadas"
+            );
         }
 
         $pdo->beginTransaction();
 
         try {
             $st = $pdo->prepare("
-                UPDATE properties
-                SET
-                    status = 'paused',
-                    is_visible = 0,
-                    paused_at = NOW(),
-                    updated_by_user_id = :updated_by_user_id
-                WHERE id = :id
-                LIMIT 1
-            ");
+            UPDATE properties
+            SET
+                status = 'paused',
+                is_visible = 0,
+                paused_at = NOW(),
+                updated_by_user_id =
+                    :updated_by_user_id
+            WHERE id = :id
+              AND real_estate_id = :real_estate_id
+              AND deleted_at IS NULL
+            LIMIT 1
+        ");
+
             $st->execute([
-                'updated_by_user_id' => (int)$user['id'],
+                'updated_by_user_id' =>
+                (int)$user['id'],
                 'id' => $propertyId,
+                'real_estate_id' =>
+                (int)$user['real_estate_id'],
             ]);
 
             $hist = $pdo->prepare("
-                INSERT INTO property_status_history (
-                    property_id,
-                    old_status,
-                    new_status,
-                    changed_by_user_id,
-                    change_reason,
-                    change_source
-                ) VALUES (
-                    :property_id,
-                    'published',
-                    'paused',
-                    :changed_by_user_id,
-                    NULL,
-                    'user'
-                )
-            ");
+            INSERT INTO property_status_history (
+                property_id,
+                old_status,
+                new_status,
+                changed_by_user_id,
+                change_reason,
+                change_source
+            ) VALUES (
+                :property_id,
+                'published',
+                'paused',
+                :changed_by_user_id,
+                NULL,
+                'user'
+            )
+        ");
+
             $hist->execute([
                 'property_id' => $propertyId,
-                'changed_by_user_id' => (int)$user['id'],
+                'changed_by_user_id' =>
+                (int)$user['id'],
             ]);
 
             $pdo->commit();
-            return self::getDetail($userId, $propertyId);
-        } catch (\Throwable $e) {
-            $pdo->rollBack();
+
+            self::archiveCompatibilitiesSafely(
+                $propertyId
+            );
+
+            return self::getDetail(
+                $userId,
+                $propertyId
+            );
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
 
-    public static function archive(int $userId, int $propertyId): array
-    {
-        [$user, $property] = self::getOwnedProperty($userId, $propertyId);
+    public static function archive(
+        int $userId,
+        int $propertyId
+    ): array {
+        [$user, $property] = self::getOwnedProperty(
+            $userId,
+            $propertyId
+        );
+
         $pdo = self::db();
 
-        if (!in_array($property['status'], ['draft', 'paused', 'published'], true)) {
-            throw new Exception("La propiedad no puede archivarse en su estado actual");
+        if (
+            !in_array(
+                $property['status'],
+                ['draft', 'paused', 'published'],
+                true
+            )
+        ) {
+            throw new Exception(
+                "La propiedad no puede archivarse en su estado actual"
+            );
         }
 
         $pdo->beginTransaction();
@@ -840,63 +1390,112 @@ class PropertyService
             $oldStatus = $property['status'];
 
             $st = $pdo->prepare("
-                UPDATE properties
-                SET
-                    status = 'archived',
-                    is_visible = 0,
-                    archived_at = NOW(),
-                    updated_by_user_id = :updated_by_user_id
-                WHERE id = :id
-                LIMIT 1
-            ");
+            UPDATE properties
+            SET
+                status = 'archived',
+                is_visible = 0,
+                archived_at = NOW(),
+                updated_by_user_id =
+                    :updated_by_user_id
+            WHERE id = :id
+              AND real_estate_id = :real_estate_id
+              AND deleted_at IS NULL
+            LIMIT 1
+        ");
+
             $st->execute([
-                'updated_by_user_id' => (int)$user['id'],
+                'updated_by_user_id' =>
+                (int)$user['id'],
                 'id' => $propertyId,
+                'real_estate_id' =>
+                (int)$user['real_estate_id'],
             ]);
 
             $hist = $pdo->prepare("
-                INSERT INTO property_status_history (
-                    property_id,
-                    old_status,
-                    new_status,
-                    changed_by_user_id,
-                    change_reason,
-                    change_source
-                ) VALUES (
-                    :property_id,
-                    :old_status,
-                    'archived',
-                    :changed_by_user_id,
-                    NULL,
-                    'user'
-                )
-            ");
+            INSERT INTO property_status_history (
+                property_id,
+                old_status,
+                new_status,
+                changed_by_user_id,
+                change_reason,
+                change_source
+            ) VALUES (
+                :property_id,
+                :old_status,
+                'archived',
+                :changed_by_user_id,
+                NULL,
+                'user'
+            )
+        ");
+
             $hist->execute([
                 'property_id' => $propertyId,
                 'old_status' => $oldStatus,
-                'changed_by_user_id' => (int)$user['id'],
+                'changed_by_user_id' =>
+                (int)$user['id'],
             ]);
 
             $pdo->commit();
-            return self::getDetail($userId, $propertyId);
-        } catch (\Throwable $e) {
-            $pdo->rollBack();
+
+            self::archiveCompatibilitiesSafely(
+                $propertyId
+            );
+
+            return self::getDetail(
+                $userId,
+                $propertyId
+            );
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
 
-    public static function close(int $userId, int $propertyId, string $closingType): array
-    {
-        [$user, $property] = self::getOwnedProperty($userId, $propertyId);
+    public static function close(
+        int $userId,
+        int $propertyId,
+        string $closingType
+    ): array {
+        [$user, $property] = self::getOwnedProperty(
+            $userId,
+            $propertyId
+        );
+
         $pdo = self::db();
 
-        $validClosingTypes = ['sold', 'exchanged', 'withdrawn', 'expired'];
-        if (!in_array($closingType, $validClosingTypes, true)) {
-            throw new Exception("Tipo de cierre inválido");
+        $validClosingTypes = [
+            'sold',
+            'exchanged',
+            'withdrawn',
+            'expired',
+        ];
+
+        if (
+            !in_array(
+                $closingType,
+                $validClosingTypes,
+                true
+            )
+        ) {
+            throw new Exception(
+                "Tipo de cierre inválido"
+            );
         }
 
-        if (!in_array($property['status'], ['published', 'paused'], true)) {
-            throw new Exception("La propiedad no puede cerrarse en su estado actual");
+        if (
+            !in_array(
+                $property['status'],
+                ['published', 'paused'],
+                true
+            )
+        ) {
+            throw new Exception(
+                "La propiedad no puede cerrarse en su estado actual"
+            );
         }
 
         $pdo->beginTransaction();
@@ -905,49 +1504,69 @@ class PropertyService
             $oldStatus = $property['status'];
 
             $st = $pdo->prepare("
-                UPDATE properties
-                SET
-                    status = 'closed',
-                    is_visible = 0,
-                    closing_type = :closing_type,
-                    updated_by_user_id = :updated_by_user_id
-                WHERE id = :id
-                LIMIT 1
-            ");
+            UPDATE properties
+            SET
+                status = 'closed',
+                is_visible = 0,
+                closing_type = :closing_type,
+                updated_by_user_id =
+                    :updated_by_user_id
+            WHERE id = :id
+              AND real_estate_id = :real_estate_id
+              AND deleted_at IS NULL
+            LIMIT 1
+        ");
+
             $st->execute([
                 'closing_type' => $closingType,
-                'updated_by_user_id' => (int)$user['id'],
+                'updated_by_user_id' =>
+                (int)$user['id'],
                 'id' => $propertyId,
+                'real_estate_id' =>
+                (int)$user['real_estate_id'],
             ]);
 
             $hist = $pdo->prepare("
-                INSERT INTO property_status_history (
-                    property_id,
-                    old_status,
-                    new_status,
-                    changed_by_user_id,
-                    change_reason,
-                    change_source
-                ) VALUES (
-                    :property_id,
-                    :old_status,
-                    'closed',
-                    :changed_by_user_id,
-                    :change_reason,
-                    'user'
-                )
-            ");
+            INSERT INTO property_status_history (
+                property_id,
+                old_status,
+                new_status,
+                changed_by_user_id,
+                change_reason,
+                change_source
+            ) VALUES (
+                :property_id,
+                :old_status,
+                'closed',
+                :changed_by_user_id,
+                :change_reason,
+                'user'
+            )
+        ");
+
             $hist->execute([
                 'property_id' => $propertyId,
                 'old_status' => $oldStatus,
-                'changed_by_user_id' => (int)$user['id'],
+                'changed_by_user_id' =>
+                (int)$user['id'],
                 'change_reason' => $closingType,
             ]);
 
             $pdo->commit();
-            return self::getDetail($userId, $propertyId);
-        } catch (\Throwable $e) {
-            $pdo->rollBack();
+
+            self::archiveCompatibilitiesSafely(
+                $propertyId
+            );
+
+            return self::getDetail(
+                $userId,
+                $propertyId
+            );
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
@@ -1088,13 +1707,33 @@ class PropertyService
         ];
     }
 
-    public static function delete(int $userId, int $propertyId): array
-    {
-        [$user, $property] = self::getOwnedProperty($userId, $propertyId);
+    public static function delete(
+        int $userId,
+        int $propertyId
+    ): array {
+        [$user, $property] = self::getOwnedProperty(
+            $userId,
+            $propertyId
+        );
+
         $pdo = self::db();
 
-        if (!in_array($property['status'], ['draft', 'published', 'paused', 'archived', 'closed'], true)) {
-            throw new Exception("La propiedad no puede eliminarse en su estado actual");
+        if (
+            !in_array(
+                $property['status'],
+                [
+                    'draft',
+                    'published',
+                    'paused',
+                    'archived',
+                    'closed',
+                ],
+                true
+            )
+        ) {
+            throw new Exception(
+                "La propiedad no puede eliminarse en su estado actual"
+            );
         }
 
         $pdo->beginTransaction();
@@ -1107,13 +1746,20 @@ class PropertyService
             SET
                 deleted_at = NOW(),
                 is_visible = 0,
-                updated_by_user_id = :updated_by_user_id
+                updated_by_user_id =
+                    :updated_by_user_id
             WHERE id = :id
+              AND real_estate_id = :real_estate_id
+              AND deleted_at IS NULL
             LIMIT 1
         ");
+
             $st->execute([
-                'updated_by_user_id' => (int)$user['id'],
+                'updated_by_user_id' =>
+                (int)$user['id'],
                 'id' => $propertyId,
+                'real_estate_id' =>
+                (int)$user['real_estate_id'],
             ]);
 
             $hist = $pdo->prepare("
@@ -1133,21 +1779,31 @@ class PropertyService
                 'user'
             )
         ");
+
             $hist->execute([
                 'property_id' => $propertyId,
                 'old_status' => $oldStatus,
-                'changed_by_user_id' => (int)$user['id'],
+                'changed_by_user_id' =>
+                (int)$user['id'],
             ]);
 
             $pdo->commit();
 
+            self::archiveCompatibilitiesSafely(
+                $propertyId
+            );
+
             return [
                 'ok' => true,
                 'property_id' => $propertyId,
-                'deleted_at' => date('Y-m-d H:i:s'),
+                'deleted_at' =>
+                date('Y-m-d H:i:s'),
             ];
-        } catch (\Throwable $e) {
-            $pdo->rollBack();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
@@ -1155,18 +1811,19 @@ class PropertyService
     public static function listExploreProperties(int $userId, array $filters = []): array
     {
         $pdo = self::db();
-        $user = self::getValidPublisherUser($userId);
-
+        $user = self::getValidViewerUser($userId);
         $where = [
             "p.deleted_at IS NULL",
             "p.status = 'published'",
             "p.is_visible = 1",
-            "p.real_estate_id <> :real_estate_id",
         ];
 
-        $params = [
-            'real_estate_id' => (int)$user['real_estate_id'],
-        ];
+        $params = [];
+
+        if (!empty($user['real_estate_id'])) {
+            $where[] = "p.real_estate_id <> :real_estate_id";
+            $params['real_estate_id'] = (int)$user['real_estate_id'];
+        }
 
         if (!empty($filters['q'])) {
             $where[] = "(
@@ -1363,23 +2020,32 @@ class PropertyService
     public static function getExploreDetail(int $userId, int $propertyId): array
     {
         $pdo = self::db();
-        $user = self::getValidPublisherUser($userId);
+        $user = self::getValidViewerUser($userId);
+
+        $where = [
+            "id = :id",
+            "status = 'published'",
+            "is_visible = 1",
+            "deleted_at IS NULL",
+        ];
+
+        $params = [
+            'id' => $propertyId,
+        ];
+
+        if (!empty($user['real_estate_id'])) {
+            $where[] = "real_estate_id <> :real_estate_id";
+            $params['real_estate_id'] = (int)$user['real_estate_id'];
+        }
 
         $st = $pdo->prepare("
-        SELECT *
-        FROM properties
-        WHERE id = :id
-          AND real_estate_id <> :real_estate_id
-          AND status = 'published'
-          AND is_visible = 1
-          AND deleted_at IS NULL
-        LIMIT 1
-    ");
-        $st->execute([
-            'id' => $propertyId,
-            'real_estate_id' => (int)$user['real_estate_id'],
-        ]);
+    SELECT *
+    FROM properties
+    WHERE " . implode(" AND ", $where) . "
+    LIMIT 1
+");
 
+        $st->execute($params);
         $property = $st->fetch();
 
         if (!$property) {
@@ -1413,6 +2079,7 @@ class PropertyService
 
         $requirementPropertyTypes = [];
         $requirementLocations = [];
+        $amenities = self::getPropertyAmenities($propertyId);
 
         if ($requirements && !empty($requirements['id'])) {
             $requirementId = (int)$requirements['id'];
@@ -1450,6 +2117,7 @@ class PropertyService
                 'can_close' => false,
                 'can_delete' => false,
             ],
+            'amenities' => $amenities,
         ];
     }
 }

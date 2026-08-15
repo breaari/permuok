@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { api, unwrap, getErrorMessage } from "../../../api/http.js";
 import { useAuth } from "../../auth/components/AuthContext";
+import { useToast } from "../../../ui/toast/ToastProvider";
 
 import AdminDetailHeader from "../components/detail/AdminDetailHeader";
 import AdminDetailLoading from "../components/detail/AdminDetailLoading";
@@ -26,6 +27,7 @@ export default function AdminUserDetail() {
   const isAdmin = Number(user?.role) === 1;
   const navigate = useNavigate();
   const { id } = useParams();
+  const toast = useToast();
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -60,6 +62,13 @@ export default function AdminUserDetail() {
         },
       );
     } catch (e) {
+      setDetail(null);
+      setChildren([]);
+      setChildrenSummary({
+        agents: 0,
+        investors: 0,
+        total: 0,
+      });
       setErr(getErrorMessage(e, "No se pudo cargar el detalle del usuario"));
     } finally {
       setLoading(false);
@@ -79,9 +88,6 @@ export default function AdminUserDetail() {
   const isRealEstateUser = Number(detail?.role) === 2;
   const membershipLabel = membershipStatusLabel(detail?.membership_status);
   const membershipTone = membershipStatusClasses(detail?.membership_status);
-
-  const adminActionLabel =
-    Number(detail?.is_active) === 1 ? "Desactivar" : "Activar";
 
   function getHeaderSubtitle() {
     if (!detail) return "Cargando detalle...";
@@ -114,7 +120,6 @@ export default function AdminUserDetail() {
     if (!detail?.id) return;
 
     setStatusBusy(true);
-    setErr("");
 
     try {
       await api.post("/admin/users/status", {
@@ -124,9 +129,18 @@ export default function AdminUserDetail() {
       });
 
       setStatusModalOpen(false);
+
+      toast.success(
+        Number(is_active) === 1
+          ? "Usuario activado correctamente."
+          : "Usuario desactivado correctamente.",
+      );
+
       await loadDetail();
     } catch (e) {
-      setErr(getErrorMessage(e, "No se pudo actualizar el estado del usuario"));
+      toast.error(
+        getErrorMessage(e, "No se pudo actualizar el estado del usuario"),
+      );
     } finally {
       setStatusBusy(false);
     }
@@ -200,23 +214,25 @@ export default function AdminUserDetail() {
             </div>
 
             <div className="flex flex-col gap-6">
-             <AdminAdministrativeStatusCard
-  isActive={detail?.is_active}
-  deactivatedByEmail={detail?.deactivated_by_email}
-  deactivatedAt={detail?.deactivated_at}
-  deactivationReason={detail?.deactivation_reason}
-  formatDate={formatDate}
-  statusLabel={statusLabel}
-  actionLabel={Number(detail?.is_active) === 1 ? "Desactivar" : "Activar"}
-  actionDisabled={false}
-  onAction={openStatusModal}
-  activeNote="La cuenta del usuario se encuentra operativa."
-  actionClassName={
-    Number(detail?.is_active) === 1
-      ? "bg-slate-200 hover:bg-red-100 text-slate-700 hover:text-red-700"
-      : "bg-primary hover:bg-primary/90 text-white"
-  }
-/>
+              <AdminAdministrativeStatusCard
+                isActive={detail?.is_active}
+                deactivatedByEmail={detail?.deactivated_by_email}
+                deactivatedAt={detail?.deactivated_at}
+                deactivationReason={detail?.deactivation_reason}
+                formatDate={formatDate}
+                statusLabel={statusLabel}
+                actionLabel={
+                  Number(detail?.is_active) === 1 ? "Desactivar" : "Activar"
+                }
+                actionDisabled={false}
+                onAction={openStatusModal}
+                activeNote="La cuenta del usuario se encuentra operativa."
+                actionClassName={
+                  Number(detail?.is_active) === 1
+                    ? "bg-slate-200 hover:bg-red-100 text-slate-700 hover:text-red-700"
+                    : "bg-primary hover:bg-primary/90 text-white"
+                }
+              />
 
               <AdminMembershipCard
                 membership={detail?.membership}

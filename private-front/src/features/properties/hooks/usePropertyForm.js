@@ -23,9 +23,11 @@ import {
   publishProperty,
   reorderPropertyImages,
 } from "../api/properties.api.js";
+import { useToast } from "../../../ui/toast/ToastProvider";
 
 export function usePropertyForm({ googleMapsLoaded }) {
   const navigate = useNavigate();
+  const toast = useToast();
   const { id } = useParams();
 
   const isEditMode = useMemo(() => !!id, [id]);
@@ -57,6 +59,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
     latitude: "",
     longitude: "",
     status: "draft",
+    amenities: [],
   });
 
   const [requirements, setRequirements] = useState(emptyRequirements());
@@ -65,8 +68,6 @@ export function usePropertyForm({ googleMapsLoaded }) {
   const [initialExistingImageIds, setInitialExistingImageIds] = useState([]);
   const [isLocationValid, setIsLocationValid] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitMessage, setSubmitMessage] = useState("");
-  const [submitError, setSubmitError] = useState("");
   const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [initialError, setInitialError] = useState("");
 
@@ -79,8 +80,6 @@ export function usePropertyForm({ googleMapsLoaded }) {
       try {
         setInitialLoading(true);
         setInitialError("");
-        setSubmitError("");
-        setSubmitMessage("");
 
         const res = await api.get(`/properties/${id}`);
         const data = unwrap(res);
@@ -99,7 +98,14 @@ export function usePropertyForm({ googleMapsLoaded }) {
           : [];
         const serverImages = Array.isArray(data?.images) ? data.images : [];
 
-        setForm(mapPropertyToForm(property));
+        const serverAmenities = Array.isArray(data?.amenities)
+          ? data.amenities
+          : [];
+
+        setForm({
+          ...mapPropertyToForm(property),
+          amenities: serverAmenities,
+        });
         setPropertyStatus(property?.status || "draft");
 
         setRequirements(
@@ -200,94 +206,190 @@ export function usePropertyForm({ googleMapsLoaded }) {
   }
 
   async function refreshPropertyState(propertyId) {
-    const detailRes = await api.get(`/properties/${propertyId}`);
+    const detailRes = await api.get(
+      `/properties/${propertyId}?_=${Date.now()}`,
+    );
+
     const detail = unwrap(detailRes);
 
     const property = detail?.property || {};
+
     const refreshedImages = Array.isArray(detail?.images) ? detail.images : [];
 
-    setForm(mapPropertyToForm(property));
+    const refreshedAmenities = Array.isArray(detail?.amenities)
+      ? detail.amenities
+      : [];
+
+    const requirementsData = detail?.requirements || null;
+
+    const requirementLocations = Array.isArray(detail?.requirement_locations)
+      ? detail.requirement_locations
+      : [];
+
+    const requirementPropertyTypes = Array.isArray(
+      detail?.requirement_property_types,
+    )
+      ? detail.requirement_property_types
+      : [];
+
+    setForm({
+      ...mapPropertyToForm(property),
+      amenities: refreshedAmenities,
+    });
+
+    setRequirements(
+      mapRequirementsToState(
+        requirementsData,
+        requirementPropertyTypes,
+        requirementLocations,
+      ),
+    );
+
     setPropertyStatus(property?.status || propertyStatus);
 
     setExistingImages(refreshedImages);
+
     setInitialExistingImageIds(
       refreshedImages
-        .map((img) => Number(img?.id))
-        .filter((imgId) => Number.isFinite(imgId) && imgId > 0),
+        .map((image) => Number(image?.id))
+        .filter((imageId) => Number.isFinite(imageId) && imageId > 0),
     );
+
     setImages([]);
+
+    setIsLocationValid(
+      !!property?.place_id &&
+        !!property?.formatted_address &&
+        property?.latitude !== null &&
+        property?.latitude !== "" &&
+        property?.longitude !== null &&
+        property?.longitude !== "",
+    );
 
     return detail;
   }
+  function showError(message) {
+    if (message) toast.error(message);
+  }
 
+  function showSuccess(message) {
+    if (message) toast.success(message);
+  }
   async function syncImagesForEdit(propertyId) {
     const currentExistingIds = existingImages
-      .map((img) => Number(img?.id))
-      .filter((imgId) => Number.isFinite(imgId) && imgId > 0);
+      .map((image) => Number(image?.id))
+      .filter((imageId) => Number.isFinite(imageId) && imageId > 0);
 
     const deletedExistingIds = initialExistingImageIds.filter(
-      (imgId) => !currentExistingIds.includes(imgId),
+      (imageId) => !currentExistingIds.includes(imageId),
     );
 
     for (const imageId of deletedExistingIds) {
       await api.del(`/properties/images/${imageId}`);
     }
 
-    let latestDetail = null;
+    let uploadResult = null;
 
-    if (images.length) {
-      latestDetail = await uploadPropertyImages(propertyId, images);
+    if (images.length > 0) {
+      uploadResult = await uploadPropertyImages(propertyId, images);
     }
 
-    if (!latestDetail) {
-      const detailRes = await api.get(`/properties/${propertyId}`);
-      latestDetail = unwrap(detailRes);
-    }
+    /*
+     * Primero intentamos obtener las imágenes desde la respuesta
+     * del endpoint de carga.
+     */
+    const imagesFromUpload = Array.isArray(uploadResult?.images)
+      ? uploadResult.images
+      : Array.isArray(uploadResult?.data?.images)
+        ? uploadResult.data.images
+        : Array.isArray(uploadResult?.property?.images)
+          ? uploadResult.property.images
+          : [];
 
-    const latestImages = Array.isArray(latestDetail?.images)
+    /*
+     * Luego consultamos el detalle evitando caché.
+     */
+    const detailResponse = await api.get(
+      `/properties/${propertyId}?_=${Date.now()}`,
+    );
+
+    const latestDetail = unwrap(detailResponse);
+
+    const imagesFromDetail = Array.isArray(latestDetail?.images)
       ? latestDetail.images
       : [];
 
-    const latestIds = latestImages
-      .map((img) => Number(img?.id))
-      .filter((imgId) => Number.isFinite(imgId) && imgId > 0);
+    const latestImages =
+      imagesFromDetail.length > 0 ? imagesFromDetail : imagesFromUpload;
 
-    const newUploadedIds = latestIds.filter(
-      (imgId) => !currentExistingIds.includes(imgId),
+    const latestIds = latestImages
+      .map((image) => Number(image?.id))
+      .filter((imageId) => Number.isFinite(imageId) && imageId > 0);
+
+    /*
+     * Conservamos solamente imágenes que realmente siguen existiendo.
+     */
+    const survivingExistingIds = currentExistingIds.filter((imageId) =>
+      latestIds.includes(imageId),
     );
 
-    const finalOrderedIds = [...currentExistingIds, ...newUploadedIds];
+    const newUploadedIds = latestIds.filter(
+      (imageId) => !currentExistingIds.includes(imageId),
+    );
 
-    if (!finalOrderedIds.length) {
-      throw new Error("La propiedad debe conservar al menos una imagen.");
+    const finalOrderedIds = [...survivingExistingIds, ...newUploadedIds];
+
+    /*
+     * No generamos un error solamente porque el GET inmediato
+     * todavía no haya reflejado la nueva imagen.
+     * El endpoint de upload ya habría lanzado una excepción real
+     * si la carga hubiera fallado.
+     */
+    if (finalOrderedIds.length > 0) {
+      const reorderPayload = finalOrderedIds.map((imageId, index) => ({
+        id: imageId,
+        is_cover: index === 0,
+      }));
+
+      await reorderPropertyImages(propertyId, reorderPayload);
     }
 
-    const reorderPayload = finalOrderedIds.map((imageId, index) => ({
-      id: imageId,
-      is_cover: index === 0,
-    }));
-
-    await reorderPropertyImages(propertyId, reorderPayload);
+    await refreshPropertyState(propertyId);
   }
-
   async function syncImagesForCreate(propertyId) {
-    const uploaded = await uploadPropertyImages(propertyId, images);
-    const uploadedImages = Array.isArray(uploaded?.images)
-      ? uploaded.images
+    const uploadResult = await uploadPropertyImages(propertyId, images);
+
+    const imagesFromUpload = Array.isArray(uploadResult?.images)
+      ? uploadResult.images
+      : Array.isArray(uploadResult?.data?.images)
+        ? uploadResult.data.images
+        : Array.isArray(uploadResult?.property?.images)
+          ? uploadResult.property.images
+          : [];
+
+    const detailResponse = await api.get(
+      `/properties/${propertyId}?_=${Date.now()}`,
+    );
+
+    const latestDetail = unwrap(detailResponse);
+
+    const imagesFromDetail = Array.isArray(latestDetail?.images)
+      ? latestDetail.images
       : [];
 
-    if (!uploadedImages.length) {
-      throw new Error(
-        "El servidor no devolvió correctamente las imágenes subidas.",
-      );
+    const uploadedImages =
+      imagesFromDetail.length > 0 ? imagesFromDetail : imagesFromUpload;
+
+    const reorderPayload = uploadedImages
+      .map((image, index) => ({
+        id: Number(image?.id),
+        is_cover: index === 0,
+      }))
+      .filter((image) => Number.isFinite(image.id) && image.id > 0);
+
+    if (reorderPayload.length > 0) {
+      await reorderPropertyImages(propertyId, reorderPayload);
     }
-
-    const reorderPayload = uploadedImages.map((img, index) => ({
-      id: img.id,
-      is_cover: index === 0,
-    }));
-
-    await reorderPropertyImages(propertyId, reorderPayload);
   }
 
   async function submitProperty({
@@ -295,8 +397,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
     redirectAfterSave = true,
     successMessageOverride = "",
   } = {}) {
-    setSubmitError("");
-    setSubmitMessage("");
+    if (isSubmitting) return;
 
     try {
       validateBeforeSubmit();
@@ -311,7 +412,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
         propertyId = Number(id);
       } else {
         const created = await createPropertyDraft(propertyPayload);
-        propertyId = created?.property?.id;
+        propertyId = Number(created?.property?.id);
       }
 
       if (!propertyId) {
@@ -325,6 +426,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
       }
 
       const requirementsPayload = buildRequirementsPayload(requirements);
+
       await savePropertyRequirements(propertyId, requirementsPayload);
 
       if (publishNow) {
@@ -334,21 +436,17 @@ export function usePropertyForm({ googleMapsLoaded }) {
         setPropertyStatus("draft");
       }
 
-      let message = "";
+      const successMessage =
+        successMessageOverride ||
+        (publishNow
+          ? isEditMode
+            ? "La propiedad fue actualizada y publicada correctamente."
+            : "La propiedad fue publicada correctamente."
+          : isEditMode
+            ? "Los datos de la propiedad se actualizaron correctamente."
+            : "La propiedad se guardó como borrador.");
 
-      if (successMessageOverride) {
-        message = successMessageOverride;
-      } else if (publishNow) {
-        message = isEditMode
-          ? "La propiedad fue actualizada y publicada correctamente."
-          : "La propiedad fue publicada correctamente.";
-      } else {
-        message = isEditMode
-          ? "Los datos de la propiedad se actualizaron correctamente."
-          : "La propiedad se guardó como borrador.";
-      }
-
-      setSubmitMessage(message);
+      showSuccess(successMessage);
       setPublishChoiceOpen(false);
 
       if (redirectAfterSave) {
@@ -359,14 +457,11 @@ export function usePropertyForm({ googleMapsLoaded }) {
         await refreshPropertyState(propertyId);
       }
     } catch (error) {
-      setSubmitError(
-        getErrorMessage(error, "No se pudo finalizar la publicación."),
-      );
+      showError(getErrorMessage(error, "No se pudo finalizar la publicación."));
     } finally {
       setIsSubmitting(false);
     }
   }
-
   async function handlePublish() {
     if (isSubmitting) return;
 
@@ -403,18 +498,14 @@ export function usePropertyForm({ googleMapsLoaded }) {
 
     try {
       setIsSubmitting(true);
-      setSubmitError("");
-      setSubmitMessage("");
 
       await archiveProperty(Number(id));
       await refreshPropertyState(Number(id));
 
       setPropertyStatus("archived");
-      setSubmitMessage("La publicación fue archivada correctamente.");
+      showSuccess("La publicación fue archivada correctamente.");
     } catch (error) {
-      setSubmitError(
-        getErrorMessage(error, "No se pudo archivar la publicación."),
-      );
+      showError(getErrorMessage(error, "No se pudo archivar la publicación."));
     } finally {
       setIsSubmitting(false);
     }
@@ -425,18 +516,14 @@ export function usePropertyForm({ googleMapsLoaded }) {
 
     try {
       setIsSubmitting(true);
-      setSubmitError("");
-      setSubmitMessage("");
 
       await api.post(`/properties/${id}/pause`, {});
       await refreshPropertyState(Number(id));
 
       setPropertyStatus("paused");
-      setSubmitMessage("La publicación fue pausada correctamente.");
+      showSuccess("La publicación fue pausada correctamente.");
     } catch (error) {
-      setSubmitError(
-        getErrorMessage(error, "No se pudo pausar la publicación."),
-      );
+      showError(getErrorMessage(error, "No se pudo pausar la publicación."));
     } finally {
       setIsSubmitting(false);
     }
@@ -447,29 +534,22 @@ export function usePropertyForm({ googleMapsLoaded }) {
 
     try {
       setIsSubmitting(true);
-      setSubmitError("");
-      setSubmitMessage("");
 
       await deleteProperty(Number(id));
       setPropertyStatus("deleted");
-      setSubmitMessage("La publicación fue eliminada correctamente.");
+      showSuccess("La publicación fue eliminada correctamente.");
 
       setTimeout(() => {
         navigate("/properties");
       }, 600);
     } catch (error) {
-      setSubmitError(
-        getErrorMessage(error, "No se pudo eliminar la publicación."),
-      );
+      showError(getErrorMessage(error, "No se pudo eliminar la publicación."));
     } finally {
       setIsSubmitting(false);
     }
   }
 
   function handleContinueToStepTwo() {
-    setSubmitError("");
-    setSubmitMessage("");
-
     try {
       if (!googleMapsLoaded) {
         throw new Error("Google Maps todavía se está cargando.");
@@ -494,27 +574,22 @@ export function usePropertyForm({ googleMapsLoaded }) {
       setCurrentStep(2);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
-      setSubmitError(error.message || "No se pudo avanzar al paso 2.");
+      showError(getErrorMessage(error, "No se pudo avanzar al paso 2."));
     }
   }
 
   function handleBackToStepOne() {
-    setSubmitError("");
-    setSubmitMessage("");
     setPublishChoiceOpen(false);
     setCurrentStep(1);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function handleOpenPublishChoice() {
-    setSubmitError("");
-    setSubmitMessage("");
-
     try {
       validateBeforeSubmit();
       setPublishChoiceOpen(true);
     } catch (error) {
-      setSubmitError(error.message || "No se pudo continuar.");
+      showError(getErrorMessage(error, "No se pudo continuar."));
     }
   }
 
@@ -538,10 +613,6 @@ export function usePropertyForm({ googleMapsLoaded }) {
     }
 
     handleOpenPublishChoice();
-  }
-
-  function handlePreview() {
-    console.log("Vista previa");
   }
 
   return {
@@ -573,10 +644,6 @@ export function usePropertyForm({ googleMapsLoaded }) {
     isLocationValid,
     setIsLocationValid,
     isSubmitting,
-    submitMessage,
-    submitError,
-    setSubmitMessage,
-    setSubmitError,
 
     initialLoading,
     initialError,
@@ -591,8 +658,10 @@ export function usePropertyForm({ googleMapsLoaded }) {
     handleArchive,
     handlePause,
     handleDelete,
-    handlePreview,
     submitProperty,
     navigate,
+
+    showError,
+    showSuccess,
   };
 }

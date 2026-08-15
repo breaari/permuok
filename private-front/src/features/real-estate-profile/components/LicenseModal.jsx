@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { api, unwrap, getErrorMessage } from "../../../api/http";
 import { Icon } from "../../../ui/icons/Index";
 
@@ -42,7 +42,7 @@ export function LicenseModal({
     setProvLoading(true);
 
     api
-      .get("/provinces")
+      .get("/locations/provinces")
       .then(unwrap)
       .then((data) => {
         if (!alive) return;
@@ -50,8 +50,8 @@ export function LicenseModal({
         const items = Array.isArray(data?.items)
           ? data.items
           : Array.isArray(data)
-          ? data
-          : [];
+            ? data
+            : [];
 
         setProvinces(items);
       })
@@ -69,12 +69,9 @@ export function LicenseModal({
     };
   }, [open, provinces.length]);
 
-  const canSubmit = useMemo(() => {
-    const lnOk = String(form.license_number || "").trim().length > 0;
-    const provOk = String(form.province_id || "").trim().length > 0;
-
-    return !isLocked && !busy && lnOk && provOk;
-  }, [isLocked, busy, form]);
+  const lnOk = String(form.license_number || "").trim().length > 0;
+  const provOk = String(form.province_id || "").trim().length > 0;
+  const canSubmit = !isLocked && !busy && lnOk && provOk;
 
   if (!open) return null;
 
@@ -149,7 +146,8 @@ export function LicenseModal({
               </p>
             ) : isLocked ? (
               <p className="text-xs text-slate-500 mt-1">
-                No podés modificar matrículas mientras el perfil está en revisión.
+                No podés modificar matrículas mientras el perfil está en
+                revisión.
               </p>
             ) : null}
           </div>

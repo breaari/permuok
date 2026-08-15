@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { api, unwrap, getErrorMessage } from "../../../api/http.js";
 import { useAuth } from "../../auth/components/AuthContext";
+import { useToast } from "../../../ui/toast/ToastProvider.jsx";
 
 const TABS = [
   { key: "active", label: "Activas" },
@@ -384,7 +385,7 @@ export default function AdminBilling() {
   const { user } = useAuth();
   const isAdmin = Number(user?.role) === 1;
   const navigate = useNavigate();
-
+  const toast = useToast();
   if (!isAdmin) return <Navigate to="/" replace />;
 
   const [tab, setTab] = useState("active");
@@ -403,7 +404,6 @@ export default function AdminBilling() {
   const [q, setQ] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
 
   const [page, setPage] = useState(1);
   const [perPage] = useState(DEFAULT_PER_PAGE);
@@ -442,7 +442,6 @@ export default function AdminBilling() {
     async ({ nextPage = 1, nextQuery = q, nextTab = tab } = {}) => {
       const currentRequestId = ++requestIdRef.current;
 
-      setErr("");
       setLoading(true);
       setItems([]);
       setMeta(null);
@@ -469,9 +468,13 @@ export default function AdminBilling() {
       } catch (e) {
         if (currentRequestId !== requestIdRef.current) return;
 
+        const message = getErrorMessage(e, "No se pudo cargar la facturación");
+
         setItems([]);
         setMeta(null);
-        setErr(getErrorMessage(e, "No se pudo cargar la facturación"));
+
+
+        toast.error(message);
       } finally {
         if (currentRequestId === requestIdRef.current) {
           setLoading(false);
@@ -522,12 +525,6 @@ export default function AdminBilling() {
           últimos cobros de las inmobiliarias.
         </p>
       </div>
-
-      {err && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-          {err}
-        </div>
-      )}
 
       <div className="space-y-6">
         <div className="hidden md:block">

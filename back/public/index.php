@@ -13,6 +13,8 @@ $dotenv->load();
 $allowedOrigins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
+    'https://permuok.com',
+    'http://permuok.com',
     'permuok.com',
 ];
 
@@ -30,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-header('Content-Type: application/json; charset=utf-8');
+
 
 use App\Controllers\AuthController;
 use App\Controllers\MeController;
@@ -50,39 +52,61 @@ use App\Controllers\PropertyController;
 use App\Controllers\PropertyImageController;
 use App\Controllers\PropertyImageViewController;
 use App\Controllers\SearchRequestController;
+use App\Controllers\DevelopmentController;
+use App\Controllers\DevelopmentImageController;
+use App\Controllers\DevelopmentImageViewController;
+use App\Controllers\DevelopmentUnitTypeController;
+use App\Controllers\DevelopmentAmenityController;
+use App\Controllers\ExploreController;
+use App\Controllers\ConversationController;
+use App\Controllers\NotificationController;
+use App\Controllers\RealtimeController;
+use App\Controllers\AdminDashboardController;
+use App\Controllers\AiEnrichmentController;
+use App\Controllers\AiCompatibilityController;
 
 $method = $_SERVER['REQUEST_METHOD'];
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/';
 
-// Normalizar slashes
+$isImageRequest =
+    preg_match('#^/property-images/\d+/view$#', $uri) ||
+    preg_match('#^/development-images/\d+/view$#', $uri);
+
+if (!$isImageRequest) {
+    header('Content-Type: application/json; charset=utf-8');
+}
+
 $uri = preg_replace('#/+#', '/', $uri);
 
-// scriptDir (por ejemplo: /public)
-$scriptDir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+$scriptName = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+$scriptDir = rtrim(dirname($scriptName), '/');
 
-// Detectar el "mount" (primer segmento de la URL), ej: "permuok"
-$parts = explode('/', trim($uri, '/'));
-$mount = $parts[0] ?? '';
-
-$baseCandidates = [];
-if ($scriptDir !== '') {
-    // Caso normal: /public
-    $baseCandidates[] = $scriptDir;
-
-    // Caso con mount: /permuok/public
-    if ($mount !== '') {
-        $baseCandidates[] = '/' . $mount . $scriptDir;
+/*
+|--------------------------------------------------------------------------
+| Normalización de URI
+|--------------------------------------------------------------------------
+| Ejemplos:
+| /permuok/public/auth/login      => /auth/login
+| /permuok/public/explore         => /explore
+| /permuok/public/index.php/login => /login
+|--------------------------------------------------------------------------
+*/
+if ($scriptName && str_starts_with($uri, $scriptName)) {
+    $uri = substr($uri, strlen($scriptName));
+} elseif ($scriptDir && $scriptDir !== '/' && str_starts_with($uri, $scriptDir)) {
+    $uri = substr($uri, strlen($scriptDir));
+} else {
+    $publicPos = strpos($uri, '/public/');
+    if ($publicPos !== false) {
+        $uri = substr($uri, $publicPos + strlen('/public'));
+    } elseif (str_ends_with($uri, '/public')) {
+        $uri = '/';
     }
 }
 
-// Recortar el primer basePath que matchee
-foreach ($baseCandidates as $base) {
-    if ($base !== '' && str_starts_with($uri, $base)) {
-        $uri = substr($uri, strlen($base));
-        break;
-    }
-}
-
+$uri = '/' . ltrim($uri, '/');
+$uri = preg_replace('#/+#', '/', $uri);
+$uri = rtrim($uri, '/');
 $uri = $uri === '' ? '/' : $uri;
 
 $routes = [
@@ -136,6 +160,9 @@ $routes = [
     'GET /admin/billing/counts' => [AdminBillingController::class, 'counts'],
     'GET /admin/billing'        => [AdminBillingController::class, 'list'],
 
+    // Explore unificado
+    'GET /explore' => [ExploreController::class, 'index'],
+
     // Properties - propias
     'GET /properties'  => [PropertyController::class, 'list'],
     'POST /properties' => [PropertyController::class, 'create'],
@@ -149,6 +176,28 @@ $routes = [
 
     // Search requests - explorar
     'GET /explore/search-requests' => [SearchRequestController::class, 'explore'],
+
+    // Developments - propios
+    'GET /developments'  => [DevelopmentController::class, 'list'],
+    'POST /developments' => [DevelopmentController::class, 'create'],
+
+    // Developments - explorar
+    'GET /explore/developments' => [DevelopmentController::class, 'explore'],
+
+    // Conversations
+    'GET /conversations'        => [ConversationController::class, 'index'],
+    'POST /conversations/start' => [ConversationController::class, 'start'],
+    'GET /conversations/unread-count' => [ConversationController::class, 'unreadCount'],
+
+    // Notifications
+    'GET /notifications' => [NotificationController::class, 'index'],
+    'GET /notifications/unread-count' => [NotificationController::class, 'unreadCount'],
+    'POST /notifications/read-all' => [NotificationController::class, 'markAllAsRead'],
+
+    'GET /stream' => [RealtimeController::class, 'stream'],
+
+    'GET /admin/dashboard/stats' => [AdminDashboardController::class, 'stats'],
+
 ];
 
 $key = $method . ' ' . $uri;
@@ -159,7 +208,7 @@ if (isset($routes[$key])) {
     exit;
 }
 
-// Dynamic routes (regex)
+// Dynamic routes
 
 if ($method === 'GET' && preg_match('#^/admin/real-estates/(\d+)$#', $uri, $m)) {
     $_GET['id'] = (int)$m[1];
@@ -170,6 +219,12 @@ if ($method === 'GET' && preg_match('#^/admin/real-estates/(\d+)$#', $uri, $m)) 
 if ($method === 'GET' && preg_match('#^/admin/users/(\d+)$#', $uri, $m)) {
     $_GET['id'] = (int)$m[1];
     AdminUserController::detail();
+    exit;
+}
+
+if ($method === 'GET' && preg_match('#^/admin/billing/(\d+)$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    AdminBillingController::detail();
     exit;
 }
 
@@ -295,5 +350,236 @@ if ($method === 'GET' && preg_match('#^/explore/search-requests/(\d+)$#', $uri, 
     exit;
 }
 
+if ($method === 'GET' && preg_match('#^/explore/developments/(\d+)$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    DevelopmentController::detail();
+    exit;
+}
+
+// Developments dynamic routes
+
+if ($method === 'GET' && preg_match('#^/developments/(\d+)$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    DevelopmentController::detail();
+    exit;
+}
+
+if ($method === 'PATCH' && preg_match('#^/developments/(\d+)$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    DevelopmentController::update();
+    exit;
+}
+
+if ($method === 'POST' && preg_match('#^/developments/(\d+)/publish$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    DevelopmentController::publish();
+    exit;
+}
+
+if ($method === 'POST' && preg_match('#^/developments/(\d+)/pause$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    DevelopmentController::pause();
+    exit;
+}
+
+if ($method === 'POST' && preg_match('#^/developments/(\d+)/archive$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    DevelopmentController::archive();
+    exit;
+}
+
+if ($method === 'POST' && preg_match('#^/developments/(\d+)/delete$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    DevelopmentController::delete();
+    exit;
+}
+
+
+
+if ($method === 'POST' && preg_match('#^/developments/(\d+)/close$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    DevelopmentController::close();
+    exit;
+}
+
+if ($method === 'POST' && preg_match('#^/developments/(\d+)/images$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    DevelopmentImageController::upload();
+    exit;
+}
+
+if ($method === 'DELETE' && preg_match('#^/developments/images/(\d+)$#', $uri, $m)) {
+    $_GET['image_id'] = (int)$m[1];
+    DevelopmentImageController::delete();
+    exit;
+}
+
+if ($method === 'PATCH' && preg_match('#^/developments/(\d+)/images/reorder$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    DevelopmentImageController::reorder();
+    exit;
+}
+
+if ($method === 'GET' && preg_match('#^/development-images/(\d+)/view$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    DevelopmentImageViewController::show();
+    exit;
+}
+
+if ($method === 'GET' && preg_match('#^/developments/(\d+)/unit-types$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    DevelopmentUnitTypeController::list();
+    exit;
+}
+
+if ($method === 'POST' && preg_match('#^/developments/(\d+)/unit-types$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    DevelopmentUnitTypeController::create();
+    exit;
+}
+
+if ($method === 'PATCH' && preg_match('#^/developments/unit-types/(\d+)$#', $uri, $m)) {
+    $_GET['unit_type_id'] = (int)$m[1];
+    DevelopmentUnitTypeController::update();
+    exit;
+}
+
+if ($method === 'DELETE' && preg_match('#^/developments/unit-types/(\d+)$#', $uri, $m)) {
+    $_GET['unit_type_id'] = (int)$m[1];
+    DevelopmentUnitTypeController::delete();
+    exit;
+}
+
+if ($method === 'GET' && preg_match('#^/developments/(\d+)/amenities$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    DevelopmentAmenityController::list();
+    exit;
+}
+
+if ($method === 'PUT' && preg_match('#^/developments/(\d+)/amenities$#', $uri, $m)) {
+    $_GET['id'] = (int)$m[1];
+    DevelopmentAmenityController::replaceAll();
+    exit;
+}
+
+// Conversations detail
+if ($method === 'GET' && preg_match('#^/conversations/(\d+)$#', $uri, $m)) {
+    ConversationController::show((int)$m[1]);
+    exit;
+}
+
+// Send message
+if ($method === 'POST' && preg_match('#^/conversations/(\d+)/messages$#', $uri, $m)) {
+    ConversationController::sendMessage((int)$m[1]);
+    exit;
+}
+
+// Request contact share
+if ($method === 'POST' && preg_match('#^/conversations/(\d+)/share-contact/request$#', $uri, $m)) {
+    ConversationController::requestContactShare((int)$m[1]);
+    exit;
+}
+
+// Respond contact share
+if ($method === 'POST' && preg_match('#^/conversations/(\d+)/share-contact/respond$#', $uri, $m)) {
+    ConversationController::respondContactShare((int)$m[1]);
+    exit;
+}
+
+if ($method === 'PATCH' && preg_match('#^/conversations/(\d+)/status$#', $uri, $m)) {
+    ConversationController::updateStatus((int)$m[1]);
+    exit;
+}
+
+// Mark notification as read
+if ($method === 'POST' && preg_match('#^/notifications/(\d+)/read$#', $uri, $m)) {
+    NotificationController::markAsRead((int)$m[1]);
+    exit;
+}
+// Archive conversation
+if ($method === 'POST' && preg_match('#^/conversations/(\d+)/archive$#', $uri, $m)) {
+    ConversationController::archive((int)$m[1]);
+    exit;
+}
+
+// Unarchive conversation
+if ($method === 'POST' && preg_match('#^/conversations/(\d+)/unarchive$#', $uri, $m)) {
+    ConversationController::unarchive((int)$m[1]);
+    exit;
+}
+if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/ai/properties/(\d+)/analyze$#',
+        $uri,
+        $matches
+    )
+) {
+    AiEnrichmentController::analyzeProperty(
+        (int)$matches[1]
+    );
+    exit;
+}
+if (
+    $method === 'GET' &&
+    preg_match(
+        '#^/ai/properties/(\d+)/analysis$#',
+        $uri,
+        $matches
+    )
+) {
+    AiEnrichmentController::propertyAnalysis(
+        (int)$matches[1]
+    );
+    exit;
+}
+if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/ai/search-requests/(\d+)/analyze$#',
+        $uri,
+        $matches
+    )
+) {
+    AiEnrichmentController::analyzeSearchRequest(
+        (int)$matches[1]
+    );
+    exit;
+}
+if (
+    $method === 'GET' &&
+    preg_match(
+        '#^/ai/search-requests/(\d+)/analysis$#',
+        $uri,
+        $matches
+    )
+) {
+    AiEnrichmentController::searchRequestAnalysis(
+        (int)$matches[1]
+    );
+    exit;
+}
+if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/ai/compatibilities/search-requests/(\d+)/calculate$#',
+        $uri,
+        $matches
+    )
+) {
+    AiCompatibilityController::calculateForSearchRequest(
+        (int)$matches[1]
+    );
+    exit;
+}
 http_response_code(404);
-echo json_encode(['error' => 'Ruta no encontrada']);
+echo json_encode([
+    'error' => 'Ruta no encontrada',
+    'debug' => [
+        'method' => $method,
+        'uri' => $uri,
+        'key' => $key,
+        'request_uri' => $_SERVER['REQUEST_URI'] ?? null,
+        'script_name' => $_SERVER['SCRIPT_NAME'] ?? null,
+    ],
+]);

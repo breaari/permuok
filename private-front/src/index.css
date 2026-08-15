@@ -218,3 +218,25 @@ gmp-place-autocomplete::part(input) {
   outline: none !important;
   box-shadow: none !important;
 }
+
+@keyframes public-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.public-marquee {
+  animation: public-marquee 26s linear infinite;
+}
+
+.public-grid-bg {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(255, 255, 255, 0.08) 1px,
+    transparent 0
+  );
+  background-size: 36px 36px;
+}

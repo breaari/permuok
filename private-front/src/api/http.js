@@ -5,10 +5,13 @@ const API_BASE_URL =
 const ACCESS_KEY = "permuok_access_token";
 const REFRESH_KEY = "permuok_refresh_token";
 
+let refreshPromise = null;
+
 export function unwrap(res) {
   if (res && typeof res === "object" && "success" in res && "data" in res) {
     return res.data;
   }
+
   return res;
 }
 
@@ -30,23 +33,47 @@ export function setTokens({ access_token, refresh_token }) {
     hasRefreshToken: !!refresh_token,
   });
 
-  if (access_token) localStorage.setItem(ACCESS_KEY, access_token);
-  if (refresh_token) localStorage.setItem(REFRESH_KEY, refresh_token);
+  if (access_token) {
+    localStorage.setItem(ACCESS_KEY, access_token);
+  }
+
+  if (refresh_token) {
+    localStorage.setItem(REFRESH_KEY, refresh_token);
+  }
 }
 
 export function clearTokens() {
-  console.log("[AUTH] clearTokens()");
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
 }
 
 export function getErrorMessage(err, fallback = "Ocurrió un error") {
-  const d = err?.data;
-  return (
-    (d && typeof d === "object" && (d.message || d.error)) ||
-    err?.message ||
-    fallback
-  );
+  const data = err?.data;
+
+  if (data && typeof data === "object") {
+    if (typeof data.message === "string") return data.message;
+    if (typeof data.error === "string") return data.error;
+
+    if (Array.isArray(data.errors) && data.errors.length) {
+      return data.errors
+        .map((item) => {
+          if (typeof item === "string") return item;
+          return item?.message || item?.error || "";
+        })
+        .filter(Boolean)
+        .join(" ");
+    }
+  }
+
+  if (typeof data === "string" && data.trim()) {
+    return data;
+  }
+
+  if (typeof err?.message === "string" && err.message.trim()) {
+    return err.message;
+  }
+
+  return fallback;
 }
 
 function buildUrl(path, params) {
@@ -60,106 +87,54 @@ function buildUrl(path, params) {
 
   Object.entries(params).forEach(([key, value]) => {
     if (value === undefined || value === null || value === "") return;
+
+    if (Array.isArray(value)) {
+      if (!value.length) return;
+      search.append(key, value.join(","));
+      return;
+    }
+
     search.append(key, String(value));
   });
 
   const qs = search.toString();
+
   return qs ? `${baseUrl}?${qs}` : baseUrl;
 }
 
-async function request(
-  path,
-  { method = "GET", body, headers, params, skipAuth = false } = {},
-  { retry = true } = {}
-) {
-  const url = buildUrl(path, params);
-
-  const finalHeaders = { ...(headers || {}) };
-  const hasBody = body !== undefined && body !== null;
-
-  if (hasBody && !(body instanceof FormData)) {
-    finalHeaders["Content-Type"] =
-      finalHeaders["Content-Type"] || "application/json";
-  }
-
-  const access = getAccessToken();
-
-  if (!skipAuth && access) {
-    finalHeaders["Authorization"] = `Bearer ${access}`;
-  }
-
-  console.log("[HTTP] request", {
-    url,
-    method,
-    retry,
-    skipAuth,
-    hasAccessToken: !!access,
-    hasRefreshToken: !!getRefreshToken(),
-  });
-
-  const res = await fetch(url, {
-    method,
-    headers: finalHeaders,
-    body: hasBody
-      ? body instanceof FormData
-        ? body
-        : JSON.stringify(body)
-      : undefined,
-  });
-
-  console.log("[HTTP] response", {
-    url,
-    method,
-    status: res.status,
-    ok: res.ok,
-  });
-
-  if (res.status === 401 && retry && path !== "/refresh") {
-    console.log("[HTTP] 401 detected, trying refresh...", { url });
-
-    const refreshed = await tryRefresh();
-
-    console.log("[HTTP] refresh result", { refreshed });
-
-    if (refreshed) {
-      return request(
-        path,
-        { method, body, headers, params, skipAuth },
-        { retry: false }
-      );
-    }
-  }
-
+async function parseResponse(res) {
   const text = await res.text();
-  let data = null;
+
+  if (!text) return null;
 
   try {
-    data = text ? JSON.parse(text) : null;
+    return JSON.parse(text);
   } catch {
-    data = text || null;
+    return text;
   }
-
-  if (!res.ok) {
-    const message =
-      (data && typeof data === "object" && (data.message || data.error)) ||
-      (typeof data === "string" ? data : null) ||
-      `HTTP ${res.status} ${res.statusText}`;
-
-    const err = new Error(message);
-    err.status = res.status;
-    err.data = data;
-    throw err;
-  }
-
-  return data;
 }
 
-export async function tryRefresh() {
+function buildError(res, data) {
+  const message =
+    (data && typeof data === "object" && (data.message || data.error)) ||
+    (typeof data === "string" ? data : null) ||
+    `HTTP ${res.status} ${res.statusText}`;
+
+  const err = new Error(message);
+  err.status = res.status;
+  err.data = data;
+
+  return err;
+}
+
+async function doRefresh() {
   const refreshToken = getRefreshToken();
 
   console.log("[AUTH] tryRefresh()", {
     hasRefreshToken: !!refreshToken,
-    refreshTokenPreview: refreshToken ? `${refreshToken.slice(0, 16)}...` : null,
+    refreshTokenPreview: refreshToken
+      ? `${refreshToken.slice(0, 16)}...`
+      : null,
   });
 
   if (!refreshToken) {
@@ -175,14 +150,10 @@ export async function tryRefresh() {
         body: { refresh_token: refreshToken },
         skipAuth: true,
       },
-      { retry: false }
+      { retry: false },
     );
 
-    console.log("[AUTH] /refresh raw response", data);
-
     const payload = unwrap(data);
-
-    console.log("[AUTH] /refresh unwrapped payload", payload);
 
     if (payload?.access_token) {
       setTokens({
@@ -190,11 +161,9 @@ export async function tryRefresh() {
         refresh_token: payload.refresh_token || refreshToken,
       });
 
-      console.log("[AUTH] Tokens refreshed successfully");
       return true;
     }
 
-    console.log("[AUTH] Refresh response missing access_token");
     clearTokens();
     return false;
   } catch (error) {
@@ -207,6 +176,76 @@ export async function tryRefresh() {
     clearTokens();
     return false;
   }
+}
+
+export async function tryRefresh() {
+  if (!refreshPromise) {
+    refreshPromise = doRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+
+  return refreshPromise;
+}
+
+async function request(
+  path,
+  { method = "GET", body, headers, params, skipAuth = false } = {},
+  { retry = true } = {},
+) {
+  const url = buildUrl(path, params);
+
+  const finalHeaders = { ...(headers || {}) };
+  const hasBody = body !== undefined && body !== null;
+
+  if (hasBody && !(body instanceof FormData)) {
+    finalHeaders["Content-Type"] =
+      finalHeaders["Content-Type"] || "application/json";
+  }
+
+  const access = getAccessToken();
+
+  if (!skipAuth && access) {
+    finalHeaders.Authorization = `Bearer ${access}`;
+  }
+
+  const res = await fetch(url, {
+    method,
+    headers: finalHeaders,
+    body: hasBody
+      ? body instanceof FormData
+        ? body
+        : JSON.stringify(body)
+      : undefined,
+  });
+
+  if (res.status === 401 && retry && path !== "/refresh") {
+    console.log("[HTTP] 401 detected, trying refresh...", { url });
+
+    const refreshed = await tryRefresh();
+
+    if (refreshed) {
+      return request(
+        path,
+        {
+          method,
+          body,
+          headers,
+          params,
+          skipAuth,
+        },
+        { retry: false },
+      );
+    }
+  }
+
+  const data = await parseResponse(res);
+
+  if (!res.ok) {
+    throw buildError(res, data);
+  }
+
+  return data;
 }
 
 export const api = {

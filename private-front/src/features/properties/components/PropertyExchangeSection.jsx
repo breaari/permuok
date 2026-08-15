@@ -1,5 +1,5 @@
 import RequirementTypeSelector from "./RequirementTypeSelector";
-import RequirementLocationsSection from "./PropertyLocationSection";
+import RequirementLocationsSection from "./PropertyRequirementLocationsSection";
 import {
   CURRENCIES,
   CASH_DIFFERENCE_DIRECTIONS,

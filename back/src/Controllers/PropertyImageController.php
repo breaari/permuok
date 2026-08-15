@@ -5,12 +5,16 @@ namespace App\Controllers;
 use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
 use App\Services\PropertyImageService;
+use App\Services\MembershipGuard;
 
 class PropertyImageController
 {
     public static function upload(): void
     {
         $auth = AuthHelper::requireUser();
+
+        MembershipGuard::requireActiveMembership((int)$auth['id']);
+
         $propertyId = (int)($_GET['id'] ?? 0);
 
         $result = PropertyImageService::upload(
@@ -21,7 +25,6 @@ class PropertyImageController
 
         ResponseHelper::ok($result, 201);
     }
-
     public static function delete(): void
     {
         $auth = AuthHelper::requireUser();
@@ -34,6 +37,9 @@ class PropertyImageController
     public static function reorder(): void
     {
         $auth = AuthHelper::requireUser();
+
+        MembershipGuard::requireActiveMembership((int)$auth['id']);
+
         $propertyId = (int)($_GET['id'] ?? 0);
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
 

@@ -236,13 +236,6 @@ export default function SearchRequestCard({
                 </button>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    onClick={onManage}
-                    className="px-4 py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:opacity-90 transition-all"
-                  >
-                    Gestionar
-                  </button>
 
                   <button
                     type="button"

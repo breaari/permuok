@@ -1,4 +1,5 @@
 import { CURRENCIES, PROPERTY_TYPES } from "../utils/PropertyFormHelpers";
+import { AMENITIES } from "../../shared/helpers/amenities";
 
 export default function PropertyFeaturesSection({ form, setField }) {
   function handleNumberChange(name, value) {
@@ -85,7 +86,9 @@ export default function PropertyFeaturesSection({ form, setField }) {
                 step="0.01"
                 placeholder="Ej. 120"
                 value={form.total_area ?? ""}
-                onChange={(e) => handleNumberChange("total_area", e.target.value)}
+                onChange={(e) =>
+                  handleNumberChange("total_area", e.target.value)
+                }
                 className="w-full no-spinner rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
               />
             </div>
@@ -113,6 +116,45 @@ export default function PropertyFeaturesSection({ form, setField }) {
           <h3 className="text-sm font-semibold text-slate-800 mb-4">
             Ambientes y detalles
           </h3>
+
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 sm:p-5">
+            <h3 className="text-sm font-semibold text-slate-800 mb-4">
+              Amenities
+            </h3>
+
+            <div className="flex flex-wrap gap-2">
+              {AMENITIES.map((item) => {
+                const active = Array.isArray(form.amenities)
+                  ? form.amenities.includes(item.value)
+                  : false;
+
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => {
+                      const current = Array.isArray(form.amenities)
+                        ? form.amenities
+                        : [];
+
+                      const next = current.includes(item.value)
+                        ? current.filter((v) => v !== item.value)
+                        : [...current, item.value];
+
+                      setField("amenities", next);
+                    }}
+                    className={`px-3 py-2 rounded-xl text-sm font-semibold border transition ${
+                      active
+                        ? "bg-emerald-600 text-white border-emerald-600"
+                        : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>

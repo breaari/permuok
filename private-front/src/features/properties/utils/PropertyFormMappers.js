@@ -1,4 +1,5 @@
 import { emptyRequirements, resolveCountryCode } from "./PropertyFormHelpers";
+import { normalizeAmenities } from "../../shared/helpers/amenities";
 
 export function normalizeCountryCode(country) {
   const direct = resolveCountryCode(country);
@@ -45,6 +46,7 @@ export function mapPropertyToForm(property) {
     place_id: property?.place_id || "",
     latitude: property?.latitude || "",
     longitude: property?.longitude || "",
+    amenities: normalizeAmenities(property?.amenities),
     status: property?.status || "draft",
   };
 }
@@ -115,6 +117,7 @@ export function buildPropertyPayload(form) {
     bathrooms: form.bathrooms || null,
     garages: form.garages || null,
     antiquity: form.antiquity || null,
+    amenities: normalizeAmenities(form.amenities),
   };
 }
 

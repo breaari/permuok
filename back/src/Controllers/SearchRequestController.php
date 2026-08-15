@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
 use App\Services\SearchRequestService;
+use App\Services\MembershipGuard;
 
 class SearchRequestController
 {
@@ -50,9 +51,13 @@ class SearchRequestController
     {
         try {
             $auth = AuthHelper::requireUser();
+
+            MembershipGuard::requireActiveMembership((int)$auth['id']);
+
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
 
             $result = SearchRequestService::createDraft((int)$auth['id'], $data);
+
             ResponseHelper::ok($result, 201);
         } catch (\Throwable $e) {
             ResponseHelper::fail($e->getMessage(), 400);
@@ -89,6 +94,7 @@ class SearchRequestController
     {
         try {
             $auth = AuthHelper::requireUser();
+            MembershipGuard::requireActiveMembership((int)$auth['id']);
             $id = (int)($_GET['id'] ?? 0);
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
 
@@ -103,6 +109,8 @@ class SearchRequestController
     {
         try {
             $auth = AuthHelper::requireUser();
+            MembershipGuard::requireActiveMembership((int)$auth['id']);
+            
             $id = (int)($_GET['id'] ?? 0);
 
             $result = SearchRequestService::publish((int)$auth['id'], $id);

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, unwrap, getErrorMessage } from "../../../api/http.js";
 import { useAuth } from "../../auth/components/AuthContext.jsx";
+import { useToast } from "../../../ui/toast/ToastProvider";
 import { Icon } from "../../../ui/icons/Index.jsx";
 import { BillingPlanCard } from "../components/BillingPlanCard.jsx";
 import { resolveCurrentPlan } from "../utils/BillingHelpers.js";
@@ -99,11 +100,11 @@ function HelperPill({ label, tone = "slate" }) {
 export default function ChangePlan() {
   const nav = useNavigate();
   const { access, loadMe } = useAuth();
+  const toast = useToast();
 
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState([]);
   const [err, setErr] = useState("");
-  const [ok, setOk] = useState("");
   const [processingPlanCode, setProcessingPlanCode] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [paymentStarted, setPaymentStarted] = useState(false);
@@ -140,11 +141,19 @@ export default function ChangePlan() {
   async function refreshMembershipStatus({ silent = false } = {}) {
     try {
       await loadMe?.({ force: true });
-    } catch (e) {
+
       if (!silent) {
-        setErr(
-          getErrorMessage(e, "No se pudo actualizar el estado de la membresía"),
-        );
+        toast.success("Estado de membresía actualizado.");
+      }
+    } catch (e) {
+      const message = getErrorMessage(
+        e,
+        "No se pudo actualizar el estado de la membresía",
+      );
+
+      if (!silent) {
+        setErr(message);
+        toast.error(message);
       }
     }
   }
@@ -225,7 +234,8 @@ export default function ChangePlan() {
       previousCurrentPlanId !== nextCurrentPlanId
     ) {
       setPaymentStarted(false);
-      setOk("El cambio de plan fue aplicado correctamente.");
+
+      toast.success("El cambio de plan fue aplicado correctamente.");
 
       if (pollingRef.current) {
         window.clearInterval(pollingRef.current);
@@ -234,13 +244,12 @@ export default function ChangePlan() {
     }
 
     previousCurrentPlanIdRef.current = nextCurrentPlanId;
-  }, [currentPlan?.id, paymentStarted]);
+  }, [currentPlan?.id, paymentStarted, toast]);
 
   async function startPlanChange(plan) {
     if (!plan || !currentPlan) return;
 
     setErr("");
-    setOk("");
     setProcessingPlanCode(plan.code);
 
     try {
@@ -260,9 +269,13 @@ export default function ChangePlan() {
 
         if (data?.init_point) {
           setPaymentStarted(true);
+          toast.success("Enlace de pago generado. Se abrirá Mercado Pago.");
           window.open(data.init_point, "_blank", "noopener,noreferrer");
         } else {
-          setErr("No se pudo generar el enlace de pago para el upgrade.");
+          const message =
+            "No se pudo generar el enlace de pago para el upgrade.";
+          setErr(message);
+          toast.error(message);
         }
 
         return;
@@ -274,14 +287,20 @@ export default function ChangePlan() {
           mode: "next_cycle",
         });
 
-        setOk(
+        toast.success(
           `El cambio al plan "${plan.name}" quedó programado para la próxima renovación.`,
         );
+
         await refreshMembershipStatus({ silent: true });
-        return;
       }
     } catch (e) {
-      setErr(getErrorMessage(e, "No se pudo procesar el cambio de plan"));
+      const message = getErrorMessage(
+        e,
+        "No se pudo procesar el cambio de plan",
+      );
+
+      setErr(message);
+      toast.error(message);
     } finally {
       setProcessingPlanCode(null);
     }
@@ -299,18 +318,22 @@ export default function ChangePlan() {
 
   async function cancelMembership() {
     setErr("");
-    setOk("");
     setCancelling(true);
 
     try {
       await api.post("/billing/cancel", {});
-      setOk(
+
+      toast.success(
         "La cancelación quedó programada. Tu membresía seguirá activa hasta el vencimiento actual.",
       );
+
       setCancelModalOpen(false);
       await refreshMembershipStatus({ silent: true });
     } catch (e) {
-      setErr(getErrorMessage(e, "No se pudo cancelar la renovación"));
+      const message = getErrorMessage(e, "No se pudo cancelar la renovación");
+
+      setErr(message);
+      toast.error(message);
     } finally {
       setCancelling(false);
     }
@@ -390,8 +413,8 @@ export default function ChangePlan() {
                   Tenés una cancelación programada
                 </p>
                 <p className="text-sm text-slate-700">
-                  Tu membresía seguirá activa hasta el vencimiento actual y luego
-                  no se renovará. Si seleccionás otro plan para la próxima
+                  Tu membresía seguirá activa hasta el vencimiento actual y
+                  luego no se renovará. Si seleccionás otro plan para la próxima
                   renovación, esta cancelación se reemplazará por ese cambio
                   programado.
                 </p>
@@ -402,12 +425,6 @@ export default function ChangePlan() {
           {err && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
               {err}
-            </div>
-          )}
-
-          {ok && (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              {ok}
             </div>
           )}
 
@@ -434,11 +451,7 @@ export default function ChangePlan() {
                       helperTone: "amber",
                       disabled: true,
                     }
-                  : getPlanActionMeta(
-                      currentPlan,
-                      plan,
-                      processingPlanCode,
-                    );
+                  : getPlanActionMeta(currentPlan, plan, processingPlanCode);
 
                 return (
                   <div key={plan.id} className="space-y-3">

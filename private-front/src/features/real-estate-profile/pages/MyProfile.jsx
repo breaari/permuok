@@ -44,7 +44,6 @@ export default function MyProfile() {
   const {
     loading,
     err,
-    ok,
     realEstate,
     profile,
     setProfile,
@@ -248,12 +247,6 @@ export default function MyProfile() {
         {err && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
             {err}
-          </div>
-        )}
-
-        {ok && (
-          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-            {ok}
           </div>
         )}
 

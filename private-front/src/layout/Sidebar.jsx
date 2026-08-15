@@ -27,14 +27,50 @@ function Item({ to, icon, children, end = false, onClick }) {
   );
 }
 
-export default function Sidebar({ mobile = false, onNavigate }) {
-  const { user } = useAuth();
-  const role = Number(user?.role || 0);
+function resolveDevelopmentPublishAccess(user, access) {
+  const candidates = [
+    user?.can_publish_projects,
+    user?.membership?.can_publish_projects,
 
-  const isAdmin = role === 1;
-  const isRealEstate = role === 2;
-  const isAgent = role === 3;
-  const isInvestor = role === 4;
+    access?.can_publish_projects,
+    access?.membership?.can_publish_projects,
+
+    access?.features?.can_publish_projects,
+    access?.features?.publish_projects,
+    access?.features?.developments,
+    access?.features?.can_publish_developments,
+    access?.features?.developments_publish,
+
+    access?.membership?.publish_projects,
+    access?.membership?.developments,
+    access?.membership?.can_publish_developments,
+  ];
+
+  return candidates.some((value) => Number(value) === 1 || value === true);
+}
+
+export default function Sidebar({ mobile = false, onNavigate }) {
+  const { user, access, permissions } = useAuth();
+
+  const isAdmin = permissions?.isAdmin ?? Number(user?.role || 0) === 1;
+  const isRealEstate =
+    permissions?.isRealEstate ?? Number(user?.role || 0) === 2;
+  const isAgent = permissions?.isAgent ?? Number(user?.role || 0) === 3;
+  const isInvestor = permissions?.isInvestor ?? Number(user?.role || 0) === 4;
+
+  const canPublishDevelopments = resolveDevelopmentPublishAccess(user, access);
+
+  console.log("SIDEBAR AUTH DEBUG", {
+    role: Number(user?.role || 0),
+    user,
+    access,
+    permissions,
+    featuresRaw: access?.features,
+    membershipRaw: access?.membership,
+    final: {
+      canPublishDevelopments,
+    },
+  });
 
   return (
     <aside
@@ -68,8 +104,16 @@ export default function Sidebar({ mobile = false, onNavigate }) {
         {isAdmin && (
           <>
             <Item
-              to="/admin/real-estates"
+              to="/admin"
               icon={<Icon name="layoutDashboard" />}
+              end
+              onClick={onNavigate}
+            >
+              Dashboard
+            </Item>
+            <Item
+              to="/admin/real-estates"
+              icon={<Icon name="shieldCheck" />}
               onClick={onNavigate}
             >
               Solicitudes de revisión
@@ -119,6 +163,16 @@ export default function Sidebar({ mobile = false, onNavigate }) {
               Mis búsquedas
             </Item>
 
+            {canPublishDevelopments && (
+              <Item
+                to="/developments"
+                icon={<Icon name="building2" />}
+                onClick={onNavigate}
+              >
+                Mis desarrollos
+              </Item>
+            )}
+
             <Item
               to="/my-profile"
               icon={<Icon name="clipboardList" />}
@@ -135,11 +189,7 @@ export default function Sidebar({ mobile = false, onNavigate }) {
               Membresía
             </Item>
 
-            <Item
-              to="/users"
-              icon={<Icon name="users" />}
-              onClick={onNavigate}
-            >
+            <Item to="/users" icon={<Icon name="users" />} onClick={onNavigate}>
               Mis usuarios
             </Item>
           </>
@@ -170,6 +220,16 @@ export default function Sidebar({ mobile = false, onNavigate }) {
             >
               Mis búsquedas
             </Item>
+
+            {canPublishDevelopments && (
+              <Item
+                to="/developments"
+                icon={<Icon name="building2" />}
+                onClick={onNavigate}
+              >
+                Mis desarrollos
+              </Item>
+            )}
 
             <Item
               to="/my-profile"

@@ -1,3 +1,9 @@
+import {
+  AMENITIES,
+  getAmenityLabel,
+  normalizeAmenities,
+} from "../../shared/helpers/amenities";
+
 export const SEARCH_REQUEST_STATUS_OPTIONS = [
   { key: "", label: "Todas" },
   { key: "draft", label: "Borradores" },
@@ -20,19 +26,7 @@ export const SEARCH_REQUEST_PROPERTY_TYPES = [
   { value: "other", label: "Otro" },
 ];
 
-export const SEARCH_REQUEST_AMENITIES = [
-  { value: "balcony", label: "Balcón" },
-  { value: "patio", label: "Patio" },
-  { value: "terrace", label: "Terraza" },
-  { value: "pool", label: "Pileta" },
-  { value: "quincho", label: "Quincho" },
-  { value: "garden", label: "Jardín" },
-  { value: "barbecue", label: "Parrilla" },
-  { value: "sum", label: "SUM" },
-  { value: "security", label: "Seguridad" },
-  { value: "laundry", label: "Laundry" },
-  { value: "elevator", label: "Ascensor" },
-];
+export const SEARCH_REQUEST_AMENITIES = AMENITIES;
 
 export const SEARCH_REQUEST_CONDITION_OPTIONS = [
   { value: "any", label: "Cualquiera" },
@@ -54,18 +48,13 @@ export const SEARCH_REQUEST_CURRENCIES = [
 
 export const ALLOWED_COUNTRIES = [
   { value: "Argentina", label: "Argentina", code: "AR" },
-  { value: "Uruguay", label: "Uruguay", code: "UY" },
-  { value: "Paraguay", label: "Paraguay", code: "PY" },
-  { value: "Chile", label: "Chile", code: "CL" },
-  { value: "Brasil", label: "Brasil", code: "BR" },
   { value: "Estados Unidos", label: "Estados Unidos", code: "US" },
-  { value: "España", label: "España", code: "ES" },
   { value: "Italia", label: "Italia", code: "IT" },
 ];
 
 export function resolveCountryCode(country) {
   const found = ALLOWED_COUNTRIES.find(
-    (item) => item.value === country || item.label === country
+    (item) => item.value === country || item.label === country,
   );
   return found?.code || "";
 }
@@ -109,7 +98,8 @@ export function mapSearchRequestToForm(detail) {
     title: request.title || "",
     description: request.description || "",
     country: request.country || "Argentina",
-    country_code: request.country_code || resolveCountryCode(request.country) || "AR",
+    country_code:
+      request.country_code || resolveCountryCode(request.country) || "AR",
     province: request.province || "",
     city: request.city || "",
     zone: request.zone || "",
@@ -142,7 +132,7 @@ export function mapSearchRequestToForm(detail) {
     property_types: Array.isArray(detail?.property_types)
       ? detail.property_types
       : [],
-    amenities: Array.isArray(detail?.amenities) ? detail.amenities : [],
+    amenities: normalizeAmenities(detail?.amenities),
     status: request.status || "draft",
   };
 }
@@ -173,8 +163,10 @@ export function buildSearchRequestPayload(form) {
     cash_difference_currency: form.cash_difference_currency || "USD",
     open_to_other_zones: !!form.open_to_other_zones,
     notes: String(form.notes || "").trim() || null,
-    property_types: Array.isArray(form.property_types) ? form.property_types : [],
-    amenities: Array.isArray(form.amenities) ? form.amenities : [],
+    property_types: Array.isArray(form.property_types)
+      ? form.property_types
+      : [],
+    amenities: normalizeAmenities(form.amenities),
   };
 }
 
@@ -199,7 +191,10 @@ export function validateSearchRequestForm(form, { requireFull = true } = {}) {
     throw new Error("Seleccioná al menos una forma de pago.");
   }
 
-  if (requireFull && (!Array.isArray(form.property_types) || !form.property_types.length)) {
+  if (
+    requireFull &&
+    (!Array.isArray(form.property_types) || !form.property_types.length)
+  ) {
     throw new Error("Seleccioná al menos un tipo de propiedad buscada.");
   }
 
@@ -211,10 +206,7 @@ export function validateSearchRequestForm(form, { requireFull = true } = {}) {
     throw new Error("El valor mínimo no puede ser mayor al máximo.");
   }
 
-  if (
-    form.cash_difference_max !== "" &&
-    Number(form.cash_difference_max) < 0
-  ) {
+  if (form.cash_difference_max !== "" && Number(form.cash_difference_max) < 0) {
     throw new Error("La diferencia máxima en efectivo no puede ser negativa.");
   }
 }
@@ -234,4 +226,11 @@ export function formatSearchRequestPayment(formOrItem) {
   if (swap) return "Permuta";
   if (cash) return "Solo dinero";
   return "Sin definir";
+}
+
+export function getSearchRequestPropertyTypeLabel(value) {
+  return (
+    SEARCH_REQUEST_PROPERTY_TYPES.find((item) => item.value === value)?.label ||
+    value
+  );
 }

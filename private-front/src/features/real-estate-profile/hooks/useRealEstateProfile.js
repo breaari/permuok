@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, unwrap, getErrorMessage } from "../../../api/http";
+import { useToast } from "../../../ui/toast/ToastProvider";
 
 function normalizeDigits(value) {
   return String(value || "").replace(/\D/g, "");
@@ -168,9 +169,9 @@ function buildProfilePayload(profile) {
 }
 
 export function useRealEstateProfile({ loadMe }) {
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [ok, setOk] = useState("");
 
   const [realEstate, setRealEstate] = useState(null);
   const [profile, setProfile] = useState({
@@ -194,7 +195,7 @@ export function useRealEstateProfile({ loadMe }) {
 
   const profileValidation = useMemo(
     () => getProfileValidation(profile),
-    [profile]
+    [profile],
   );
 
   const profileOk = profileValidation.ok;
@@ -202,34 +203,29 @@ export function useRealEstateProfile({ loadMe }) {
 
   const clearMessages = useCallback(() => {
     setErr("");
-    setOk("");
   }, []);
 
-  const load = useCallback(
-    async ({ preserveMessages = false } = {}) => {
-      if (!preserveMessages) {
-        setErr("");
-        setOk("");
-      }
+  const load = useCallback(async ({ preserveMessages = false } = {}) => {
+    if (!preserveMessages) {
+      setErr("");
+    }
 
-      setLoading(true);
+    setLoading(true);
 
-      try {
-        const res = await api.get("/real-estate/me");
-        const data = unwrap(res);
-        const realEstateData = data?.real_estate ?? null;
+    try {
+      const res = await api.get("/real-estate/me");
+      const data = unwrap(res);
+      const realEstateData = data?.real_estate ?? null;
 
-        setRealEstate(realEstateData);
-        setProfile(normalizeProfileFromApi(realEstateData));
-        setLicenses(Array.isArray(data?.licenses) ? data.licenses : []);
-      } catch (e) {
-        setErr(getErrorMessage(e, "No se pudo cargar"));
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
+      setRealEstate(realEstateData);
+      setProfile(normalizeProfileFromApi(realEstateData));
+      setLicenses(Array.isArray(data?.licenses) ? data.licenses : []);
+    } catch (e) {
+      setErr(getErrorMessage(e, "No se pudo cargar"));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     load();
@@ -239,11 +235,10 @@ export function useRealEstateProfile({ loadMe }) {
     async (e) => {
       e?.preventDefault?.();
       setErr("");
-      setOk("");
 
       const validation = getProfileValidation(profile);
       if (!validation.ok) {
-        setErr(validation.reason);
+        toast.error(validation.reason);
         return false;
       }
 
@@ -254,26 +249,26 @@ export function useRealEstateProfile({ loadMe }) {
         await load({ preserveMessages: true });
         await loadMe?.({ force: true });
 
-        setOk("Perfil guardado.");
+        toast.success("Perfil guardado correctamente.");
         return true;
       } catch (e2) {
-        setErr(getErrorMessage(e2, "No se pudo guardar"));
+        const message = getErrorMessage(e2, "No se pudo guardar");
+        toast.error(message);
         return false;
       }
     },
-    [profile, load, loadMe]
+    [profile, load, loadMe, toast],
   );
 
   const addLicense = useCallback(
     async ({ license_number, province_id, is_primary }) => {
       setErr("");
-      setOk("");
 
       const ln = normalizeText(license_number);
       const pid = Number(province_id);
 
       if (!ln || !Number.isFinite(pid) || pid <= 0) {
-        setErr("Completá número de matrícula y provincia.");
+        toast.error("Completá número de matrícula y provincia.");
         return false;
       }
 
@@ -287,28 +282,28 @@ export function useRealEstateProfile({ loadMe }) {
         await load({ preserveMessages: true });
         await loadMe?.({ force: true });
 
-        setOk("Matrícula agregada.");
+        toast.success("Matrícula agregada correctamente.");
         return true;
       } catch (e2) {
-        setErr(getErrorMessage(e2, "No se pudo agregar"));
+        const message = getErrorMessage(e2, "No se pudo agregar");
+        toast.error(message);
         return false;
       }
     },
-    [load, loadMe]
+    [load, loadMe, toast],
   );
 
   const submitReview = useCallback(async () => {
     setErr("");
-    setOk("");
 
     const validation = getProfileValidation(profile);
     if (!validation.ok) {
-      setErr(validation.reason);
+      toast.error(validation.reason);
       return false;
     }
 
     if (!hasLicenses) {
-      setErr("Agregá al menos una matrícula.");
+      toast.error("Agregá al menos una matrícula.");
       return false;
     }
 
@@ -317,19 +312,18 @@ export function useRealEstateProfile({ loadMe }) {
       await load({ preserveMessages: true });
       await loadMe?.({ force: true });
 
-      setOk("Enviado a revisión.");
+      toast.success("Perfil enviado a revisión correctamente.");
       return true;
     } catch (e2) {
-      setErr(getErrorMessage(e2, "No se pudo enviar"));
+      const message = getErrorMessage(e2, "No se pudo enviar");
+      toast.error(message);
       return false;
     }
-  }, [profile, hasLicenses, load, loadMe]);
+  }, [profile, hasLicenses, load, loadMe, toast]);
 
   return {
     loading,
     err,
-    ok,
-    setOk,
     setErr,
     clearMessages,
     realEstate,

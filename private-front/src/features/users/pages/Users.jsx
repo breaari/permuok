@@ -4,7 +4,8 @@ import { UsersSummaryCards } from "../components/UsersSummaryCards.jsx";
 import { UsersList } from "../components/UsersList.jsx";
 import { CreateUserModal } from "../components/CreateUserModal.jsx";
 import { useAuth } from "../../auth/components/AuthContext.jsx";
-
+import { useToast } from "../../../ui/toast/ToastProvider";
+import { Navigate } from "react-router-dom";
 function getRoleLabel(role) {
   if (Number(role) === 3) return "Agente";
   if (Number(role) === 4) return "Inversor";
@@ -21,13 +22,12 @@ export default function Users() {
     investors_limit: 0,
   });
   const [err, setErr] = useState("");
-  const [ok, setOk] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState(null);
 
   const { user } = useAuth();
-
+  const toast = useToast();
   if (Number(user?.role) !== 2) {
     return <Navigate to="/app" replace />;
   }
@@ -62,14 +62,13 @@ export default function Users() {
 
   async function handleCreateUser(payload) {
     setErr("");
-    setOk("");
     setCreating(true);
 
     try {
       const res = await api.post("/users", payload);
       const data = unwrap(res);
 
-      setOk(`${getRoleLabel(payload.role)} creado correctamente.`);
+      toast.success(`${getRoleLabel(payload.role)} creado correctamente.`);
       setModalOpen(false);
       await loadUsers();
 
@@ -83,7 +82,7 @@ export default function Users() {
 
   async function handleToggleStatus(user) {
     setErr("");
-    setOk("");
+
     setUpdatingUserId(user.id);
 
     try {
@@ -92,7 +91,7 @@ export default function Users() {
         is_active: Number(user.is_active) === 1 ? 0 : 1,
       });
 
-      setOk(
+      toast.success(
         Number(user.is_active) === 1
           ? "Usuario desactivado correctamente."
           : "Usuario activado correctamente.",
@@ -100,7 +99,9 @@ export default function Users() {
 
       await loadUsers();
     } catch (e) {
-      setErr(getErrorMessage(e, "No se pudo actualizar el estado del usuario"));
+      toast.error(
+        getErrorMessage(e, "No se pudo actualizar el estado del usuario"),
+      );
     } finally {
       setUpdatingUserId(null);
     }
@@ -138,12 +139,6 @@ export default function Users() {
           {err && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
               {err}
-            </div>
-          )}
-
-          {ok && (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              {ok}
             </div>
           )}
 

@@ -5,6 +5,8 @@ namespace App\Services;
 use App\DB;
 use PDO;
 use Exception;
+use App\Services\AI\CompatibilityEngine;
+use Throwable;
 
 class SearchRequestService
 {
@@ -46,7 +48,35 @@ class SearchRequestService
 
         return $user;
     }
+    private static function getValidViewerUser(int $userId): array
+    {
+        $pdo = self::db();
 
+        $st = $pdo->prepare("
+        SELECT id, role, real_estate_id, is_active
+        FROM users
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $st->execute(['id' => $userId]);
+        $user = $st->fetch();
+
+        if (!$user) {
+            throw new Exception("Usuario no encontrado");
+        }
+
+        if (!in_array((int)$user['role'], [2, 3, 4], true)) {
+            throw new Exception("No tenés permisos para ver búsquedas");
+        }
+
+        if ((int)$user['is_active'] !== 1) {
+            throw new Exception("Tu cuenta está inactiva");
+        }
+
+        return $user;
+    }
     private static function getOwnedSearchRequestRow(int $userId, int $id): array
     {
         $pdo = self::db();
@@ -74,44 +104,83 @@ class SearchRequestService
         return [$user, $item];
     }
 
-    public static function listMySearchRequests(int $userId, array $filters): array
-    {
+    public static function listMySearchRequests(
+        int $userId,
+        array $filters = []
+    ): array {
         $pdo = self::db();
+
+        /*
+     * Esta sección permite administrar búsquedas, por lo que
+     * usamos los mismos permisos que para crear y editarlas.
+     */
         $user = self::getValidPublisherUser($userId);
 
         $where = [
-            "sr.real_estate_id = :real_estate_id",
             "sr.deleted_at IS NULL",
+            "sr.real_estate_id = :real_estate_id",
         ];
 
         $params = [
             'real_estate_id' => (int)$user['real_estate_id'],
         ];
 
+        /*
+     * El estado es opcional. Si no se envía, devuelve todas
+     * las búsquedas propias no eliminadas.
+     */
         if (!empty($filters['status'])) {
-            $where[] = "sr.status = :status";
-            $params['status'] = trim((string)$filters['status']);
+            $allowedStatuses = [
+                'draft',
+                'pending_review',
+                'published',
+                'paused',
+                'rejected',
+                'archived',
+                'closed',
+            ];
+
+            $status = trim((string)$filters['status']);
+
+            if (in_array($status, $allowedStatuses, true)) {
+                $where[] = "sr.status = :status";
+                $params['status'] = $status;
+            }
         }
 
         if (!empty($filters['q'])) {
-            $where[] = "(
-            sr.title LIKE :q
-            OR sr.description LIKE :q
-            OR sr.country LIKE :q
-            OR sr.province LIKE :q
-            OR sr.city LIKE :q
-            OR sr.zone LIKE :q
-            OR CAST(sr.id AS CHAR) LIKE :q
-        )";
-            $params['q'] = '%' . trim((string)$filters['q']) . '%';
+            $q = trim((string)$filters['q']);
+
+            if ($q !== '') {
+                $where[] = "(
+                sr.title LIKE :q
+                OR sr.description LIKE :q
+                OR sr.country LIKE :q
+                OR sr.province LIKE :q
+                OR sr.city LIKE :q
+                OR sr.zone LIKE :q
+                OR CAST(sr.id AS CHAR) LIKE :q
+            )";
+
+                $params['q'] = '%' . $q . '%';
+            }
         }
 
         $limit = (int)($filters['limit'] ?? 20);
-        if ($limit <= 0) $limit = 20;
-        if ($limit > 100) $limit = 100;
+
+        if ($limit <= 0) {
+            $limit = 20;
+        }
+
+        if ($limit > 100) {
+            $limit = 100;
+        }
 
         $page = (int)($filters['page'] ?? 1);
-        if ($page <= 0) $page = 1;
+
+        if ($page <= 0) {
+            $page = 1;
+        }
 
         $offset = ($page - 1) * $limit;
 
@@ -121,13 +190,28 @@ class SearchRequestService
         WHERE " . implode(" AND ", $where);
 
         $stCount = $pdo->prepare($countSql);
-        foreach ($params as $k => $v) {
-            $stCount->bindValue(":$k", $v);
+
+        foreach ($params as $key => $value) {
+            $stCount->bindValue(
+                ':' . $key,
+                $value
+            );
         }
+
         $stCount->execute();
 
-        $total = (int)($stCount->fetch()['total'] ?? 0);
-        $pages = max(1, (int)ceil($total / $limit));
+        $total = (int)(
+            $stCount->fetchColumn() ?: 0
+        );
+
+        /*
+     * Cuando no hay resultados mantenemos una sola página
+     * para conservar el contrato esperado por el frontend.
+     */
+        $pages = max(
+            1,
+            (int)ceil($total / $limit)
+        );
 
         if ($page > $pages) {
             $page = $pages;
@@ -137,41 +221,95 @@ class SearchRequestService
         $sql = "
         SELECT
             sr.*,
+
             (
-                SELECT GROUP_CONCAT(DISTINCT srpt.property_type ORDER BY srpt.property_type SEPARATOR ',')
+                SELECT GROUP_CONCAT(
+                    DISTINCT srpt.property_type
+                    ORDER BY srpt.property_type
+                    SEPARATOR ','
+                )
                 FROM search_request_property_types srpt
                 WHERE srpt.search_request_id = sr.id
             ) AS property_types,
+
             (
                 SELECT COUNT(*)
                 FROM search_request_property_types srpt
                 WHERE srpt.search_request_id = sr.id
             ) AS property_types_count,
+
+            (
+                SELECT GROUP_CONCAT(
+                    DISTINCT sra.amenity_code
+                    ORDER BY sra.amenity_code
+                    SEPARATOR ','
+                )
+                FROM search_request_amenities sra
+                WHERE sra.search_request_id = sr.id
+                  AND sra.deleted_at IS NULL
+            ) AS amenities,
+
             (
                 SELECT COUNT(*)
                 FROM search_request_amenities sra
                 WHERE sra.search_request_id = sr.id
+                  AND sra.deleted_at IS NULL
             ) AS amenities_count
+
         FROM search_requests sr
+
         WHERE " . implode(" AND ", $where) . "
-        ORDER BY sr.created_at DESC
-        LIMIT :limit OFFSET :offset
+
+        ORDER BY
+            CASE sr.status
+                WHEN 'published' THEN 1
+                WHEN 'draft' THEN 2
+                WHEN 'paused' THEN 3
+                WHEN 'archived' THEN 4
+                WHEN 'closed' THEN 5
+                ELSE 6
+            END ASC,
+            sr.updated_at DESC,
+            sr.created_at DESC
+
+        LIMIT :limit
+        OFFSET :offset
     ";
 
         $stmt = $pdo->prepare($sql);
 
-        foreach ($params as $k => $v) {
-            $stmt->bindValue(":$k", $v);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(
+                ':' . $key,
+                $value
+            );
         }
 
-        $stmt->bindValue(":limit", $limit, PDO::PARAM_INT);
-        $stmt->bindValue(":offset", $offset, PDO::PARAM_INT);
+        $stmt->bindValue(
+            ':limit',
+            $limit,
+            PDO::PARAM_INT
+        );
+
+        $stmt->bindValue(
+            ':offset',
+            $offset,
+            PDO::PARAM_INT
+        );
+
         $stmt->execute();
 
-        $items = $stmt->fetchAll() ?: [];
+        $items = $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        ) ?: [];
 
-        $from = $total > 0 ? $offset + 1 : 0;
-        $to = $total > 0 ? min($offset + $limit, $total) : 0;
+        $from = $total > 0
+            ? $offset + 1
+            : 0;
+
+        $to = $total > 0
+            ? min($offset + $limit, $total)
+            : 0;
 
         return [
             'items' => $items,
@@ -185,7 +323,6 @@ class SearchRequestService
             ],
         ];
     }
-
     public static function getDetail(int $userId, int $id): array
     {
         [$user, $item] = self::getOwnedSearchRequestRow($userId, $id);
@@ -416,6 +553,14 @@ class SearchRequestService
 
             $pdo->commit();
 
+            /*
+ * Si la búsqueda estaba publicada, recalculamos
+ * las compatibilidades después de guardar los cambios.
+ */
+            if ($current['status'] === 'published') {
+                self::recalculateCompatibilitiesSafely($id);
+            }
+
             return self::getDetail($userId, $id);
         } catch (\Throwable $e) {
             $pdo->rollBack();
@@ -425,17 +570,44 @@ class SearchRequestService
 
     public static function publish(int $userId, int $id): array
     {
-        return self::changeStatus($userId, $id, 'published', true);
+        $result = self::changeStatus(
+            $userId,
+            $id,
+            'published',
+            true
+        );
+
+        self::recalculateCompatibilitiesSafely($id);
+
+        return $result;
     }
 
     public static function pause(int $userId, int $id): array
     {
-        return self::changeStatus($userId, $id, 'paused', false);
+        $result = self::changeStatus(
+            $userId,
+            $id,
+            'paused',
+            false
+        );
+
+        self::archiveCompatibilitiesSafely($id);
+
+        return $result;
     }
 
     public static function archive(int $userId, int $id): array
     {
-        return self::changeStatus($userId, $id, 'archived', false);
+        $result = self::changeStatus(
+            $userId,
+            $id,
+            'archived',
+            false
+        );
+
+        self::archiveCompatibilitiesSafely($id);
+
+        return $result;
     }
 
     public static function delete(int $userId, int $id): array
@@ -465,6 +637,8 @@ class SearchRequestService
             self::logStatus($pdo, $id, $current['status'], 'deleted', $userId);
 
             $pdo->commit();
+
+            self::archiveCompatibilitiesSafely($id);
 
             return [
                 'deleted' => true,
@@ -526,7 +700,46 @@ class SearchRequestService
             throw $e;
         }
     }
+    /**
+     * Recalcula compatibilidades sin impedir que la operación
+     * principal de la búsqueda se complete.
+     */
+    private static function recalculateCompatibilitiesSafely(
+        int $searchRequestId
+    ): void {
+        try {
+            CompatibilityEngine::calculateForSearchRequest(
+                $searchRequestId
+            );
+        } catch (Throwable $e) {
+            error_log(
+                '[SEARCH REQUEST COMPATIBILITY] No se pudo recalcular ' .
+                    'la búsqueda ' . $searchRequestId . ': ' .
+                    $e->getMessage()
+            );
+        }
+    }
 
+    /**
+     * Archiva las compatibilidades todavía no avanzadas
+     * cuando la búsqueda deja de estar publicada.
+     */
+    private static function archiveCompatibilitiesSafely(
+        int $searchRequestId
+    ): void {
+        try {
+            CompatibilityEngine::archiveForSearchRequest(
+                $searchRequestId
+            );
+        } catch (Throwable $e) {
+            error_log(
+                '[SEARCH REQUEST COMPATIBILITY] No se pudieron archivar ' .
+                    'las compatibilidades de la búsqueda ' .
+                    $searchRequestId . ': ' .
+                    $e->getMessage()
+            );
+        }
+    }
     private static function validate(array $data, bool $strict = true): void
     {
         if ($strict) {
@@ -738,6 +951,30 @@ class SearchRequestService
             $params['property_type'] = trim((string)$filters['property_type']);
         }
 
+        if (!empty($filters['amenities']) && is_array($filters['amenities'])) {
+            $amenities = [];
+
+            foreach ($filters['amenities'] as $amenity) {
+                $amenity = trim((string)$amenity);
+                if ($amenity !== '') {
+                    $amenities[$amenity] = true;
+                }
+            }
+
+            foreach (array_keys($amenities) as $i => $amenity) {
+                $param = "amenity_$i";
+
+                $where[] = "EXISTS (
+            SELECT 1
+            FROM search_request_amenities sra_filter_$i
+            WHERE sra_filter_$i.search_request_id = sr.id
+              AND sra_filter_$i.amenity_code = :$param
+        )";
+
+                $params[$param] = $amenity;
+            }
+        }
+
         $limit = (int)($filters['limit'] ?? 20);
         if ($limit <= 0) $limit = 20;
         if ($limit > 100) $limit = 100;
@@ -780,10 +1017,15 @@ class SearchRequestService
                 WHERE srpt.search_request_id = sr.id
             ) AS property_types_count,
             (
-                SELECT COUNT(*)
-                FROM search_request_amenities sra
-                WHERE sra.search_request_id = sr.id
-            ) AS amenities_count
+    SELECT GROUP_CONCAT(DISTINCT sra.amenity_code ORDER BY sra.amenity_code SEPARATOR ',')
+    FROM search_request_amenities sra
+    WHERE sra.search_request_id = sr.id
+) AS amenities,
+(
+    SELECT COUNT(*)
+    FROM search_request_amenities sra
+    WHERE sra.search_request_id = sr.id
+) AS amenities_count
         FROM search_requests sr
         WHERE " . implode(" AND ", $where) . "
         ORDER BY sr.published_at DESC, sr.created_at DESC
@@ -819,45 +1061,54 @@ class SearchRequestService
     }
 
     public static function getExploreDetail(int $userId, int $id): array
-{
-    $pdo = self::db();
-    $user = self::getValidPublisherUser($userId);
+    {
+        $pdo = self::db();
+        $user = self::getValidViewerUser($userId);
 
-    $st = $pdo->prepare("
-        SELECT *
-        FROM search_requests
-        WHERE id = :id
-          AND real_estate_id <> :real_estate_id
-          AND status = 'published'
-          AND is_visible = 1
-          AND deleted_at IS NULL
-        LIMIT 1
-    ");
-    $st->execute([
-        'id' => $id,
-        'real_estate_id' => (int)$user['real_estate_id'],
-    ]);
+        $where = [
+            "id = :id",
+            "status = 'published'",
+            "is_visible = 1",
+            "deleted_at IS NULL",
+        ];
 
-    $item = $st->fetch();
+        $params = [
+            'id' => $id,
+        ];
 
-    if (!$item) {
-        throw new Exception("Búsqueda no encontrada");
+        if (!empty($user['real_estate_id'])) {
+            $where[] = "real_estate_id <> :real_estate_id";
+            $params['real_estate_id'] = (int)$user['real_estate_id'];
+        }
+
+        $st = $pdo->prepare("
+    SELECT *
+    FROM search_requests
+    WHERE " . implode(" AND ", $where) . "
+    LIMIT 1
+");
+
+        $st->execute($params);
+        $item = $st->fetch();
+
+        if (!$item) {
+            throw new Exception("Búsqueda no encontrada");
+        }
+
+        $item['property_types'] = self::getPropertyTypes($pdo, (int)$item['id']);
+        $item['amenities'] = self::getAmenities($pdo, (int)$item['id']);
+
+        return [
+            'search_request' => $item,
+            'property_types' => $item['property_types'],
+            'amenities' => $item['amenities'],
+            'access' => [
+                'can_edit' => false,
+                'can_publish' => false,
+                'can_pause' => false,
+                'can_archive' => false,
+                'can_delete' => false,
+            ],
+        ];
     }
-
-    $item['property_types'] = self::getPropertyTypes($pdo, (int)$item['id']);
-    $item['amenities'] = self::getAmenities($pdo, (int)$item['id']);
-
-    return [
-        'search_request' => $item,
-        'property_types' => $item['property_types'],
-        'amenities' => $item['amenities'],
-        'access' => [
-            'can_edit' => false,
-            'can_publish' => false,
-            'can_pause' => false,
-            'can_archive' => false,
-            'can_delete' => false,
-        ],
-    ];
-}
 }

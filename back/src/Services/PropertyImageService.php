@@ -334,54 +334,50 @@ class PropertyImageService
             throw $e;
         }
     }
-    public static function delete(int $userId, int $imageId): array
-    {
-        [, $image] = self::getOwnedImage($userId, $imageId);
-        $pdo = self::db();
+   public static function delete(int $userId, int $imageId): array
+{
+    [, $image] = self::getOwnedImage($userId, $imageId);
+    $pdo = self::db();
 
-        $stProperty = $pdo->prepare("
+    $stProperty = $pdo->prepare("
         SELECT status
         FROM properties
         WHERE id = :id
           AND deleted_at IS NULL
         LIMIT 1
     ");
-        $stProperty->execute(['id' => (int)$image['property_id']]);
-        $property = $stProperty->fetch();
+    $stProperty->execute(['id' => (int)$image['property_id']]);
+    $property = $stProperty->fetch();
 
-        if (!$property) {
-            throw new Exception("Propiedad no encontrada");
-        }
+    if (!$property) {
+        throw new Exception("Propiedad no encontrada");
+    }
 
-        if (!in_array($property['status'], ['draft', 'paused', 'archived', 'published'], true)) {
-            throw new Exception("No se pueden eliminar imágenes en el estado actual de la propiedad");
-        }
+    if (!in_array($property['status'], ['draft', 'paused', 'archived', 'published'], true)) {
+        throw new Exception("No se pueden eliminar imágenes en el estado actual de la propiedad");
+    }
 
-        $activeCount = self::countActiveImages((int)$image['property_id']);
-        if ($activeCount <= 1) {
-            throw new Exception("La propiedad debe conservar al menos una imagen");
-        }
+    $pdo->beginTransaction();
 
-        $pdo->beginTransaction();
-
-        try {
-            $st = $pdo->prepare("
+    try {
+        $st = $pdo->prepare("
             UPDATE property_images
             SET deleted_at = NOW()
             WHERE id = :id
             LIMIT 1
         ");
-            $st->execute(['id' => $imageId]);
+        $st->execute(['id' => $imageId]);
 
-            self::ensureSingleCover((int)$image['property_id']);
+        self::ensureSingleCover((int)$image['property_id']);
 
-            $pdo->commit();
-            return PropertyService::getDetail($userId, (int)$image['property_id']);
-        } catch (\Throwable $e) {
-            $pdo->rollBack();
-            throw $e;
-        }
+        $pdo->commit();
+        return PropertyService::getDetail($userId, (int)$image['property_id']);
+    } catch (\Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
     }
+}
+
     public static function reorder(int $userId, int $propertyId, array $images): array
     {
         [, $property] = self::getOwnedPropertyRow($userId, $propertyId);

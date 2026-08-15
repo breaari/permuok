@@ -28,14 +28,29 @@ export async function archiveProperty(id) {
 export async function uploadPropertyImages(id, images) {
   const formData = new FormData();
 
-  images.forEach((item) => {
-    if (item?.file) {
-      formData.append("images[]", item.file);
+  images.forEach((item, index) => {
+    const file =
+      item instanceof File
+        ? item
+        : item?.file instanceof File
+          ? item.file
+          : null;
+
+    if (file) {
+      formData.append("images[]", file);
     }
   });
 
+  const appendedFiles = formData.getAll("images[]");
+
+  if (!appendedFiles.length) {
+    throw new Error("No se encontraron archivos válidos para subir.");
+  }
+
   const res = await http.post(`/properties/${id}/images`, formData);
-  return unwrap(res);
+  const data = unwrap(res);
+
+  return data;
 }
 
 export async function reorderPropertyImages(id, images) {

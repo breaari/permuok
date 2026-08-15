@@ -159,7 +159,7 @@ export default function SearchRequestPaymentSection({
                 value={form.min_value}
                 onChange={(e) => setField("min_value", e.target.value)}
                 placeholder="Ej. 80000"
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                className="w-full no-spinner rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
               />
             </Field>
 
@@ -173,7 +173,7 @@ export default function SearchRequestPaymentSection({
                 value={form.max_value}
                 onChange={(e) => setField("max_value", e.target.value)}
                 placeholder="Ej. 150000"
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                className="w-full no-spinner rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
               />
             </Field>
           </div>
@@ -197,7 +197,7 @@ export default function SearchRequestPaymentSection({
                     setField("cash_difference_max", e.target.value)
                   }
                   placeholder="Ej. 30000"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                  className="w-full no-spinner rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                 />
               </Field>
 

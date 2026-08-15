@@ -75,8 +75,6 @@ function PaginationPro({ page, perPage, total, onPageChange }) {
     [totalPages, page],
   );
 
-
-
   return (
     <div className="mt-6 md:mt-8 border-t border-slate-200 pt-5 md:pt-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -245,10 +243,8 @@ export default function AdminRealEstates() {
         }
 
         const res = await api.get(`/admin/real-estates?${params.toString()}`);
-        console.log("RAW REAL ESTATES RESPONSE", res);
-        
+
         const data = unwrap(res);
-        console.log("UNWRAPPED REAL ESTATES RESPONSE", data);
 
         if (currentRequestId !== requestIdRef.current) return;
 
@@ -260,7 +256,8 @@ export default function AdminRealEstates() {
 
         setItems([]);
         setMeta(null);
-        setErr(getErrorMessage(e, "Error al cargar"));
+
+        setErr(getErrorMessage(e, "No se pudieron cargar las solicitudes."));
       } finally {
         if (currentRequestId === requestIdRef.current) {
           setLoading(false);
@@ -295,11 +292,6 @@ export default function AdminRealEstates() {
         effectivePerPage: Number(meta?.per_page || perPage),
       };
     }, [items, meta, page, perPage]);
-
-      console.log("ADMIN REAL ESTATES ITEMS", items);
-console.log("ADMIN REAL ESTATES META", meta);
-console.log("ADMIN REAL ESTATES TAB", tab);
-  console.log("ADMIN REAL ESTATES COUNTS", counts);
 
   return (
     <div className="space-y-8">

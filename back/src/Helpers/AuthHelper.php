@@ -30,7 +30,20 @@ class AuthHelper
     public static function requireUser(): array
     {
         $header = self::getAuthorizationHeader();
+        error_log(
+            '[AUTH DEBUG] HTTP_AUTHORIZATION: ' .
+                (!empty($_SERVER['HTTP_AUTHORIZATION']) ? 'PRESENTE' : 'AUSENTE')
+        );
 
+        error_log(
+            '[AUTH DEBUG] REDIRECT_HTTP_AUTHORIZATION: ' .
+                (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION']) ? 'PRESENTE' : 'AUSENTE')
+        );
+
+        error_log(
+            '[AUTH DEBUG] HEADER RESUELTO: ' .
+                ($header !== '' ? 'PRESENTE, longitud ' . strlen($header) : 'VACÍO')
+        );
         if (!preg_match('/Bearer\s+(.+)/i', $header, $matches)) {
             ResponseHelper::fail('No autenticado', 401);
         }

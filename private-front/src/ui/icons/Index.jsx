@@ -51,7 +51,16 @@ import {
   ArrowRight,
   TriangleAlert,
   Pause,
-  Trash
+  Trash,
+  LayoutGrid,
+  Check,
+  CheckCheck,
+  Inbox,
+  Send,
+  MessageCircle,
+  Instagram,
+  MoreVertical,
+  Clock,
 } from "lucide-react";
 
 export const Icons = {
@@ -117,8 +126,17 @@ export const Icons = {
   arrowRight: ArrowRight,
   warning: TriangleAlert,
   pause: Pause,
-  trash: Trash
-
+  trash: Trash,
+  layoutGrid: LayoutGrid,
+  check: Check,
+  checkCheck: CheckCheck,
+  inbox: Inbox,
+  send: Send,
+  messageCircle: MessageCircle,
+  instagram: Instagram,
+  moreVertical: MoreVertical,
+  badgeCheck: BadgeCheck,
+  clock: Clock,
 };
 
 export function Icon({ name, size = 18, className = "" }) {

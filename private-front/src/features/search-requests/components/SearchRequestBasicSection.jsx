@@ -1,9 +1,10 @@
 import {
-  SEARCH_REQUEST_AMENITIES,
   SEARCH_REQUEST_CONDITION_OPTIONS,
   SEARCH_REQUEST_PROPERTY_TYPES,
   SEARCH_REQUEST_URGENCY_OPTIONS,
 } from "../utils";
+
+import { AMENITIES } from "../../shared/helpers/amenities";
 
 function Field({ label, children, hint = "" }) {
   return (
@@ -110,7 +111,7 @@ export default function SearchRequestBasicSection({
           description="Opcional. Elegí solo las que realmente sean importantes."
         >
           <div className="flex flex-wrap gap-2">
-            {SEARCH_REQUEST_AMENITIES.map((item) => {
+            {AMENITIES.map((item) => {
               const active = form.amenities.includes(item.value);
 
               return (
@@ -178,7 +179,7 @@ export default function SearchRequestBasicSection({
                 value={form.min_total_area}
                 onChange={(e) => setField("min_total_area", e.target.value)}
                 placeholder="m²"
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                className="w-full no-spinner rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
               />
             </Field>
 
@@ -189,7 +190,7 @@ export default function SearchRequestBasicSection({
                 value={form.min_covered_area}
                 onChange={(e) => setField("min_covered_area", e.target.value)}
                 placeholder="m²"
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                className="w-full no-spinner rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
               />
             </Field>
 
@@ -200,7 +201,7 @@ export default function SearchRequestBasicSection({
                 value={form.max_antiquity}
                 onChange={(e) => setField("max_antiquity", e.target.value)}
                 placeholder="Años"
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                className="w-full no-spinner rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
               />
             </Field>
 
@@ -211,7 +212,7 @@ export default function SearchRequestBasicSection({
                 value={form.min_bedrooms}
                 onChange={(e) => setField("min_bedrooms", e.target.value)}
                 placeholder="Ej. 2"
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                className="w-full no-spinner rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
               />
             </Field>
 
@@ -222,7 +223,7 @@ export default function SearchRequestBasicSection({
                 value={form.min_bathrooms}
                 onChange={(e) => setField("min_bathrooms", e.target.value)}
                 placeholder="Ej. 2"
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                className="w-full no-spinner rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
               />
             </Field>
 
@@ -233,7 +234,7 @@ export default function SearchRequestBasicSection({
                 value={form.min_garages}
                 onChange={(e) => setField("min_garages", e.target.value)}
                 placeholder="Ej. 1"
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                className="w-full no-spinner rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
               />
             </Field>
           </div>

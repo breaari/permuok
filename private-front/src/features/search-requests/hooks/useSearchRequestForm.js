@@ -17,6 +17,7 @@ import {
   resolveCountryCode,
   validateSearchRequestForm,
 } from "../utils/SearchRequestHelpers";
+import { useToast } from "../../../ui/toast/ToastProvider";
 
 function resolveSearchRequestId(response) {
   const candidates = [
@@ -37,6 +38,7 @@ function resolveSearchRequestId(response) {
 }
 
 export function useSearchRequestForm() {
+  const toast = useToast();
   const navigate = useNavigate();
   const { id } = useParams();
 
@@ -58,8 +60,6 @@ export function useSearchRequestForm() {
   const [loading, setLoading] = useState(isEditMode);
   const [initialError, setInitialError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitMessage, setSubmitMessage] = useState("");
-  const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
     if (!isEditMode) return;
@@ -85,12 +85,12 @@ export function useSearchRequestForm() {
             can_pause: false,
             can_archive: true,
             can_delete: true,
-          }
+          },
         );
       } catch (error) {
         if (cancelled) return;
         setInitialError(
-          getErrorMessage(error, "No se pudo cargar la búsqueda.")
+          getErrorMessage(error, "No se pudo cargar la búsqueda."),
         );
       } finally {
         if (!cancelled) {
@@ -172,21 +172,19 @@ export function useSearchRequestForm() {
   }
 
   function handleContinueToStepTwo() {
-    setSubmitError("");
-    setSubmitMessage("");
+
 
     try {
       validateForStepOne();
       setCurrentStep(2);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
-      setSubmitError(error.message || "No se pudo avanzar al paso 2.");
+        toast.error(error.message || "No se pudo avanzar al paso 2.");
     }
   }
 
   function handleBackToStepOne() {
-    setSubmitError("");
-    setSubmitMessage("");
+
     setPublishChoiceOpen(false);
     setCurrentStep(1);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -205,7 +203,7 @@ export function useSearchRequestForm() {
         can_pause: false,
         can_archive: true,
         can_delete: true,
-      }
+      },
     );
   }
 
@@ -214,15 +212,13 @@ export function useSearchRequestForm() {
     redirectAfterSave = true,
     successMessageOverride = "",
   } = {}) {
-    setSubmitError("");
-    setSubmitMessage("");
+
 
     try {
       validateSearchRequestForm(form, { requireFull: true });
       setIsSubmitting(true);
 
       const payload = buildSearchRequestPayload(form);
-      console.log("CREATE SEARCH REQUEST PAYLOAD", payload);
 
       let requestId;
 
@@ -231,12 +227,10 @@ export function useSearchRequestForm() {
         requestId = Number(id);
       } else {
         const created = await createSearchRequestDraft(payload);
-        console.log("CREATE SEARCH REQUEST RESPONSE", created);
 
         requestId = resolveSearchRequestId(created);
 
         if (!requestId) {
-          console.error("Respuesta sin ID usable:", created);
           throw new Error("No se pudo obtener el ID de la búsqueda.");
         }
       }
@@ -258,7 +252,7 @@ export function useSearchRequestForm() {
             ? "La búsqueda fue actualizada correctamente."
             : "La búsqueda se guardó como borrador.";
 
-      setSubmitMessage(message);
+      toast.success(message);
       setPublishChoiceOpen(false);
 
       if (redirectAfterSave) {
@@ -269,23 +263,20 @@ export function useSearchRequestForm() {
         await refreshDetail(requestId);
       }
     } catch (error) {
-      setSubmitError(
-        getErrorMessage(error, "No se pudo guardar la búsqueda.")
-      );
+      toast.error(getErrorMessage(error, "No se pudo guardar la búsqueda."));
     } finally {
       setIsSubmitting(false);
     }
   }
 
   function handleOpenPublishChoice() {
-    setSubmitError("");
-    setSubmitMessage("");
+
 
     try {
       validateSearchRequestForm(form, { requireFull: true });
       setPublishChoiceOpen(true);
     } catch (error) {
-      setSubmitError(error.message || "No se pudo continuar.");
+      toast.error(error.message || "No se pudo continuar.");
     }
   }
 
@@ -343,18 +334,15 @@ export function useSearchRequestForm() {
 
     try {
       setIsSubmitting(true);
-      setSubmitError("");
-      setSubmitMessage("");
+
 
       await pauseSearchRequest(id);
       await refreshDetail(Number(id));
 
       setRequestStatus("paused");
-      setSubmitMessage("La búsqueda fue pausada correctamente.");
+      toast.success("La búsqueda fue pausada correctamente.");
     } catch (error) {
-      setSubmitError(
-        getErrorMessage(error, "No se pudo pausar la búsqueda.")
-      );
+      toast.error(getErrorMessage(error, "No se pudo pausar la búsqueda."));
     } finally {
       setIsSubmitting(false);
     }
@@ -365,17 +353,16 @@ export function useSearchRequestForm() {
 
     try {
       setIsSubmitting(true);
-      setSubmitError("");
-      setSubmitMessage("");
+
 
       await archiveSearchRequest(id);
       await refreshDetail(Number(id));
 
       setRequestStatus("archived");
-      setSubmitMessage("La búsqueda fue archivada correctamente.");
+      toast.success("La búsqueda fue archivada correctamente.");
     } catch (error) {
-      setSubmitError(
-        getErrorMessage(error, "No se pudo archivar la búsqueda.")
+      toast.error(
+        getErrorMessage(error, "No se pudo archivar la búsqueda."),
       );
     } finally {
       setIsSubmitting(false);
@@ -387,19 +374,17 @@ export function useSearchRequestForm() {
 
     try {
       setIsSubmitting(true);
-      setSubmitError("");
-      setSubmitMessage("");
 
       await deleteSearchRequest(id);
       setRequestStatus("deleted");
-      setSubmitMessage("La búsqueda fue eliminada correctamente.");
+      toast.success("La búsqueda fue eliminada correctamente.");
 
       setTimeout(() => {
         navigate("/search-requests");
       }, 600);
     } catch (error) {
-      setSubmitError(
-        getErrorMessage(error, "No se pudo eliminar la búsqueda.")
+      toast.error(
+        getErrorMessage(error, "No se pudo eliminar la búsqueda."),
       );
     } finally {
       setIsSubmitting(false);
@@ -430,10 +415,6 @@ export function useSearchRequestForm() {
     loading,
     initialError,
     isSubmitting,
-    submitMessage,
-    submitError,
-    setSubmitMessage,
-    setSubmitError,
 
     handleContinueToStepTwo,
     handleBackToStepOne,

@@ -4,6 +4,9 @@ import { Icon } from "../../../ui/icons/Index";
 
 const MAX_IMAGES = 5;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MIN_IMAGE_WIDTH = 800;
+const MIN_IMAGE_HEIGHT = 600;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 function resolveImageUrl(path) {
   if (!path) return "";
@@ -11,69 +14,162 @@ function resolveImageUrl(path) {
   return `${getApiBaseUrl()}${path}`;
 }
 
-export default function ImagesSection({
+function fileSignature(file) {
+  return `${file.name}-${file.size}-${file.lastModified}`;
+}
+
+function getImageDimensions(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve({
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+      });
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("No se pudo leer la imagen."));
+    };
+
+    img.src = url;
+  });
+}
+
+export default function DevelopmentImagesSection({
   images,
   setImages,
   existingImages = [],
   setExistingImages = () => {},
   onError,
   onSuccess,
+  onWarning,
 }) {
   const [newPreviews, setNewPreviews] = useState([]);
+  const [checkingImages, setCheckingImages] = useState(false);
 
   function clearMessages() {
     onError?.("");
     onSuccess?.("");
+    onWarning?.("");
   }
 
   function normalizeIncomingFiles(files) {
     return files.map((file, index) => ({
-      id: `${file.name}-${file.lastModified}-${index}-${crypto.randomUUID()}`,
+      id:
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? `${file.name}-${file.lastModified}-${index}-${crypto.randomUUID()}`
+          : `${file.name}-${file.lastModified}-${index}-${Date.now()}`,
       file,
     }));
   }
 
-  function handleFiles(e) {
+  async function handleFiles(e) {
     clearMessages();
 
     const selectedFiles = Array.from(e.target.files || []);
     if (!selectedFiles.length) return;
 
-    const tooLarge = selectedFiles.find((file) => file.size > MAX_IMAGE_SIZE);
+    try {
+      setCheckingImages(true);
 
-    if (tooLarge) {
-      onError?.(`La imagen "${tooLarge.name}" supera los 5 MB.`);
+      const totalCurrent = existingImages.length + images.length;
+      const availableSlots = MAX_IMAGES - totalCurrent;
+
+      if (availableSlots <= 0) {
+        onError?.(`Solo podés cargar hasta ${MAX_IMAGES} imágenes.`);
+        e.target.value = "";
+        return;
+      }
+
+      const currentNewSignatures = images
+        .map((item) => item?.file)
+        .filter(Boolean)
+        .map(fileSignature);
+
+      const acceptedFiles = [];
+      const rejectedMessages = [];
+
+      for (const file of selectedFiles) {
+        const signature = fileSignature(file);
+
+        if (acceptedFiles.length >= availableSlots) {
+          rejectedMessages.push(
+            `"${file.name}" no se agregó porque alcanzaste el máximo de ${MAX_IMAGES} imágenes.`,
+          );
+          continue;
+        }
+
+        if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+          rejectedMessages.push(
+            `"${file.name}" no tiene un formato válido. Usá JPG, PNG o WebP.`,
+          );
+          continue;
+        }
+
+        if (file.size > MAX_IMAGE_SIZE) {
+          rejectedMessages.push(`"${file.name}" supera los 5 MB.`);
+          continue;
+        }
+
+        if (
+          currentNewSignatures.includes(signature) ||
+          acceptedFiles.map(fileSignature).includes(signature)
+        ) {
+          rejectedMessages.push(`"${file.name}" ya fue seleccionada.`);
+          continue;
+        }
+
+        try {
+          const dimensions = await getImageDimensions(file);
+
+          if (
+            dimensions.width < MIN_IMAGE_WIDTH ||
+            dimensions.height < MIN_IMAGE_HEIGHT
+          ) {
+            rejectedMessages.push(
+              `La imagen "${file.name}" mide ${dimensions.width} × ${dimensions.height}px. Recomendamos usar imágenes de al menos ${MIN_IMAGE_WIDTH} × ${MIN_IMAGE_HEIGHT}px para mejor calidad.`,
+            );
+          }
+        } catch {
+          rejectedMessages.push(`"${file.name}" no pudo leerse como imagen.`);
+          continue;
+        }
+
+        acceptedFiles.push(file);
+      }
+
+      if (!acceptedFiles.length) {
+        onError?.(rejectedMessages.join(" "));
+        e.target.value = "";
+        return;
+      }
+
+      const normalized = normalizeIncomingFiles(acceptedFiles);
+      setImages((prev) => [...prev, ...normalized]);
+
+      if (rejectedMessages.length) {
+        onWarning?.(
+          `Se agregaron ${acceptedFiles.length} imagen${
+            acceptedFiles.length !== 1 ? "es" : ""
+          } correctamente. ${rejectedMessages.join(" ")}`,
+        );
+      } else {
+        onSuccess?.(
+          `${acceptedFiles.length} imagen${
+            acceptedFiles.length !== 1 ? "es" : ""
+          } agregada${acceptedFiles.length !== 1 ? "s" : ""} correctamente.`,
+        );
+      }
+
       e.target.value = "";
-      return;
+    } finally {
+      setCheckingImages(false);
     }
-
-    const totalCurrent = existingImages.length + images.length;
-    const availableSlots = MAX_IMAGES - totalCurrent;
-
-    if (availableSlots <= 0) {
-      onError?.(`Solo podés cargar hasta ${MAX_IMAGES} imágenes.`);
-      e.target.value = "";
-      return;
-    }
-
-    const filesToAdd = selectedFiles.slice(0, availableSlots);
-    const normalized = normalizeIncomingFiles(filesToAdd);
-
-    setImages((prev) => [...prev, ...normalized]);
-
-    if (selectedFiles.length > availableSlots) {
-      onError?.(
-        `Solo se agregaron ${availableSlots} imágenes. El máximo es ${MAX_IMAGES}.`
-      );
-    } else {
-      onSuccess?.(
-        `${filesToAdd.length} imagen${
-          filesToAdd.length !== 1 ? "es" : ""
-        } agregada${filesToAdd.length !== 1 ? "s" : ""} correctamente.`
-      );
-    }
-
-    e.target.value = "";
   }
 
   function removeNewImage(indexToRemove) {
@@ -122,6 +218,36 @@ export default function ImagesSection({
     });
   }
 
+  function setExistingAsCover(index) {
+    clearMessages();
+
+    setExistingImages((prev) => {
+      if (index < 0 || index >= prev.length) return prev;
+
+      const selected = prev[index];
+      const rest = prev.filter((_, i) => i !== index);
+
+      return [selected, ...rest].map((item, idx) => ({
+        ...item,
+        is_cover: idx === 0,
+        sort_order: idx,
+      }));
+    });
+  }
+
+  function setNewAsCover(index) {
+    clearMessages();
+
+    setImages((prev) => {
+      if (index < 0 || index >= prev.length) return prev;
+
+      const selected = prev[index];
+      const rest = prev.filter((_, i) => i !== index);
+
+      return [selected, ...rest];
+    });
+  }
+
   useEffect(() => {
     const nextPreviews = images.map((item) => URL.createObjectURL(item.file));
 
@@ -134,7 +260,7 @@ export default function ImagesSection({
 
   const totalImages = useMemo(
     () => existingImages.length + images.length,
-    [existingImages.length, images.length]
+    [existingImages.length, images.length],
   );
 
   const remaining = useMemo(() => MAX_IMAGES - totalImages, [totalImages]);
@@ -146,8 +272,8 @@ export default function ImagesSection({
           Imágenes
         </h2>
         <p className="text-sm text-slate-500 mt-1 max-w-2xl">
-          Sumá fotos claras y bien iluminadas. La primera imagen será la portada
-          principal de la publicación.
+          Sumá fotos o renders claros y bien presentados. La primera imagen será
+          la portada principal del desarrollo.
         </p>
       </div>
 
@@ -156,15 +282,15 @@ export default function ImagesSection({
           <input
             type="file"
             multiple
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp"
             onChange={handleFiles}
             className="hidden"
-            disabled={totalImages >= MAX_IMAGES}
+            disabled={totalImages >= MAX_IMAGES || checkingImages}
           />
 
           <div
             className={`rounded-2xl border-2 border-dashed px-5 py-8 sm:px-6 sm:py-10 text-center transition-colors ${
-              totalImages >= MAX_IMAGES
+              totalImages >= MAX_IMAGES || checkingImages
                 ? "border-slate-200 bg-slate-50 cursor-not-allowed opacity-70"
                 : "border-slate-300 bg-slate-50 cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/40"
             }`}
@@ -174,15 +300,17 @@ export default function ImagesSection({
             </div>
 
             <p className="text-sm sm:text-base font-semibold text-slate-800">
-              {totalImages >= MAX_IMAGES
-                ? "Límite de imágenes alcanzado"
-                : "Hacé click para subir imágenes"}
+              {checkingImages
+                ? "Validando imágenes..."
+                : totalImages >= MAX_IMAGES
+                  ? "Límite de imágenes alcanzado"
+                  : "Hacé click para subir imágenes"}
             </p>
 
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
               {totalImages >= MAX_IMAGES
                 ? `Ya cargaste el máximo de ${MAX_IMAGES} imágenes`
-                : `Podés seleccionar hasta ${MAX_IMAGES} imágenes (${remaining} disponibles)`}
+                : `JPG, PNG o WebP. Máximo 5 MB. Recomendado ${MIN_IMAGE_WIDTH} × ${MIN_IMAGE_HEIGHT}px. (${remaining} disponibles)`}
             </p>
           </div>
         </label>
@@ -213,7 +341,7 @@ export default function ImagesSection({
                   {existingImages.map((img, i) => {
                     const isPrimary = i === 0;
                     const imageUrl = resolveImageUrl(
-                      img?.view_url || img?.url || img?.file_path || ""
+                      img?.view_url || img?.url || img?.file_path || "",
                     );
 
                     return (
@@ -241,6 +369,16 @@ export default function ImagesSection({
                         >
                           <Icon name="close" size={14} />
                         </button>
+
+                        {!isPrimary && (
+                          <button
+                            type="button"
+                            onClick={() => setExistingAsCover(i)}
+                            className="absolute top-2 left-2 rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-semibold text-slate-700 shadow-sm transition hover:bg-white"
+                          >
+                            Usar portada
+                          </button>
+                        )}
 
                         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent p-2">
                           <div className="flex items-center justify-between gap-1">
@@ -312,6 +450,16 @@ export default function ImagesSection({
                           <Icon name="close" size={14} />
                         </button>
 
+                        {!isPrimary && !existingImages.length && (
+                          <button
+                            type="button"
+                            onClick={() => setNewAsCover(i)}
+                            className="absolute top-2 left-2 rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-semibold text-slate-700 shadow-sm transition hover:bg-white"
+                          >
+                            Usar portada
+                          </button>
+                        )}
+
                         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent p-2">
                           <div className="flex items-center justify-between gap-1">
                             <button
@@ -353,7 +501,8 @@ export default function ImagesSection({
             )}
 
             <p className="text-xs text-slate-400">
-              La primera imagen visible será la portada principal.
+              La primera imagen visible será la portada principal. Para
+              publicar, recomendamos cargar al menos una imagen.
             </p>
           </div>
         )}

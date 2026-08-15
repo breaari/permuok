@@ -122,7 +122,11 @@ function InfoField({ label, value, strong = false }) {
       <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
         {label}
       </p>
-      <p className={strong ? "text-slate-900 font-bold text-lg" : "text-slate-700"}>
+      <p
+        className={
+          strong ? "text-slate-900 font-bold text-lg" : "text-slate-700"
+        }
+      >
         {value || "—"}
       </p>
     </div>
@@ -136,9 +140,7 @@ function BillingSummarySection({ summary }) {
     <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="p-6 border-b border-slate-100 flex items-center gap-3">
         <span className="text-primary text-xl">₳</span>
-        <h2 className="text-xl font-bold text-slate-900">
-          Resumen de cobro
-        </h2>
+        <h2 className="text-xl font-bold text-slate-900">Resumen de cobro</h2>
       </div>
 
       <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-8">
@@ -294,27 +296,39 @@ function PaymentsHistorySection({ payments }) {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm text-slate-600">
                         <p>
-                          <span className="font-semibold text-slate-900">Importe:</span>{" "}
+                          <span className="font-semibold text-slate-900">
+                            Importe:
+                          </span>{" "}
                           {formatMoney(payment.amount_ars)}
                         </p>
                         <p>
-                          <span className="font-semibold text-slate-900">Estado:</span>{" "}
+                          <span className="font-semibold text-slate-900">
+                            Estado:
+                          </span>{" "}
                           {payment.status || "—"}
                         </p>
                         <p>
-                          <span className="font-semibold text-slate-900">MP status:</span>{" "}
+                          <span className="font-semibold text-slate-900">
+                            MP status:
+                          </span>{" "}
                           {payment.mp_status || "—"}
                         </p>
                         <p>
-                          <span className="font-semibold text-slate-900">Aprobado:</span>{" "}
+                          <span className="font-semibold text-slate-900">
+                            Aprobado:
+                          </span>{" "}
                           {formatDateTime(payment.approved_at)}
                         </p>
                         <p>
-                          <span className="font-semibold text-slate-900">Pagado:</span>{" "}
+                          <span className="font-semibold text-slate-900">
+                            Pagado:
+                          </span>{" "}
                           {formatDateTime(payment.paid_at)}
                         </p>
                         <p>
-                          <span className="font-semibold text-slate-900">Creado:</span>{" "}
+                          <span className="font-semibold text-slate-900">
+                            Creado:
+                          </span>{" "}
                           {formatDateTime(payment.created_at)}
                         </p>
                       </div>
@@ -322,11 +336,15 @@ function PaymentsHistorySection({ payments }) {
 
                     <div className="text-xs text-slate-500 md:text-right">
                       <p>
-                        <span className="font-semibold text-slate-900">Ref:</span>{" "}
+                        <span className="font-semibold text-slate-900">
+                          Ref:
+                        </span>{" "}
                         {payment.external_reference || "—"}
                       </p>
                       <p className="mt-1">
-                        <span className="font-semibold text-slate-900">Payment ID:</span>{" "}
+                        <span className="font-semibold text-slate-900">
+                          Payment ID:
+                        </span>{" "}
                         {payment.mp_payment_id || "—"}
                       </p>
                     </div>
@@ -372,6 +390,7 @@ export default function AdminBillingDetail() {
           payments: Array.isArray(payload?.payments) ? payload.payments : [],
         });
       } catch (e) {
+        setData(null);
         setErr(
           getErrorMessage(e, "No se pudo cargar el detalle de facturación"),
         );

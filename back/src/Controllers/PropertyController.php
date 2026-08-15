@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
 use App\Services\PropertyService;
+use App\Services\MembershipGuard;
 
 class PropertyController
 {
@@ -50,6 +51,9 @@ class PropertyController
     {
         try {
             $auth = AuthHelper::requireUser();
+
+            MembershipGuard::requireActiveMembership((int)$auth['id']);
+
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
 
             $result = PropertyService::createDraft((int)$auth['id'], $data);
@@ -117,6 +121,9 @@ class PropertyController
     {
         try {
             $auth = AuthHelper::requireUser();
+
+            MembershipGuard::requireActiveMembership((int)$auth['id']);
+
             $id = (int)($_GET['id'] ?? 0);
 
             $result = PropertyService::publish((int)$auth['id'], $id);

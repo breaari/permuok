@@ -47,7 +47,7 @@ class BillingService
         }
 
         $user = self::getValidRealEstateUser($userId);
-        self::getApprovedRealEstate((int)$user['real_estate_id']);
+        self::getBillableRealEstate((int)$user['real_estate_id']);
 
         $activeMembership = self::getActiveMembership((int)$user['real_estate_id']);
         if ($activeMembership) {
@@ -115,6 +115,44 @@ class BillingService
             'init_point' => (string)$initPoint,
             'external_reference' => $externalRef,
         ];
+    }
+
+    private static function getBillableRealEstate(int $realEstateId): array
+    {
+        $pdo = self::db();
+
+        $st = $pdo->prepare("
+        SELECT *
+        FROM real_estates
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'id' => $realEstateId,
+        ]);
+
+        $realEstate = $st->fetch();
+
+        if (!$realEstate) {
+            throw new \Exception('No se encontró la inmobiliaria.');
+        }
+
+        $profileStatus = (int)($realEstate['profile_status'] ?? 0);
+        $validationStatus = (int)($realEstate['validation_status'] ?? 0);
+
+        $isBillable =
+            $validationStatus === 1 ||
+            in_array($profileStatus, [2, 4], true);
+
+        if (!$isBillable) {
+            throw new \Exception(
+                'Tu perfil todavía no está habilitado para contratar una membresía.'
+            );
+        }
+
+        return $realEstate;
     }
 
     public static function previewPlanChange(int $userId, string $targetPlanCode): array

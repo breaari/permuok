@@ -25,12 +25,10 @@ export default function AdminLicensesSection({
 
       <div className="p-6 space-y-4">
         {!licenses.length ? (
-          <div className="text-sm text-slate-500">
-            Sin matrículas cargadas.
-          </div>
+          <div className="text-sm text-slate-500">Sin matrículas cargadas.</div>
         ) : (
           licenses.map((lic, idx) => {
-            const isPrimary = !!lic?.is_primary || idx === 0;
+            const isPrimary = Number(lic?.is_primary) === 1;
 
             return (
               <div

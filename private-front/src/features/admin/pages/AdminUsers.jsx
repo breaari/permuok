@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { api, unwrap, getErrorMessage } from "../../../api/http.js";
 import { useAuth } from "../../auth/components/AuthContext";
+import { useToast } from "../../../ui/toast/ToastProvider";
 
 import AdminUsersTabs from "../components/users/AdminUsersTabs.jsx";
 import AdminUsersList from "../components/users/AdminUsersList.jsx";
@@ -146,6 +147,7 @@ export default function AdminUsers() {
   const { user } = useAuth();
   const isAdmin = Number(user?.role) === 1;
   const navigate = useNavigate();
+  const toast = useToast();
 
   if (!isAdmin) return <Navigate to="/" replace />;
 
@@ -162,7 +164,6 @@ export default function AdminUsers() {
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [ok, setOk] = useState("");
 
   const [page, setPage] = useState(1);
   const [perPage] = useState(DEFAULT_PER_PAGE);
@@ -286,8 +287,6 @@ export default function AdminUsers() {
     if (!selectedUser) return;
 
     setStatusBusy(true);
-    setErr("");
-    setOk("");
 
     try {
       await api.post("/admin/users/status", {
@@ -296,13 +295,14 @@ export default function AdminUsers() {
         reason,
       });
 
-      setOk(
+      toast.success(
         Number(is_active) === 1
           ? "Usuario activado correctamente."
           : "Usuario desactivado correctamente.",
       );
 
       closeStatusModal();
+
       await loadCounts(q, statusFilter);
       await loadList({
         nextPage: page,
@@ -311,7 +311,9 @@ export default function AdminUsers() {
         nextStatus: statusFilter,
       });
     } catch (e) {
-      setErr(getErrorMessage(e, "No se pudo actualizar el estado del usuario"));
+      toast.error(
+        getErrorMessage(e, "No se pudo actualizar el estado del usuario"),
+      );
     } finally {
       setStatusBusy(false);
     }
@@ -340,12 +342,6 @@ export default function AdminUsers() {
         </div>
 
         {err && <AdminDetailError message={err} />}
-
-        {ok && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-            {ok}
-          </div>
-        )}
 
         <div className="space-y-6">
           <AdminUsersTabs

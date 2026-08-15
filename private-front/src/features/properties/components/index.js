@@ -1,4 +1,4 @@
-export { default as ImagesSection } from "./ImagesSection";
+export { default as ImagesSection } from "./PropertyImagesSection";
 export { default as PropertyBasicSection } from "./PropertyBasicSection";
 export { default as PropertyCard } from "./PropertyCard";
 export { default as PropertyDeleteModal } from "./PropertyDeleteModal";
