@@ -1179,6 +1179,48 @@ class CompatibilityEngine
 
         return $row ?: null;
     }
+
+    private static function hasLocationCriteria(
+        array $search
+    ): bool {
+        foreach (
+            [
+                'country',
+                'province',
+                'city',
+                'zone',
+            ] as $field
+        ) {
+            if (
+                trim(
+                    (string)(
+                        $search[$field] ?? ''
+                    )
+                ) !== ''
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function hasPriceCriteria(
+        array $search
+    ): bool {
+        $minValue =
+            self::toNullableFloat(
+                $search['min_value'] ?? null
+            );
+
+        $maxValue =
+            self::toNullableFloat(
+                $search['max_value'] ?? null
+            );
+
+        return ($minValue !== null && $minValue > 0) ||
+            ($maxValue !== null && $maxValue > 0);
+    }
     private static function evaluatePropertyAgainstSearch(
         array $search,
         array $desiredPropertyTypes,
@@ -1227,41 +1269,62 @@ class CompatibilityEngine
         }
 
         /*
-         * 2. Ubicación: 25 puntos.
-         */
-        $possibleScore += 25;
+ * 2. Ubicación: 25 puntos.
+ *
+ * Solo participa del score cuando la búsqueda
+ * tiene alguna ubicación efectivamente definida.
+ */
+        if (self::hasLocationCriteria($search)) {
+            $possibleScore += 25;
 
-        $locationScore = self::calculateLocationScore(
-            $search,
-            $property
-        );
+            $locationScore =
+                self::calculateLocationScore(
+                    $search,
+                    $property
+                );
 
-        $score += $locationScore['score'];
+            $score +=
+                $locationScore['score'];
 
-        $reasons[] = $locationScore['reason'];
+            $reasons[] =
+                $locationScore['reason'];
 
-        if ($locationScore['score'] === 0.0) {
-            $penalties[] = [
-                'code' => 'location_mismatch',
-                'label' =>
-                'La propiedad está fuera de la ubicación buscada',
-                'penalty' => 0,
-            ];
+            if (
+                $locationScore['score'] === 0.0
+            ) {
+                $penalties[] = [
+                    'code' =>
+                    'location_mismatch',
+
+                    'label' =>
+                    'La propiedad está fuera de la ubicación buscada',
+
+                    'penalty' => 0,
+                ];
+            }
         }
 
         /*
-         * 3. Precio: 20 puntos.
-         */
-        $possibleScore += 20;
+ * 3. Precio: 20 puntos.
+ *
+ * Solo participa cuando la búsqueda
+ * especificó un mínimo y/o un máximo.
+ */
+        if (self::hasPriceCriteria($search)) {
+            $possibleScore += 20;
 
-        $priceResult = self::calculatePriceScore(
-            $search,
-            $property
-        );
+            $priceResult =
+                self::calculatePriceScore(
+                    $search,
+                    $property
+                );
 
-        $score += $priceResult['score'];
-        $reasons[] = $priceResult['reason'];
+            $score +=
+                $priceResult['score'];
 
+            $reasons[] =
+                $priceResult['reason'];
+        }
         /*
          * 4. Características mínimas: 20 puntos.
          */
@@ -1317,6 +1380,7 @@ class CompatibilityEngine
             ];
         }
         /*
+ /*
  * 6. Viabilidad de permuta: 20 puntos.
  *
  * Solo se evalúa cuando la búsqueda indica que
@@ -1344,20 +1408,61 @@ class CompatibilityEngine
                 $swapResult['penalties']
             );
         }
+
         /*
-         * Normalización a escala 0–100.
-         */
+ * Normalización a escala 0–100.
+ */
         $normalizedScore = $possibleScore > 0
-            ? round(($score / $possibleScore) * 100, 2)
+            ? round(
+                ($score / $possibleScore) * 100,
+                2
+            )
             : 0.0;
 
+        /*
+ * Primero obtenemos el nivel normal
+ * según el porcentaje alcanzado.
+ */
+        $matchLevel =
+            self::resolveMatchLevel(
+                $normalizedScore
+            );
+
+        /*
+ * Si la propiedad incumple alguna característica
+ * mínima expresamente solicitada, evitamos mostrarla
+ * como compatibilidad alta o total.
+ *
+ * Puede seguir siendo una alternativa válida,
+ * pero existe una diferencia importante respecto
+ * de lo solicitado.
+ */
+        if (
+            ($featuresResult['has_minimum_mismatch'] ?? false)
+            && in_array(
+                $matchLevel,
+                ['high', 'total'],
+                true
+            )
+        ) {
+            $matchLevel = 'medium';
+        }
+
         return [
-            'discarded' => $discarded,
-            'score' => $normalizedScore,
+            'discarded' =>
+            $discarded,
+
+            'score' =>
+            $normalizedScore,
+
             'match_level' =>
-            self::resolveMatchLevel($normalizedScore),
-            'reasons' => $reasons,
-            'penalties' => $penalties,
+            $matchLevel,
+
+            'reasons' =>
+            $reasons,
+
+            'penalties' =>
+            $penalties,
         ];
     }
 
@@ -1625,6 +1730,7 @@ class CompatibilityEngine
         $possibleScore = 0.0;
         $reasons = [];
         $penalties = [];
+        $hasMinimumMismatch = false;
 
         foreach ($rules as $rule) {
             $required = self::toNullableFloat(
@@ -1648,31 +1754,51 @@ class CompatibilityEngine
             if ($matched) {
                 $score += $rule['weight'];
             } else {
+                $hasMinimumMismatch = true;
+
                 $penalties[] = [
                     'code' =>
                     $rule['search_field'] . '_mismatch',
-                    'label' => $rule['label'],
-                    'required' => $required,
-                    'actual' => $actual,
+                    'label' =>
+                    $rule['label'],
+                    'required' =>
+                    $required,
+                    'actual' =>
+                    $actual,
                 ];
             }
 
             $reasons[] = [
                 'code' =>
                 $rule['search_field'] . '_match',
-                'label' => $rule['label'],
-                'weight' => $rule['weight'],
-                'matched' => $matched,
-                'required' => $required,
-                'actual' => $actual,
+                'label' =>
+                $rule['label'],
+                'weight' =>
+                $rule['weight'],
+                'matched' =>
+                $matched,
+                'required' =>
+                $required,
+                'actual' =>
+                $actual,
             ];
         }
 
         return [
-            'score' => $score,
-            'possible_score' => $possibleScore,
-            'reasons' => $reasons,
-            'penalties' => $penalties,
+            'score' =>
+            $score,
+
+            'possible_score' =>
+            $possibleScore,
+
+            'has_minimum_mismatch' =>
+            $hasMinimumMismatch,
+
+            'reasons' =>
+            $reasons,
+
+            'penalties' =>
+            $penalties,
         ];
     }
     private static function calculateSwapScore(
