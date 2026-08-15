@@ -42,6 +42,9 @@ import Inbox from "./features/conversations/pages/Inbox";
 import ConversationDetail from "./features/conversations/pages/ConversationDetail";
 import AdminDashboard from "./features/admin/pages/AdminDashboard";
 
+import Compatibilities from "./features/compatibilities/pages/Compatibilities";
+import CompatibilityDetail from "./features/compatibilities/pages/CompatibilityDetail";
+
 export default function App() {
   return (
     <Routes>
@@ -146,6 +149,8 @@ export default function App() {
             </RequireDevelopmentAccess>
           }
         />
+        <Route path="compatibilities" element={<Compatibilities />} />
+        <Route path="compatibilities/:id" element={<CompatibilityDetail />} />
 
         <Route path="conversations" element={<Inbox />} />
         <Route path="conversations/:id" element={<ConversationDetail />} />

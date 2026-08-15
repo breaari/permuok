@@ -64,6 +64,7 @@ use App\Controllers\RealtimeController;
 use App\Controllers\AdminDashboardController;
 use App\Controllers\AiEnrichmentController;
 use App\Controllers\AiCompatibilityController;
+use App\Controllers\CompatibilityController;
 
 $method = $_SERVER['REQUEST_METHOD'];
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/';
@@ -197,7 +198,10 @@ $routes = [
     'GET /stream' => [RealtimeController::class, 'stream'],
 
     'GET /admin/dashboard/stats' => [AdminDashboardController::class, 'stats'],
-
+    // Compatibilities / recomendaciones
+    'GET /compatibilities/recommendations' =>
+    [CompatibilityController::class, 'recommendations'],
+  
 ];
 
 $key = $method . ' ' . $uri;
@@ -556,6 +560,46 @@ if (
 ) {
     AiEnrichmentController::searchRequestAnalysis(
         (int)$matches[1]
+    );
+    exit;
+}
+if (
+    $method === 'GET' &&
+    preg_match(
+        '#^/compatibilities/(\d+)$#',
+        $uri,
+        $m
+    )
+) {
+    CompatibilityController::detail(
+        (int)$m[1]
+    );
+    exit;
+}
+if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/compatibilities/(\d+)/respond$#',
+        $uri,
+        $m
+    )
+) {
+    CompatibilityController::respond(
+        (int)$m[1]
+    );
+    exit;
+}
+
+if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/compatibilities/(\d+)/feedback$#',
+        $uri,
+        $m
+    )
+) {
+    CompatibilityController::feedback(
+        (int)$m[1]
     );
     exit;
 }

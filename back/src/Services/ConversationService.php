@@ -120,7 +120,349 @@ class ConversationService
             throw $e;
         }
     }
+    public static function createFromCompatibility(
+        int $compatibilityId
+    ): array {
+        $pdo = self::db();
 
+        if ($compatibilityId <= 0) {
+            throw new Exception(
+                'Compatibilidad inválida.',
+                422
+            );
+        }
+
+        /*
+     * Primero verificamos si ya existe.
+     * Esto hace al método idempotente.
+     */
+        $stExisting = $pdo->prepare("
+        SELECT *
+        FROM conversations
+        WHERE compatibility_id = :compatibility_id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $stExisting->execute([
+            ':compatibility_id' => $compatibilityId,
+        ]);
+
+        $existing =
+            $stExisting->fetch(PDO::FETCH_ASSOC);
+
+        if ($existing) {
+            /*
+         * Nos aseguramos también de que
+         * la compatibilidad figure habilitada.
+         */
+            $stCompatibility = $pdo->prepare("
+            UPDATE compatibilities
+            SET
+                status = 'chat_enabled',
+                chat_enabled_at = COALESCE(
+                    chat_enabled_at,
+                    NOW()
+                )
+            WHERE id = :id
+            LIMIT 1
+        ");
+
+            $stCompatibility->execute([
+                ':id' => $compatibilityId,
+            ]);
+
+            return [
+                'conversation' => $existing,
+                'already_exists' => true,
+            ];
+        }
+
+        /*
+     * Buscamos toda la información necesaria
+     * para construir la conversación.
+     */
+        $st = $pdo->prepare("
+        SELECT
+            c.id,
+            c.property_id,
+            c.search_request_id,
+
+            c.source_response,
+            c.target_response,
+
+            c.source_real_estate_id,
+            c.target_real_estate_id,
+
+            c.source_responded_by_user_id,
+            c.target_responded_by_user_id,
+
+            p.title AS property_title,
+            sr.title AS search_title
+
+        FROM compatibilities c
+
+        INNER JOIN properties p
+            ON p.id = c.property_id
+           AND p.deleted_at IS NULL
+
+        INNER JOIN search_requests sr
+            ON sr.id = c.search_request_id
+           AND sr.deleted_at IS NULL
+
+        WHERE c.id = :id
+          AND c.deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $st->execute([
+            ':id' => $compatibilityId,
+        ]);
+
+        $compatibility =
+            $st->fetch(PDO::FETCH_ASSOC);
+
+        if (!$compatibility) {
+            throw new Exception(
+                'Compatibilidad no encontrada.',
+                404
+            );
+        }
+
+        /*
+     * Solamente puede abrirse el chat
+     * cuando ambos expresaron interés.
+     */
+        if (
+            $compatibility['source_response']
+            !== 'interested' ||
+            $compatibility['target_response']
+            !== 'interested'
+        ) {
+            throw new Exception(
+                'La conversación solo puede habilitarse cuando ambas partes muestran interés.',
+                422
+            );
+        }
+
+        $sourceUserId =
+            (int)(
+                $compatibility['source_responded_by_user_id'] ?? 0
+            );
+
+        $targetUserId =
+            (int)(
+                $compatibility['target_responded_by_user_id'] ?? 0
+            );
+
+        if (
+            $sourceUserId <= 0 ||
+            $targetUserId <= 0
+        ) {
+            throw new Exception(
+                'No se pudieron determinar los usuarios que mostraron interés.',
+                422
+            );
+        }
+
+        if ($sourceUserId === $targetUserId) {
+            throw new Exception(
+                'No se puede crear una conversación con el mismo usuario.',
+                422
+            );
+        }
+
+        /*
+     * Para property_search_request usamos
+     * la propiedad como oportunidad principal.
+     *
+     * El lado de la búsqueda funciona como initiator.
+     * El lado de la propiedad funciona como owner.
+     */
+        $propertyId =
+            (int)$compatibility['property_id'];
+
+        $propertyTitle =
+            trim(
+                (string)(
+                    $compatibility['property_title'] ?? ''
+                )
+            );
+
+        $searchTitle =
+            trim(
+                (string)(
+                    $compatibility['search_title'] ?? ''
+                )
+            );
+
+        $subject =
+            'Match: ' .
+            (
+                $propertyTitle !== ''
+                ? $propertyTitle
+                : 'Propiedad'
+            );
+
+        if ($searchTitle !== '') {
+            $subject .=
+                ' · ' .
+                $searchTitle;
+        }
+
+        /*
+     * Evitamos pasarnos del varchar(255).
+     */
+        $subject =
+            mb_substr(
+                $subject,
+                0,
+                255
+            );
+
+        $pdo->beginTransaction();
+
+        try {
+            /*
+         * El UNIQUE de compatibility_id
+         * nos protege además contra creación doble.
+         */
+            $stInsert = $pdo->prepare("
+            INSERT INTO conversations (
+                compatibility_id,
+                opportunity_type,
+                opportunity_id,
+                created_by_user_id,
+                owner_user_id,
+                subject,
+                contact_shared,
+                status
+            )
+            VALUES (
+                :compatibility_id,
+                'property',
+                :opportunity_id,
+                :created_by_user_id,
+                :owner_user_id,
+                :subject,
+                0,
+                'open'
+            )
+        ");
+
+            $stInsert->execute([
+                ':compatibility_id' =>
+                $compatibilityId,
+
+                ':opportunity_id' =>
+                $propertyId,
+
+                ':created_by_user_id' =>
+                $sourceUserId,
+
+                ':owner_user_id' =>
+                $targetUserId,
+
+                ':subject' =>
+                $subject,
+            ]);
+
+            $conversationId =
+                (int)$pdo->lastInsertId();
+
+            /*
+         * Reutilizamos los métodos internos
+         * que ya usa startConversation().
+         */
+            self::addParticipant(
+                $conversationId,
+                $sourceUserId,
+                'initiator'
+            );
+
+            self::addParticipant(
+                $conversationId,
+                $targetUserId,
+                'owner'
+            );
+
+            /*
+         * Mensaje automático inicial.
+         */
+            $systemMessage =
+                self::createSystemMessage(
+                    $conversationId,
+                    'Ambas partes mostraron interés en esta compatibilidad. La conversación fue habilitada automáticamente.'
+                );
+
+            self::touchConversation(
+                $conversationId,
+                (int)$systemMessage['id']
+            );
+
+            /*
+         * Marcamos el match como chat habilitado.
+         */
+            $stCompatibility = $pdo->prepare("
+            UPDATE compatibilities
+            SET
+                status = 'chat_enabled',
+                chat_enabled_at = NOW()
+            WHERE id = :id
+            LIMIT 1
+        ");
+
+            $stCompatibility->execute([
+                ':id' => $compatibilityId,
+            ]);
+
+            $pdo->commit();
+
+            return [
+                'conversation' =>
+                self::getConversationById(
+                    $conversationId
+                ),
+
+                'already_exists' => false,
+            ];
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+
+            /*
+         * Si dos requests llegaron casi
+         * simultáneamente, el UNIQUE puede
+         * haber permitido que el otro cree
+         * primero la conversación.
+         */
+            if (
+                $e instanceof \PDOException &&
+                (string)$e->getCode() === '23000'
+            ) {
+                $stExisting->execute([
+                    ':compatibility_id' =>
+                    $compatibilityId,
+                ]);
+
+                $existing =
+                    $stExisting->fetch(
+                        PDO::FETCH_ASSOC
+                    );
+
+                if ($existing) {
+                    return [
+                        'conversation' =>
+                        $existing,
+
+                        'already_exists' =>
+                        true,
+                    ];
+                }
+            }
+
+            throw $e;
+        }
+    }
     public static function listConversations(int $userId, array $query = []): array
     {
         $pdo = self::db();
