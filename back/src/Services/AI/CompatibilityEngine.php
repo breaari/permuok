@@ -49,6 +49,24 @@ class CompatibilityEngine
             $propertyTypes
         );
 
+        $propertyIds = array_map(
+            static fn(array $property): int =>
+            (int)$property['id'],
+            $properties
+        );
+
+        $amenitiesByProperty =
+            self::getPropertyAmenitiesBatch(
+                $pdo,
+                $propertyIds
+            );
+
+        $requirementsByProperty =
+            self::getPropertyRequirementsBatch(
+                $pdo,
+                $propertyIds
+            );
+
         $pdo->beginTransaction();
 
         try {
@@ -58,14 +76,11 @@ class CompatibilityEngine
             foreach ($properties as $property) {
                 $propertyId = (int)$property['id'];
 
-                $propertyAmenities = self::getPropertyAmenities(
-                    $pdo,
-                    $propertyId
-                );
-                $propertyRequirements = self::getPropertyRequirements(
-                    $pdo,
-                    $propertyId
-                );
+                $propertyAmenities =
+                    $amenitiesByProperty[$propertyId] ?? [];
+
+                $propertyRequirements =
+                    $requirementsByProperty[$propertyId] ?? null;
                 $evaluation = self::evaluatePropertyAgainstSearch(
                     $searchRequest,
                     $propertyTypes,
@@ -132,6 +147,114 @@ class CompatibilityEngine
             throw $e;
         }
     }
+    private static function getPropertyAmenitiesBatch(
+        PDO $pdo,
+        array $propertyIds
+    ): array {
+        if ($propertyIds === []) {
+            return [];
+        }
+
+        $params = [];
+        $placeholders = [];
+
+        foreach (
+            array_values(array_unique($propertyIds))
+            as $index => $propertyId
+        ) {
+            $key = 'property_id_' . $index;
+
+            $placeholders[] = ':' . $key;
+            $params[$key] = (int)$propertyId;
+        }
+
+        $st = $pdo->prepare("
+        SELECT
+            property_id,
+            amenity_code
+
+        FROM property_amenities
+
+        WHERE property_id IN (
+            " . implode(', ', $placeholders) . "
+        )
+
+          AND deleted_at IS NULL
+
+        ORDER BY
+            property_id ASC,
+            amenity_code ASC
+    ");
+
+        $st->execute($params);
+
+        $map = [];
+
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            $propertyId =
+                (int)$row['property_id'];
+
+            $map[$propertyId][] =
+                (string)$row['amenity_code'];
+        }
+
+        return $map;
+    }
+
+    private static function getPropertyRequirementsBatch(
+    PDO $pdo,
+    array $propertyIds
+): array {
+    if ($propertyIds === []) {
+        return [];
+    }
+
+    $params = [];
+    $placeholders = [];
+
+    foreach (
+        array_values(array_unique($propertyIds))
+        as $index => $propertyId
+    ) {
+        $key = 'property_id_' . $index;
+
+        $placeholders[] = ':' . $key;
+        $params[$key] = (int)$propertyId;
+    }
+
+    $st = $pdo->prepare("
+        SELECT *
+
+        FROM property_requirements
+
+        WHERE property_id IN (
+            " . implode(', ', $placeholders) . "
+        )
+
+          AND deleted_at IS NULL
+
+        ORDER BY property_id ASC, id ASC
+    ");
+
+    $st->execute($params);
+
+    $map = [];
+
+    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+        $propertyId =
+            (int)$row['property_id'];
+
+        /*
+         * El modelo actual contempla un único
+         * requerimiento activo por propiedad.
+         */
+        if (!isset($map[$propertyId])) {
+            $map[$propertyId] = $row;
+        }
+    }
+
+    return $map;
+}
 
     public static function calculateForProperty(
         int $propertyId
@@ -200,21 +323,48 @@ class CompatibilityEngine
      * Traemos solamente búsquedas potencialmente
      * relevantes para esta propiedad.
      */
-        $searchRequestIds =
+        $searchRequests =
             self::getCandidateSearchRequestsForProperty(
                 $pdo,
                 $property
             );
 
+        $searchRequestIds = array_map(
+            static fn(array $searchRequest): int =>
+            (int)$searchRequest['id'],
+            $searchRequests
+        );
+
+        /*
+ * Cargamos toda la información relacionada
+ * en bloques para evitar consultas por cada búsqueda.
+ */
+        $propertyTypesBySearch =
+            self::getSearchRequestPropertyTypesBatch(
+                $pdo,
+                $searchRequestIds
+            );
+
+        $amenitiesBySearch =
+            self::getSearchRequestAmenitiesBatch(
+                $pdo,
+                $searchRequestIds
+            );
+
+        $exchangeOffersBySearch =
+            self::getSearchRequestExchangeOffersBatch(
+                $pdo,
+                $searchRequestIds
+            );
         $evaluated = 0;
         $saved = 0;
         $archived = 0;
         $errors = [];
         $results = [];
 
-        foreach ($searchRequestIds as $searchRequestId) {
+        foreach ($searchRequests as $searchRequest) {
             $searchRequestId =
-                (int)$searchRequestId;
+                (int)$searchRequest['id'];
 
             try {
                 $result =
@@ -223,7 +373,14 @@ class CompatibilityEngine
                         $property,
                         $propertyAmenities,
                         $propertyRequirements,
-                        $searchRequestId
+
+                        $searchRequest,
+
+                        $propertyTypesBySearch[$searchRequestId] ?? [],
+
+                        $amenitiesBySearch[$searchRequestId] ?? [],
+
+                        $exchangeOffersBySearch[$searchRequestId] ?? []
                     );
 
                 $evaluated++;
@@ -242,7 +399,8 @@ class CompatibilityEngine
                     $archived++;
                 }
 
-                $results[] = $result;
+                $results[] =
+                    $result;
             } catch (Throwable $e) {
                 $errors[] = [
                     'search_request_id' =>
@@ -277,7 +435,6 @@ class CompatibilityEngine
             $errors,
         ];
     }
-
     private static function getCandidateSearchRequestsForProperty(
         PDO $pdo,
         array $property
@@ -296,19 +453,8 @@ class CompatibilityEngine
                 )
             );
 
-        /*
-     * Una búsqueda entra como candidata cuando:
-     *
-     * 1. pertenece a otra inmobiliaria;
-     * 2. está publicada;
-     * 3. no especificó tipos de propiedad;
-     *    O pide específicamente este tipo;
-     * 4. O ya tenía una compatibilidad con esta
-     *    propiedad y necesitamos volver a evaluarla
-     *    para poder archivarla si dejó de coincidir.
-     */
         $st = $pdo->prepare("
-        SELECT sr.id
+        SELECT sr.*
 
         FROM search_requests sr
 
@@ -369,43 +515,24 @@ class CompatibilityEngine
         ]);
 
         return $st->fetchAll(
-            PDO::FETCH_COLUMN
+            PDO::FETCH_ASSOC
         ) ?: [];
     }
-
     private static function calculatePropertySearchPair(
         PDO $pdo,
         array $property,
         array $propertyAmenities,
         ?array $propertyRequirements,
-        int $searchRequestId
+        array $searchRequest,
+        array $propertyTypes,
+        array $desiredAmenities,
+        array $exchangeOffers
     ): array {
         $propertyId =
             (int)$property['id'];
 
-        $searchRequest =
-            self::getSearchRequest(
-                $pdo,
-                $searchRequestId
-            );
-
-        $propertyTypes =
-            self::getSearchRequestPropertyTypes(
-                $pdo,
-                $searchRequestId
-            );
-
-        $desiredAmenities =
-            self::getSearchRequestAmenities(
-                $pdo,
-                $searchRequestId
-            );
-
-        $exchangeOffers =
-            self::getSearchRequestExchangeOffers(
-                $pdo,
-                $searchRequestId
-            );
+        $searchRequestId =
+            (int)$searchRequest['id'];
 
         $evaluation =
             self::evaluatePropertyAgainstSearch(
@@ -418,10 +545,6 @@ class CompatibilityEngine
                 $propertyRequirements
             );
 
-        /*
-     * Si dejó de ser una compatibilidad válida,
-     * archivamos solamente ESTE par.
-     */
         if (
             $evaluation['discarded'] ||
             $evaluation['score'] <
@@ -461,10 +584,6 @@ class CompatibilityEngine
             ];
         }
 
-        /*
-     * Solamente guardamos/actualizamos la
-     * compatibilidad de este par.
-     */
         $compatibilityId =
             self::saveCompatibility(
                 $pdo,
@@ -502,6 +621,8 @@ class CompatibilityEngine
             $evaluation['penalties'],
         ];
     }
+
+
     private static function archivePropertySearchPair(
         PDO $pdo,
         int $propertyId,
@@ -580,7 +701,7 @@ class CompatibilityEngine
 
         return $st->rowCount();
     }
-    
+
     public static function archiveForProperty(
         int $propertyId
     ): array {
@@ -659,6 +780,8 @@ class CompatibilityEngine
             'compatibilities_archived' => $st->rowCount(),
         ];
     }
+
+
     private static function getSearchRequest(
         PDO $pdo,
         int $searchRequestId
@@ -687,6 +810,184 @@ class CompatibilityEngine
 
         return $row;
     }
+
+
+    private static function getSearchRequestPropertyTypesBatch(
+        PDO $pdo,
+        array $searchRequestIds
+    ): array {
+        if ($searchRequestIds === []) {
+            return [];
+        }
+
+        $params = [];
+        $placeholders = [];
+
+        foreach (
+            array_values(array_unique($searchRequestIds))
+            as $index => $searchRequestId
+        ) {
+            $key = 'search_id_' . $index;
+
+            $placeholders[] = ':' . $key;
+            $params[$key] = (int)$searchRequestId;
+        }
+
+        $st = $pdo->prepare("
+        SELECT
+            search_request_id,
+            property_type
+
+        FROM search_request_property_types
+
+        WHERE search_request_id IN (
+            " . implode(', ', $placeholders) . "
+        )
+
+        ORDER BY
+            search_request_id ASC,
+            property_type ASC
+    ");
+
+        $st->execute($params);
+
+        $map = [];
+
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            $searchRequestId =
+                (int)$row['search_request_id'];
+
+            $map[$searchRequestId][] =
+                (string)$row['property_type'];
+        }
+
+        return $map;
+    }
+
+    private static function getSearchRequestAmenitiesBatch(
+        PDO $pdo,
+        array $searchRequestIds
+    ): array {
+        if ($searchRequestIds === []) {
+            return [];
+        }
+
+        $params = [];
+        $placeholders = [];
+
+        foreach (
+            array_values(array_unique($searchRequestIds))
+            as $index => $searchRequestId
+        ) {
+            $key = 'search_id_' . $index;
+
+            $placeholders[] = ':' . $key;
+            $params[$key] = (int)$searchRequestId;
+        }
+
+        $st = $pdo->prepare("
+        SELECT
+            search_request_id,
+            amenity_code
+
+        FROM search_request_amenities
+
+        WHERE search_request_id IN (
+            " . implode(', ', $placeholders) . "
+        )
+
+          AND deleted_at IS NULL
+
+        ORDER BY
+            search_request_id ASC,
+            amenity_code ASC
+    ");
+
+        $st->execute($params);
+
+        $map = [];
+
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            $searchRequestId =
+                (int)$row['search_request_id'];
+
+            $map[$searchRequestId][] =
+                (string)$row['amenity_code'];
+        }
+
+        return $map;
+    }
+
+    private static function getSearchRequestExchangeOffersBatch(
+        PDO $pdo,
+        array $searchRequestIds
+    ): array {
+        if ($searchRequestIds === []) {
+            return [];
+        }
+
+        $params = [];
+        $placeholders = [];
+
+        foreach (
+            array_values(array_unique($searchRequestIds))
+            as $index => $searchRequestId
+        ) {
+            $key = 'search_id_' . $index;
+
+            $placeholders[] = ':' . $key;
+            $params[$key] = (int)$searchRequestId;
+        }
+
+        $st = $pdo->prepare("
+        SELECT
+            id,
+            search_request_id,
+            title,
+            property_type,
+            estimated_price,
+            currency,
+            country_code,
+            country,
+            province,
+            city,
+            zone,
+            total_area,
+            covered_area,
+            bedrooms,
+            bathrooms,
+            garages,
+            antiquity
+
+        FROM search_request_exchange_offers
+
+        WHERE search_request_id IN (
+            " . implode(', ', $placeholders) . "
+        )
+
+          AND deleted_at IS NULL
+
+        ORDER BY
+            search_request_id ASC,
+            estimated_price DESC,
+            id ASC
+    ");
+
+        $st->execute($params);
+
+        $map = [];
+
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            $searchRequestId =
+                (int)$row['search_request_id'];
+
+            $map[$searchRequestId][] =
+                $row;
+        }
+
+        return $map;
+    }
+
 
     private static function getSearchRequestPropertyTypes(
         PDO $pdo,
