@@ -1310,6 +1310,12 @@ class CompatibilityEngine
  * Solo participa cuando la búsqueda
  * especificó un mínimo y/o un máximo.
  */
+
+        $priceResult = [
+            'score' => 0.0,
+            'reason' => null,
+            'has_significant_mismatch' => false,
+        ];
         if (self::hasPriceCriteria($search)) {
             $possibleScore += 20;
 
@@ -1437,9 +1443,14 @@ class CompatibilityEngine
  * pero existe una diferencia importante respecto
  * de lo solicitado.
  */
-        if (
+        $hasImportantMismatch =
             ($featuresResult['has_minimum_mismatch'] ?? false)
-            && in_array(
+            ||
+            ($priceResult['has_significant_mismatch'] ?? false);
+
+        if (
+            $hasImportantMismatch &&
+            in_array(
                 $matchLevel,
                 ['high', 'total'],
                 true
@@ -1580,21 +1591,24 @@ class CompatibilityEngine
             ],
         ];
     }
-
     private static function calculatePriceScore(
         array $search,
         array $property
     ): array {
         $searchCurrency = strtoupper(
-            trim((string)($search['currency'] ?? ''))
+            trim(
+                (string)(
+                    $search['currency'] ?? ''
+                )
+            )
         );
 
         $propertyCurrency = strtoupper(
-            trim((string)($property['currency'] ?? ''))
-        );
-
-        $price = self::toNullableFloat(
-            $property['price'] ?? null
+            trim(
+                (string)(
+                    $property['currency'] ?? ''
+                )
+            )
         );
 
         $minValue = self::toNullableFloat(
@@ -1605,87 +1619,313 @@ class CompatibilityEngine
             $search['max_value'] ?? null
         );
 
+        $propertyPrice = self::toNullableFloat(
+            $property['price'] ?? null
+        );
+
+        /*
+     * Si la propiedad no tiene precio,
+     * no podemos evaluar este criterio.
+     */
         if (
-            $price === null ||
-            $searchCurrency === '' ||
-            $propertyCurrency === '' ||
-            $searchCurrency !== $propertyCurrency
+            $propertyPrice === null ||
+            $propertyPrice <= 0
         ) {
             return [
                 'score' => 0.0,
+
                 'reason' => [
-                    'code' => 'price_not_comparable',
+                    'code' =>
+                    'price_not_available',
+
                     'label' =>
-                    'El precio no puede compararse directamente',
-                    'weight' => 20,
-                    'matched' => false,
+                    'La propiedad no tiene un precio válido para comparar',
+
+                    'weight' =>
+                    20,
+
+                    'matched' =>
+                    false,
                 ],
-            ];
-        }
 
-        $withinMin =
-            $minValue === null ||
-            $minValue <= 0 ||
-            $price >= $minValue;
-
-        $withinMax =
-            $maxValue === null ||
-            $maxValue <= 0 ||
-            $price <= $maxValue;
-
-        if ($withinMin && $withinMax) {
-            return [
-                'score' => 20.0,
-                'reason' => [
-                    'code' => 'price_in_range',
-                    'label' =>
-                    'Precio dentro del rango buscado',
-                    'weight' => 20,
-                    'matched' => true,
-                    'property_price' => $price,
-                    'min_value' => $minValue,
-                    'max_value' => $maxValue,
-                    'currency' => $propertyCurrency,
-                ],
+                'has_significant_mismatch' =>
+                true,
             ];
         }
 
         /*
-         * Hasta 10% por encima del máximo:
-         * coincidencia parcial.
-         */
+     * Por ahora no hacemos conversión de monedas.
+     * Si ambas están informadas y son distintas,
+     * no consideramos comparable el precio.
+     */
         if (
-            $maxValue !== null &&
-            $maxValue > 0 &&
-            $price > $maxValue &&
-            $price <= ($maxValue * 1.10)
+            $searchCurrency !== '' &&
+            $propertyCurrency !== '' &&
+            $searchCurrency !== $propertyCurrency
         ) {
             return [
-                'score' => 8.0,
+                'score' => 0.0,
+
                 'reason' => [
-                    'code' => 'price_slightly_above',
+                    'code' =>
+                    'currency_mismatch',
+
                     'label' =>
-                    'Precio levemente superior al presupuesto',
-                    'weight' => 20,
-                    'matched' => false,
-                    'property_price' => $price,
-                    'max_value' => $maxValue,
+                    'La moneda del precio no coincide con la búsqueda',
+
+                    'weight' =>
+                    20,
+
+                    'matched' =>
+                    false,
+
+                    'search_currency' =>
+                    $searchCurrency,
+
+                    'property_currency' =>
+                    $propertyCurrency,
                 ],
+
+                'has_significant_mismatch' =>
+                true,
             ];
         }
 
+        /*
+     * Precio dentro del rango solicitado.
+     */
+        $meetsMin =
+            $minValue === null ||
+            $minValue <= 0 ||
+            $propertyPrice >= $minValue;
+
+        $meetsMax =
+            $maxValue === null ||
+            $maxValue <= 0 ||
+            $propertyPrice <= $maxValue;
+
+        if ($meetsMin && $meetsMax) {
+            return [
+                'score' => 20.0,
+
+                'reason' => [
+                    'code' =>
+                    'price_in_range',
+
+                    'label' =>
+                    'El precio está dentro del rango buscado',
+
+                    'weight' =>
+                    20,
+
+                    'matched' =>
+                    true,
+
+                    'price' =>
+                    $propertyPrice,
+
+                    'min_value' =>
+                    $minValue,
+
+                    'max_value' =>
+                    $maxValue,
+                ],
+
+                'has_significant_mismatch' =>
+                false,
+            ];
+        }
+
+        /*
+     * Una propiedad por debajo del mínimo no es
+     * necesariamente un problema comercial.
+     *
+     * Puede significar una oportunidad más económica,
+     * por lo que conserva una puntuación alta.
+     */
+        if (
+            $minValue !== null &&
+            $minValue > 0 &&
+            $propertyPrice < $minValue
+        ) {
+            return [
+                'score' => 18.0,
+
+                'reason' => [
+                    'code' =>
+                    'price_below_range',
+
+                    'label' =>
+                    'El precio está por debajo del rango buscado',
+
+                    'weight' =>
+                    20,
+
+                    'matched' =>
+                    true,
+
+                    'price' =>
+                    $propertyPrice,
+
+                    'min_value' =>
+                    $minValue,
+                ],
+
+                'has_significant_mismatch' =>
+                false,
+            ];
+        }
+
+        /*
+     * A partir de acá sabemos que está
+     * por encima del máximo.
+     */
+        if (
+            $maxValue === null ||
+            $maxValue <= 0
+        ) {
+            return [
+                'score' => 0.0,
+
+                'reason' => [
+                    'code' =>
+                    'price_out_of_range',
+
+                    'label' =>
+                    'El precio no coincide con el rango buscado',
+
+                    'weight' =>
+                    20,
+
+                    'matched' =>
+                    false,
+                ],
+
+                'has_significant_mismatch' =>
+                true,
+            ];
+        }
+
+        $overPercentage =
+            (($propertyPrice - $maxValue) / $maxValue)
+            * 100;
+
+        /*
+     * Diferencia pequeña:
+     * sigue siendo una muy buena alternativa.
+     */
+        if ($overPercentage <= 5) {
+            return [
+                'score' => 16.0,
+
+                'reason' => [
+                    'code' =>
+                    'price_slightly_above',
+
+                    'label' =>
+                    'El precio está hasta un 5% por encima del presupuesto',
+
+                    'weight' =>
+                    20,
+
+                    'matched' =>
+                    false,
+
+                    'difference_percentage' =>
+                    round($overPercentage, 2),
+                ],
+
+                'has_significant_mismatch' =>
+                false,
+            ];
+        }
+
+        /*
+     * Hasta 10%:
+     * todavía puede tener sentido comercial.
+     */
+        if ($overPercentage <= 10) {
+            return [
+                'score' => 12.0,
+
+                'reason' => [
+                    'code' =>
+                    'price_above_10',
+
+                    'label' =>
+                    'El precio está entre un 5% y un 10% por encima del presupuesto',
+
+                    'weight' =>
+                    20,
+
+                    'matched' =>
+                    false,
+
+                    'difference_percentage' =>
+                    round($overPercentage, 2),
+                ],
+
+                'has_significant_mismatch' =>
+                false,
+            ];
+        }
+
+        /*
+     * Entre 10% y 20%:
+     * ya es una diferencia relevante.
+     */
+        if ($overPercentage <= 20) {
+            return [
+                'score' => 6.0,
+
+                'reason' => [
+                    'code' =>
+                    'price_significantly_above',
+
+                    'label' =>
+                    'El precio está entre un 10% y un 20% por encima del presupuesto',
+
+                    'weight' =>
+                    20,
+
+                    'matched' =>
+                    false,
+
+                    'difference_percentage' =>
+                    round($overPercentage, 2),
+                ],
+
+                'has_significant_mismatch' =>
+                true,
+            ];
+        }
+
+        /*
+     * Más de 20%:
+     * la diferencia de precio es fuerte.
+     */
         return [
             'score' => 0.0,
+
             'reason' => [
-                'code' => 'price_out_of_range',
+                'code' =>
+                'price_far_above',
+
                 'label' =>
-                'Precio fuera del rango buscado',
-                'weight' => 20,
-                'matched' => false,
-                'property_price' => $price,
-                'min_value' => $minValue,
-                'max_value' => $maxValue,
+                'El precio supera ampliamente el presupuesto buscado',
+
+                'weight' =>
+                20,
+
+                'matched' =>
+                false,
+
+                'difference_percentage' =>
+                round($overPercentage, 2),
             ],
+
+            'has_significant_mismatch' =>
+            true,
         ];
     }
 
