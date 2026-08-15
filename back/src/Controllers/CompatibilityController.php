@@ -43,56 +43,74 @@ class CompatibilityController
     }
 
     public static function respond(
-    int $compatibilityId
-): void {
-    try {
-        $user = AuthHelper::requireUser();
+        int $compatibilityId
+    ): void {
+        try {
+            $user = AuthHelper::requireUser();
 
-        $body = json_decode(
-            file_get_contents('php://input'),
-            true
-        ) ?: [];
+            $body = json_decode(
+                file_get_contents('php://input'),
+                true
+            ) ?: [];
 
-        $response = trim(
-            (string)($body['response'] ?? '')
-        );
-
-        $result =
-            CompatibilityService::respond(
-                (int)$user['id'],
-                $compatibilityId,
-                $response
+            $response = trim(
+                (string)($body['response'] ?? '')
             );
 
-        ResponseHelper::ok($result);
-    } catch (Throwable $e) {
-        self::error($e);
+            $result =
+                CompatibilityService::respond(
+                    (int)$user['id'],
+                    $compatibilityId,
+                    $response
+                );
+
+            ResponseHelper::ok($result);
+        } catch (Throwable $e) {
+            self::error($e);
+        }
     }
-}
 
-public static function feedback(
-    int $compatibilityId
-): void {
-    try {
-        $user = AuthHelper::requireUser();
+    public static function feedback(
+        int $compatibilityId
+    ): void {
+        try {
+            $user = AuthHelper::requireUser();
 
-        $body = json_decode(
-            file_get_contents('php://input'),
-            true
-        ) ?: [];
+            $body = json_decode(
+                file_get_contents('php://input'),
+                true
+            ) ?: [];
 
-        $result =
-            CompatibilityService::saveFeedback(
-                (int)$user['id'],
-                $compatibilityId,
-                $body
-            );
+            $result =
+                CompatibilityService::saveFeedback(
+                    (int)$user['id'],
+                    $compatibilityId,
+                    $body
+                );
 
-        ResponseHelper::ok($result);
-    } catch (Throwable $e) {
-        self::error($e);
+            ResponseHelper::ok($result);
+        } catch (Throwable $e) {
+            self::error($e);
+        }
     }
-}
+
+    public static function seen(
+        int $compatibilityId
+    ): void {
+        try {
+            $user = AuthHelper::requireUser();
+
+            $result =
+                CompatibilityService::markAsSeen(
+                    (int)$user['id'],
+                    $compatibilityId
+                );
+
+            ResponseHelper::ok($result);
+        } catch (Throwable $e) {
+            self::error($e);
+        }
+    }
     private static function error(
         Throwable $e
     ): void {

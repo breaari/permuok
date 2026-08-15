@@ -5,6 +5,7 @@ namespace App\Services;
 use PDO;
 use Exception;
 use App\Services\ConversationService;
+use App\Services\NotificationService;
 
 class CompatibilityService
 {
@@ -243,7 +244,173 @@ class CompatibilityService
         );
 
         $total = (int)$stCount->fetchColumn();
+        /*
+ * Resumen global de compatibilidades.
+ *
+ * No depende de la vista active/history ni de la paginación.
+ * Representa el estado general de las oportunidades
+ * de esta inmobiliaria.
+ */
+        $summarySql = "
+    SELECT
+        COUNT(*) AS total,
 
+        SUM(
+            CASE
+                WHEN (
+                    (
+                        c.source_real_estate_id = :summary_source_re_new
+                        AND c.source_seen_at IS NULL
+                    )
+                    OR
+                    (
+                        c.target_real_estate_id = :summary_target_re_new
+                        AND c.target_seen_at IS NULL
+                    )
+                )
+                AND c.status IN (
+                    'detected',
+                    'one_side_interested',
+                    'mutual_interest',
+                    'chat_enabled'
+                )
+                THEN 1
+                ELSE 0
+            END
+        ) AS new_count,
+
+        SUM(
+            CASE
+                WHEN DATE(c.calculated_at) = CURDATE()
+                AND c.status IN (
+                    'detected',
+                    'one_side_interested',
+                    'mutual_interest',
+                    'chat_enabled'
+                )
+                THEN 1
+                ELSE 0
+            END
+        ) AS today_count,
+
+        SUM(
+            CASE
+                WHEN (
+                    (
+                        c.source_real_estate_id = :summary_source_re_attention
+                        AND c.source_response = 'pending'
+                    )
+                    OR
+                    (
+                        c.target_real_estate_id = :summary_target_re_attention
+                        AND c.target_response = 'pending'
+                    )
+                )
+                AND c.status IN (
+                    'detected',
+                    'one_side_interested'
+                )
+                THEN 1
+                ELSE 0
+            END
+        ) AS needs_attention_count,
+
+        SUM(
+            CASE
+                WHEN c.status IN (
+                    'mutual_interest',
+                    'chat_enabled'
+                )
+                THEN 1
+                ELSE 0
+            END
+        ) AS in_progress_count,
+
+        SUM(
+            CASE
+                WHEN c.status = 'dismissed'
+                THEN 1
+                ELSE 0
+            END
+        ) AS dismissed_count,
+
+        SUM(
+            CASE
+                WHEN c.status = 'archived'
+                THEN 1
+                ELSE 0
+            END
+        ) AS archived_count
+
+    FROM compatibilities c
+
+    INNER JOIN properties p
+        ON p.id = c.property_id
+       AND p.deleted_at IS NULL
+
+    INNER JOIN search_requests sr
+        ON sr.id = c.search_request_id
+       AND sr.deleted_at IS NULL
+
+    WHERE
+        c.deleted_at IS NULL
+
+        AND (
+            c.source_real_estate_id = :summary_real_estate_id_1
+            OR
+            c.target_real_estate_id = :summary_real_estate_id_2
+        )
+
+        AND c.compatibility_type = 'property_search_request'
+";
+
+        $stSummary = $pdo->prepare($summarySql);
+
+        self::executeStatement(
+            $stSummary,
+            [
+                'summary_source_re_new' =>
+                $realEstateId,
+
+                'summary_target_re_new' =>
+                $realEstateId,
+
+                'summary_source_re_attention' =>
+                $realEstateId,
+
+                'summary_target_re_attention' =>
+                $realEstateId,
+
+                'summary_real_estate_id_1' =>
+                $realEstateId,
+
+                'summary_real_estate_id_2' =>
+                $realEstateId,
+            ]
+        );
+
+        $summaryRow =
+            $stSummary->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $summary = [
+            'new' =>
+            (int)($summaryRow['new_count'] ?? 0),
+
+            'today' =>
+            (int)($summaryRow['today_count'] ?? 0),
+
+            'needs_attention' =>
+            (int)($summaryRow['needs_attention_count'] ?? 0),
+
+            'in_progress' =>
+            (int)($summaryRow['in_progress_count'] ?? 0),
+
+            'dismissed' =>
+            (int)($summaryRow['dismissed_count'] ?? 0),
+
+            'archived' =>
+            (int)($summaryRow['archived_count'] ?? 0),
+        ];
         /*
      * Datos.
      */
@@ -281,6 +448,8 @@ class CompatibilityService
             c.archived_at,
             c.created_at,
             c.updated_at,
+            c.source_seen_at,
+c.target_seen_at,
 
             (
                 SELECT conv.id
@@ -415,6 +584,8 @@ class CompatibilityService
                         $total
                     )
                     : 0,
+
+                'summary' => $summary,
             ],
         ];
     }
@@ -477,6 +648,8 @@ class CompatibilityService
 c.archived_at,
             c.created_at,
             c.updated_at,
+            c.source_seen_at,
+c.target_seen_at,
 (
     SELECT conv.id
     FROM conversations conv
@@ -584,19 +757,16 @@ c.archived_at,
             $realEstateId
         );
     }
-
-    public static function respond(
+    public static function markAsSeen(
         int $userId,
-        int $compatibilityId,
-        string $response
+        int $compatibilityId
     ): array {
         $pdo = self::db();
 
-        $user =
-            self::getUser(
-                $pdo,
-                $userId
-            );
+        $user = self::getUser(
+            $pdo,
+            $userId
+        );
 
         $realEstateId =
             (int)($user['real_estate_id'] ?? 0);
@@ -615,10 +785,108 @@ c.archived_at,
             );
         }
 
+        $st = $pdo->prepare("
+        SELECT
+            id,
+            source_real_estate_id,
+            target_real_estate_id,
+            source_seen_at,
+            target_seen_at
+        FROM compatibilities
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'id' => $compatibilityId,
+        ]);
+
+        $compatibility =
+            $st->fetch(PDO::FETCH_ASSOC);
+
+        if (!$compatibility) {
+            throw new Exception(
+                'Compatibilidad no encontrada.',
+                404
+            );
+        }
+
+        $isSource =
+            (int)$compatibility['source_real_estate_id'] === $realEstateId;
+
+        $isTarget =
+            (int)$compatibility['target_real_estate_id'] === $realEstateId;
+        $seenAt =
+            $isSource
+            ? ($row['source_seen_at'] ?? null)
+            : ($row['target_seen_at'] ?? null);
+        if (!$isSource && !$isTarget) {
+            throw new Exception(
+                'No tenés acceso a esta compatibilidad.',
+                403
+            );
+        }
+
+        $seenField =
+            $isSource
+            ? 'source_seen_at'
+            : 'target_seen_at';
+
         /*
-     * pending sirve para reactivar
-     * una decisión anterior.
+     * Solo guardamos la primera vez que fue vista.
+     * No queremos que abrirla nuevamente cambie
+     * permanentemente la fecha original de lectura.
      */
+        $stUpdate = $pdo->prepare("
+        UPDATE compatibilities
+        SET
+            {$seenField} = COALESCE(
+                {$seenField},
+                NOW()
+            )
+        WHERE id = :id
+        LIMIT 1
+    ");
+
+        $stUpdate->execute([
+            'id' => $compatibilityId,
+        ]);
+
+        return self::getRecommendationDetail(
+            $userId,
+            $compatibilityId
+        );
+    }
+    public static function respond(
+        int $userId,
+        int $compatibilityId,
+        string $response
+    ): array {
+        $pdo = self::db();
+
+        $user = self::getUser(
+            $pdo,
+            $userId
+        );
+
+        $realEstateId =
+            (int)($user['real_estate_id'] ?? 0);
+
+        if ($realEstateId <= 0) {
+            throw new Exception(
+                'El usuario no está vinculado a una inmobiliaria.',
+                422
+            );
+        }
+
+        if ($compatibilityId <= 0) {
+            throw new Exception(
+                'Compatibilidad inválida.',
+                422
+            );
+        }
+
         if (
             !in_array(
                 $response,
@@ -636,11 +904,33 @@ c.archived_at,
             );
         }
 
+        /*
+     * Traemos también los usuarios creadores
+     * de las dos publicaciones.
+     */
         $st = $pdo->prepare("
-        SELECT *
-        FROM compatibilities
-        WHERE id = :id
-          AND deleted_at IS NULL
+        SELECT
+            c.*,
+
+            sr.created_by_user_id
+                AS search_owner_user_id,
+
+            p.created_by_user_id
+                AS property_owner_user_id
+
+        FROM compatibilities c
+
+        INNER JOIN search_requests sr
+            ON sr.id = c.search_request_id
+           AND sr.deleted_at IS NULL
+
+        INNER JOIN properties p
+            ON p.id = c.property_id
+           AND p.deleted_at IS NULL
+
+        WHERE c.id = :id
+          AND c.deleted_at IS NULL
+
         LIMIT 1
     ");
 
@@ -649,9 +939,7 @@ c.archived_at,
         ]);
 
         $compatibility =
-            $st->fetch(
-                PDO::FETCH_ASSOC
-            );
+            $st->fetch(PDO::FETCH_ASSOC);
 
         if (!$compatibility) {
             throw new Exception(
@@ -673,10 +961,6 @@ c.archived_at,
             );
         }
 
-        /*
-     * Si ya existe un chat, el match ya
-     * superó la instancia de decisión.
-     */
         if (
             $compatibility['status']
             === 'chat_enabled'
@@ -687,11 +971,6 @@ c.archived_at,
             );
         }
 
-        /*
-     * Si quedó mutual_interest pero el chat
-     * falló al crearse, permitimos repetir
-     * "interested" para intentar generarlo.
-     */
         if (
             $compatibility['status']
             === 'mutual_interest' &&
@@ -702,6 +981,29 @@ c.archived_at,
                 422
             );
         }
+
+        /*
+     * Guardamos la respuesta previa para no
+     * duplicar notificaciones si repiten la acción.
+     */
+        $previousMyResponse =
+            $isSource
+            ? $compatibility['source_response']
+            : $compatibility['target_response'];
+
+        /*
+     * El usuario que debe recibir la notificación
+     * de primer interés es quien creó la publicación
+     * de la otra parte.
+     */
+        $counterpartUserId =
+            $isSource
+            ? (int)(
+                $compatibility['property_owner_user_id'] ?? 0
+            )
+            : (int)(
+                $compatibility['search_owner_user_id'] ?? 0
+            );
 
         $responseField =
             $isSource
@@ -718,19 +1020,9 @@ c.archived_at,
             ? 'source_responded_by_user_id'
             : 'target_responded_by_user_id';
 
-        /*
-     * La transacción de CompatibilityService
-     * termina ANTES de intentar crear el chat.
-     */
         $pdo->beginTransaction();
 
         try {
-            /*
-         * pending = reactivar.
-         *
-         * En ese caso limpiamos fecha
-         * y usuario de respuesta.
-         */
             $stUpdate = $pdo->prepare("
             UPDATE compatibilities
             SET
@@ -769,10 +1061,6 @@ c.archived_at,
                 $compatibilityId,
             ]);
 
-            /*
-         * Releemos las dos decisiones
-         * una vez guardado el cambio.
-         */
             $stCurrent = $pdo->prepare("
             SELECT
                 source_response,
@@ -783,8 +1071,7 @@ c.archived_at,
         ");
 
             $stCurrent->execute([
-                'id' =>
-                $compatibilityId,
+                'id' => $compatibilityId,
             ]);
 
             $current =
@@ -805,13 +1092,6 @@ c.archived_at,
             $targetResponse =
                 $current['target_response'];
 
-            /*
-         * Estado global.
-         *
-         * Una sola parte que descarta
-         * alcanza para detener el match.
-         * No lo eliminamos: pasa a Historial.
-         */
             if (
                 $sourceResponse === 'dismissed' ||
                 $targetResponse === 'dismissed'
@@ -832,12 +1112,6 @@ c.archived_at,
                 $status = 'detected';
             }
 
-            /*
-         * dismissed_at se completa solamente
-         * mientras el match está descartado.
-         *
-         * Si se reactiva, vuelve a NULL.
-         */
             $stStatus = $pdo->prepare("
             UPDATE compatibilities
             SET
@@ -869,11 +1143,6 @@ c.archived_at,
 
             $pdo->commit();
         } catch (\Throwable $e) {
-            /*
-         * Esto corrige:
-         *
-         * "There is no active transaction"
-         */
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
@@ -882,11 +1151,26 @@ c.archived_at,
         }
 
         /*
-     * IMPORTANTE:
-     *
-     * ConversationService puede iniciar su
-     * propia transacción. Por eso se ejecuta
-     * cuando la anterior ya terminó.
+     * Primer interés:
+     * notificamos a la otra parte,
+     * pero todavía NO creamos conversación.
+     */
+        if (
+            $status === 'one_side_interested' &&
+            $response === 'interested' &&
+            $previousMyResponse !== 'interested' &&
+            $counterpartUserId > 0 &&
+            $counterpartUserId !== $userId
+        ) {
+            NotificationService::notifyCompatibilityInterest(
+                $counterpartUserId,
+                $compatibilityId
+            );
+        }
+
+        /*
+     * Interés mutuo:
+     * ConversationService crea el chat.
      */
         if ($status === 'mutual_interest') {
             ConversationService::createFromCompatibility(
@@ -894,12 +1178,6 @@ c.archived_at,
             );
         }
 
-        /*
-     * createFromCompatibility() cambia
-     * mutual_interest → chat_enabled.
-     *
-     * Por eso releemos al final.
-     */
         return self::getRecommendationDetail(
             $userId,
             $compatibilityId
@@ -1138,7 +1416,10 @@ c.archived_at,
         $isSource =
             (int)$row['source_real_estate_id']
             === $realEstateId;
-
+        $seenAt =
+            $isSource
+            ? ($row['source_seen_at'] ?? null)
+            : ($row['target_seen_at'] ?? null);
         $reasonsData =
             self::decodeReasons(
                 $row['reasons_json'] ?? null
@@ -1205,7 +1486,14 @@ c.archived_at,
 
             'calculated_at' =>
             $row['calculated_at'],
+            'is_new' =>
+            empty($seenAt),
 
+            'seen_at' =>
+            $seenAt,
+
+            'detected_at' =>
+            $row['calculated_at'],
             'created_at' =>
             $row['created_at'],
 

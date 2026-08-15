@@ -29,9 +29,12 @@ function getNotificationPath(item) {
     return `/conversations/${item.related_id}`;
   }
 
+  if (item?.related_type === "compatibility" && item?.related_id) {
+    return `/compatibilities/${item.related_id}`;
+  }
+
   return null;
 }
-
 function getNotificationIcon(type) {
   switch (type) {
     case "new_message":
@@ -52,6 +55,11 @@ function getNotificationIcon(type) {
     case "conversation_status_changed":
       return "refreshCcw";
 
+    case "compatibility_interest":
+      return "search";
+
+    case "compatibility_mutual_interest":
+      return "messagesSquare";
     default:
       return "bell";
   }
@@ -65,10 +73,7 @@ function getNotificationColor(unread) {
   return "bg-slate-100 text-slate-500";
 }
 
-export default function NotificationsDropdown({
-  onUnreadChange,
-  onClose,
-}) {
+export default function NotificationsDropdown({ onUnreadChange, onClose }) {
   const navigate = useNavigate();
 
   const [items, setItems] = useState([]);
@@ -83,13 +88,9 @@ export default function NotificationsDropdown({
         limit: 8,
       });
 
-      const nextItems = Array.isArray(res?.items)
-        ? res.items
-        : [];
+      const nextItems = Array.isArray(res?.items) ? res.items : [];
 
-      const nextUnread = Number(
-        res?.unread_count?.count || 0,
-      );
+      const nextUnread = Number(res?.unread_count?.count || 0);
 
       setItems(nextItems);
       setUnreadCount(nextUnread);
@@ -166,14 +167,10 @@ export default function NotificationsDropdown({
     <div className="absolute right-0 top-full mt-3 w-[380px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
         <div>
-          <p className="text-sm font-black text-slate-900">
-            Notificaciones
-          </p>
+          <p className="text-sm font-black text-slate-900">Notificaciones</p>
 
           <p className="text-xs font-semibold text-slate-400">
-            {unreadCount > 0
-              ? `${unreadCount} sin leer`
-              : "Todo leído"}
+            {unreadCount > 0 ? `${unreadCount} sin leer` : "Todo leído"}
           </p>
         </div>
 
@@ -210,8 +207,7 @@ export default function NotificationsDropdown({
           </div>
         ) : (
           items.map((item) => {
-            const unread =
-              Number(item?.is_read || 0) === 0;
+            const unread = Number(item?.is_read || 0) === 0;
 
             return (
               <button
@@ -219,9 +215,7 @@ export default function NotificationsDropdown({
                 type="button"
                 onClick={() => handleOpen(item)}
                 className={`flex w-full gap-3 border-b border-slate-100 px-4 py-3 text-left transition last:border-b-0 hover:bg-slate-50 ${
-                  unread
-                    ? "bg-emerald-50/40"
-                    : "bg-white"
+                  unread ? "bg-emerald-50/40" : "bg-white"
                 }`}
               >
                 <div
@@ -229,10 +223,7 @@ export default function NotificationsDropdown({
                     unread,
                   )}`}
                 >
-                  <Icon
-                    name={getNotificationIcon(item?.type)}
-                    size={18}
-                  />
+                  <Icon name={getNotificationIcon(item?.type)} size={18} />
                 </div>
 
                 <div className="min-w-0 flex-1">

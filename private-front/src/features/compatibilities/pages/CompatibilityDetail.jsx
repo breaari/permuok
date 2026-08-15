@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
   getCompatibilityDetail,
+  markCompatibilityAsSeen,
   respondToCompatibility,
   saveCompatibilityFeedback,
 } from "../api/compatibilities.api";
-
 import { Icon } from "../../../ui/icons/Index";
 
 function formatMoney(value, currency = "USD") {
@@ -33,24 +32,15 @@ function buildLocation(location = {}) {
 function getReasonLabel(reason) {
   const labels = {
     property_type_match: "Es el tipo de propiedad buscado",
-
     exact_zone_match: "Coincide exactamente con la zona",
-
     city_match: "Coincide con la ciudad buscada",
-
     province_match: "Coincide con la provincia",
-
     price_in_range: "Está dentro del presupuesto",
-
     amenities_match: "Cumple los amenities solicitados",
-
     swap_mode_accepted: "La propiedad acepta permuta",
-
     exchange_offer_value_match:
       "El inmueble ofrecido tiene un valor compatible",
-
     cash_difference_capacity: "La diferencia puede ser cubierta",
-
     owner_difference_conditions: "La diferencia está dentro de lo aceptado",
   };
 
@@ -87,11 +77,8 @@ function ScoreCircle({ score }) {
 
 function FeedbackModal({ open, onClose, onSubmit, submitting }) {
   const [useful, setUseful] = useState(null);
-
   const [rating, setRating] = useState(null);
-
   const [comment, setComment] = useState("");
-
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -120,11 +107,19 @@ function FeedbackModal({ open, onClose, onSubmit, submitting }) {
 
     setError("");
 
-    await onSubmit({
-      useful,
-      rating,
-      comment: comment.trim(),
-    });
+    try {
+      await onSubmit({
+        useful,
+        rating,
+        comment: comment.trim(),
+      });
+    } catch (err) {
+      setError(
+        err?.response?.data?.error ||
+          err?.message ||
+          "No se pudo enviar tu opinión.",
+      );
+    }
   }
 
   return (
@@ -263,23 +258,18 @@ function FeedbackModal({ open, onClose, onSubmit, submitting }) {
 
 export default function CompatibilityDetail() {
   const { id } = useParams();
-
   const navigate = useNavigate();
 
   const [item, setItem] = useState(null);
-
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState("");
 
   const [actionLoading, setActionLoading] = useState(false);
-
   const [actionError, setActionError] = useState("");
+  const [actionSuccess, setActionSuccess] = useState("");
 
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
-
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
   useEffect(() => {
@@ -291,6 +281,27 @@ export default function CompatibilityDetail() {
         const data = await getCompatibilityDetail(id);
 
         setItem(data || null);
+
+        /*
+         * Marcamos la compatibilidad como vista
+         * solamente después de haber podido cargarla.
+         */
+        try {
+          const updated = await markCompatibilityAsSeen(id);
+
+          if (updated) {
+            setItem(updated);
+          }
+        } catch (seenError) {
+          /*
+           * No bloqueamos la pantalla si falla
+           * solamente el marcado de lectura.
+           */
+          console.error(
+            "No se pudo marcar la compatibilidad como vista:",
+            seenError,
+          );
+        }
       } catch (err) {
         console.error("Error cargando compatibilidad:", err);
 
@@ -344,9 +355,7 @@ export default function CompatibilityDetail() {
   }
 
   const property = item.property || {};
-
   const search = item.search_request || {};
-
   const swap = item.swap || {};
 
   const isSearchSide = item.my_side === "search_request";
@@ -359,19 +368,28 @@ export default function CompatibilityDetail() {
 
   const counterpartResponse = item.counterpart_response || "pending";
 
-  const hasResponded = myResponse !== "pending";
-
   const isInterested = myResponse === "interested";
+
+  const isDismissed = myResponse === "dismissed";
+
+  const counterpartInterested =
+    myResponse === "pending" && counterpartResponse === "interested";
+
+  const counterpartDismissed = counterpartResponse === "dismissed";
+
   const hasConversation = Number(item?.conversation_id) > 0;
 
   const isMutualInterest =
     item?.status === "mutual_interest" || item?.status === "chat_enabled";
-  const isDismissed = myResponse === "dismissed";
+
+  const canReactivate = Boolean(
+    item?.actions?.can_reactivate ||
+    (isDismissed && item?.status === "dismissed"),
+  );
 
   function openSearchRequest() {
     if (isSearchSide) {
       navigate(`/search-requests/${search.id}`);
-
       return;
     }
 
@@ -381,14 +399,13 @@ export default function CompatibilityDetail() {
   function openProperty() {
     if (!isSearchSide) {
       navigate(`/properties/${property.id}`);
-
       return;
     }
 
     navigate(`/explore/properties/${property.id}`);
   }
 
-  async function handleDecision(response) {
+  async function handleDecision(response, { openFeedback = true } = {}) {
     if (actionLoading) {
       return;
     }
@@ -396,16 +413,31 @@ export default function CompatibilityDetail() {
     try {
       setActionLoading(true);
       setActionError("");
+      setActionSuccess("");
 
       const updated = await respondToCompatibility(item.id, response);
 
       setItem(updated);
 
-      /*
-       * Abrimos feedback después
-       * de guardar la decisión.
-       */
-      setFeedbackOpen(true);
+      if (response === "pending") {
+        setActionSuccess("La compatibilidad fue reactivada.");
+
+        return;
+      }
+
+      if (response === "interested" && Number(updated?.conversation_id) > 0) {
+        setActionSuccess(
+          "Hay interés mutuo. La conversación ya está habilitada.",
+        );
+      } else if (response === "interested") {
+        setActionSuccess(
+          "Registramos tu interés. Le avisamos a la otra parte.",
+        );
+      }
+
+      if (openFeedback) {
+        setFeedbackOpen(true);
+      }
     } catch (err) {
       console.error("Error respondiendo compatibilidad:", err);
 
@@ -468,8 +500,22 @@ export default function CompatibilityDetail() {
           </p>
         </div>
 
+        {actionSuccess && (
+          <div className="mb-5 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <Icon
+              name="checkCircle"
+              size={19}
+              className="mt-0.5 shrink-0 text-emerald-700"
+            />
+
+            <p className="text-sm font-medium text-emerald-800">
+              {actionSuccess}
+            </p>
+          </div>
+        )}
+
         {feedbackSuccess && (
-          <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <div className="mb-5 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
             <Icon
               name="checkCircle"
               size={19}
@@ -774,15 +820,70 @@ export default function CompatibilityDetail() {
                 Tu decisión
               </span>
 
-              {!hasResponded && (
+              {/* Conversación habilitada */}
+              {hasConversation && (
                 <>
-                  <h3 className="mt-1 text-lg font-black text-slate-900">
-                    ¿Esta oportunidad te interesa?
-                  </h3>
+                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                    <div className="flex items-start gap-3">
+                      <Icon
+                        name="checkCircle"
+                        size={20}
+                        className="mt-0.5 shrink-0 text-emerald-700"
+                      />
 
-                  <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                    Si la otra inmobiliaria también muestra interés, PermuOK
-                    podrá habilitar el siguiente paso.
+                      <div>
+                        <p className="text-sm font-black text-emerald-900">
+                          ¡Hay interés mutuo!
+                        </p>
+
+                        <p className="mt-1 text-xs leading-relaxed text-emerald-800/80">
+                          Ambas partes quieren avanzar. Ya pueden conversar
+                          dentro de PermuOK.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(`/conversations/${item.conversation_id}`)
+                    }
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white transition hover:opacity-90"
+                  >
+                    Abrir conversación
+                    <Icon name="arrowRight" size={17} />
+                  </button>
+                </>
+              )}
+
+              {/* La otra parte ya está interesada */}
+              {!hasConversation && counterpartInterested && (
+                <>
+                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                    <div className="flex items-start gap-3">
+                      <Icon
+                        name="checkCircle"
+                        size={20}
+                        className="mt-0.5 shrink-0 text-emerald-700"
+                      />
+
+                      <div>
+                        <p className="text-sm font-black text-emerald-900">
+                          Hay interés en esta oportunidad
+                        </p>
+
+                        <p className="mt-1 text-xs leading-relaxed text-emerald-800/80">
+                          La otra inmobiliaria ya indicó que quiere avanzar con
+                          este match.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="mt-4 text-sm leading-relaxed text-slate-500">
+                    Si también te interesa, habilitaremos automáticamente una
+                    conversación entre ambas partes.
                   </p>
 
                   <button
@@ -793,7 +894,7 @@ export default function CompatibilityDetail() {
                   >
                     <Icon name="check" size={17} />
 
-                    {actionLoading ? "Guardando..." : "Me interesa"}
+                    {actionLoading ? "Guardando..." : "También me interesa"}
                   </button>
 
                   <button
@@ -802,12 +903,51 @@ export default function CompatibilityDetail() {
                     disabled={actionLoading}
                     className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Descartar
+                    No quiero avanzar
                   </button>
                 </>
               )}
 
-              {isInterested && (
+              {/* Nadie respondió todavía */}
+              {!hasConversation &&
+                !counterpartInterested &&
+                myResponse === "pending" &&
+                !counterpartDismissed && (
+                  <>
+                    <h3 className="mt-1 text-lg font-black text-slate-900">
+                      ¿Esta oportunidad te interesa?
+                    </h3>
+
+                    <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                      Si marcás interés, avisaremos a la otra inmobiliaria. La
+                      conversación solo se habilitará si ambas partes quieren
+                      avanzar.
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDecision("interested")}
+                      disabled={actionLoading}
+                      className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Icon name="check" size={17} />
+
+                      {actionLoading ? "Guardando..." : "Me interesa"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDecision("dismissed")}
+                      disabled={actionLoading}
+                      className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Descartar
+                    </button>
+                  </>
+                )}
+
+              {/* Yo mostré interés */}
+              {!hasConversation && isInterested && !counterpartDismissed && (
                 <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                   <div className="flex items-start gap-3">
                     <Icon
@@ -816,44 +956,62 @@ export default function CompatibilityDetail() {
                       className="mt-0.5 shrink-0 text-emerald-700"
                     />
 
-                    <div className="min-w-0 flex-1">
+                    <div>
                       <p className="text-sm font-bold text-emerald-900">
-                        {isMutualInterest
-                          ? "¡Hay interés mutuo!"
-                          : "Marcaste que te interesa"}
+                        Marcaste que te interesa
                       </p>
 
                       <p className="mt-1 text-xs leading-relaxed text-emerald-800/80">
-                        {isMutualInterest
-                          ? "La otra inmobiliaria también mostró interés. Ya pueden comenzar a conversar."
-                          : "Estamos esperando la respuesta de la otra inmobiliaria."}
+                        Le avisamos a la otra inmobiliaria. Si también muestra
+                        interés, habilitaremos una conversación automáticamente.
                       </p>
-
-                      {hasConversation && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            navigate(`/conversations/${item.conversation_id}`)
-                          }
-                          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-90"
-                        >
-                          Abrir conversación
-                          <Icon name="arrowRight" size={16} />
-                        </button>
-                      )}
                     </div>
                   </div>
                 </div>
               )}
 
+              {/* Yo descarté */}
               {isDismissed && (
+                <>
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm font-bold text-slate-700">
+                      Descartaste esta oportunidad
+                    </p>
+
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                      El match quedó guardado en tu historial.
+                    </p>
+                  </div>
+
+                  {canReactivate && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleDecision("pending", {
+                          openFeedback: false,
+                        })
+                      }
+                      disabled={actionLoading}
+                      className="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {actionLoading
+                        ? "Reactivando..."
+                        : "Reactivar compatibilidad"}
+                    </button>
+                  )}
+                </>
+              )}
+
+              {/* La otra parte descartó */}
+              {!hasConversation && counterpartDismissed && !isDismissed && (
                 <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-sm font-bold text-slate-700">
-                    Descartaste esta oportunidad
+                    La otra parte decidió no avanzar
                   </p>
 
                   <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                    La compatibilidad ya no avanzará en tu flujo comercial.
+                    Conservamos esta compatibilidad en tu historial para que
+                    puedas consultarla más adelante.
                   </p>
                 </div>
               )}

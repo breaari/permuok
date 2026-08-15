@@ -4,7 +4,16 @@ import { useAuth } from "../features/auth/components/AuthContext";
 import LogoParaFondoAzul from "../assets/logoparafondoazul.png";
 import { Icon } from "../ui/icons/Index";
 
-function itemClass(isActive) {
+function itemClass(isActive, highlight = false) {
+  if (highlight) {
+    return [
+      "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
+      isActive
+        ? "bg-emerald-500/10 text-emerald-400 border-l-4 border-emerald-400"
+        : "text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300",
+    ].join(" ");
+  }
+
   return [
     "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
     isActive
@@ -13,15 +22,18 @@ function itemClass(isActive) {
   ].join(" ");
 }
 
-function Item({ to, icon, children, end = false, onClick }) {
+function Item({ to, icon, children, end = false, onClick, highlight = false }) {
   return (
     <NavLink
       to={to}
       end={end}
       onClick={onClick}
-      className={({ isActive }) => itemClass(isActive)}
+      className={({ isActive }) => itemClass(isActive, highlight)}
     >
-      <span className="text-slate-300">{icon}</span>
+      <span className={highlight ? "text-emerald-400" : "text-slate-300"}>
+        {icon}
+      </span>
+
       <span className="font-medium">{children}</span>
     </NavLink>
   );
@@ -146,7 +158,14 @@ export default function Sidebar({ mobile = false, onNavigate }) {
             >
               Panel
             </Item>
-
+            <Item
+              to="/compatibilities"
+              icon={<Icon name="sparkles" />}
+              onClick={onNavigate}
+              highlight
+            >
+              Matches IA
+            </Item>
             <Item
               to="/properties"
               icon={<Icon name="building2" />}
@@ -204,7 +223,14 @@ export default function Sidebar({ mobile = false, onNavigate }) {
             >
               Panel
             </Item>
-
+            <Item
+              to="/compatibilities"
+              icon={<Icon name="sparkles" />}
+              onClick={onNavigate}
+              highlight
+            >
+              Matches IA
+            </Item>
             <Item
               to="/properties"
               icon={<Icon name="building2" />}

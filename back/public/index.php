@@ -201,7 +201,7 @@ $routes = [
     // Compatibilities / recomendaciones
     'GET /compatibilities/recommendations' =>
     [CompatibilityController::class, 'recommendations'],
-  
+
 ];
 
 $key = $method . ' ' . $uri;
@@ -599,6 +599,19 @@ if (
     )
 ) {
     CompatibilityController::feedback(
+        (int)$m[1]
+    );
+    exit;
+}
+if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/compatibilities/(\d+)/seen$#',
+        $uri,
+        $m
+    )
+) {
+    CompatibilityController::seen(
         (int)$m[1]
     );
     exit;

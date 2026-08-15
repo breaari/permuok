@@ -1,6 +1,4 @@
-import {
-  useNavigate,
-} from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { Icon } from "../../../ui/icons/Index";
 
@@ -34,6 +32,31 @@ function buildLocation(
   ]
     .filter(Boolean)
     .join(", ");
+}
+
+function formatDetectedDate(value) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized =
+    String(value).replace(" ", "T");
+
+  const date = new Date(normalized);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat(
+    "es-AR",
+    {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    },
+  ).format(date);
 }
 
 function getMatchMeta(
@@ -236,6 +259,60 @@ function ReasonChip({
   );
 }
 
+function StatusBadge({ item }) {
+  const hasConversation =
+    item?.status === "chat_enabled" &&
+    item?.conversation_id;
+
+  const counterpartInterested =
+    item?.my_response ===
+      "pending" &&
+    item?.counterpart_response ===
+      "interested";
+
+  const waitingResponse =
+    item?.my_response ===
+      "interested" &&
+    item?.counterpart_response ===
+      "pending";
+
+  if (hasConversation) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-blue-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+        En curso
+      </span>
+    );
+  }
+
+  if (counterpartInterested) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-amber-800">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+        Requiere tu atención
+      </span>
+    );
+  }
+
+  if (waitingResponse) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-sky-700">
+        Interés enviado
+      </span>
+    );
+  }
+
+  if (item?.is_new) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white">
+        Nueva
+      </span>
+    );
+  }
+
+  return null;
+}
+
 function HistoryStatus({
   item,
 }) {
@@ -283,13 +360,13 @@ function HistoryStatus({
     return (
       <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
         <p className="text-sm font-bold text-slate-700">
-          La otra parte no avanzó
-          con este match
+          La otra parte no avanzó con
+          este match
         </p>
 
         <p className="mt-1 text-xs text-slate-500">
-          Conservamos el registro en
-          tu historial.
+          Conservamos el registro en tu
+          historial.
         </p>
       </div>
     );
@@ -304,8 +381,7 @@ export default function CompatibilityCard({
   onReactivate,
   reactivating = false,
 }) {
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
 
   const property =
     item?.property || {};
@@ -362,6 +438,20 @@ export default function CompatibilityCard({
         item?.conversation_id,
     );
 
+  const detectedLabel =
+    formatDetectedDate(
+      item?.detected_at ||
+        item?.calculated_at,
+    );
+
+  const isInProgress =
+    hasConversation;
+
+  const needsAttention =
+    item?.my_response === "pending" &&
+    item?.counterpart_response ===
+      "interested";
+
   function handleOpenDetail() {
     navigate(
       `/compatibilities/${item.id}`,
@@ -380,12 +470,24 @@ export default function CompatibilityCard({
 
   return (
     <article
-      className={`rounded-2xl border bg-white p-5 shadow-sm transition-all duration-300 hover:shadow-md sm:p-6 ${
-        isHistory
-          ? "border-slate-200"
-          : "border-slate-200 hover:border-slate-300"
+      className={`relative overflow-hidden rounded-2xl border bg-white p-5 shadow-sm transition-all duration-300 hover:shadow-md sm:p-6 ${
+        isInProgress
+          ? "border-blue-200"
+          : needsAttention
+            ? "border-amber-300"
+            : isHistory
+              ? "border-slate-200"
+              : "border-slate-200 hover:border-slate-300"
       }`}
     >
+      {isInProgress && (
+        <div className="absolute inset-x-0 top-0 h-1 bg-blue-500" />
+      )}
+
+      {needsAttention && (
+        <div className="absolute inset-x-0 top-0 h-1 bg-amber-400" />
+      )}
+
       <div className="flex flex-col gap-5 xl:flex-row xl:items-center">
         {/* Score */}
         <div className="flex shrink-0 items-center gap-4 xl:block">
@@ -395,31 +497,39 @@ export default function CompatibilityCard({
           />
 
           <div className="xl:hidden">
-            <span
-              className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${matchMeta.badge}`}
-            >
-              {matchMeta.label}
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${matchMeta.badge}`}
+              >
+                {matchMeta.label}
+              </span>
 
-            <p className="mt-1 text-xs text-slate-400">
-              Compatibilidad #
-              {item.id}
-            </p>
+              <StatusBadge item={item} />
+            </div>
           </div>
         </div>
 
         {/* Contenido */}
         <div className="min-w-0 flex-1">
-          <div className="mb-4 hidden items-center gap-2 xl:flex">
+          <div className="mb-3 hidden flex-wrap items-center gap-2 xl:flex">
             <span
               className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${matchMeta.badge}`}
             >
               {matchMeta.label}
             </span>
 
+            <StatusBadge item={item} />
+
             <span className="text-xs font-medium text-slate-400">
               #{item.id}
             </span>
+
+            {detectedLabel && (
+              <span className="text-xs text-slate-400">
+                Detectada{" "}
+                {detectedLabel}
+              </span>
+            )}
 
             {isHistory && (
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
@@ -428,7 +538,35 @@ export default function CompatibilityCard({
             )}
           </div>
 
-          {/* Motivos */}
+          {isInProgress && (
+            <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+              <p className="text-sm font-bold text-blue-900">
+                Esta oportunidad está en
+                curso
+              </p>
+
+              <p className="mt-0.5 text-xs text-blue-700">
+                Ambas partes mostraron
+                interés y la conversación
+                ya está habilitada.
+              </p>
+            </div>
+          )}
+
+          {needsAttention && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <p className="text-sm font-bold text-amber-900">
+                La otra inmobiliaria
+                quiere avanzar
+              </p>
+
+              <p className="mt-0.5 text-xs text-amber-800">
+                Revisá el match y decidí
+                si también te interesa.
+              </p>
+            </div>
+          )}
+
           {reasons.length > 0 && (
             <div className="mb-4 flex flex-wrap gap-2">
               {reasons.map(
@@ -444,7 +582,6 @@ export default function CompatibilityCard({
 
           {/* Comparación */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {/* Búsqueda */}
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div className="mb-2 flex items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200">
@@ -495,7 +632,6 @@ export default function CompatibilityCard({
               </div>
             </div>
 
-            {/* Propiedad */}
             <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
               <div className="mb-2 flex items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100">
@@ -559,7 +695,6 @@ export default function CompatibilityCard({
             </div>
           </div>
 
-          {/* Estado histórico */}
           {isHistory && (
             <div className="mt-4">
               <HistoryStatus
@@ -570,8 +705,27 @@ export default function CompatibilityCard({
         </div>
 
         {/* Acciones */}
-        <div className="flex w-full shrink-0 flex-col gap-2 xl:w-auto xl:min-w-[180px]">
-          {hasConversation ? (
+        <div className="flex w-full shrink-0 flex-col gap-2 xl:w-auto xl:min-w-[190px]">
+          <button
+            type="button"
+            onClick={handleOpenDetail}
+            className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition ${
+              hasConversation
+                ? "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                : "bg-primary text-white shadow-sm hover:opacity-90"
+            }`}
+          >
+            Ver detalle
+
+            {!hasConversation && (
+              <Icon
+                name="arrowRight"
+                size={17}
+              />
+            )}
+          </button>
+
+          {hasConversation && (
             <button
               type="button"
               onClick={
@@ -586,34 +740,15 @@ export default function CompatibilityCard({
                 size={17}
               />
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={
-                handleOpenDetail
-              }
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
-            >
-              Ver detalle
-
-              <Icon
-                name="arrowRight"
-                size={17}
-              />
-            </button>
           )}
 
           {isHistory &&
             canReactivate && (
               <button
                 type="button"
-                disabled={
-                  reactivating
-                }
+                disabled={reactivating}
                 onClick={() =>
-                  onReactivate?.(
-                    item,
-                  )
+                  onReactivate?.(item)
                 }
                 className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
               >

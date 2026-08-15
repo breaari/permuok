@@ -268,7 +268,59 @@ class NotificationService
             $conversation
         );
     }
+    public static function notifyCompatibilityInterest(
+        int $userId,
+        int $compatibilityId
+    ): void {
+        if ($userId <= 0 || $compatibilityId <= 0) {
+            return;
+        }
 
+        self::create(
+            $userId,
+            'compatibility_interest',
+            'Hay interés en una compatibilidad',
+            'La otra inmobiliaria indicó que le interesa avanzar con una oportunidad compatible.',
+            'compatibility',
+            $compatibilityId
+        );
+    }
+
+    public static function notifyCompatibilityMutualInterest(
+        int $userId,
+        int $compatibilityId,
+        ?int $conversationId = null
+    ): void {
+        if ($userId <= 0 || $compatibilityId <= 0) {
+            return;
+        }
+
+        /*
+     * Si ya existe conversación, la notificación
+     * lleva directamente al chat.
+     */
+        if ($conversationId && $conversationId > 0) {
+            self::create(
+                $userId,
+                'compatibility_mutual_interest',
+                '¡Hay interés mutuo!',
+                'Ambas inmobiliarias mostraron interés. Ya pueden comenzar a conversar.',
+                'conversation',
+                $conversationId
+            );
+
+            return;
+        }
+
+        self::create(
+            $userId,
+            'compatibility_mutual_interest',
+            '¡Hay interés mutuo!',
+            'Ambas inmobiliarias mostraron interés en esta compatibilidad.',
+            'compatibility',
+            $compatibilityId
+        );
+    }
     private static function buildConversationTitle(string $type, array $conversation): string
     {
         $subject = self::conversationSubject($conversation);

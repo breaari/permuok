@@ -418,6 +418,22 @@ class ConversationService
 
             $pdo->commit();
 
+            /*
+ * Al quedar habilitado el chat,
+ * notificamos a ambas partes.
+ */
+            NotificationService::notifyCompatibilityMutualInterest(
+                $sourceUserId,
+                $compatibilityId,
+                $conversationId
+            );
+
+            NotificationService::notifyCompatibilityMutualInterest(
+                $targetUserId,
+                $compatibilityId,
+                $conversationId
+            );
+
             return [
                 'conversation' =>
                 self::getConversationById(

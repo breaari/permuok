@@ -61,6 +61,7 @@ import {
   Instagram,
   MoreVertical,
   Clock,
+  Sparkles,
 } from "lucide-react";
 
 export const Icons = {
@@ -137,6 +138,7 @@ export const Icons = {
   moreVertical: MoreVertical,
   badgeCheck: BadgeCheck,
   clock: Clock,
+  sparkles: Sparkles,
 };
 
 export function Icon({ name, size = 18, className = "" }) {
