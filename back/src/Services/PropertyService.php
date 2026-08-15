@@ -5,7 +5,6 @@ namespace App\Services;
 use PDO;
 use Exception;
 use Throwable;
-use App\Services\AI\CompatibilityEngine;
 
 class PropertyService
 {
@@ -182,33 +181,36 @@ class PropertyService
 
         return [$user, $property];
     }
-    private static function recalculateCompatibilitiesSafely(
+    private static function queueCompatibilityRecalculation(
         int $propertyId
     ): void {
         try {
-            CompatibilityEngine::calculateForProperty(
+            CompatibilityJobService::enqueuePropertyRecalculation(
                 $propertyId
             );
         } catch (Throwable $e) {
             error_log(
-                '[PROPERTY COMPATIBILITY] No se pudo recalcular ' .
-                    'la propiedad ' . $propertyId . ': ' .
+                '[PROPERTY COMPATIBILITY QUEUE] ' .
+                    'No se pudo encolar el recálculo ' .
+                    'de la propiedad ' .
+                    $propertyId . ': ' .
                     $e->getMessage()
             );
         }
     }
 
-    private static function archiveCompatibilitiesSafely(
+    private static function queueCompatibilityArchive(
         int $propertyId
     ): void {
         try {
-            CompatibilityEngine::archiveForProperty(
+            CompatibilityJobService::enqueuePropertyArchive(
                 $propertyId
             );
         } catch (Throwable $e) {
             error_log(
-                '[PROPERTY COMPATIBILITY] No se pudieron archivar ' .
-                    'las compatibilidades de la propiedad ' .
+                '[PROPERTY COMPATIBILITY QUEUE] ' .
+                    'No se pudo encolar el archivado ' .
+                    'de la propiedad ' .
                     $propertyId . ': ' .
                     $e->getMessage()
             );
@@ -570,7 +572,7 @@ class PropertyService
          * sus compatibilidades.
          */
             if ($property['status'] === 'published') {
-                self::recalculateCompatibilitiesSafely(
+                self::queueCompatibilityRecalculation(
                     $propertyId
                 );
             }
@@ -1081,7 +1083,7 @@ class PropertyService
             $pdo->commit();
 
             if ($property['status'] === 'published') {
-                self::recalculateCompatibilitiesSafely(
+                self::queueCompatibilityRecalculation(
                     $propertyId
                 );
             }
@@ -1260,10 +1262,9 @@ class PropertyService
 
             $pdo->commit();
 
-            self::recalculateCompatibilitiesSafely(
+            self::queueCompatibilityRecalculation(
                 $propertyId
             );
-
             return self::getDetail(
                 $userId,
                 $propertyId
@@ -1344,7 +1345,7 @@ class PropertyService
 
             $pdo->commit();
 
-            self::archiveCompatibilitiesSafely(
+            self::queueCompatibilityArchive(
                 $propertyId
             );
 
@@ -1438,7 +1439,7 @@ class PropertyService
 
             $pdo->commit();
 
-            self::archiveCompatibilitiesSafely(
+            self::queueCompatibilityArchive(
                 $propertyId
             );
 
@@ -1554,7 +1555,7 @@ class PropertyService
 
             $pdo->commit();
 
-            self::archiveCompatibilitiesSafely(
+            self::queueCompatibilityArchive(
                 $propertyId
             );
 
@@ -1789,7 +1790,7 @@ class PropertyService
 
             $pdo->commit();
 
-            self::archiveCompatibilitiesSafely(
+            self::queueCompatibilityArchive(
                 $propertyId
             );
 

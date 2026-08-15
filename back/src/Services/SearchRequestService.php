@@ -5,7 +5,6 @@ namespace App\Services;
 use App\DB;
 use PDO;
 use Exception;
-use App\Services\AI\CompatibilityEngine;
 use Throwable;
 
 class SearchRequestService
@@ -558,7 +557,7 @@ class SearchRequestService
  * las compatibilidades después de guardar los cambios.
  */
             if ($current['status'] === 'published') {
-                self::recalculateCompatibilitiesSafely($id);
+                self::queueCompatibilityRecalculation($id);
             }
 
             return self::getDetail($userId, $id);
@@ -577,7 +576,7 @@ class SearchRequestService
             true
         );
 
-        self::recalculateCompatibilitiesSafely($id);
+        self::queueCompatibilityRecalculation($id);
 
         return $result;
     }
@@ -591,7 +590,7 @@ class SearchRequestService
             false
         );
 
-        self::archiveCompatibilitiesSafely($id);
+        self::queueCompatibilityArchive($id);
 
         return $result;
     }
@@ -605,7 +604,7 @@ class SearchRequestService
             false
         );
 
-        self::archiveCompatibilitiesSafely($id);
+        self::queueCompatibilityArchive($id);
 
         return $result;
     }
@@ -638,7 +637,7 @@ class SearchRequestService
 
             $pdo->commit();
 
-            self::archiveCompatibilitiesSafely($id);
+            self::queueCompatibilityArchive($id);
 
             return [
                 'deleted' => true,
@@ -700,46 +699,48 @@ class SearchRequestService
             throw $e;
         }
     }
+
     /**
-     * Recalcula compatibilidades sin impedir que la operación
-     * principal de la búsqueda se complete.
+     * Encola el recálculo de compatibilidades sin impedir que
+     * la operación principal de la búsqueda se complete.
      */
-    private static function recalculateCompatibilitiesSafely(
+    private static function queueCompatibilityRecalculation(
         int $searchRequestId
     ): void {
         try {
-            CompatibilityEngine::calculateForSearchRequest(
+            CompatibilityJobService::enqueueSearchRequestRecalculation(
                 $searchRequestId
             );
         } catch (Throwable $e) {
             error_log(
-                '[SEARCH REQUEST COMPATIBILITY] No se pudo recalcular ' .
-                    'la búsqueda ' . $searchRequestId . ': ' .
+                '[SEARCH REQUEST COMPATIBILITY QUEUE] No se pudo encolar ' .
+                    'el recálculo de la búsqueda ' . $searchRequestId . ': ' .
                     $e->getMessage()
             );
         }
     }
 
     /**
-     * Archiva las compatibilidades todavía no avanzadas
-     * cuando la búsqueda deja de estar publicada.
+     * Encola el archivado de compatibilidades cuando la búsqueda
+     * deja de estar publicada.
      */
-    private static function archiveCompatibilitiesSafely(
+    private static function queueCompatibilityArchive(
         int $searchRequestId
     ): void {
         try {
-            CompatibilityEngine::archiveForSearchRequest(
+            CompatibilityJobService::enqueueSearchRequestArchive(
                 $searchRequestId
             );
         } catch (Throwable $e) {
             error_log(
-                '[SEARCH REQUEST COMPATIBILITY] No se pudieron archivar ' .
-                    'las compatibilidades de la búsqueda ' .
+                '[SEARCH REQUEST COMPATIBILITY QUEUE] No se pudo encolar ' .
+                    'el archivado de compatibilidades de la búsqueda ' .
                     $searchRequestId . ': ' .
                     $e->getMessage()
             );
         }
     }
+
     private static function validate(array $data, bool $strict = true): void
     {
         if ($strict) {
