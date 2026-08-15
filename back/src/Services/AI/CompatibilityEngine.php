@@ -45,7 +45,8 @@ class CompatibilityEngine
         );
         $properties = self::getCandidateProperties(
             $pdo,
-            (int)$searchRequest['real_estate_id']
+            (int)$searchRequest['real_estate_id'],
+            $propertyTypes
         );
 
         $pdo->beginTransaction();
@@ -143,13 +144,12 @@ class CompatibilityEngine
 
         $pdo = self::db();
 
+        /*
+     * Necesitamos la propiedad completa porque ahora
+     * vamos a evaluarla directamente contra cada búsqueda.
+     */
         $stProperty = $pdo->prepare("
-        SELECT
-            id,
-            real_estate_id,
-            status,
-            is_visible,
-            deleted_at
+        SELECT *
         FROM properties
         WHERE id = :id
         LIMIT 1
@@ -159,11 +159,13 @@ class CompatibilityEngine
             'id' => $propertyId,
         ]);
 
-        $property = $stProperty->fetch(PDO::FETCH_ASSOC);
+        $property = $stProperty->fetch(
+            PDO::FETCH_ASSOC
+        );
 
         /*
-     * Si la propiedad fue eliminada, pausada, archivada
-     * o cerrada, archivamos sus coincidencias pendientes.
+     * Si la propiedad ya no está publicada,
+     * archivamos sus compatibilidades pendientes.
      */
         if (
             !$property ||
@@ -171,71 +173,414 @@ class CompatibilityEngine
             $property['status'] !== 'published' ||
             (int)$property['is_visible'] !== 1
         ) {
-            return self::archiveForProperty($propertyId);
+            return self::archiveForProperty(
+                $propertyId
+            );
         }
 
         /*
-     * Recalculamos todas las búsquedas publicadas de otras
-     * inmobiliarias. En una versión posterior podremos
-     * prefiltrarlas para mejorar rendimiento.
+     * Estos datos pertenecen a la propiedad y son
+     * iguales para todas las búsquedas.
+     *
+     * Los cargamos una sola vez.
      */
-        $stSearchRequests = $pdo->prepare("
-        SELECT id
-        FROM search_requests
-        WHERE real_estate_id <> :real_estate_id
-          AND status = 'published'
-          AND is_visible = 1
-          AND deleted_at IS NULL
-        ORDER BY id ASC
-    ");
+        $propertyAmenities =
+            self::getPropertyAmenities(
+                $pdo,
+                $propertyId
+            );
 
-        $stSearchRequests->execute([
-            'real_estate_id' =>
-            (int)$property['real_estate_id'],
-        ]);
+        $propertyRequirements =
+            self::getPropertyRequirements(
+                $pdo,
+                $propertyId
+            );
 
-        $searchRequestIds = $stSearchRequests->fetchAll(
-            PDO::FETCH_COLUMN
-        ) ?: [];
+        /*
+     * Traemos solamente búsquedas potencialmente
+     * relevantes para esta propiedad.
+     */
+        $searchRequestIds =
+            self::getCandidateSearchRequestsForProperty(
+                $pdo,
+                $property
+            );
 
-        $recalculated = [];
+        $evaluated = 0;
+        $saved = 0;
+        $archived = 0;
         $errors = [];
+        $results = [];
 
         foreach ($searchRequestIds as $searchRequestId) {
-            $searchRequestId = (int)$searchRequestId;
+            $searchRequestId =
+                (int)$searchRequestId;
 
             try {
-                $result = self::calculateForSearchRequest(
-                    $searchRequestId
-                );
+                $result =
+                    self::calculatePropertySearchPair(
+                        $pdo,
+                        $property,
+                        $propertyAmenities,
+                        $propertyRequirements,
+                        $searchRequestId
+                    );
 
-                $recalculated[] = [
-                    'search_request_id' => $searchRequestId,
-                    'compatibilities_saved' =>
-                    (int)($result['compatibilities_saved'] ?? 0),
-                    'compatibilities_archived' =>
-                    (int)($result['compatibilities_archived'] ?? 0),
-                ];
+                $evaluated++;
+
+                if (
+                    ($result['saved'] ?? false)
+                    === true
+                ) {
+                    $saved++;
+                }
+
+                if (
+                    ($result['archived'] ?? false)
+                    === true
+                ) {
+                    $archived++;
+                }
+
+                $results[] = $result;
             } catch (Throwable $e) {
                 $errors[] = [
-                    'search_request_id' => $searchRequestId,
-                    'message' => $e->getMessage(),
+                    'search_request_id' =>
+                    $searchRequestId,
+
+                    'message' =>
+                    $e->getMessage(),
                 ];
             }
         }
 
         return [
-            'property_id' => $propertyId,
+            'property_id' =>
+            $propertyId,
+
             'search_requests_evaluated' =>
-            count($searchRequestIds),
-            'search_requests_recalculated' =>
-            count($recalculated),
-            'errors_count' => count($errors),
-            'recalculated' => $recalculated,
-            'errors' => $errors,
+            $evaluated,
+
+            'compatibilities_saved' =>
+            $saved,
+
+            'compatibilities_archived' =>
+            $archived,
+
+            'errors_count' =>
+            count($errors),
+
+            'results' =>
+            $results,
+
+            'errors' =>
+            $errors,
         ];
     }
 
+    private static function getCandidateSearchRequestsForProperty(
+        PDO $pdo,
+        array $property
+    ): array {
+        $propertyId =
+            (int)$property['id'];
+
+        $realEstateId =
+            (int)$property['real_estate_id'];
+
+        $propertyType =
+            trim(
+                (string)(
+                    $property['property_type']
+                    ?? ''
+                )
+            );
+
+        /*
+     * Una búsqueda entra como candidata cuando:
+     *
+     * 1. pertenece a otra inmobiliaria;
+     * 2. está publicada;
+     * 3. no especificó tipos de propiedad;
+     *    O pide específicamente este tipo;
+     * 4. O ya tenía una compatibilidad con esta
+     *    propiedad y necesitamos volver a evaluarla
+     *    para poder archivarla si dejó de coincidir.
+     */
+        $st = $pdo->prepare("
+        SELECT sr.id
+
+        FROM search_requests sr
+
+        WHERE
+            sr.real_estate_id <> :real_estate_id
+
+            AND sr.status = 'published'
+
+            AND sr.is_visible = 1
+
+            AND sr.deleted_at IS NULL
+
+            AND (
+                NOT EXISTS (
+                    SELECT 1
+                    FROM search_request_property_types srpt_any
+                    WHERE
+                        srpt_any.search_request_id = sr.id
+                )
+
+                OR EXISTS (
+                    SELECT 1
+                    FROM search_request_property_types srpt_match
+                    WHERE
+                        srpt_match.search_request_id = sr.id
+                        AND srpt_match.property_type = :property_type
+                )
+
+                OR EXISTS (
+                    SELECT 1
+                    FROM compatibilities c
+                    WHERE
+                        c.compatibility_type =
+                            'property_search_request'
+
+                        AND c.property_id =
+                            :property_id
+
+                        AND c.search_request_id =
+                            sr.id
+
+                        AND c.deleted_at IS NULL
+                )
+            )
+
+        ORDER BY sr.id ASC
+    ");
+
+        $st->execute([
+            'real_estate_id' =>
+            $realEstateId,
+
+            'property_type' =>
+            $propertyType,
+
+            'property_id' =>
+            $propertyId,
+        ]);
+
+        return $st->fetchAll(
+            PDO::FETCH_COLUMN
+        ) ?: [];
+    }
+
+    private static function calculatePropertySearchPair(
+        PDO $pdo,
+        array $property,
+        array $propertyAmenities,
+        ?array $propertyRequirements,
+        int $searchRequestId
+    ): array {
+        $propertyId =
+            (int)$property['id'];
+
+        $searchRequest =
+            self::getSearchRequest(
+                $pdo,
+                $searchRequestId
+            );
+
+        $propertyTypes =
+            self::getSearchRequestPropertyTypes(
+                $pdo,
+                $searchRequestId
+            );
+
+        $desiredAmenities =
+            self::getSearchRequestAmenities(
+                $pdo,
+                $searchRequestId
+            );
+
+        $exchangeOffers =
+            self::getSearchRequestExchangeOffers(
+                $pdo,
+                $searchRequestId
+            );
+
+        $evaluation =
+            self::evaluatePropertyAgainstSearch(
+                $searchRequest,
+                $propertyTypes,
+                $desiredAmenities,
+                $exchangeOffers,
+                $property,
+                $propertyAmenities,
+                $propertyRequirements
+            );
+
+        /*
+     * Si dejó de ser una compatibilidad válida,
+     * archivamos solamente ESTE par.
+     */
+        if (
+            $evaluation['discarded'] ||
+            $evaluation['score'] <
+            self::MIN_SCORE_TO_SAVE
+        ) {
+            $archived =
+                self::archivePropertySearchPair(
+                    $pdo,
+                    $propertyId,
+                    $searchRequestId
+                );
+
+            return [
+                'property_id' =>
+                $propertyId,
+
+                'search_request_id' =>
+                $searchRequestId,
+
+                'score' =>
+                $evaluation['score'],
+
+                'match_level' =>
+                $evaluation['match_level'],
+
+                'saved' =>
+                false,
+
+                'archived' =>
+                $archived > 0,
+
+                'reasons' =>
+                $evaluation['reasons'],
+
+                'penalties' =>
+                $evaluation['penalties'],
+            ];
+        }
+
+        /*
+     * Solamente guardamos/actualizamos la
+     * compatibilidad de este par.
+     */
+        $compatibilityId =
+            self::saveCompatibility(
+                $pdo,
+                $searchRequest,
+                $property,
+                $evaluation
+            );
+
+        return [
+            'compatibility_id' =>
+            $compatibilityId,
+
+            'property_id' =>
+            $propertyId,
+
+            'search_request_id' =>
+            $searchRequestId,
+
+            'score' =>
+            $evaluation['score'],
+
+            'match_level' =>
+            $evaluation['match_level'],
+
+            'saved' =>
+            true,
+
+            'archived' =>
+            false,
+
+            'reasons' =>
+            $evaluation['reasons'],
+
+            'penalties' =>
+            $evaluation['penalties'],
+        ];
+    }
+    private static function archivePropertySearchPair(
+        PDO $pdo,
+        int $propertyId,
+        int $searchRequestId
+    ): int {
+        /*
+     * No alteramos compatibilidades que ya
+     * avanzaron comercialmente.
+     */
+        $protectedStatuses = [
+            'one_side_interested',
+            'mutual_interest',
+            'chat_enabled',
+        ];
+
+        $params = [
+            'property_id' =>
+            $propertyId,
+
+            'search_request_id' =>
+            $searchRequestId,
+        ];
+
+        $placeholders = [];
+
+        foreach (
+            $protectedStatuses
+            as $index => $status
+        ) {
+            $key =
+                'protected_status_' . $index;
+
+            $placeholders[] =
+                ':' . $key;
+
+            $params[$key] =
+                $status;
+        }
+
+        $sql = "
+        UPDATE compatibilities
+
+        SET
+            status = 'archived',
+
+            archived_at = NOW(),
+
+            updated_at =
+                CURRENT_TIMESTAMP
+
+        WHERE
+            compatibility_type =
+                'property_search_request'
+
+            AND property_id =
+                :property_id
+
+            AND search_request_id =
+                :search_request_id
+
+            AND deleted_at IS NULL
+
+            AND status NOT IN (
+                " .
+            implode(
+                ', ',
+                $placeholders
+            ) .
+            "
+            )
+    ";
+
+        $st = $pdo->prepare($sql);
+
+        $st->execute($params);
+
+        return $st->rowCount();
+    }
+    
     public static function archiveForProperty(
         int $propertyId
     ): array {
@@ -382,24 +727,81 @@ class CompatibilityEngine
 
     private static function getCandidateProperties(
         PDO $pdo,
-        int $sourceRealEstateId
+        int $sourceRealEstateId,
+        array $propertyTypes
     ): array {
-        $st = $pdo->prepare("
-            SELECT *
-            FROM properties
-            WHERE real_estate_id <> :source_real_estate_id
-              AND status = 'published'
-              AND is_visible = 1
-              AND deleted_at IS NULL
-            ORDER BY id DESC
-        ");
+        $sql = "
+        SELECT p.*
+        FROM properties p
+        WHERE p.real_estate_id <> :source_real_estate_id
+          AND p.status = 'published'
+          AND p.is_visible = 1
+          AND p.deleted_at IS NULL
+    ";
 
-        $st->execute([
-            'source_real_estate_id' => $sourceRealEstateId,
-        ]);
+        $params = [
+            'source_real_estate_id' =>
+            $sourceRealEstateId,
+        ];
 
-        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        /*
+     * Si la búsqueda especifica tipos de propiedad,
+     * descartamos directamente desde SQL los tipos
+     * que el motor igualmente descartaría después.
+     */
+        $propertyTypes = array_values(
+            array_unique(
+                array_filter(
+                    array_map(
+                        static fn($type) =>
+                        trim((string)$type),
+                        $propertyTypes
+                    ),
+                    static fn($type) =>
+                    $type !== ''
+                )
+            )
+        );
+
+        if ($propertyTypes !== []) {
+            $placeholders = [];
+
+            foreach ($propertyTypes as $index => $propertyType) {
+                $key =
+                    'property_type_' . $index;
+
+                $placeholders[] =
+                    ':' . $key;
+
+                $params[$key] =
+                    $propertyType;
+            }
+
+            $sql .= "
+          AND p.property_type IN (
+              " .
+                implode(
+                    ', ',
+                    $placeholders
+                ) .
+                "
+          )
+        ";
+        }
+
+        $sql .= "
+        ORDER BY p.id DESC
+    ";
+
+        $st = $pdo->prepare($sql);
+
+        $st->execute($params);
+
+        return $st->fetchAll(
+            PDO::FETCH_ASSOC
+        ) ?: [];
     }
+
     private static function getSearchRequestExchangeOffers(
         PDO $pdo,
         int $searchRequestId
