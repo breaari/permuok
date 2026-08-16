@@ -21,6 +21,24 @@ class PropertyImageService
         return pdo();
     }
 
+    private static function queueQualityRecalculation(
+        int $propertyId
+    ): void {
+        try {
+            CompatibilityJobService::enqueuePropertyQualityRecalculation(
+                $propertyId
+            );
+        } catch (\Throwable $e) {
+            error_log(
+                '[PROPERTY IMAGE QUALITY QUEUE] ' .
+                    'No se pudo encolar el recálculo ' .
+                    'de calidad de la propiedad ' .
+                    $propertyId . ': ' .
+                    $e->getMessage()
+            );
+        }
+    }
+
     private static function getUploadBaseDir(): string
     {
         $base = rtrim((string)($_ENV['UPLOADS_DIR'] ?? ''), '/');
@@ -325,58 +343,75 @@ class PropertyImageService
                 ]);
             }
 
-            self::ensureSingleCover($propertyId);
+            self::ensureSingleCover(
+                $propertyId
+            );
 
             $pdo->commit();
-            return PropertyService::getDetail($userId, $propertyId);
+
+            self::queueQualityRecalculation(
+                $propertyId
+            );
+
+            return PropertyService::getDetail(
+                $userId,
+                $propertyId
+            );
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw $e;
         }
     }
-   public static function delete(int $userId, int $imageId): array
-{
-    [, $image] = self::getOwnedImage($userId, $imageId);
-    $pdo = self::db();
+    public static function delete(int $userId, int $imageId): array
+    {
+        [, $image] = self::getOwnedImage($userId, $imageId);
+        $pdo = self::db();
 
-    $stProperty = $pdo->prepare("
+        $stProperty = $pdo->prepare("
         SELECT status
         FROM properties
         WHERE id = :id
           AND deleted_at IS NULL
         LIMIT 1
     ");
-    $stProperty->execute(['id' => (int)$image['property_id']]);
-    $property = $stProperty->fetch();
+        $stProperty->execute(['id' => (int)$image['property_id']]);
+        $property = $stProperty->fetch();
 
-    if (!$property) {
-        throw new Exception("Propiedad no encontrada");
-    }
+        if (!$property) {
+            throw new Exception("Propiedad no encontrada");
+        }
 
-    if (!in_array($property['status'], ['draft', 'paused', 'archived', 'published'], true)) {
-        throw new Exception("No se pueden eliminar imágenes en el estado actual de la propiedad");
-    }
+        if (!in_array($property['status'], ['draft', 'paused', 'archived', 'published'], true)) {
+            throw new Exception("No se pueden eliminar imágenes en el estado actual de la propiedad");
+        }
 
-    $pdo->beginTransaction();
+        $pdo->beginTransaction();
 
-    try {
-        $st = $pdo->prepare("
+        try {
+            $st = $pdo->prepare("
             UPDATE property_images
             SET deleted_at = NOW()
             WHERE id = :id
             LIMIT 1
         ");
-        $st->execute(['id' => $imageId]);
+            $st->execute(['id' => $imageId]);
 
-        self::ensureSingleCover((int)$image['property_id']);
+            self::ensureSingleCover((int)$image['property_id']);
 
-        $pdo->commit();
-        return PropertyService::getDetail($userId, (int)$image['property_id']);
-    } catch (\Throwable $e) {
-        $pdo->rollBack();
-        throw $e;
+            $pdo->commit();
+            self::queueQualityRecalculation(
+                (int)$image['property_id']
+            );
+
+            return PropertyService::getDetail(
+                $userId,
+                (int)$image['property_id']
+            );
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
     }
-}
 
     public static function reorder(int $userId, int $propertyId, array $images): array
     {
@@ -447,6 +482,11 @@ class PropertyImageService
             }
 
             $pdo->commit();
+
+            self::queueQualityRecalculation(
+                $propertyId
+            );
+
             return PropertyService::getDetail($userId, $propertyId);
         } catch (\Throwable $e) {
             $pdo->rollBack();
