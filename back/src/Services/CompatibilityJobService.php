@@ -9,16 +9,19 @@ use Throwable;
 class CompatibilityJobService
 {
     private const TYPE_PROPERTY_RECALCULATE =
-        'property_recalculate';
+    'property_recalculate';
 
     private const TYPE_SEARCH_RECALCULATE =
-        'search_request_recalculate';
+    'search_request_recalculate';
 
     private const TYPE_PROPERTY_ARCHIVE =
-        'property_archive';
+    'property_archive';
 
     private const TYPE_SEARCH_ARCHIVE =
-        'search_request_archive';
+    'search_request_archive';
+
+    private const TYPE_PROPERTY_QUALITY_RECALCULATE =
+    'property_quality_recalculate';
 
     private const STALE_LOCK_MINUTES = 10;
 
@@ -27,6 +30,17 @@ class CompatibilityJobService
         require_once __DIR__ . '/../../db.php';
 
         return pdo();
+    }
+
+    public static function enqueuePropertyQualityRecalculation(
+        int $propertyId,
+        int $priority = 4
+    ): array {
+        return self::enqueue(
+            self::TYPE_PROPERTY_QUALITY_RECALCULATE,
+            $propertyId,
+            $priority
+        );
     }
 
     public static function enqueuePropertyRecalculation(
@@ -89,6 +103,7 @@ class CompatibilityJobService
             self::TYPE_SEARCH_RECALCULATE,
             self::TYPE_PROPERTY_ARCHIVE,
             self::TYPE_SEARCH_ARCHIVE,
+            self::TYPE_PROPERTY_QUALITY_RECALCULATE,
         ];
 
         if (!in_array($jobType, $validTypes, true)) {
@@ -159,16 +174,16 @@ class CompatibilityJobService
 
         $st->execute([
             'job_type' =>
-                $jobType,
+            $jobType,
 
             'entity_id' =>
-                $entityId,
+            $entityId,
 
             'priority' =>
-                $priority,
+            $priority,
 
             'active_key' =>
-                $activeKey,
+            $activeKey,
         ]);
 
         $stFind = $pdo->prepare("
@@ -275,10 +290,10 @@ class CompatibilityJobService
 
             $stUpdate->execute([
                 'locked_by' =>
-                    $workerId,
+                $workerId,
 
                 'id' =>
-                    $jobId,
+                $jobId,
             ]);
 
             $pdo->commit();
@@ -472,10 +487,10 @@ class CompatibilityJobService
 
         $st->execute([
             'error_message' =>
-                $message,
+            $message,
 
             'id' =>
-                $jobId,
+            $jobId,
         ]);
     }
 

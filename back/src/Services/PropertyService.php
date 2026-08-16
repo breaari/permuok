@@ -181,6 +181,25 @@ class PropertyService
 
         return [$user, $property];
     }
+
+    private static function queueQualityRecalculation(
+        int $propertyId
+    ): void {
+        try {
+            CompatibilityJobService::enqueuePropertyQualityRecalculation(
+                $propertyId
+            );
+        } catch (Throwable $e) {
+            error_log(
+                '[PROPERTY QUALITY QUEUE] ' .
+                    'No se pudo encolar el recálculo ' .
+                    'de calidad de la propiedad ' .
+                    $propertyId . ': ' .
+                    $e->getMessage()
+            );
+        }
+    }
+
     private static function queueCompatibilityRecalculation(
         int $propertyId
     ): void {
@@ -386,7 +405,21 @@ class PropertyService
             $data['amenities'] ?? []
         );
 
-        return self::getDetail($userId, $id);
+        /*
+ * Calculamos la calidad inicial incluso
+ * mientras la propiedad está en borrador.
+ *
+ * Esto permitirá mostrar sugerencias al usuario
+ * antes de que publique.
+ */
+        self::queueQualityRecalculation(
+            $id
+        );
+
+        return self::getDetail(
+            $userId,
+            $id
+        );
     }
 
     public static function getDetail(int $userId, int $propertyId): array
@@ -571,6 +604,18 @@ class PropertyService
          * ubicación, características o amenities puede modificar
          * sus compatibilidades.
          */
+            /*
+ * La calidad se recalcula siempre,
+ * incluso si todavía es borrador.
+ */
+            self::queueQualityRecalculation(
+                $propertyId
+            );
+
+            /*
+ * Las compatibilidades solamente necesitan
+ * recalcularse cuando la propiedad está publicada.
+ */
             if ($property['status'] === 'published') {
                 self::queueCompatibilityRecalculation(
                     $propertyId
@@ -1082,6 +1127,14 @@ class PropertyService
 
             $pdo->commit();
 
+            /*
+ * Los criterios de intercambio forman parte
+ * del potencial de matching de la publicación.
+ */
+            self::queueQualityRecalculation(
+                $propertyId
+            );
+
             if ($property['status'] === 'published') {
                 self::queueCompatibilityRecalculation(
                     $propertyId
@@ -1261,10 +1314,14 @@ class PropertyService
             ]);
 
             $pdo->commit();
+            self::queueQualityRecalculation(
+                $propertyId
+            );
 
             self::queueCompatibilityRecalculation(
                 $propertyId
             );
+            
             return self::getDetail(
                 $userId,
                 $propertyId

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Exception;
 use App\Services\AI\CompatibilityEngine;
+use App\Services\AI\PublicationQualityService;
 
 class CompatibilityJobProcessor
 {
@@ -24,30 +25,33 @@ class CompatibilityJobProcessor
 
         return match ($jobType) {
             'property_recalculate' =>
-                CompatibilityEngine::calculateForProperty(
-                    $entityId
-                ),
-
+            CompatibilityEngine::calculateForProperty(
+                $entityId
+            ),
+            'property_quality_recalculate' =>
+            PublicationQualityService::analyzeProperty(
+                $entityId
+            ),
             'search_request_recalculate' =>
-                CompatibilityEngine::calculateForSearchRequest(
-                    $entityId
-                ),
+            CompatibilityEngine::calculateForSearchRequest(
+                $entityId
+            ),
 
             'property_archive' =>
-                CompatibilityEngine::archiveForProperty(
-                    $entityId
-                ),
+            CompatibilityEngine::archiveForProperty(
+                $entityId
+            ),
 
             'search_request_archive' =>
-                CompatibilityEngine::archiveForSearchRequest(
-                    $entityId
-                ),
+            CompatibilityEngine::archiveForSearchRequest(
+                $entityId
+            ),
 
             default =>
-                throw new Exception(
-                    'Tipo de job desconocido: ' .
-                        $jobType
-                ),
+            throw new Exception(
+                'Tipo de job desconocido: ' .
+                    $jobType
+            ),
         };
     }
 }
