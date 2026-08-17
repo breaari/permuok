@@ -215,7 +215,10 @@ export function usePropertyForm({ googleMapsLoaded }) {
     const detail = unwrap(detailRes);
 
     const property = detail?.property || {};
+    const refreshedQuality = detail?.quality || null;
+
     setQuality(refreshedQuality);
+
     const refreshedImages = Array.isArray(detail?.images) ? detail.images : [];
 
     const refreshedAmenities = Array.isArray(detail?.amenities)
@@ -248,7 +251,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
     );
 
     setPropertyStatus(property?.status || propertyStatus);
-
+    setQuality(refreshedQuality);
     setExistingImages(refreshedImages);
 
     setInitialExistingImageIds(

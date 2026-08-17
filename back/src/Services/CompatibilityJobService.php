@@ -23,6 +23,9 @@ class CompatibilityJobService
     private const TYPE_PROPERTY_QUALITY_RECALCULATE =
     'property_quality_recalculate';
 
+    private const TYPE_PROPERTY_AI_ANALYZE =
+    'property_ai_analyze';
+
     private const STALE_LOCK_MINUTES = 10;
 
     private static function db(): PDO
@@ -38,6 +41,17 @@ class CompatibilityJobService
     ): array {
         return self::enqueue(
             self::TYPE_PROPERTY_QUALITY_RECALCULATE,
+            $propertyId,
+            $priority
+        );
+    }
+
+    public static function enqueuePropertyAIAnalysis(
+        int $propertyId,
+        int $priority = 3
+    ): array {
+        return self::enqueue(
+            self::TYPE_PROPERTY_AI_ANALYZE,
             $propertyId,
             $priority
         );
@@ -104,6 +118,7 @@ class CompatibilityJobService
             self::TYPE_PROPERTY_ARCHIVE,
             self::TYPE_SEARCH_ARCHIVE,
             self::TYPE_PROPERTY_QUALITY_RECALCULATE,
+            self::TYPE_PROPERTY_AI_ANALYZE,
         ];
 
         if (!in_array($jobType, $validTypes, true)) {
