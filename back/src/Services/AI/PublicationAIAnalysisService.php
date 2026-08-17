@@ -825,20 +825,18 @@ class PublicationAIAnalysisService
                 true
             )
         ) {
+            $analysisId =
+                (int)$existing['id'];
+
             $job =
                 CompatibilityJobService::enqueuePropertyAIAnalysis(
                     $propertyId,
                     $analysisId
                 );
 
-            CompatibilityJobService::enqueuePropertyAIAnalysis(
-                $propertyId,
-                (int)$existing['id']
-            );
-
             return [
                 'analysis_id' =>
-                (int)$existing['id'],
+                $analysisId,
 
                 'status' =>
                 (string)$existing['status'],
@@ -893,7 +891,8 @@ class PublicationAIAnalysisService
             try {
                 $job =
                     CompatibilityJobService::enqueuePropertyAIAnalysis(
-                        $propertyId
+                        $propertyId,
+                        $analysisId
                     );
             } catch (Throwable $e) {
                 self::markAnalysisFailed(
@@ -963,7 +962,8 @@ class PublicationAIAnalysisService
         try {
             $job =
                 CompatibilityJobService::enqueuePropertyAIAnalysis(
-                    $propertyId
+                    $propertyId,
+                    $analysisId
                 );
         } catch (Throwable $e) {
             self::markAnalysisFailed(
