@@ -10,7 +10,7 @@ use App\Services\CompatibilityJobService;
 
 class PublicationAIAnalysisService
 {
-    private const PROMPT_VERSION = '1.5';
+    private const PROMPT_VERSION = '1.6';
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const ALLOWED_QUESTION_FIELDS = [
@@ -1761,6 +1761,56 @@ REGLAS DE CALIDAD DEL TÍTULO Y DESCRIPCIÓN:
   "departamento"
   "propiedad prueba"
   "casa en venta"
+
+  CRITERIOS PARA UN BUEN TÍTULO EN PERMUOK:
+
+- El título debe ser comercial, claro y breve.
+- Más información NO significa necesariamente un mejor título.
+- Evaluá el título con los mismos criterios que usaría una inmobiliaria
+  profesional para presentar rápidamente una propiedad.
+
+- Priorizar, cuando estén confirmados:
+  tipo de propiedad,
+  cantidad de ambientes,
+  atributo diferencial relevante,
+  zona o barrio.
+
+- Ejemplos de buenos títulos:
+  "Departamento 2 ambientes en Lanús Oeste"
+  "Casa 4 ambientes con jardín en Martínez"
+  "Departamento 3 ambientes con cochera en Mar del Plata"
+  "Local comercial en Palermo Soho"
+
+- NO penalices un título por no incluir:
+  superficie total,
+  superficie cubierta,
+  piso,
+  número de departamento,
+  dirección exacta,
+  baños,
+  dormitorios si ya se expresaron los ambientes,
+  antigüedad,
+  tipo de cochera,
+  precio o moneda.
+
+- No sugieras agregar piso, número de departamento o dirección exacta al título.
+
+- No sugieras agregar superficies al título salvo que la superficie sea
+  excepcionalmente relevante para identificar la tipología del inmueble.
+
+- No sugieras datos técnicos solamente para aumentar la cantidad de
+  información del título.
+
+- Piso, unidad/departamento y dirección exacta son datos de identificación
+  y ubicación, no atributos comerciales que normalmente deban formar parte
+  del título.
+
+- Un título breve que identifica correctamente tipología, ambientes y zona
+  puede recibir un puntaje alto aunque no incluya otros datos.
+
+- Si el título fue generado correctamente con esos criterios, no generar una
+  suggestion sólo para hacerlo más largo.
+
 
 - Una descripción demasiado breve, genérica, redundante, de prueba o que no
   aporte información inmobiliaria útil debe recibir un description_score bajo.

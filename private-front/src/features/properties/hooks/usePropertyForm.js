@@ -131,7 +131,17 @@ export function usePropertyForm({ googleMapsLoaded }) {
         setExistingImages(serverImages);
         setQuality(serverQuality);
         try {
-          const analysis = await getPropertyAIAnalysis(Number(id));
+          let analysis = await getPropertyAIAnalysis(Number(id));
+
+          if (analysis?.status === "pending") {
+            const queued = await requestPropertyAIAnalysis(Number(id));
+
+            analysis = {
+              ...analysis,
+              id: queued?.analysis_id ?? analysis?.id ?? null,
+              status: queued?.status || analysis?.status || "pending",
+            };
+          }
 
           if (!cancelled) {
             setAIAnalysis(analysis);
@@ -823,7 +833,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
       }
     };
   }, [id, isEditMode, aiAnalysis?.status]);
-  
+
   return {
     id,
     isEditMode,
