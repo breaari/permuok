@@ -35,7 +35,9 @@ class CompatibilityJobProcessor
             ),
             'property_ai_analyze' =>
             PublicationAIAnalysisService::processPropertyAnalysis(
-                $entityId
+                $entityId,
+                (int)($job['attempts'] ?? 1),
+                (int)($job['max_attempts'] ?? 3)
             ),
             'search_request_recalculate' =>
             CompatibilityEngine::calculateForSearchRequest(

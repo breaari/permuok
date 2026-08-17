@@ -26,7 +26,7 @@ $st = $pdo->prepare("
 ");
 
 $st->execute([
-    'id' => 1,
+    'id' => 3,
 ]);
 
 $row = $st->fetch(PDO::FETCH_ASSOC);

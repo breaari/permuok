@@ -10,7 +10,7 @@ use App\Services\CompatibilityJobService;
 
 class PublicationAIAnalysisService
 {
-    private const PROMPT_VERSION = '1.1';
+    private const PROMPT_VERSION = '1.2';
     private const DEFAULT_MODEL = 'gpt-5-mini';
     private static function db(
         bool $forceReconnect = false
@@ -929,7 +929,9 @@ class PublicationAIAnalysisService
     }
 
     public static function processPropertyAnalysis(
-        int $propertyId
+        int $propertyId,
+        int $attempt = 1,
+        int $maxAttempts = 3
     ): array {
         if ($propertyId <= 0) {
             throw new Exception(
@@ -1067,10 +1069,17 @@ class PublicationAIAnalysisService
                 $result['_model'] ?? null,
             ];
         } catch (Throwable $e) {
-            self::markAnalysisFailed(
-                $analysisId,
-                $e->getMessage()
-            );
+            if ($attempt < $maxAttempts) {
+                self::markAnalysisPendingForRetry(
+                    $analysisId,
+                    $e->getMessage()
+                );
+            } else {
+                self::markAnalysisFailed(
+                    $analysisId,
+                    $e->getMessage()
+                );
+            }
 
             throw $e;
         }
@@ -1337,6 +1346,39 @@ class PublicationAIAnalysisService
         return $analysis;
     }
 
+    private static function markAnalysisPendingForRetry(
+        int $analysisId,
+        string $message
+    ): void {
+        if ($analysisId <= 0) {
+            return;
+        }
+
+        $pdo = self::db(true);
+
+        $message = mb_substr(
+            $message,
+            0,
+            6000
+        );
+
+        $st = $pdo->prepare("
+        UPDATE publication_ai_analyses
+        SET
+            status = 'pending',
+            error_message = :error_message,
+            analyzed_at = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = :id
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'error_message' => $message,
+            'id' => $analysisId,
+        ]);
+    }
+
     private static function markAnalysisFailed(
         int $analysisId,
         string $message
@@ -1457,6 +1499,36 @@ REGLAS DE REDACCIÓN:
 - Evitar abreviaturas innecesarias y texto repetitivo.
 - No usar lenguaje robótico.
 - No inventar información para hacer el texto más atractivo.
+
+CAMPOS ACTUALMENTE EDITABLES EN LA FICHA DE PROPIEDAD:
+
+- título
+- descripción
+- tipo de propiedad
+- precio
+- moneda
+- país
+- provincia
+- ciudad
+- zona
+- dirección
+- superficie total
+- superficie cubierta
+- dormitorios
+- baños
+- cocheras
+- antigüedad
+- amenities disponibles en PermuOK
+- imágenes
+- requisitos de permuta/búsqueda
+
+REGLA:
+Las preguntas de questions deben referirse únicamente a datos que el
+usuario pueda confirmar y luego cargar en alguno de estos campos.
+
+Si detectás otro dato comercialmente útil que PermuOK todavía no permite
+guardar, podés mencionarlo en suggestions, pero no generes una question
+accionable sobre ese dato.
 
 PUBLICACIÓN:
 
