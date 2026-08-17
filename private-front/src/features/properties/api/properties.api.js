@@ -64,3 +64,15 @@ export async function deleteProperty(id) {
   const res = await http.post(`/properties/${id}/delete`, {});
   return unwrap(res);
 }
+
+export async function getPropertyAIAnalysis(id) {
+  const res = await http.get(`/properties/${id}/ai-analysis`);
+  const data = unwrap(res);
+
+  return data?.analysis || null;
+}
+
+export async function requestPropertyAIAnalysis(id) {
+  const res = await http.post(`/properties/${id}/ai-analysis`, {});
+  return unwrap(res);
+}

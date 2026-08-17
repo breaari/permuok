@@ -61,6 +61,10 @@ export default function PropertyForm() {
     submitProperty,
     navigate,
     quality,
+    aiAnalysis,
+    aiAnalysisLoading,
+    aiAnalysisRequesting,
+    handleRequestAIAnalysis,
     showError,
     showSuccess,
   } = usePropertyForm({ googleMapsLoaded });
@@ -209,7 +213,13 @@ export default function PropertyForm() {
               {/* COLUMNA DERECHA: OPTIMIZADOR */}
               {isEditMode && quality ? (
                 <aside className="self-start min-w-0">
-                  <PropertyQualityOptimizer quality={quality} />
+                  <PropertyQualityOptimizer
+                    quality={quality}
+                    aiAnalysis={aiAnalysis}
+                    aiAnalysisLoading={aiAnalysisLoading}
+                    aiAnalysisRequesting={aiAnalysisRequesting}
+                    onRequestAIAnalysis={handleRequestAIAnalysis}
+                  />
                 </aside>
               ) : (
                 <div className="hidden xl:block" />

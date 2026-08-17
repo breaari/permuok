@@ -22,6 +22,8 @@ import {
   uploadPropertyImages,
   publishProperty,
   reorderPropertyImages,
+  getPropertyAIAnalysis,
+  requestPropertyAIAnalysis,
 } from "../api/properties.api.js";
 import { useToast } from "../../../ui/toast/ToastProvider";
 
@@ -71,6 +73,9 @@ export function usePropertyForm({ googleMapsLoaded }) {
   const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [initialError, setInitialError] = useState("");
   const [quality, setQuality] = useState(null);
+  const [aiAnalysis, setAIAnalysis] = useState(null);
+  const [aiAnalysisLoading, setAIAnalysisLoading] = useState(false);
+  const [aiAnalysisRequesting, setAIAnalysisRequesting] = useState(false);
 
   useEffect(() => {
     if (!isEditMode) return;
@@ -119,6 +124,23 @@ export function usePropertyForm({ googleMapsLoaded }) {
 
         setExistingImages(serverImages);
         setQuality(serverQuality);
+        try {
+          const analysis = await getPropertyAIAnalysis(Number(id));
+
+          if (!cancelled) {
+            setAIAnalysis(analysis);
+          }
+        } catch (error) {
+          /*
+           * No bloqueamos la carga de la propiedad
+           * si solamente falla el optimizador IA.
+           */
+          console.error("[PROPERTY AI] No se pudo cargar el análisis:", error);
+
+          if (!cancelled) {
+            setAIAnalysis(null);
+          }
+        }
         setInitialExistingImageIds(
           serverImages
             .map((img) => Number(img?.id))
@@ -619,7 +641,97 @@ export function usePropertyForm({ googleMapsLoaded }) {
 
     handleOpenPublishChoice();
   }
+  async function refreshAIAnalysis(propertyId = Number(id)) {
+    if (!propertyId) {
+      return null;
+    }
 
+    try {
+      setAIAnalysisLoading(true);
+
+      const analysis = await getPropertyAIAnalysis(propertyId);
+
+      setAIAnalysis(analysis);
+
+      return analysis;
+    } catch (error) {
+      showError(getErrorMessage(error, "No se pudo consultar el análisis IA."));
+
+      return null;
+    } finally {
+      setAIAnalysisLoading(false);
+    }
+  }
+
+  async function handleRequestAIAnalysis() {
+    if (!isEditMode || aiAnalysisRequesting) {
+      return;
+    }
+
+    try {
+      setAIAnalysisRequesting(true);
+
+      const result = await requestPropertyAIAnalysis(Number(id));
+
+      /*
+       * Si el análisis ya estaba terminado
+       * solamente volvemos a consultarlo.
+       */
+      if (result?.status === "completed") {
+        await refreshAIAnalysis(Number(id));
+        return;
+      }
+
+      /*
+       * Si fue encolado, mostramos inmediatamente
+       * el estado correspondiente.
+       */
+      setAIAnalysis((prev) => ({
+        ...(prev || {}),
+        id: result?.analysis_id ?? prev?.id ?? null,
+        status: result?.status || "pending",
+      }));
+    } catch (error) {
+      showError(getErrorMessage(error, "No se pudo iniciar el análisis IA."));
+    } finally {
+      setAIAnalysisRequesting(false);
+    }
+  }
+
+  useEffect(() => {
+    if (
+      !isEditMode ||
+      !id ||
+      !["pending", "processing"].includes(aiAnalysis?.status)
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const intervalId = window.setInterval(async () => {
+      try {
+        const analysis = await getPropertyAIAnalysis(Number(id));
+
+        if (cancelled) {
+          return;
+        }
+
+        setAIAnalysis(analysis);
+
+        if (analysis && !["pending", "processing"].includes(analysis.status)) {
+          window.clearInterval(intervalId);
+        }
+      } catch (error) {
+        console.error("[PROPERTY AI] Error consultando estado:", error);
+      }
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [id, isEditMode, aiAnalysis?.status]);
   return {
     id,
     isEditMode,
@@ -666,6 +778,13 @@ export function usePropertyForm({ googleMapsLoaded }) {
     submitProperty,
     navigate,
     quality,
+
+    aiAnalysis,
+    aiAnalysisLoading,
+    aiAnalysisRequesting,
+    refreshAIAnalysis,
+    handleRequestAIAnalysis,
+
     showError,
     showSuccess,
   };

@@ -27,10 +27,7 @@ function SectionScore({ label, score, maxScore }) {
   const safeScore = Number(score || 0);
   const safeMax = Number(maxScore || 1);
 
-  const percent = Math.max(
-    0,
-    Math.min(100, (safeScore / safeMax) * 100),
-  );
+  const percent = Math.max(0, Math.min(100, (safeScore / safeMax) * 100));
 
   return (
     <div className="space-y-1.5">
@@ -52,7 +49,13 @@ function SectionScore({ label, score, maxScore }) {
   );
 }
 
-export default function PropertyQualityOptimizer({ quality }) {
+export default function PropertyQualityOptimizer({
+  quality,
+  aiAnalysis,
+  aiAnalysisLoading = false,
+  aiAnalysisRequesting = false,
+  onRequestAIAnalysis,
+}) {
   if (!quality) {
     return null;
   }
@@ -75,8 +78,7 @@ export default function PropertyQualityOptimizer({ quality }) {
   const prioritizedSuggestions = [...suggestions]
     .sort(
       (a, b) =>
-        (priorityOrder[a?.priority] || 99) -
-        (priorityOrder[b?.priority] || 99),
+        (priorityOrder[a?.priority] || 99) - (priorityOrder[b?.priority] || 99),
     )
     .slice(0, 4);
 
@@ -206,7 +208,84 @@ export default function PropertyQualityOptimizer({ quality }) {
             </div>
           </div>
         )}
+        <div className="border-t border-slate-100 pt-6">
+          <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+                <Icon name="sparkles" size={18} />
+              </div>
 
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-slate-900">
+                  Análisis inteligente
+                </p>
+
+                {!aiAnalysis && (
+                  <p className="mt-1 text-sm leading-5 text-slate-600">
+                    La IA puede revisar la ficha, descripción e imágenes para
+                    detectar mejoras y datos que conviene confirmar.
+                  </p>
+                )}
+
+                {aiAnalysis?.status === "pending" && (
+                  <p className="mt-1 text-sm text-slate-600">
+                    El análisis está en espera para ser procesado.
+                  </p>
+                )}
+
+                {aiAnalysis?.status === "processing" && (
+                  <p className="mt-1 text-sm text-slate-600">
+                    Estamos analizando la publicación.
+                  </p>
+                )}
+
+                {aiAnalysis?.status === "completed" && (
+                  <p className="mt-1 text-sm font-medium text-emerald-700">
+                    Análisis IA disponible.
+                  </p>
+                )}
+
+                {aiAnalysis?.status === "failed" && (
+                  <p className="mt-1 text-sm text-rose-700">
+                    No se pudo completar el análisis.
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={onRequestAIAnalysis}
+                  disabled={
+                    aiAnalysisLoading ||
+                    aiAnalysisRequesting ||
+                    ["pending", "processing"].includes(aiAnalysis?.status)
+                  }
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Icon
+                    name={
+                      aiAnalysis?.status === "completed"
+                        ? "refresh"
+                        : "sparkles"
+                    }
+                    size={17}
+                  />
+
+                  {aiAnalysisRequesting
+                    ? "Solicitando..."
+                    : aiAnalysis?.status === "pending"
+                      ? "En espera..."
+                      : aiAnalysis?.status === "processing"
+                        ? "Analizando..."
+                        : aiAnalysis?.status === "completed"
+                          ? "Actualizar análisis"
+                          : aiAnalysis?.status === "failed"
+                            ? "Reintentar análisis"
+                            : "Analizar con IA"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
         <div className="flex items-center gap-2 border-t border-slate-100 pt-4 text-xs text-slate-400">
           <Icon name="clock" size={14} />
 
