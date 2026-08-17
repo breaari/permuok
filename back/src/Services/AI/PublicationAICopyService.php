@@ -440,6 +440,15 @@ No inventes ni deduzcas:
 - usos posibles;
 - amenities;
 - ambientes que no estén confirmados.
+- No inferir accesibilidad, conectividad, tranquilidad, seguridad,
+  cercanía a servicios, transporte, comercios o puntos de interés
+  si esos datos no están explícitamente confirmados.
+- Evitar frases genéricas como:
+  "zona de fácil acceso",
+  "excelente ubicación",
+  "zona tranquila",
+  "cerca de todo",
+  salvo que exista información concreta que las respalde.
 
 No afirmar algo solamente porque aparezca en una imagen.
 
