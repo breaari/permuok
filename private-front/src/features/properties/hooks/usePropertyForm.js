@@ -272,7 +272,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
 
     setAITitleSuggestion("");
     setAIDescriptionSuggestion("");
-    
+
     setRequirements(
       mapRequirementsToState(
         requirementsData,
@@ -806,7 +806,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
       } catch (error) {
         console.error("[PROPERTY AI] Error consultando estado:", error);
       }
-    }, 3000);
+    }, 5000);
 
     return () => {
       cancelled = true;
