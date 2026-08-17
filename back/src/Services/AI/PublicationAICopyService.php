@@ -11,7 +11,7 @@ class PublicationAICopyService
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const TITLE_PROMPT_VERSION = '1.0';
-    private const DESCRIPTION_PROMPT_VERSION = '2.0';
+    private const DESCRIPTION_PROMPT_VERSION = '2.1';
 
     private static function db(
         bool $forceReconnect = false
@@ -380,6 +380,16 @@ ESTILO DE REDACCIÓN:
 - No uses encabezados como "Descripción", "Características",
   "Superficie", "Permuta" u "Operación".
 - No uses lenguaje grandilocuente ni exageraciones.
+- Evitá frases propias de una ficha técnica como
+  "se compone de", "dispone de X m²", "cuenta con una superficie de"
+  cuando puedan expresarse de una manera más natural.
+- La descripción debe tener una introducción comercial y luego
+  desarrollar los datos disponibles con continuidad.
+- Variá la construcción de las frases para que el texto no parezca
+  generado desde campos estructurados.
+- Si hay poca información disponible, priorizá calidad sobre longitud.
+  Una descripción breve y natural es mejor que una descripción larga
+  rellenada artificialmente.
 
 ESTRUCTURA ORIENTATIVA:
 
@@ -448,6 +458,16 @@ REGLAS DE CONTENIDO:
 - No decir "contactanos", "coordiná una visita" ni similares.
 - No mencionar información faltante.
 - No recomendar mejoras.
+- No mencionar características ausentes solamente porque estén
+  informadas con valor 0.
+- Por ejemplo, si cocheras = 0, NO escribir
+  "no posee cochera" o "no dispone de cochera".
+- Las ausencias sólo deben mencionarse cuando sean realmente
+  relevantes para comprender la propiedad.
+- No convertir la descripción en una lista exhaustiva de datos.
+- No es obligatorio mencionar superficie, dormitorios, baños,
+  antigüedad, cochera y permuta todos juntos.
+- Elegir los datos que permitan construir el texto más natural.
 
 PERMUTA:
 
@@ -466,12 +486,11 @@ No usar etiquetas como:
 
 EJEMPLO DEL ESTILO BUSCADO:
 
-"Departamento de 2 ambientes ubicado en Lanús Oeste.
+"En Lanús Oeste se encuentra este departamento de 2 ambientes,
+con una superficie total de 40 m² y 35 m² cubiertos.
 
-Cuenta con 1 dormitorio y 1 baño, con 35 m² cubiertos sobre una
-superficie total de 40 m².
-
-La propiedad acepta propuestas abiertas de permuta."
+La unidad cuenta con 1 dormitorio y 1 baño. La propiedad acepta
+propuestas abiertas de permuta."
 
 Este ejemplo muestra el TONO y la FORMA DE REDACTAR.
 No copies información del ejemplo que no esté presente en la propiedad.
@@ -487,6 +506,11 @@ Operación en moneda USD."
 "Propiedad ideal para inversión por su excelente funcionalidad."
 
 "Permuta: acepta propuestas abiertas."
+"No dispone de cochera."
+
+"No posee balcón."
+
+"No cuenta con patio."
 
 OPCIONES GENERADAS ANTERIORMENTE:
 
