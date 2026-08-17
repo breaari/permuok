@@ -55,6 +55,8 @@ export default function PropertyQualityOptimizer({
   aiAnalysisLoading = false,
   aiAnalysisRequesting = false,
   onRequestAIAnalysis,
+  onApplyTitle,
+  onApplyDescription,
 }) {
   if (!quality) {
     return null;
@@ -284,6 +286,94 @@ export default function PropertyQualityOptimizer({
                 </button>
               </div>
             </div>
+
+            {aiAnalysis?.status === "completed" && (
+              <div className="space-y-4">
+                {aiAnalysis?.suggested_title && (
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-violet-600">
+                          Título sugerido
+                        </p>
+
+                        <p className="mt-2 text-sm font-bold leading-5 text-slate-900">
+                          {aiAnalysis.suggested_title}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => onApplyTitle?.(aiAnalysis.suggested_title)}
+                      className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-bold text-violet-700 transition hover:bg-violet-100"
+                    >
+                      <Icon name="check" size={16} />
+                      Usar este título
+                    </button>
+                  </div>
+                )}
+
+                {aiAnalysis?.suggested_description && (
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-violet-600">
+                      Descripción sugerida
+                    </p>
+
+                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">
+                      {aiAnalysis.suggested_description}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onApplyDescription?.(aiAnalysis.suggested_description)
+                      }
+                      className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-bold text-violet-700 transition hover:bg-violet-100"
+                    >
+                      <Icon name="check" size={16} />
+                      Usar esta descripción
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {aiAnalysis?.status === "completed" &&
+              Array.isArray(aiAnalysis?.questions) &&
+              aiAnalysis.questions.length > 0 && (
+                <div className="border-t border-slate-100 pt-5">
+                  <div className="mb-3">
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Datos para confirmar
+                    </h3>
+
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      La IA detectó información que podría mejorar o precisar la
+                      publicación.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {aiAnalysis.questions.map((item, index) => (
+                      <div
+                        key={`${item?.field || "question"}-${index}`}
+                        className="rounded-xl border border-violet-100 bg-violet-50/40 p-4"
+                      >
+                        <p className="text-sm font-bold leading-5 text-slate-900">
+                          {item?.question}
+                        </p>
+
+                        {item?.reason && (
+                          <p className="mt-1 text-xs leading-5 text-slate-500">
+                            {item.reason}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
           </div>
         </div>
         <div className="flex items-center gap-2 border-t border-slate-100 pt-4 text-xs text-slate-400">

@@ -219,6 +219,14 @@ export default function PropertyForm() {
                     aiAnalysisLoading={aiAnalysisLoading}
                     aiAnalysisRequesting={aiAnalysisRequesting}
                     onRequestAIAnalysis={handleRequestAIAnalysis}
+                    onApplyTitle={(title) => {
+                      setField("title", title);
+                      showSuccess("Se aplicó el título sugerido.");
+                    }}
+                    onApplyDescription={(description) => {
+                      setField("description", description);
+                      showSuccess("Se aplicó la descripción sugerida.");
+                    }}
                   />
                 </aside>
               ) : (
