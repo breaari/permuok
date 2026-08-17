@@ -10,7 +10,7 @@ use App\Services\CompatibilityJobService;
 
 class PublicationAIAnalysisService
 {
-    private const PROMPT_VERSION = '1.3';
+    private const PROMPT_VERSION = '1.5';
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const ALLOWED_QUESTION_FIELDS = [
@@ -1431,6 +1431,11 @@ class PublicationAIAnalysisService
             'model' =>
             $model,
 
+            'reasoning' => [
+                'effort' =>
+                'low',
+            ],
+
             'input' => [
                 [
                     'role' =>
@@ -1711,6 +1716,46 @@ REGLAS IMPORTANTES:
 - Escribí siempre en español rioplatense profesional.
 - Priorizá utilidad comercial y calidad para matching inmobiliario B2B.
 
+REGLAS DE CALIDAD DEL TÍTULO Y DESCRIPCIÓN:
+
+- Evaluá título y descripción de manera crítica. No consideres bueno un texto
+  solamente porque existe.
+
+- Un título extremadamente genérico, de prueba o que no permita identificar
+  correctamente la propiedad debe recibir un title_score bajo y generar una
+  suggestion de prioridad high o medium.
+
+- Ejemplos de títulos pobres:
+  "casa blanca"
+  "departamento"
+  "propiedad prueba"
+  "casa en venta"
+
+- Una descripción demasiado breve, genérica, redundante, de prueba o que no
+  aporte información inmobiliaria útil debe recibir un description_score bajo.
+
+- Una descripción de menos de 60 caracteres normalmente debe considerarse
+  insuficiente, salvo casos excepcionales.
+
+- Una descripción como:
+  "una descripción de la casa blanca"
+  debe considerarse claramente pobre.
+
+- Cuando título o descripción sean pobres, agregá obligatoriamente una entrada
+  en suggestions.
+
+- Para problemas de redacción de título o descripción usá suggestions, no
+  questions. Las questions se reservan para datos que el usuario debe confirmar.
+
+- Si la descripción es muy pobre:
+  description_score no debe superar 35.
+
+- Si el título es extremadamente genérico:
+  title_score no debe superar 40.
+
+- No inventes características para recomendar cómo completar el texto.
+  Indicá qué tipo de información sería útil agregar.
+
 REGLAS SOBRE PREGUNTAS:
 
 - Priorizá preguntas sobre datos que puedan ser confirmados y cargados
@@ -1722,6 +1767,28 @@ REGLAS SOBRE PREGUNTAS:
   podría ser útil.
 - Máximo 5 preguntas, priorizadas por impacto.
 - Evitá preguntas redundantes.
+- Las preguntas están dirigidas a usuarios inmobiliarios, no a programadores.
+- Nunca mencionar nombres internos de campos, variables o datos técnicos.
+- No usar términos como:
+  "formatted_address",
+  "country_code",
+  "place_id",
+  "latitude",
+  "longitude",
+  "property_type",
+  "criteria_mode"
+  ni ningún otro nombre interno del sistema.
+- Cuando exista una inconsistencia, describirla con lenguaje natural.
+- Por ejemplo, en lugar de:
+  "La ciudad indica Lanús pero formatted_address indica Lomas de Zamora"
+  escribir:
+  "La ciudad cargada es Lanús, pero la dirección seleccionada corresponde a Lomas de Zamora. ¿Podés confirmar cuál es la ubicación correcta?"
+- La pregunta debe poder entenderse sin conocer cómo funciona PermuOK internamente.
+- Las preguntas están dirigidas a usuarios inmobiliarios, no a programadores.
+- Nunca mencionar nombres internos de campos, variables o atributos técnicos
+  como formatted_address, country_code, place_id, latitude, longitude,
+  property_type o criteria_mode.
+- Explicar siempre las inconsistencias usando lenguaje natural.
 
 REGLAS SOBRE IMÁGENES:
 

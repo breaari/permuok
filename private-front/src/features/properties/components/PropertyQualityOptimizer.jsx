@@ -48,7 +48,32 @@ function SectionScore({ label, score, maxScore }) {
     </div>
   );
 }
+function formatAnalysisDate(value) {
+  if (!value) {
+    return null;
+  }
 
+  const raw = String(value).trim();
+
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)
+    ? `${raw.replace(" ", "T")}Z`
+    : raw;
+
+  const date = new Date(normalized);
+
+  if (Number.isNaN(date.getTime())) {
+    return raw;
+  }
+
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
 export default function PropertyQualityOptimizer({
   quality,
   aiAnalysis,
@@ -81,7 +106,21 @@ export default function PropertyQualityOptimizer({
         (priorityOrder[a?.priority] || 99) - (priorityOrder[b?.priority] || 99),
     )
     .slice(0, 4);
+  const aiSuggestions = Array.isArray(aiAnalysis?.suggestions)
+    ? aiAnalysis.suggestions
+    : [];
 
+  const aiContradictions = Array.isArray(aiAnalysis?.contradictions)
+    ? aiAnalysis.contradictions
+    : [];
+
+  const aiScores = aiAnalysis?.scores || {};
+  const lastAnalysisAt =
+    aiAnalysis?.analyzed_at || quality?.analyzed_at || null;
+
+  const lastAnalysisLabel = aiAnalysis?.analyzed_at
+    ? "Último análisis IA"
+    : "Última evaluación de calidad";
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 bg-slate-50/70 px-5 py-5 sm:px-6">
@@ -272,7 +311,88 @@ export default function PropertyQualityOptimizer({
                 </button>
               </div>
             </div>
+            {aiAnalysis?.status === "completed" && (
+              <div className="mt-5 border-t border-violet-100 pt-5">
+                <div className="mb-4">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Resultado del análisis
+                  </h3>
 
+                  <p className="mt-1 text-xs text-slate-500">
+                    Evaluación realizada sobre el contenido guardado de la
+                    publicación.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-violet-100 bg-white p-3">
+                    <p className="text-xs text-slate-500">Título</p>
+                    <p className="mt-1 text-lg font-bold text-slate-900">
+                      {Math.round(Number(aiScores?.title || 0))}/100
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-violet-100 bg-white p-3">
+                    <p className="text-xs text-slate-500">Descripción</p>
+                    <p className="mt-1 text-lg font-bold text-slate-900">
+                      {Math.round(Number(aiScores?.description || 0))}/100
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-violet-100 bg-white p-3">
+                    <p className="text-xs text-slate-500">Imágenes</p>
+                    <p className="mt-1 text-lg font-bold text-slate-900">
+                      {Math.round(Number(aiScores?.images || 0))}/100
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-violet-100 bg-white p-3">
+                    <p className="text-xs text-slate-500">Contenido general</p>
+                    <p className="mt-1 text-lg font-bold text-slate-900">
+                      {Math.round(Number(aiScores?.content || 0))}/100
+                    </p>
+                  </div>
+                </div>
+
+                {aiSuggestions.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Mejoras detectadas por IA
+                    </p>
+
+                    {aiSuggestions.map((item, index) => (
+                      <div
+                        key={`ai-suggestion-${index}`}
+                        className="rounded-lg border border-violet-100 bg-white p-3"
+                      >
+                        <p className="text-sm leading-5 text-slate-700">
+                          {item?.message}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {aiContradictions.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-rose-600">
+                      Inconsistencias detectadas
+                    </p>
+
+                    {aiContradictions.map((item, index) => (
+                      <div
+                        key={`ai-contradiction-${index}`}
+                        className="rounded-lg border border-rose-100 bg-rose-50 p-3"
+                      >
+                        <p className="text-sm leading-5 text-rose-800">
+                          {item?.message}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {aiAnalysis?.status === "completed" &&
               Array.isArray(aiAnalysis?.questions) &&
               aiAnalysis.questions.length > 0 && (
@@ -314,8 +434,8 @@ export default function PropertyQualityOptimizer({
           <Icon name="clock" size={14} />
 
           <span>
-            Último análisis:{" "}
-            {quality?.analyzed_at || "pendiente de actualización"}
+            {lastAnalysisLabel}:{" "}
+            {formatAnalysisDate(lastAnalysisAt) || "pendiente de actualización"}
           </span>
         </div>
       </div>

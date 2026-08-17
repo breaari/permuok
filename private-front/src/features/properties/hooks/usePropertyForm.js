@@ -789,8 +789,9 @@ export function usePropertyForm({ googleMapsLoaded }) {
     }
 
     let cancelled = false;
+    let timeoutId = null;
 
-    const intervalId = window.setInterval(async () => {
+    async function checkAnalysis() {
       try {
         const analysis = await getPropertyAIAnalysis(Number(id));
 
@@ -800,19 +801,29 @@ export function usePropertyForm({ googleMapsLoaded }) {
 
         setAIAnalysis(analysis);
 
-        if (analysis && !["pending", "processing"].includes(analysis.status)) {
-          window.clearInterval(intervalId);
+        if (analysis && ["pending", "processing"].includes(analysis.status)) {
+          timeoutId = window.setTimeout(checkAnalysis, 3000);
         }
       } catch (error) {
         console.error("[PROPERTY AI] Error consultando estado:", error);
+
+        if (!cancelled) {
+          timeoutId = window.setTimeout(checkAnalysis, 3000);
+        }
       }
-    }, 5000);
+    }
+
+    timeoutId = window.setTimeout(checkAnalysis, 1000);
 
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
+
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
     };
   }, [id, isEditMode, aiAnalysis?.status]);
+  
   return {
     id,
     isEditMode,
