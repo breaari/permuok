@@ -304,6 +304,15 @@ REGLAS:
 - No mencionar valores cero ni características ausentes.
 - Un buen título puede ser breve. No agregar datos irrelevantes
   solamente para hacerlo más largo.
+  - La permuta puede mencionarse en el título únicamente cuando
+  no haya otro atributo diferencial más relevante.
+- Si se menciona, usar una formulación natural como:
+  "acepta permuta".
+- NO usar expresiones como:
+  "con permuta aceptada",
+  "permuta disponible",
+  "permuta habilitada",
+  "permuta admitida".
 
 EJEMPLOS DE DATOS QUE NORMALMENTE NO SON DIFERENCIALES:
 
@@ -349,12 +358,14 @@ Departamento 2 ambientes en Lanús Oeste
 Casa 4 ambientes con jardín en Martínez
 Local comercial en Palermo Soho
 Terreno en barrio privado de Pilar
+Departamento 2 ambientes en Lanús Oeste - acepta permuta
 
 NO GENERAR:
 
 Departamento en Lanús Oeste - 1 dormitorio · 40 m² · USD 65.489
 DEPARTAMENTO IMPERDIBLE
 Departamento USD 65.489
+Departamento 2 ambientes en Lanús Oeste con permuta aceptada
 
 OPCIONES GENERADAS ANTERIORMENTE:
 
@@ -510,7 +521,7 @@ No inventes ni deduzcas:
   "perfecto para",
   salvo que esa afirmación provenga explícitamente de información
   confirmada y sea objetivamente verificable.
-  
+
 No afirmar algo solamente porque aparezca en una imagen.
 
 REGLAS DE CONTENIDO:
