@@ -67,15 +67,12 @@ $workerId =
     getmypid();
 
 /*
- * Cantidad máxima de jobs que procesará esta ejecución.
+ * Worker permanente.
  *
- * Por ahora usamos 100 para evitar que una ejecución manual
- * quede corriendo indefinidamente.
- *
- * Más adelante, cuando lo instalemos como proceso permanente,
- * podemos convertirlo en un worker continuo.
+ * Si la cola está vacía espera brevemente
+ * y vuelve a consultar.
  */
-$maxJobs = 100;
+$idleSleepMicroseconds = 750000;
 
 $processed = 0;
 $completed = 0;
@@ -85,11 +82,11 @@ echo "========================================\n";
 echo " PermuOK Compatibility Worker\n";
 echo "========================================\n";
 echo "Worker: {$workerId}\n";
-echo "Máximo de jobs: {$maxJobs}\n";
+echo "Modo: permanente\n";
 echo "----------------------------------------\n";
 
 try {
-    while ($processed < $maxJobs) {
+    while (true) {
         /*
          * Busca y bloquea el próximo trabajo disponible.
          *
@@ -105,7 +102,8 @@ try {
          * No quedan trabajos disponibles.
          */
         if ($job === null) {
-            break;
+            usleep($idleSleepMicroseconds);
+            continue;
         }
 
         $jobId =
@@ -185,13 +183,3 @@ try {
 
     exit(1);
 }
-
-echo "\n";
-echo "----------------------------------------\n";
-echo "Worker finalizado\n";
-echo "Procesados: {$processed}\n";
-echo "Completados: {$completed}\n";
-echo "Con error: {$failed}\n";
-echo "========================================\n";
-
-exit(0);

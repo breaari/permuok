@@ -1423,7 +1423,7 @@ class PublicationAIAnalysisService
              * auto es suficiente inicialmente.
              */
                 'detail' =>
-                'auto',
+                'low',
             ];
         }
 
@@ -1690,13 +1690,12 @@ Analizá esta publicación para PermuOK.
 OBJETIVOS:
 
 1. Evaluar la calidad del título.
-2. Proponer un título profesional y atractivo.
-3. Evaluar la descripción.
-4. Proponer una descripción mejorada.
-5. Detectar información posiblemente faltante.
-6. Detectar contradicciones entre ficha, descripción e imágenes.
-7. Analizar las imágenes buscando atributos útiles de la propiedad.
-8. Formular preguntas inteligentes cuando una imagen sugiera un atributo que no esté confirmado en la ficha.
+2. Evaluar la descripción.
+3. Detectar información posiblemente faltante.
+4. Detectar contradicciones entre ficha, descripción e imágenes.
+5. Analizar las imágenes buscando atributos útiles de la propiedad.
+6. Formular preguntas inteligentes cuando una imagen sugiera un atributo
+   que no esté confirmado en la ficha.
 
 REGLAS IMPORTANTES:
 
@@ -1711,98 +1710,6 @@ REGLAS IMPORTANTES:
 - Si falta información, no la inventes: sugerí completarla.
 - Escribí siempre en español rioplatense profesional.
 - Priorizá utilidad comercial y calidad para matching inmobiliario B2B.
-
-
-REGLAS PARA EL TÍTULO SUGERIDO:
-
-- El título debe funcionar como un título inmobiliario comercial real.
-- Debe ser breve, natural y fácil de escanear.
-- NO incluir precio.
-- NO incluir moneda.
-- NO incluir superficie total ni superficie cubierta salvo que sea
-  absolutamente determinante para identificar el inmueble.
-- NO repetir datos que PermuOK ya muestra visualmente junto a la publicación.
-- Priorizar, en este orden:
-  1. tipo de propiedad;
-  2. cantidad de ambientes cuando pueda derivarse con seguridad;
-  3. atributo diferencial confirmado;
-  4. zona o barrio.
-- Para departamentos y casas:
-  si existe una cantidad confirmada de dormitorios, podés expresar
-  ambientes como dormitorios + 1 cuando el uso inmobiliario argentino
-  lo haga natural.
-  Ejemplo:
-  1 dormitorio -> 2 ambientes
-  2 dormitorios -> 3 ambientes
-  3 dormitorios -> 4 ambientes
-- No hacer esta conversión si existen datos que generen duda sobre la
-  distribución.
-- No mencionar dirección exacta en el título.
-- No usar separadores largos con listas de atributos.
-- No usar mayúsculas sostenidas.
-- No usar expresiones promocionales vacías como "imperdible",
-  "oportunidad única" o similares.
-- El título debe parecer escrito por un corredor inmobiliario profesional,
-  no generado a partir de una base de datos.
-
-Ejemplos adecuados:
-"Departamento 2 ambientes en Lanús Oeste"
-"Casa 4 ambientes con jardín en Martínez"
-"Local comercial en Palermo Soho"
-"Terreno en barrio privado de Pilar"
-
-Ejemplos NO adecuados:
-"Departamento en Lanús Oeste - 1 dormitorio · 40 m² · USD 65.489"
-"DEPARTAMENTO EXCELENTE OPORTUNIDAD"
-"Departamento 40 m² USD 65.489"
-
-REGLAS PARA LA DESCRIPCIÓN SUGERIDA:
-
-La propiedad suggested_description debe contener EXCLUSIVAMENTE
-el texto que podría publicarse como descripción comercial del inmueble.
-
-NO debe contener:
-- análisis;
-- recomendaciones;
-- campos faltantes;
-- preguntas;
-- frases como "datos confirmados";
-- frases como "para optimizar";
-- referencias a PermuOK;
-- referencias al proceso de análisis;
-- información sobre qué debería completar el usuario;
-- comentarios sobre fotografías faltantes;
-- explicación de contradicciones.
-
-Toda esa información pertenece a questions, suggestions,
-contradictions o image_analysis, nunca a suggested_description.
-
-La descripción debe:
-
-- estar escrita como una publicación inmobiliaria profesional;
-- utilizar únicamente información confirmada;
-- ser clara y comercial, pero sin exageraciones;
-- priorizar primero ubicación/tipo y características principales;
-- después mencionar atributos, amenities o condiciones relevantes;
-- integrar naturalmente la posibilidad de permuta cuando corresponda;
-- evitar enumerar mecánicamente todos los campos de la ficha;
-- evitar repetir precio si PermuOK ya lo muestra de manera independiente;
-- evitar repetir la dirección completa salvo que aporte valor comercial;
-- no inventar luminosidad, estado, distribución, vistas, orientación,
-  materiales o calidad constructiva;
-- usar párrafos naturales.
-Ejemplo:
-
-En vez de:
-"Datos confirmados: 40 m² totales / 35 m² cubiertos,
-1 dormitorio, 1 baño..."
-
-Preferir:
-"Departamento de 2 ambientes ubicado en Lanús Oeste.
-Cuenta con 1 dormitorio y 1 baño, con 35 m² cubiertos
-sobre una superficie total de 40 m².
-
-La propiedad acepta propuestas abiertas de permuta."
 
 REGLAS SOBRE PREGUNTAS:
 
@@ -2114,8 +2021,6 @@ PROMPT;
                 'title_score',
                 'description_score',
                 'image_score',
-                'suggested_title',
-                'suggested_description',
                 'questions',
                 'suggestions',
                 'detected_features',

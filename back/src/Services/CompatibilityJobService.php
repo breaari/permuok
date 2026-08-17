@@ -49,7 +49,7 @@ class CompatibilityJobService
 
     public static function enqueuePropertyAIAnalysis(
         int $propertyId,
-        int $priority = 3
+        int $priority = 7
     ): array {
         return self::enqueue(
             self::TYPE_PROPERTY_AI_ANALYZE,
