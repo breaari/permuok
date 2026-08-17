@@ -76,3 +76,12 @@ export async function requestPropertyAIAnalysis(id) {
   const res = await http.post(`/properties/${id}/ai-analysis`, {});
   return unwrap(res);
 }
+export async function generatePropertyAITitle(id) {
+  const res = await http.post(`/properties/${id}/ai-copy/title`, {});
+  return unwrap(res);
+}
+
+export async function generatePropertyAIDescription(id) {
+  const res = await http.post(`/properties/${id}/ai-copy/description`, {});
+  return unwrap(res);
+}

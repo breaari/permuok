@@ -24,6 +24,8 @@ import {
   reorderPropertyImages,
   getPropertyAIAnalysis,
   requestPropertyAIAnalysis,
+  generatePropertyAITitle,
+  generatePropertyAIDescription,
 } from "../api/properties.api.js";
 import { useToast } from "../../../ui/toast/ToastProvider";
 
@@ -76,7 +78,11 @@ export function usePropertyForm({ googleMapsLoaded }) {
   const [aiAnalysis, setAIAnalysis] = useState(null);
   const [aiAnalysisLoading, setAIAnalysisLoading] = useState(false);
   const [aiAnalysisRequesting, setAIAnalysisRequesting] = useState(false);
+  const [aiTitleSuggestion, setAITitleSuggestion] = useState("");
+  const [aiDescriptionSuggestion, setAIDescriptionSuggestion] = useState("");
 
+  const [aiTitleLoading, setAITitleLoading] = useState(false);
+  const [aiDescriptionLoading, setAIDescriptionLoading] = useState(false);
   useEffect(() => {
     if (!isEditMode) return;
 
@@ -698,6 +704,74 @@ export function usePropertyForm({ googleMapsLoaded }) {
     }
   }
 
+  async function handleGenerateAITitle() {
+    if (!isEditMode || aiTitleLoading) {
+      return;
+    }
+
+    try {
+      setAITitleLoading(true);
+
+      const result = await generatePropertyAITitle(Number(id));
+
+      const content = String(result?.content || "").trim();
+
+      if (!content) {
+        throw new Error("La IA no generó un título.");
+      }
+
+      setAITitleSuggestion(content);
+    } catch (error) {
+      showError(getErrorMessage(error, "No se pudo generar el título con IA."));
+    } finally {
+      setAITitleLoading(false);
+    }
+  }
+
+  async function handleGenerateAIDescription() {
+    if (!isEditMode || aiDescriptionLoading) {
+      return;
+    }
+
+    try {
+      setAIDescriptionLoading(true);
+
+      const result = await generatePropertyAIDescription(Number(id));
+
+      const content = String(result?.content || "").trim();
+
+      if (!content) {
+        throw new Error("La IA no generó una descripción.");
+      }
+
+      setAIDescriptionSuggestion(content);
+    } catch (error) {
+      showError(
+        getErrorMessage(error, "No se pudo generar la descripción con IA."),
+      );
+    } finally {
+      setAIDescriptionLoading(false);
+    }
+  }
+
+  function handleApplyAITitle() {
+    if (!aiTitleSuggestion) {
+      return;
+    }
+
+    setField("title", aiTitleSuggestion);
+    showSuccess("Se aplicó el título sugerido.");
+  }
+
+  function handleApplyAIDescription() {
+    if (!aiDescriptionSuggestion) {
+      return;
+    }
+
+    setField("description", aiDescriptionSuggestion);
+    showSuccess("Se aplicó la descripción sugerida.");
+  }
+
   useEffect(() => {
     if (
       !isEditMode ||
@@ -784,7 +858,14 @@ export function usePropertyForm({ googleMapsLoaded }) {
     aiAnalysisRequesting,
     refreshAIAnalysis,
     handleRequestAIAnalysis,
-
+    aiTitleSuggestion,
+    aiDescriptionSuggestion,
+    aiTitleLoading,
+    aiDescriptionLoading,
+    handleGenerateAITitle,
+    handleGenerateAIDescription,
+    handleApplyAITitle,
+    handleApplyAIDescription,
     showError,
     showSuccess,
   };
