@@ -1823,14 +1823,6 @@ PROMPT;
                     'maximum' => 100,
                 ],
 
-                'suggested_title' => [
-                    'type' => 'string',
-                ],
-
-                'suggested_description' => [
-                    'type' => 'string',
-                ],
-
                 'questions' => [
                     'type' =>
                     'array',
@@ -2180,12 +2172,6 @@ PROMPT;
             image_score =
                 :image_score,
 
-            suggested_title =
-                :suggested_title,
-
-            suggested_description =
-                :suggested_description,
-
             questions_json =
                 :questions_json,
 
@@ -2239,16 +2225,6 @@ PROMPT;
 
             'image_score' =>
             (float)$result['image_score'],
-
-            'suggested_title' =>
-            trim(
-                (string)$result['suggested_title']
-            ),
-
-            'suggested_description' =>
-            trim(
-                (string)$result['suggested_description']
-            ),
 
             'questions_json' =>
             $encode(
