@@ -36,6 +36,7 @@ class CompatibilityJobProcessor
             'property_ai_analyze' =>
             PublicationAIAnalysisService::processPropertyAnalysis(
                 $entityId,
+                (int)($job['reference_id'] ?? 0),
                 (int)($job['attempts'] ?? 1),
                 (int)($job['max_attempts'] ?? 3)
             ),

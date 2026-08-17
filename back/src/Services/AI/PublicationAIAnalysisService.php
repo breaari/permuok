@@ -1192,6 +1192,7 @@ class PublicationAIAnalysisService
 
     public static function processPropertyAnalysis(
         int $propertyId,
+        int $analysisId,
         int $attempt = 1,
         int $maxAttempts = 3
     ): array {
@@ -1201,47 +1202,38 @@ class PublicationAIAnalysisService
             );
         }
 
+        if ($analysisId <= 0) {
+            throw new Exception(
+                'El job de análisis IA no contiene un analysis_id válido.'
+            );
+        }
+
         $pdo = self::db();
 
         /*
-     * Calculamos nuevamente el hash.
+     * Recuperamos exactamente el análisis
+     * asociado al job.
      *
-     * Esto es importante porque el job pudo haber
-     * esperado algunos segundos/minutos en la cola.
-     */
-        $currentHash =
-            self::buildPropertyInputHash(
-                $propertyId
-            );
-
-        /*
-     * Buscamos específicamente el análisis pendiente
-     * correspondiente al estado actual.
+     * Ya no intentamos adivinarlo mediante
+     * el hash actual de la propiedad.
      */
         $st = $pdo->prepare("
         SELECT *
         FROM publication_ai_analyses
 
-        WHERE entity_type = 'property'
+        WHERE id = :id
+          AND entity_type = 'property'
           AND entity_id = :entity_id
-          AND input_hash = :input_hash
-          AND prompt_version = :prompt_version
-          AND status IN ('pending', 'processing')
-
-        ORDER BY id DESC
 
         LIMIT 1
     ");
 
         $st->execute([
+            'id' =>
+            $analysisId,
+
             'entity_id' =>
             $propertyId,
-
-            'input_hash' =>
-            $currentHash,
-
-            'prompt_version' =>
-            self::PROMPT_VERSION,
         ]);
 
         $analysis =
@@ -1249,26 +1241,63 @@ class PublicationAIAnalysisService
                 PDO::FETCH_ASSOC
             );
 
-        /*
-     * Puede pasar que la propiedad haya cambiado
-     * después de solicitar el análisis.
-     *
-     * En ese caso NO analizamos información vieja.
-     */
         if (!$analysis) {
+            throw new Exception(
+                'No se encontró el análisis IA asociado al job.'
+            );
+        }
+
+        /*
+     * Si ya terminó, el job puede cerrarse
+     * sin volver a llamar a OpenAI.
+     */
+        if ($analysis['status'] === 'completed') {
             return [
                 'ok' => true,
                 'skipped' => true,
+                'analysis_id' => $analysisId,
                 'reason' =>
-                'No existe un análisis pendiente para el estado actual de la propiedad.',
+                'El análisis ya había sido completado.',
             ];
         }
 
-        $analysisId =
-            (int)$analysis['id'];
+        /*
+     * Verificamos que la propiedad todavía tenga
+     * exactamente el contenido para el cual se
+     * solicitó este análisis.
+     */
+        $currentHash =
+            self::buildPropertyInputHash(
+                $propertyId
+            );
+
+        $requestedHash =
+            (string)($analysis['input_hash'] ?? '');
+
+        if (
+            $requestedHash === '' ||
+            !hash_equals(
+                $requestedHash,
+                $currentHash
+            )
+        ) {
+            self::markAnalysisFailed(
+                $analysisId,
+                'La publicación cambió después de solicitar el análisis. Solicitá un nuevo análisis para evaluar la versión actual.'
+            );
+
+            return [
+                'ok' => true,
+                'skipped' => true,
+                'analysis_id' => $analysisId,
+                'reason' =>
+                'La publicación cambió después de solicitar el análisis.',
+            ];
+        }
 
         /*
-     * Marcamos processing.
+     * Marcamos exactamente esta fila
+     * como processing.
      */
         $stProcessing = $pdo->prepare("
         UPDATE publication_ai_analyses
@@ -1290,8 +1319,8 @@ class PublicationAIAnalysisService
 
         try {
             /*
-         * Volvemos a preparar el input exactamente
-         * en el momento de enviar a OpenAI.
+         * Preparamos los datos inmediatamente
+         * antes de llamar a OpenAI.
          */
             $input =
                 self::preparePropertyInput(
@@ -1304,12 +1333,9 @@ class PublicationAIAnalysisService
                 );
 
             /*
- * La llamada multimodal puede tardar lo suficiente
- * como para que MySQL cierre la conexión inactiva.
- *
- * Forzamos una conexión nueva antes de persistir
- * el resultado.
- */
+         * La llamada a OpenAI puede ser larga.
+         * Renovamos la conexión antes de guardar.
+         */
             self::db(true);
 
             self::completeAnalysis(
@@ -1346,7 +1372,6 @@ class PublicationAIAnalysisService
             throw $e;
         }
     }
-
     private static function callOpenAIForProperty(
         array $input
     ): array {
