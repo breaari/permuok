@@ -1513,8 +1513,6 @@ class PublicationAIAnalysisService
                 'effort' =>
                 'low',
             ],
-            'max_output_tokens' =>
-            1200,
 
             'input' => [
                 [
