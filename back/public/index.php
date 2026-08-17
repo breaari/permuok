@@ -619,6 +619,37 @@ if (
 if (
     $method === 'POST' &&
     preg_match(
+        '#^/properties/(\d+)/ai-analysis$#',
+        $uri,
+        $m
+    )
+) {
+    $_GET['id'] =
+        (int)$m[1];
+
+    PropertyController::requestAIAnalysis();
+
+    exit;
+}
+
+if (
+    $method === 'GET' &&
+    preg_match(
+        '#^/properties/(\d+)/ai-analysis$#',
+        $uri,
+        $m
+    )
+) {
+    $_GET['id'] =
+        (int)$m[1];
+
+    PropertyController::getAIAnalysis();
+
+    exit;
+}
+if (
+    $method === 'POST' &&
+    preg_match(
         '#^/ai/compatibilities/search-requests/(\d+)/calculate$#',
         $uri,
         $matches

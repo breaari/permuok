@@ -5,6 +5,7 @@ namespace App\Services;
 use PDO;
 use Exception;
 use Throwable;
+use App\Services\AI\PublicationAIAnalysisService;
 
 class PropertyService
 {
@@ -24,6 +25,44 @@ class PropertyService
         }
 
         return '/property-images/' . $imageId . '/view';
+    }
+
+    public static function requestAIAnalysis(
+        int $userId,
+        int $propertyId
+    ): array {
+        /*
+     * Valida usuario y propiedad.
+     *
+     * Sólo puede analizar una propiedad perteneciente
+     * a su propia inmobiliaria.
+     */
+        self::getOwnedProperty(
+            $userId,
+            $propertyId
+        );
+
+        return PublicationAIAnalysisService::requestPropertyAnalysis(
+            $propertyId
+        );
+    }
+
+    public static function getAIAnalysis(
+        int $userId,
+        int $propertyId
+    ): ?array {
+        /*
+     * Mismo control de acceso para consultar
+     * los resultados.
+     */
+        self::getOwnedProperty(
+            $userId,
+            $propertyId
+        );
+
+        return PublicationAIAnalysisService::getCurrentPropertyAnalysis(
+            $propertyId
+        );
     }
 
     private static function getPropertyAmenities(int $propertyId): array

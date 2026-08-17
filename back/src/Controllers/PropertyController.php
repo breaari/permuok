@@ -186,4 +186,57 @@ class PropertyController
             ResponseHelper::fail($e->getMessage(), 400);
         }
     }
+
+    public static function requestAIAnalysis(): void
+    {
+        try {
+            $auth =
+                AuthHelper::requireUser();
+
+            $id =
+                (int)($_GET['id'] ?? 0);
+
+            $result =
+                PropertyService::requestAIAnalysis(
+                    (int)$auth['id'],
+                    $id
+                );
+
+            ResponseHelper::ok(
+                $result,
+                202
+            );
+        } catch (\Throwable $e) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                400
+            );
+        }
+    }
+
+    public static function getAIAnalysis(): void
+    {
+        try {
+            $auth =
+                AuthHelper::requireUser();
+
+            $id =
+                (int)($_GET['id'] ?? 0);
+
+            $result =
+                PropertyService::getAIAnalysis(
+                    (int)$auth['id'],
+                    $id
+                );
+
+            ResponseHelper::ok([
+                'analysis' => $result,
+            ]);
+        } catch (\Throwable $e) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                400
+            );
+        }
+    }
 }

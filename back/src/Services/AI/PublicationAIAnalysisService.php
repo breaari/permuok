@@ -989,6 +989,201 @@ class PublicationAIAnalysisService
         ];
     }
 
+
+    public static function getCurrentPropertyAnalysis(
+        int $propertyId
+    ): ?array {
+        if ($propertyId <= 0) {
+            throw new Exception(
+                'El ID de la propiedad no es válido.'
+            );
+        }
+
+        /*
+     * Calculamos el hash actual.
+     *
+     * Así nunca devolvemos como vigente un análisis
+     * correspondiente a una versión vieja de la ficha.
+     */
+        $inputHash =
+            self::buildPropertyInputHash(
+                $propertyId
+            );
+
+        $pdo = self::db();
+
+        $st = $pdo->prepare("
+        SELECT
+            id,
+            entity_type,
+            entity_id,
+            status,
+
+            content_score,
+            title_score,
+            description_score,
+            image_score,
+
+            suggested_title,
+            suggested_description,
+
+            questions_json,
+            suggestions_json,
+            detected_features_json,
+            contradictions_json,
+            image_analysis_json,
+
+            model_name,
+            prompt_version,
+            input_hash,
+            error_message,
+
+            analyzed_at,
+            created_at,
+            updated_at
+
+        FROM publication_ai_analyses
+
+        WHERE entity_type = 'property'
+          AND entity_id = :entity_id
+          AND input_hash = :input_hash
+          AND prompt_version = :prompt_version
+
+        ORDER BY id DESC
+
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'entity_id' =>
+            $propertyId,
+
+            'input_hash' =>
+            $inputHash,
+
+            'prompt_version' =>
+            self::PROMPT_VERSION,
+        ]);
+
+        $row =
+            $st->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+        if (!$row) {
+            return null;
+        }
+
+        $decodeJson =
+            static function ($value): array {
+                if (
+                    $value === null ||
+                    trim((string)$value) === ''
+                ) {
+                    return [];
+                }
+
+                $decoded =
+                    json_decode(
+                        (string)$value,
+                        true
+                    );
+
+                return is_array($decoded)
+                    ? $decoded
+                    : [];
+            };
+
+        return [
+            'id' =>
+            (int)$row['id'],
+
+            'entity_type' =>
+            (string)$row['entity_type'],
+
+            'entity_id' =>
+            (int)$row['entity_id'],
+
+            'status' =>
+            (string)$row['status'],
+
+            'scores' => [
+                'content' =>
+                $row['content_score'] !== null
+                    ? (float)$row['content_score']
+                    : null,
+
+                'title' =>
+                $row['title_score'] !== null
+                    ? (float)$row['title_score']
+                    : null,
+
+                'description' =>
+                $row['description_score'] !== null
+                    ? (float)$row['description_score']
+                    : null,
+
+                'images' =>
+                $row['image_score'] !== null
+                    ? (float)$row['image_score']
+                    : null,
+            ],
+
+            'suggested_title' =>
+            $row['suggested_title'],
+
+            'suggested_description' =>
+            $row['suggested_description'],
+
+            'questions' =>
+            $decodeJson(
+                $row['questions_json']
+            ),
+
+            'suggestions' =>
+            $decodeJson(
+                $row['suggestions_json']
+            ),
+
+            'detected_features' =>
+            $decodeJson(
+                $row['detected_features_json']
+            ),
+
+            'contradictions' =>
+            $decodeJson(
+                $row['contradictions_json']
+            ),
+
+            'image_analysis' =>
+            $decodeJson(
+                $row['image_analysis_json']
+            ),
+
+            'model_name' =>
+            $row['model_name'],
+
+            'prompt_version' =>
+            (string)$row['prompt_version'],
+
+            'input_hash' =>
+            (string)$row['input_hash'],
+
+            'error_message' =>
+            $row['error_message'],
+
+            'analyzed_at' =>
+            $row['analyzed_at'],
+
+            'created_at' =>
+            $row['created_at'],
+
+            'updated_at' =>
+            $row['updated_at'],
+        ];
+    }
+
+
     public static function processPropertyAnalysis(
         int $propertyId,
         int $attempt = 1,
