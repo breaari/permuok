@@ -243,7 +243,37 @@ if ($method === 'PATCH' && preg_match('#^/properties/(\d+)$#', $uri, $m)) {
     PropertyController::update();
     exit;
 }
+if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/properties/(\d+)/ai-analysis$#',
+        $uri,
+        $m
+    )
+) {
+    $_GET['id'] =
+        (int)$m[1];
 
+    PropertyController::requestAIAnalysis();
+
+    exit;
+}
+
+if (
+    $method === 'GET' &&
+    preg_match(
+        '#^/properties/(\d+)/ai-analysis$#',
+        $uri,
+        $m
+    )
+) {
+    $_GET['id'] =
+        (int)$m[1];
+
+    PropertyController::getAIAnalysis();
+
+    exit;
+}
 if ($method === 'PUT' && preg_match('#^/properties/(\d+)/requirements$#', $uri, $m)) {
     $_GET['id'] = (int)$m[1];
     PropertyController::saveRequirements();
@@ -616,37 +646,7 @@ if (
     );
     exit;
 }
-if (
-    $method === 'POST' &&
-    preg_match(
-        '#^/properties/(\d+)/ai-analysis$#',
-        $uri,
-        $m
-    )
-) {
-    $_GET['id'] =
-        (int)$m[1];
 
-    PropertyController::requestAIAnalysis();
-
-    exit;
-}
-
-if (
-    $method === 'GET' &&
-    preg_match(
-        '#^/properties/(\d+)/ai-analysis$#',
-        $uri,
-        $m
-    )
-) {
-    $_GET['id'] =
-        (int)$m[1];
-
-    PropertyController::getAIAnalysis();
-
-    exit;
-}
 if (
     $method === 'POST' &&
     preg_match(
