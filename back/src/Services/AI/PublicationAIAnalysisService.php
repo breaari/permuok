@@ -12,6 +12,30 @@ class PublicationAIAnalysisService
 {
     private const PROMPT_VERSION = '1.2';
     private const DEFAULT_MODEL = 'gpt-5-mini';
+
+    private const ALLOWED_QUESTION_FIELDS = [
+        'title',
+        'description',
+        'property_type',
+        'price',
+        'currency',
+        'country',
+        'province',
+        'city',
+        'zone',
+        'address',
+        'total_area',
+        'covered_area',
+        'bedrooms',
+        'bathrooms',
+        'garages',
+        'antiquity',
+        'amenities',
+        'images',
+        'requirements',
+    ];
+
+
     private static function db(
         bool $forceReconnect = false
     ): PDO {
@@ -20,6 +44,30 @@ class PublicationAIAnalysisService
         return pdo($forceReconnect);
     }
 
+    private static function filterAllowedQuestions(
+        array $questions
+    ): array {
+        return array_values(
+            array_filter(
+                $questions,
+                static function ($question): bool {
+                    if (!is_array($question)) {
+                        return false;
+                    }
+
+                    $field = trim(
+                        (string)($question['field'] ?? '')
+                    );
+
+                    return in_array(
+                        $field,
+                        self::ALLOWED_QUESTION_FIELDS,
+                        true
+                    );
+                }
+            )
+        );
+    }
     /**
      * Prepara todos los datos que posteriormente
      * enviaremos al modelo de IA.
@@ -837,12 +885,17 @@ class PublicationAIAnalysisService
                 throw $e;
             }
 
+            $job =
+                CompatibilityJobService::enqueuePropertyAIAnalysis(
+                    $propertyId
+                );
+
             return [
                 'analysis_id' =>
-                $analysisId,
+                (int)$existing['id'],
 
                 'status' =>
-                'pending',
+                (string)$existing['status'],
 
                 'input_hash' =>
                 $inputHash,
@@ -2001,9 +2054,10 @@ PROMPT;
 
             'questions_json' =>
             $encode(
-                $result['questions'] ?? []
+                self::filterAllowedQuestions(
+                    $result['questions'] ?? []
+                )
             ),
-
             'suggestions_json' =>
             $encode(
                 $result['suggestions'] ?? []

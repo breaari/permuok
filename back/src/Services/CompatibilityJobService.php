@@ -340,7 +340,7 @@ class CompatibilityJobService
             return;
         }
 
-        $pdo = self::db();
+        $pdo = self::db(true);
 
         $st = $pdo->prepare("
             UPDATE compatibility_jobs

@@ -129,27 +129,28 @@ try {
         echo "  Intento: {$attempt}\n";
 
         try {
-            /*
-             * Ejecuta el trabajo real:
-             *
-             * property_recalculate
-             * search_request_recalculate
-             * property_archive
-             * search_request_archive
-             */
-            CompatibilityJobProcessor::process(
-                $job
-            );
+            $result =
+                CompatibilityJobProcessor::process(
+                    $job
+                );
 
-            /*
-             * Si CompatibilityEngine terminó correctamente,
-             * marcamos el job como completed.
-             */
             CompatibilityJobService::complete(
                 $jobId
             );
 
             $completed++;
+
+            if (
+                !empty($result['skipped'])
+            ) {
+                echo "[JOB {$jobId}] skipped\n";
+
+                if (!empty($result['reason'])) {
+                    echo "  {$result['reason']}\n";
+                }
+
+                continue;
+            }
 
             echo "[JOB {$jobId}] completed\n";
         } catch (Throwable $e) {
