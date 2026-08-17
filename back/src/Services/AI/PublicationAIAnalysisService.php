@@ -10,7 +10,7 @@ use App\Services\CompatibilityJobService;
 
 class PublicationAIAnalysisService
 {
-    private const PROMPT_VERSION = '1.0';
+    private const PROMPT_VERSION = '1.1';
     private const DEFAULT_MODEL = 'gpt-5-mini';
     private static function db(
         bool $forceReconnect = false
@@ -1415,6 +1415,48 @@ REGLAS IMPORTANTES:
 - Si falta información, no la inventes: sugerí completarla.
 - Escribí siempre en español rioplatense profesional.
 - Priorizá utilidad comercial y calidad para matching inmobiliario B2B.
+
+REGLAS SOBRE PREGUNTAS:
+
+- Priorizá preguntas sobre datos que puedan ser confirmados y cargados
+  actualmente en la ficha.
+- Un valor 0 confirmado no significa que el dato esté faltante.
+- No preguntes por cocheras si la ficha indica 0, salvo que exista
+  evidencia visual concreta que sugiera una cochera.
+- No generes preguntas genéricas solamente porque un campo comercial
+  podría ser útil.
+- Máximo 5 preguntas, priorizadas por impacto.
+- Evitá preguntas redundantes.
+
+REGLAS SOBRE IMÁGENES:
+
+- detected_features contiene solamente características potenciales
+  del inmueble.
+- No incluir "render", "plano", "foto", "imagen borrosa",
+  "vista cenital", "diagrama" ni características de la imagen dentro
+  de detected_features.
+- Toda característica inferida exclusivamente desde una imagen debe
+  llevar requires_confirmation=true.
+- Nunca considerar una inferencia visual como dato confirmado.
+- El tipo y la calidad de la imagen deben informarse solamente en
+  image_analysis.
+
+REGLAS SOBRE CONTRADICCIONES:
+
+- contradictions debe contener solamente contradicciones objetivas
+  entre datos confirmados.
+- Una diferencia entre la ficha y algo inferido visualmente NO debe
+  considerarse una contradicción confirmada.
+- En esos casos generar una question y, si corresponde, una suggestion
+  indicando que existe una posible inconsistencia visual.
+
+REGLAS DE REDACCIÓN:
+
+- Nunca mostrar códigos internos como apartment, house, commercial.
+- Usar sus equivalentes naturales en español.
+- Evitar abreviaturas innecesarias y texto repetitivo.
+- No usar lenguaje robótico.
+- No inventar información para hacer el texto más atractivo.
 
 PUBLICACIÓN:
 
