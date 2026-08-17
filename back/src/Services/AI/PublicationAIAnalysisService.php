@@ -11,12 +11,13 @@ use App\Services\CompatibilityJobService;
 class PublicationAIAnalysisService
 {
     private const PROMPT_VERSION = '1.0';
-
-    private static function db(): PDO
-    {
+    private const DEFAULT_MODEL = 'gpt-5-mini';
+    private static function db(
+        bool $forceReconnect = false
+    ): PDO {
         require_once __DIR__ . '/../../../db.php';
 
-        return pdo();
+        return pdo($forceReconnect);
     }
 
     /**
@@ -927,6 +928,415 @@ class PublicationAIAnalysisService
         ];
     }
 
+    public static function processPropertyAnalysis(
+        int $propertyId
+    ): array {
+        if ($propertyId <= 0) {
+            throw new Exception(
+                'El ID de la propiedad no es válido.'
+            );
+        }
+
+        $pdo = self::db();
+
+        /*
+     * Calculamos nuevamente el hash.
+     *
+     * Esto es importante porque el job pudo haber
+     * esperado algunos segundos/minutos en la cola.
+     */
+        $currentHash =
+            self::buildPropertyInputHash(
+                $propertyId
+            );
+
+        /*
+     * Buscamos específicamente el análisis pendiente
+     * correspondiente al estado actual.
+     */
+        $st = $pdo->prepare("
+        SELECT *
+        FROM publication_ai_analyses
+
+        WHERE entity_type = 'property'
+          AND entity_id = :entity_id
+          AND input_hash = :input_hash
+          AND prompt_version = :prompt_version
+          AND status IN ('pending', 'processing')
+
+        ORDER BY id DESC
+
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'entity_id' =>
+            $propertyId,
+
+            'input_hash' =>
+            $currentHash,
+
+            'prompt_version' =>
+            self::PROMPT_VERSION,
+        ]);
+
+        $analysis =
+            $st->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+        /*
+     * Puede pasar que la propiedad haya cambiado
+     * después de solicitar el análisis.
+     *
+     * En ese caso NO analizamos información vieja.
+     */
+        if (!$analysis) {
+            return [
+                'ok' => true,
+                'skipped' => true,
+                'reason' =>
+                'No existe un análisis pendiente para el estado actual de la propiedad.',
+            ];
+        }
+
+        $analysisId =
+            (int)$analysis['id'];
+
+        /*
+     * Marcamos processing.
+     */
+        $stProcessing = $pdo->prepare("
+        UPDATE publication_ai_analyses
+
+        SET
+            status = 'processing',
+            error_message = NULL,
+            updated_at = CURRENT_TIMESTAMP
+
+        WHERE id = :id
+
+        LIMIT 1
+    ");
+
+        $stProcessing->execute([
+            'id' =>
+            $analysisId,
+        ]);
+
+        try {
+            /*
+         * Volvemos a preparar el input exactamente
+         * en el momento de enviar a OpenAI.
+         */
+            $input =
+                self::preparePropertyInput(
+                    $propertyId
+                );
+
+            $result =
+                self::callOpenAIForProperty(
+                    $input
+                );
+
+            /*
+ * La llamada multimodal puede tardar lo suficiente
+ * como para que MySQL cierre la conexión inactiva.
+ *
+ * Forzamos una conexión nueva antes de persistir
+ * el resultado.
+ */
+            self::db(true);
+
+            self::completeAnalysis(
+                $analysisId,
+                $result
+            );
+
+            return [
+                'ok' =>
+                true,
+
+                'analysis_id' =>
+                $analysisId,
+
+                'status' =>
+                'completed',
+
+                'model' =>
+                $result['_model'] ?? null,
+            ];
+        } catch (Throwable $e) {
+            self::markAnalysisFailed(
+                $analysisId,
+                $e->getMessage()
+            );
+
+            throw $e;
+        }
+    }
+
+    private static function callOpenAIForProperty(
+        array $input
+    ): array {
+        $apiKey =
+            trim(
+                (string)(
+                    $_ENV['OPENAI_API_KEY']
+                    ?? getenv('OPENAI_API_KEY')
+                    ?: ''
+                )
+            );
+
+        if ($apiKey === '') {
+            throw new Exception(
+                'OPENAI_API_KEY no está configurada.'
+            );
+        }
+
+        $model =
+            trim(
+                (string)(
+                    $_ENV['OPENAI_MODEL']
+                    ?? getenv('OPENAI_MODEL')
+                    ?: self::DEFAULT_MODEL
+                )
+            );
+
+        if ($model === '') {
+            $model =
+                self::DEFAULT_MODEL;
+        }
+
+        $content = [];
+
+        /*
+     * Instrucciones + ficha completa.
+     */
+        $content[] = [
+            'type' =>
+            'input_text',
+
+            'text' =>
+            self::buildPropertyPrompt(
+                $input
+            ),
+        ];
+
+        /*
+     * Imágenes.
+     *
+     * Para esta primera versión las enviamos
+     * como data URLs base64.
+     *
+     * Así no necesitamos que OpenAI tenga acceso
+     * público a las URLs privadas de PermuOK.
+     */
+        foreach (
+            $input['images'] ?? []
+            as $image
+        ) {
+            $dataUrl =
+                self::propertyImageToDataUrl(
+                    (string)(
+                        $image['file_path'] ?? ''
+                    )
+                );
+
+            if ($dataUrl === null) {
+                continue;
+            }
+
+            $content[] = [
+                'type' =>
+                'input_image',
+
+                'image_url' =>
+                $dataUrl,
+
+                /*
+             * auto es suficiente inicialmente.
+             */
+                'detail' =>
+                'auto',
+            ];
+        }
+
+        $body = [
+            'model' =>
+            $model,
+
+            'input' => [
+                [
+                    'role' =>
+                    'user',
+
+                    'content' =>
+                    $content,
+                ],
+            ],
+
+            /*
+         * Structured Outputs.
+         */
+            'text' => [
+                'format' => [
+                    'type' =>
+                    'json_schema',
+
+                    'name' =>
+                    'property_publication_analysis',
+
+                    'strict' =>
+                    true,
+
+                    'schema' =>
+                    self::analysisSchema(),
+                ],
+            ],
+        ];
+
+        $jsonBody = json_encode(
+            $body,
+            JSON_UNESCAPED_UNICODE |
+                JSON_UNESCAPED_SLASHES |
+                JSON_THROW_ON_ERROR
+        );
+
+        $ch = curl_init(
+            'https://api.openai.com/v1/responses'
+        );
+
+        if ($ch === false) {
+            throw new Exception(
+                'No se pudo inicializar la conexión con OpenAI.'
+            );
+        }
+
+        curl_setopt_array(
+            $ch,
+            [
+                CURLOPT_POST =>
+                true,
+
+                CURLOPT_RETURNTRANSFER =>
+                true,
+
+                CURLOPT_HTTPHEADER => [
+                    'Authorization: Bearer ' .
+                        $apiKey,
+
+                    'Content-Type: application/json',
+                ],
+
+                CURLOPT_POSTFIELDS =>
+                $jsonBody,
+
+                CURLOPT_CONNECTTIMEOUT =>
+                15,
+
+                CURLOPT_TIMEOUT =>
+                120,
+            ]
+        );
+
+        $response =
+            curl_exec(
+                $ch
+            );
+
+        if ($response === false) {
+            $curlError =
+                curl_error(
+                    $ch
+                );
+
+            curl_close(
+                $ch
+            );
+
+            throw new Exception(
+                'Error conectando con OpenAI: ' .
+                    $curlError
+            );
+        }
+
+        $httpCode =
+            (int)curl_getinfo(
+                $ch,
+                CURLINFO_HTTP_CODE
+            );
+
+        curl_close(
+            $ch
+        );
+
+        try {
+            $decoded =
+                json_decode(
+                    $response,
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+        } catch (JsonException $e) {
+            throw new Exception(
+                'OpenAI devolvió una respuesta inválida.',
+                0,
+                $e
+            );
+        }
+
+        if (
+            $httpCode < 200 ||
+            $httpCode >= 300
+        ) {
+            $apiMessage =
+                $decoded['error']['message']
+                ?? 'Error desconocido de OpenAI.';
+
+            throw new Exception(
+                'OpenAI API: ' .
+                    $apiMessage
+            );
+        }
+
+        $outputText =
+            self::extractOpenAIOutputText(
+                $decoded
+            );
+
+        if ($outputText === '') {
+            throw new Exception(
+                'OpenAI no devolvió el análisis esperado.'
+            );
+        }
+
+        try {
+            $analysis =
+                json_decode(
+                    $outputText,
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+        } catch (JsonException $e) {
+            throw new Exception(
+                'No se pudo interpretar el análisis generado por OpenAI.',
+                0,
+                $e
+            );
+        }
+
+        $analysis['_model'] =
+            (string)(
+                $decoded['model']
+                ?? $model
+            );
+
+        return $analysis;
+    }
+
     private static function markAnalysisFailed(
         int $analysisId,
         string $message
@@ -935,7 +1345,7 @@ class PublicationAIAnalysisService
             return;
         }
 
-        $pdo = self::db();
+        $pdo = self::db(true);
 
         $st = $pdo->prepare("
         UPDATE publication_ai_analyses
@@ -956,6 +1366,556 @@ class PublicationAIAnalysisService
                 $message,
                 0,
                 6000
+            ),
+
+            'id' =>
+            $analysisId,
+        ]);
+    }
+
+    private static function buildPropertyPrompt(
+        array $input
+    ): string {
+        $propertyJson =
+            json_encode(
+                $input,
+                JSON_PRETTY_PRINT |
+                    JSON_UNESCAPED_UNICODE |
+                    JSON_UNESCAPED_SLASHES
+            );
+
+        return <<<PROMPT
+Sos un asistente especializado en optimización de publicaciones inmobiliarias B2B.
+
+Analizá esta publicación para PermuOK.
+
+OBJETIVOS:
+
+1. Evaluar la calidad del título.
+2. Proponer un título profesional y atractivo.
+3. Evaluar la descripción.
+4. Proponer una descripción mejorada.
+5. Detectar información posiblemente faltante.
+6. Detectar contradicciones entre ficha, descripción e imágenes.
+7. Analizar las imágenes buscando atributos útiles de la propiedad.
+8. Formular preguntas inteligentes cuando una imagen sugiera un atributo que no esté confirmado en la ficha.
+
+REGLAS IMPORTANTES:
+
+- Nunca inventes características.
+- Nunca afirmes como cierto algo observado únicamente en una imagen.
+- Si una imagen parece mostrar un atributo no informado, generá una pregunta de confirmación.
+- Ejemplo: si parece verse un balcón, preguntá "¿La propiedad cuenta con balcón?".
+- Los atributos detectados visualmente deben tener requires_confirmation=true.
+- No modifiques datos estructurados.
+- No inventes superficies, dormitorios, baños, antigüedad, ubicación ni precio.
+- Detectá lenguaje poco profesional, texto de prueba, insultos, exageraciones o contenido poco comercial.
+- El título sugerido debe ser descriptivo, profesional y conciso.
+- La descripción sugerida debe utilizar únicamente datos confirmados.
+- Si falta información, no la inventes: sugerí completarla.
+- Escribí siempre en español rioplatense profesional.
+- Priorizá utilidad comercial y calidad para matching inmobiliario B2B.
+
+PUBLICACIÓN:
+
+{$propertyJson}
+PROMPT;
+    }
+
+    private static function analysisSchema(): array
+    {
+        return [
+            'type' =>
+            'object',
+
+            'additionalProperties' =>
+            false,
+
+            'properties' => [
+                'content_score' => [
+                    'type' => 'number',
+                    'minimum' => 0,
+                    'maximum' => 100,
+                ],
+
+                'title_score' => [
+                    'type' => 'number',
+                    'minimum' => 0,
+                    'maximum' => 100,
+                ],
+
+                'description_score' => [
+                    'type' => 'number',
+                    'minimum' => 0,
+                    'maximum' => 100,
+                ],
+
+                'image_score' => [
+                    'type' => 'number',
+                    'minimum' => 0,
+                    'maximum' => 100,
+                ],
+
+                'suggested_title' => [
+                    'type' => 'string',
+                ],
+
+                'suggested_description' => [
+                    'type' => 'string',
+                ],
+
+                'questions' => [
+                    'type' =>
+                    'array',
+
+                    'items' => [
+                        'type' =>
+                        'object',
+
+                        'additionalProperties' =>
+                        false,
+
+                        'properties' => [
+                            'field' => [
+                                'type' => 'string',
+                            ],
+
+                            'question' => [
+                                'type' => 'string',
+                            ],
+
+                            'reason' => [
+                                'type' => 'string',
+                            ],
+                        ],
+
+                        'required' => [
+                            'field',
+                            'question',
+                            'reason',
+                        ],
+                    ],
+                ],
+
+                'suggestions' => [
+                    'type' =>
+                    'array',
+
+                    'items' => [
+                        'type' =>
+                        'object',
+
+                        'additionalProperties' =>
+                        false,
+
+                        'properties' => [
+                            'type' => [
+                                'type' => 'string',
+                            ],
+
+                            'priority' => [
+                                'type' => 'string',
+                                'enum' => [
+                                    'low',
+                                    'medium',
+                                    'high',
+                                ],
+                            ],
+
+                            'message' => [
+                                'type' => 'string',
+                            ],
+                        ],
+
+                        'required' => [
+                            'type',
+                            'priority',
+                            'message',
+                        ],
+                    ],
+                ],
+
+                'detected_features' => [
+                    'type' =>
+                    'array',
+
+                    'items' => [
+                        'type' =>
+                        'object',
+
+                        'additionalProperties' =>
+                        false,
+
+                        'properties' => [
+                            'feature' => [
+                                'type' => 'string',
+                            ],
+
+                            'confidence' => [
+                                'type' => 'number',
+                                'minimum' => 0,
+                                'maximum' => 1,
+                            ],
+
+                            'requires_confirmation' => [
+                                'type' => 'boolean',
+                            ],
+
+                            'reason' => [
+                                'type' => 'string',
+                            ],
+                        ],
+
+                        'required' => [
+                            'feature',
+                            'confidence',
+                            'requires_confirmation',
+                            'reason',
+                        ],
+                    ],
+                ],
+
+                'contradictions' => [
+                    'type' =>
+                    'array',
+
+                    'items' => [
+                        'type' =>
+                        'object',
+
+                        'additionalProperties' =>
+                        false,
+
+                        'properties' => [
+                            'field' => [
+                                'type' => 'string',
+                            ],
+
+                            'message' => [
+                                'type' => 'string',
+                            ],
+                        ],
+
+                        'required' => [
+                            'field',
+                            'message',
+                        ],
+                    ],
+                ],
+
+                'image_analysis' => [
+                    'type' =>
+                    'array',
+
+                    'items' => [
+                        'type' =>
+                        'object',
+
+                        'additionalProperties' =>
+                        false,
+
+                        'properties' => [
+                            'image_index' => [
+                                'type' => 'integer',
+                            ],
+
+                            'observations' => [
+                                'type' =>
+                                'array',
+
+                                'items' => [
+                                    'type' =>
+                                    'string',
+                                ],
+                            ],
+
+                            'quality_notes' => [
+                                'type' =>
+                                'array',
+
+                                'items' => [
+                                    'type' =>
+                                    'string',
+                                ],
+                            ],
+                        ],
+
+                        'required' => [
+                            'image_index',
+                            'observations',
+                            'quality_notes',
+                        ],
+                    ],
+                ],
+            ],
+
+            'required' => [
+                'content_score',
+                'title_score',
+                'description_score',
+                'image_score',
+                'suggested_title',
+                'suggested_description',
+                'questions',
+                'suggestions',
+                'detected_features',
+                'contradictions',
+                'image_analysis',
+            ],
+        ];
+    }
+
+    private static function propertyImageToDataUrl(
+        string $relativePath
+    ): ?string {
+        $relativePath =
+            trim(
+                $relativePath
+            );
+
+        if ($relativePath === '') {
+            return null;
+        }
+
+        $uploadsBase =
+            rtrim(
+                (string)(
+                    $_ENV['UPLOADS_DIR']
+                    ?? ''
+                ),
+                '/\\'
+            );
+
+        if ($uploadsBase === '') {
+            $uploadsBase =
+                dirname(
+                    __DIR__,
+                    3
+                ) .
+                '/uploads';
+        }
+
+        $fullPath =
+            $uploadsBase .
+            '/' .
+            ltrim(
+                $relativePath,
+                '/\\'
+            );
+
+        if (
+            !is_file(
+                $fullPath
+            )
+        ) {
+            return null;
+        }
+
+        $mime =
+            mime_content_type(
+                $fullPath
+            );
+
+        $allowed = [
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+        ];
+
+        if (
+            !in_array(
+                $mime,
+                $allowed,
+                true
+            )
+        ) {
+            return null;
+        }
+
+        $binary =
+            file_get_contents(
+                $fullPath
+            );
+
+        if ($binary === false) {
+            return null;
+        }
+
+        return sprintf(
+            'data:%s;base64,%s',
+            $mime,
+            base64_encode(
+                $binary
+            )
+        );
+    }
+
+    private static function extractOpenAIOutputText(
+        array $response
+    ): string {
+        foreach (
+            $response['output'] ?? []
+            as $outputItem
+        ) {
+            if (
+                ($outputItem['type'] ?? null)
+                !== 'message'
+            ) {
+                continue;
+            }
+
+            foreach (
+                $outputItem['content'] ?? []
+                as $content
+            ) {
+                if (
+                    ($content['type'] ?? null)
+                    !== 'output_text'
+                ) {
+                    continue;
+                }
+
+                $text =
+                    trim(
+                        (string)(
+                            $content['text'] ?? ''
+                        )
+                    );
+
+                if ($text !== '') {
+                    return $text;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    private static function completeAnalysis(
+        int $analysisId,
+        array $result
+    ): void {
+        $pdo = self::db(true);
+
+        $st = $pdo->prepare("
+        UPDATE publication_ai_analyses
+
+        SET
+            status = 'completed',
+
+            content_score =
+                :content_score,
+
+            title_score =
+                :title_score,
+
+            description_score =
+                :description_score,
+
+            image_score =
+                :image_score,
+
+            suggested_title =
+                :suggested_title,
+
+            suggested_description =
+                :suggested_description,
+
+            questions_json =
+                :questions_json,
+
+            suggestions_json =
+                :suggestions_json,
+
+            detected_features_json =
+                :detected_features_json,
+
+            contradictions_json =
+                :contradictions_json,
+
+            image_analysis_json =
+                :image_analysis_json,
+
+            model_name =
+                :model_name,
+
+            error_message =
+                NULL,
+
+            analyzed_at =
+                NOW(),
+
+            updated_at =
+                CURRENT_TIMESTAMP
+
+        WHERE id = :id
+
+        LIMIT 1
+    ");
+
+        $encode =
+            static fn(array $value): string =>
+            json_encode(
+                $value,
+                JSON_UNESCAPED_UNICODE |
+                    JSON_UNESCAPED_SLASHES |
+                    JSON_THROW_ON_ERROR
+            );
+
+        $st->execute([
+            'content_score' =>
+            (float)$result['content_score'],
+
+            'title_score' =>
+            (float)$result['title_score'],
+
+            'description_score' =>
+            (float)$result['description_score'],
+
+            'image_score' =>
+            (float)$result['image_score'],
+
+            'suggested_title' =>
+            trim(
+                (string)$result['suggested_title']
+            ),
+
+            'suggested_description' =>
+            trim(
+                (string)$result['suggested_description']
+            ),
+
+            'questions_json' =>
+            $encode(
+                $result['questions'] ?? []
+            ),
+
+            'suggestions_json' =>
+            $encode(
+                $result['suggestions'] ?? []
+            ),
+
+            'detected_features_json' =>
+            $encode(
+                $result['detected_features'] ?? []
+            ),
+
+            'contradictions_json' =>
+            $encode(
+                $result['contradictions'] ?? []
+            ),
+
+            'image_analysis_json' =>
+            $encode(
+                $result['image_analysis'] ?? []
+            ),
+
+            'model_name' =>
+            trim(
+                (string)(
+                    $result['_model']
+                    ?? self::DEFAULT_MODEL
+                )
             ),
 
             'id' =>

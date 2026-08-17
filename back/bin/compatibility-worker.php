@@ -7,6 +7,12 @@ use App\Services\CompatibilityJobService;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
+$dotenv = Dotenv\Dotenv::createImmutable(
+    __DIR__ . '/../'
+);
+
+$dotenv->load();
+
 /*
 |--------------------------------------------------------------------------
 | Compatibility Worker

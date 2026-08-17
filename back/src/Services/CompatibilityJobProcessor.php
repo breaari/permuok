@@ -5,6 +5,7 @@ namespace App\Services;
 use Exception;
 use App\Services\AI\CompatibilityEngine;
 use App\Services\AI\PublicationQualityService;
+use App\Services\AI\PublicationAIAnalysisService;
 
 class CompatibilityJobProcessor
 {
@@ -30,6 +31,10 @@ class CompatibilityJobProcessor
             ),
             'property_quality_recalculate' =>
             PublicationQualityService::analyzeProperty(
+                $entityId
+            ),
+            'property_ai_analyze' =>
+            PublicationAIAnalysisService::processPropertyAnalysis(
                 $entityId
             ),
             'search_request_recalculate' =>

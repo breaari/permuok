@@ -28,11 +28,12 @@ class CompatibilityJobService
 
     private const STALE_LOCK_MINUTES = 10;
 
-    private static function db(): PDO
-    {
+    private static function db(
+        bool $forceReconnect = false
+    ): PDO {
         require_once __DIR__ . '/../../db.php';
 
-        return pdo();
+        return pdo($forceReconnect);
     }
 
     public static function enqueuePropertyQualityRecalculation(
@@ -377,7 +378,7 @@ class CompatibilityJobService
             return;
         }
 
-        $pdo = self::db();
+        $pdo = self::db(true);
 
         $stCurrent = $pdo->prepare("
             SELECT
