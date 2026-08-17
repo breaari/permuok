@@ -80,7 +80,7 @@ export default function PropertyImagesSection({
       onSuccess?.(
         `${filesToAdd.length} imagen${
           filesToAdd.length !== 1 ? "es" : ""
-        } agregada${filesToAdd.length !== 1 ? "s" : ""} correctamente.`,
+        } seleccionada${filesToAdd.length !== 1 ? "s" : ""}. Guardá los cambios para confirmar la carga.`,
       );
     }
 
