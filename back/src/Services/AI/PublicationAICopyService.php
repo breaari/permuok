@@ -11,7 +11,7 @@ class PublicationAICopyService
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const TITLE_PROMPT_VERSION = '1.0';
-    private const DESCRIPTION_PROMPT_VERSION = '1.1';
+    private const DESCRIPTION_PROMPT_VERSION = '2.0';
 
     private static function db(
         bool $forceReconnect = false
@@ -76,8 +76,8 @@ class PublicationAICopyService
 
         $promptVersion =
             $copyType === 'title'
-                ? self::TITLE_PROMPT_VERSION
-                : self::DESCRIPTION_PROMPT_VERSION;
+            ? self::TITLE_PROMPT_VERSION
+            : self::DESCRIPTION_PROMPT_VERSION;
 
         $inputHash =
             self::buildInputHash(
@@ -131,42 +131,42 @@ class PublicationAICopyService
 
         $st->execute([
             'entity_id' =>
-                $propertyId,
+            $propertyId,
 
             'copy_type' =>
-                $copyType,
+            $copyType,
 
             'content' =>
-                $generated['content'],
+            $generated['content'],
 
             'input_hash' =>
-                $inputHash,
+            $inputHash,
 
             'model_name' =>
-                $generated['model'],
+            $generated['model'],
 
             'prompt_version' =>
-                $promptVersion,
+            $promptVersion,
 
             'created_by_user_id' =>
-                $userId,
+            $userId,
         ]);
 
         return [
             'id' =>
-                (int)$pdo->lastInsertId(),
+            (int)$pdo->lastInsertId(),
 
             'type' =>
-                $copyType,
+            $copyType,
 
             'content' =>
-                $generated['content'],
+            $generated['content'],
 
             'input_hash' =>
-                $inputHash,
+            $inputHash,
 
             'prompt_version' =>
-                $promptVersion,
+            $promptVersion,
         ];
     }
 
@@ -179,13 +179,13 @@ class PublicationAICopyService
             $json = json_encode(
                 [
                     'copy_type' =>
-                        $copyType,
+                    $copyType,
 
                     'prompt_version' =>
-                        $promptVersion,
+                    $promptVersion,
 
                     'input' =>
-                        $input,
+                    $input,
                 ],
                 JSON_UNESCAPED_UNICODE |
                     JSON_UNESCAPED_SLASHES |
@@ -230,13 +230,13 @@ class PublicationAICopyService
 
         $st->execute([
             'entity_id' =>
-                $propertyId,
+            $propertyId,
 
             'copy_type' =>
-                $copyType,
+            $copyType,
 
             'input_hash' =>
-                $inputHash,
+            $inputHash,
         ]);
 
         return $st->fetchAll(
@@ -244,26 +244,26 @@ class PublicationAICopyService
         ) ?: [];
     }
     private static function buildTitlePrompt(
-    array $input,
-    array $previousOptions
-): string {
-    $propertyJson =
-        json_encode(
-            $input,
-            JSON_PRETTY_PRINT |
-                JSON_UNESCAPED_UNICODE |
-                JSON_UNESCAPED_SLASHES
-        );
+        array $input,
+        array $previousOptions
+    ): string {
+        $propertyJson =
+            json_encode(
+                $input,
+                JSON_PRETTY_PRINT |
+                    JSON_UNESCAPED_UNICODE |
+                    JSON_UNESCAPED_SLASHES
+            );
 
-    $previousJson =
-        json_encode(
-            $previousOptions,
-            JSON_PRETTY_PRINT |
-                JSON_UNESCAPED_UNICODE |
-                JSON_UNESCAPED_SLASHES
-        );
+        $previousJson =
+            json_encode(
+                $previousOptions,
+                JSON_PRETTY_PRINT |
+                    JSON_UNESCAPED_UNICODE |
+                    JSON_UNESCAPED_SLASHES
+            );
 
-    return <<<PROMPT
+        return <<<PROMPT
 Sos un redactor inmobiliario profesional especializado
 en publicaciones inmobiliarias argentinas.
 
@@ -330,154 +330,212 @@ PROPIEDAD:
 
 {$propertyJson}
 PROMPT;
-}
-private static function buildDescriptionPrompt(
-    array $input,
-    array $previousOptions
-): string {
-    $propertyJson =
-        json_encode(
-            $input,
-            JSON_PRETTY_PRINT |
-                JSON_UNESCAPED_UNICODE |
-                JSON_UNESCAPED_SLASHES
-        );
+    }
 
-    $previousJson =
-        json_encode(
-            $previousOptions,
-            JSON_PRETTY_PRINT |
-                JSON_UNESCAPED_UNICODE |
-                JSON_UNESCAPED_SLASHES
-        );
+    private static function buildDescriptionPrompt(
+        array $input,
+        array $previousOptions
+    ): string {
+        $propertyJson =
+            json_encode(
+                $input,
+                JSON_PRETTY_PRINT |
+                    JSON_UNESCAPED_UNICODE |
+                    JSON_UNESCAPED_SLASHES
+            );
 
-    return <<<PROMPT
-Sos un redactor inmobiliario profesional argentino.
+        $previousJson =
+            json_encode(
+                $previousOptions,
+                JSON_PRETTY_PRINT |
+                    JSON_UNESCAPED_UNICODE |
+                    JSON_UNESCAPED_SLASHES
+            );
 
-Redactá una descripción comercial lista para publicarse
-para la siguiente propiedad.
+        return <<<PROMPT
+Actuás como redactor de una inmobiliaria profesional argentina.
 
-Tu respuesta se insertará directamente dentro del campo
-"Descripción" de PermuOK.
+Tu tarea es escribir la descripción comercial de una propiedad
+lista para ser publicada.
 
-REGLAS CRÍTICAS:
+IMPORTANTE:
 
-- Devolver solamente la descripción.
-- No explicar tu respuesta.
-- No realizar análisis.
-- No mencionar PermuOK.
-- No decir "datos confirmados".
-- No decir "para optimizar".
-- No recomendar completar información.
-- No mencionar campos faltantes.
-- No formular preguntas.
-- No comentar la calidad de las imágenes.
-- No explicar cómo mejorar la publicación.
-- No inferir público objetivo ni uso ideal.
-- No escribir frases como "ideal para inversión",
-  "ideal para primera vivienda" o similares.
-- No inferir funcionalidad, comodidad, amplitud,
-  luminosidad o calidad si no están confirmadas.
-- No agregar frases genéricas de cierre como:
-  "contactanos",
-  "coordiná una visita",
-  "consultanos",
-  "no dejes pasar esta oportunidad".
-- No incluir la dirección exacta salvo que sea
-  explícitamente relevante para la descripción.
-- Preferir zona, barrio o ciudad.
-- No convertir "acepta propuestas abiertas" en
-  "abierto a ofertas" si eso no está confirmado.
-- Si la propiedad acepta propuestas abiertas de permuta,
-  expresarlo únicamente como condición de permuta.
+No estás redactando una ficha técnica.
+No estás resumiendo una base de datos.
+No estás analizando la publicación.
+Estás escribiendo el texto comercial que leería una persona
+interesada en la propiedad.
 
-  NO GENERAR:
+ESTILO DE REDACCIÓN:
 
-"Ideal como inversión o primera vivienda por su tamaño
-y funcionalidad. Contacto para consultas y coordinación
-de visitas."
+- Escribí como una inmobiliaria profesional argentina.
+- Usá lenguaje natural, claro y comercial.
+- La descripción debe tener ritmo y continuidad.
+- Evitá enumerar campos de una base de datos.
+- No intentes incluir todos los datos disponibles.
+- Seleccioná únicamente la información que aporte valor comercial.
+- Preferí explicar cómo está compuesta la propiedad antes que
+  enumerar números sin contexto.
+- Podés dividir el texto en 2 o 3 párrafos breves.
+- No uses encabezados como "Descripción", "Características",
+  "Superficie", "Permuta" u "Operación".
+- No uses lenguaje grandilocuente ni exageraciones.
 
-USAR SOLAMENTE INFORMACIÓN CONFIRMADA.
+ESTRUCTURA ORIENTATIVA:
 
-Nunca inventar:
+1. Presentación breve:
+   tipo de propiedad + ambientes + zona.
 
+2. Desarrollo:
+   contar naturalmente cómo está compuesta la propiedad usando
+   únicamente información confirmada.
+
+3. Información adicional relevante:
+   superficies, cochera, patio, amenities, antigüedad,
+   condiciones de permuta u otros datos confirmados que realmente
+   aporten valor.
+
+No es obligatorio utilizar las tres partes.
+Si hay poca información confirmada, redactá un texto más breve
+en lugar de rellenarlo artificialmente.
+
+AMBIENTES:
+
+En departamentos y casas, cuando existe una cantidad confirmada
+de dormitorios y no hay información que lo contradiga, podés utilizar:
+
+1 dormitorio = 2 ambientes
+2 dormitorios = 3 ambientes
+3 dormitorios = 4 ambientes
+
+Esto es solamente una forma comercial de redactar el texto.
+No modifica el dato estructurado.
+
+REGLAS DE VERACIDAD:
+
+Usá solamente información confirmada en la ficha.
+
+No inventes ni deduzcas:
 - luminosidad;
+- amplitud;
+- comodidad;
+- funcionalidad;
+- distribución específica;
+- estado de conservación;
 - orientación;
 - vistas;
-- estado;
-- calidad constructiva;
 - materiales;
-- distribución;
+- calidad constructiva;
+- público objetivo;
+- usos posibles;
 - amenities;
-- balcones;
-- terrazas;
-- cocheras;
-- antigüedad.
+- ambientes que no estén confirmados.
 
-La descripción debe:
+No afirmar algo solamente porque aparezca en una imagen.
 
-- sonar como una publicación inmobiliaria real;
-- ser profesional y natural;
-- utilizar español rioplatense;
-- priorizar tipo de inmueble y ubicación;
-- integrar naturalmente las características relevantes;
-- mencionar condiciones de permuta cuando realmente correspondan;
-- evitar repetir mecánicamente toda la ficha;
-- no incluir precio salvo que resulte imprescindible;
-- utilizar párrafos breves;
-- tener aproximadamente entre 300 y 700 caracteres
-  cuando haya suficiente información.
+REGLAS DE CONTENIDO:
+
+- No incluir precio.
+- No incluir moneda.
+- No repetir la dirección exacta.
+- Utilizar preferentemente barrio o zona.
+- No mencionar país, provincia o partido si resulta redundante.
+- No mencionar PermuOK.
+- No hablar de la publicación, ficha o datos cargados.
+- No decir "se publica", "se informa", "datos confirmados",
+  "tipología", "operación en moneda" ni expresiones similares.
+- No agregar llamadas a la acción.
+- No decir "contactanos", "coordiná una visita" ni similares.
+- No mencionar información faltante.
+- No recomendar mejoras.
+
+PERMUTA:
+
+Si existen condiciones de permuta confirmadas, incorporarlas
+naturalmente al final.
+
+Por ejemplo:
+
+"La propiedad acepta propuestas abiertas de permuta."
+
+No usar etiquetas como:
+
+"Permuta:"
+"Operación:"
+"Condiciones:"
+
+EJEMPLO DEL ESTILO BUSCADO:
+
+"Departamento de 2 ambientes ubicado en Lanús Oeste.
+
+Cuenta con 1 dormitorio y 1 baño, con 35 m² cubiertos sobre una
+superficie total de 40 m².
+
+La propiedad acepta propuestas abiertas de permuta."
+
+Este ejemplo muestra el TONO y la FORMA DE REDACTAR.
+No copies información del ejemplo que no esté presente en la propiedad.
+
+EJEMPLOS DE ESTILO NO DESEADO:
+
+"Departamento en Lanús Oeste, Lanús, Provincia de Buenos Aires.
+Superficie total 40 m², superficie cubierta 35 m².
+Operación en moneda USD."
+
+"Se publica con detalle de superficies y tipología del inmueble."
+
+"Propiedad ideal para inversión por su excelente funcionalidad."
+
+"Permuta: acepta propuestas abiertas."
 
 OPCIONES GENERADAS ANTERIORMENTE:
 
 {$previousJson}
 
-Si existen opciones anteriores, generá otra redacción,
-sin inventar características.
-
-
+Si existen opciones anteriores, redactá una alternativa diferente
+manteniendo el mismo nivel profesional.
 
 PROPIEDAD:
 
 {$propertyJson}
 PROMPT;
-}
-private static function callOpenAI(
-    array $input,
-    string $copyType,
-    array $previousOptions
-): array {
-    $apiKey =
-        trim(
-            (string)(
-                $_ENV['OPENAI_API_KEY']
-                ?? getenv('OPENAI_API_KEY')
-                ?: ''
-            )
-        );
-
-    if ($apiKey === '') {
-        throw new Exception(
-            'OPENAI_API_KEY no está configurada.'
-        );
     }
+    private static function callOpenAI(
+        array $input,
+        string $copyType,
+        array $previousOptions
+    ): array {
+        $apiKey =
+            trim(
+                (string)(
+                    $_ENV['OPENAI_API_KEY']
+                    ?? getenv('OPENAI_API_KEY')
+                    ?: ''
+                )
+            );
 
-    $model =
-        trim(
-            (string)(
-                $_ENV['OPENAI_MODEL']
-                ?? getenv('OPENAI_MODEL')
-                ?: self::DEFAULT_MODEL
-            )
-        );
+        if ($apiKey === '') {
+            throw new Exception(
+                'OPENAI_API_KEY no está configurada.'
+            );
+        }
 
-    if ($model === '') {
         $model =
-            self::DEFAULT_MODEL;
-    }
+            trim(
+                (string)(
+                    $_ENV['OPENAI_MODEL']
+                    ?? getenv('OPENAI_MODEL')
+                    ?: self::DEFAULT_MODEL
+                )
+            );
 
-    $prompt =
-        $copyType === 'title'
+        if ($model === '') {
+            $model =
+                self::DEFAULT_MODEL;
+        }
+
+        $prompt =
+            $copyType === 'title'
             ? self::buildTitlePrompt(
                 $input,
                 $previousOptions
@@ -487,167 +545,167 @@ private static function callOpenAI(
                 $previousOptions
             );
 
-    $body = [
-        'model' =>
+        $body = [
+            'model' =>
             $model,
 
-        'input' =>
+            'input' =>
             $prompt,
-    ];
+        ];
 
-    $jsonBody =
-        json_encode(
-            $body,
-            JSON_UNESCAPED_UNICODE |
-                JSON_UNESCAPED_SLASHES |
-                JSON_THROW_ON_ERROR
-        );
+        $jsonBody =
+            json_encode(
+                $body,
+                JSON_UNESCAPED_UNICODE |
+                    JSON_UNESCAPED_SLASHES |
+                    JSON_THROW_ON_ERROR
+            );
 
-    $ch =
-        curl_init(
-            'https://api.openai.com/v1/responses'
-        );
+        $ch =
+            curl_init(
+                'https://api.openai.com/v1/responses'
+            );
 
-    if ($ch === false) {
-        throw new Exception(
-            'No se pudo inicializar la conexión con OpenAI.'
-        );
-    }
+        if ($ch === false) {
+            throw new Exception(
+                'No se pudo inicializar la conexión con OpenAI.'
+            );
+        }
 
-    curl_setopt_array(
-        $ch,
-        [
-            CURLOPT_POST =>
+        curl_setopt_array(
+            $ch,
+            [
+                CURLOPT_POST =>
                 true,
 
-            CURLOPT_RETURNTRANSFER =>
+                CURLOPT_RETURNTRANSFER =>
                 true,
 
-            CURLOPT_HTTPHEADER => [
-                'Authorization: Bearer ' .
-                    $apiKey,
+                CURLOPT_HTTPHEADER => [
+                    'Authorization: Bearer ' .
+                        $apiKey,
 
-                'Content-Type: application/json',
-            ],
+                    'Content-Type: application/json',
+                ],
 
-            CURLOPT_POSTFIELDS =>
+                CURLOPT_POSTFIELDS =>
                 $jsonBody,
 
-            CURLOPT_CONNECTTIMEOUT =>
+                CURLOPT_CONNECTTIMEOUT =>
                 15,
 
-            CURLOPT_TIMEOUT =>
+                CURLOPT_TIMEOUT =>
                 60,
-        ]
-    );
-
-    $response =
-        curl_exec(
-            $ch
+            ]
         );
 
-    if ($response === false) {
-        $error =
-            curl_error(
+        $response =
+            curl_exec(
                 $ch
+            );
+
+        if ($response === false) {
+            $error =
+                curl_error(
+                    $ch
+                );
+
+            curl_close(
+                $ch
+            );
+
+            throw new Exception(
+                'Error conectando con OpenAI: ' .
+                    $error
+            );
+        }
+
+        $httpCode =
+            (int)curl_getinfo(
+                $ch,
+                CURLINFO_HTTP_CODE
             );
 
         curl_close(
             $ch
         );
 
-        throw new Exception(
-            'Error conectando con OpenAI: ' .
-                $error
-        );
-    }
-
-    $httpCode =
-        (int)curl_getinfo(
-            $ch,
-            CURLINFO_HTTP_CODE
-        );
-
-    curl_close(
-        $ch
-    );
-
-    try {
-        $decoded =
-            json_decode(
-                $response,
-                true,
-                512,
-                JSON_THROW_ON_ERROR
+        try {
+            $decoded =
+                json_decode(
+                    $response,
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+        } catch (JsonException $e) {
+            throw new Exception(
+                'OpenAI devolvió una respuesta inválida.',
+                0,
+                $e
             );
-    } catch (JsonException $e) {
-        throw new Exception(
-            'OpenAI devolvió una respuesta inválida.',
-            0,
-            $e
-        );
-    }
+        }
 
-    if (
-        $httpCode < 200 ||
-        $httpCode >= 300
-    ) {
-        throw new Exception(
-            'OpenAI API: ' .
-                (
-                    $decoded['error']['message']
-                    ?? 'Error desconocido.'
-                )
-        );
-    }
+        if (
+            $httpCode < 200 ||
+            $httpCode >= 300
+        ) {
+            throw new Exception(
+                'OpenAI API: ' .
+                    (
+                        $decoded['error']['message']
+                        ?? 'Error desconocido.'
+                    )
+            );
+        }
 
-    $content =
-        self::extractOutputText(
-            $decoded
-        );
+        $content =
+            self::extractOutputText(
+                $decoded
+            );
 
-    if ($content === '') {
-        throw new Exception(
-            'OpenAI no generó contenido.'
-        );
-    }
+        if ($content === '') {
+            throw new Exception(
+                'OpenAI no generó contenido.'
+            );
+        }
 
-    return [
-        'content' =>
+        return [
+            'content' =>
             trim($content),
 
-        'model' =>
+            'model' =>
             (string)(
                 $decoded['model']
                 ?? $model
             ),
-    ];
-}
-private static function extractOutputText(
-    array $response
-): string {
-    foreach (
-        $response['output'] ?? []
-        as $output
-    ) {
+        ];
+    }
+    private static function extractOutputText(
+        array $response
+    ): string {
         foreach (
-            $output['content'] ?? []
-            as $content
+            $response['output'] ?? []
+            as $output
         ) {
-            if (
-                ($content['type'] ?? null)
-                === 'output_text'
+            foreach (
+                $output['content'] ?? []
+                as $content
             ) {
-                return trim(
-                    (string)(
-                        $content['text']
-                        ?? ''
-                    )
-                );
+                if (
+                    ($content['type'] ?? null)
+                    === 'output_text'
+                ) {
+                    return trim(
+                        (string)(
+                            $content['text']
+                            ?? ''
+                        )
+                    );
+                }
             }
         }
-    }
 
-    return '';
-}
+        return '';
+    }
 }
