@@ -1348,7 +1348,6 @@ class PublicationAIAnalysisService
      * La llamada a OpenAI puede ser larga.
      * Renovamos la conexión antes de guardar.
      */
-            self::db(true);
 
             self::completeAnalysis(
                 $analysisId,
@@ -1694,7 +1693,7 @@ class PublicationAIAnalysisService
             return;
         }
 
-        $pdo = self::db(true);
+        $pdo = self::db();
 
         $message = mb_substr(
             $message,
@@ -1727,7 +1726,7 @@ class PublicationAIAnalysisService
             return;
         }
 
-        $pdo = self::db(true);
+        $pdo = self::db();
 
         $st = $pdo->prepare("
         UPDATE publication_ai_analyses
@@ -2348,7 +2347,7 @@ PROMPT;
         int $analysisId,
         array $result
     ): void {
-        $pdo = self::db(true);
+        $pdo = self::db();
 
         $st = $pdo->prepare("
         UPDATE publication_ai_analyses
