@@ -811,9 +811,11 @@ class PublicationAIAnalysisService
         }
 
         /*
-     * Ya existe un trabajo pendiente o procesándose.
+     * Ya existe un análisis pendiente
+     * o procesándose.
      *
-     * Tampoco generamos otro.
+     * Volvemos a pedir el job para garantizar que
+     * exista uno activo. active_key evita duplicados.
      */
         if (
             $existing &&
@@ -823,6 +825,11 @@ class PublicationAIAnalysisService
                 true
             )
         ) {
+            $job =
+                CompatibilityJobService::enqueuePropertyAIAnalysis(
+                    $propertyId
+                );
+
             return [
                 'analysis_id' =>
                 (int)$existing['id'],
@@ -837,13 +844,19 @@ class PublicationAIAnalysisService
                 true,
 
                 'queued' =>
-                false,
+                true,
+
+                'job_id' =>
+                (int)($job['id'] ?? 0),
             ];
         }
 
         /*
-     * Si anteriormente falló el mismo análisis,
-     * reutilizamos su fila y permitimos reintentar.
+     * Si anteriormente falló exactamente
+     * este mismo análisis, reutilizamos su fila.
+     *
+     * Lo volvemos a pending y generamos/reutilizamos
+     * el job correspondiente.
      */
         if (
             $existing &&
@@ -885,17 +898,12 @@ class PublicationAIAnalysisService
                 throw $e;
             }
 
-            $job =
-                CompatibilityJobService::enqueuePropertyAIAnalysis(
-                    $propertyId
-                );
-
             return [
                 'analysis_id' =>
-                (int)$existing['id'],
+                $analysisId,
 
                 'status' =>
-                (string)$existing['status'],
+                'pending',
 
                 'input_hash' =>
                 $inputHash,

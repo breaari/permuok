@@ -138,7 +138,7 @@ try {
                 $jobId
             );
 
-            $completed++;
+
 
             if (
                 !empty($result['skipped'])
@@ -151,7 +151,7 @@ try {
 
                 continue;
             }
-
+            $completed++;
             echo "[JOB {$jobId}] completed\n";
         } catch (Throwable $e) {
             /*
