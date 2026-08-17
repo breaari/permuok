@@ -239,4 +239,56 @@ class PropertyController
             );
         }
     }
+
+    public static function generateAITitle(): void
+{
+    try {
+        $auth =
+            AuthHelper::requireUser();
+
+        $id =
+            (int)($_GET['id'] ?? 0);
+
+        $result =
+            PropertyService::generateAITitle(
+                (int)$auth['id'],
+                $id
+            );
+
+        ResponseHelper::ok(
+            $result
+        );
+    } catch (\Throwable $e) {
+        ResponseHelper::fail(
+            $e->getMessage(),
+            400
+        );
+    }
+}
+
+public static function generateAIDescription(): void
+{
+    try {
+        $auth =
+            AuthHelper::requireUser();
+
+        $id =
+            (int)($_GET['id'] ?? 0);
+
+        $result =
+            PropertyService::generateAIDescription(
+                (int)$auth['id'],
+                $id
+            );
+
+        ResponseHelper::ok(
+            $result
+        );
+    } catch (\Throwable $e) {
+        ResponseHelper::fail(
+            $e->getMessage(),
+            400
+        );
+    }
+}
 }

@@ -274,6 +274,37 @@ if (
 
     exit;
 }
+if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/properties/(\d+)/ai-copy/title$#',
+        $uri,
+        $m
+    )
+) {
+    $_GET['id'] =
+        (int)$m[1];
+
+    PropertyController::generateAITitle();
+
+    exit;
+}
+
+if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/properties/(\d+)/ai-copy/description$#',
+        $uri,
+        $m
+    )
+) {
+    $_GET['id'] =
+        (int)$m[1];
+
+    PropertyController::generateAIDescription();
+
+    exit;
+}
 if ($method === 'PUT' && preg_match('#^/properties/(\d+)/requirements$#', $uri, $m)) {
     $_GET['id'] = (int)$m[1];
     PropertyController::saveRequirements();

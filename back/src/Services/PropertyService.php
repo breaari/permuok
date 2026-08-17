@@ -6,6 +6,7 @@ use PDO;
 use Exception;
 use Throwable;
 use App\Services\AI\PublicationAIAnalysisService;
+use App\Services\AI\PublicationAICopyService;
 
 class PropertyService
 {
@@ -18,6 +19,36 @@ class PropertyService
         return pdo();
     }
 
+
+    public static function generateAITitle(
+        int $userId,
+        int $propertyId
+    ): array {
+        self::getOwnedProperty(
+            $userId,
+            $propertyId
+        );
+
+        return PublicationAICopyService::generatePropertyTitle(
+            $propertyId,
+            $userId
+        );
+    }
+
+    public static function generateAIDescription(
+        int $userId,
+        int $propertyId
+    ): array {
+        self::getOwnedProperty(
+            $userId,
+            $propertyId
+        );
+
+        return PublicationAICopyService::generatePropertyDescription(
+            $propertyId,
+            $userId
+        );
+    }
     private static function imageViewUrl(?int $imageId): ?string
     {
         if (!$imageId) {

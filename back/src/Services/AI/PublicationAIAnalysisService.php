@@ -10,7 +10,7 @@ use App\Services\CompatibilityJobService;
 
 class PublicationAIAnalysisService
 {
-    private const PROMPT_VERSION = '1.2';
+    private const PROMPT_VERSION = '1.3';
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const ALLOWED_QUESTION_FIELDS = [
@@ -1791,6 +1791,18 @@ La descripción debe:
 - no inventar luminosidad, estado, distribución, vistas, orientación,
   materiales o calidad constructiva;
 - usar párrafos naturales.
+Ejemplo:
+
+En vez de:
+"Datos confirmados: 40 m² totales / 35 m² cubiertos,
+1 dormitorio, 1 baño..."
+
+Preferir:
+"Departamento de 2 ambientes ubicado en Lanús Oeste.
+Cuenta con 1 dormitorio y 1 baño, con 35 m² cubiertos
+sobre una superficie total de 40 m².
+
+La propiedad acepta propuestas abiertas de permuta."
 
 REGLAS SOBRE PREGUNTAS:
 
