@@ -827,8 +827,14 @@ class PublicationAIAnalysisService
         ) {
             $job =
                 CompatibilityJobService::enqueuePropertyAIAnalysis(
-                    $propertyId
+                    $propertyId,
+                    $analysisId
                 );
+
+            CompatibilityJobService::enqueuePropertyAIAnalysis(
+                $propertyId,
+                (int)$existing['id']
+            );
 
             return [
                 'analysis_id' =>

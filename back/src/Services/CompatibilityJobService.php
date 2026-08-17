@@ -49,12 +49,14 @@ class CompatibilityJobService
 
     public static function enqueuePropertyAIAnalysis(
         int $propertyId,
+        int $analysisId,
         int $priority = 7
     ): array {
         return self::enqueue(
             self::TYPE_PROPERTY_AI_ANALYZE,
             $propertyId,
-            $priority
+            $priority,
+            $analysisId
         );
     }
 
@@ -105,7 +107,8 @@ class CompatibilityJobService
     private static function enqueue(
         string $jobType,
         int $entityId,
-        int $priority = 5
+        int $priority = 5,
+        ?int $referenceId = null
     ): array {
         if ($entityId <= 0) {
             throw new Exception(
@@ -135,8 +138,22 @@ class CompatibilityJobService
 
         $pdo = self::db();
 
-        $activeKey =
-            $jobType . ':' . $entityId;
+        if (
+            $jobType === self::TYPE_PROPERTY_AI_ANALYZE &&
+            $referenceId !== null
+        ) {
+            $activeKey =
+                $jobType .
+                ':' .
+                $entityId .
+                ':' .
+                $referenceId;
+        } else {
+            $activeKey =
+                $jobType .
+                ':' .
+                $entityId;
+        }
 
         /*
          * Gracias al UNIQUE(active_key):
@@ -153,6 +170,7 @@ class CompatibilityJobService
             INSERT INTO compatibility_jobs (
                 job_type,
                 entity_id,
+                reference_id,
                 status,
                 priority,
                 attempts,
@@ -162,6 +180,7 @@ class CompatibilityJobService
             ) VALUES (
                 :job_type,
                 :entity_id,
+                :reference_id,
                 'pending',
                 :priority,
                 0,
@@ -194,6 +213,9 @@ class CompatibilityJobService
 
             'entity_id' =>
             $entityId,
+
+            'reference_id' =>
+            $referenceId,
 
             'priority' =>
             $priority,
