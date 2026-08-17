@@ -11,7 +11,7 @@ class PublicationAICopyService
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const TITLE_PROMPT_VERSION = '1.0';
-    private const DESCRIPTION_PROMPT_VERSION = '1.0';
+    private const DESCRIPTION_PROMPT_VERSION = '1.1';
 
     private static function db(
         bool $forceReconnect = false
@@ -373,6 +373,29 @@ REGLAS CRÍTICAS:
 - No formular preguntas.
 - No comentar la calidad de las imágenes.
 - No explicar cómo mejorar la publicación.
+- No inferir público objetivo ni uso ideal.
+- No escribir frases como "ideal para inversión",
+  "ideal para primera vivienda" o similares.
+- No inferir funcionalidad, comodidad, amplitud,
+  luminosidad o calidad si no están confirmadas.
+- No agregar frases genéricas de cierre como:
+  "contactanos",
+  "coordiná una visita",
+  "consultanos",
+  "no dejes pasar esta oportunidad".
+- No incluir la dirección exacta salvo que sea
+  explícitamente relevante para la descripción.
+- Preferir zona, barrio o ciudad.
+- No convertir "acepta propuestas abiertas" en
+  "abierto a ofertas" si eso no está confirmado.
+- Si la propiedad acepta propuestas abiertas de permuta,
+  expresarlo únicamente como condición de permuta.
+
+  NO GENERAR:
+
+"Ideal como inversión o primera vivienda por su tamaño
+y funcionalidad. Contacto para consultas y coordinación
+de visitas."
 
 USAR SOLAMENTE INFORMACIÓN CONFIRMADA.
 
@@ -411,6 +434,8 @@ OPCIONES GENERADAS ANTERIORMENTE:
 
 Si existen opciones anteriores, generá otra redacción,
 sin inventar características.
+
+
 
 PROPIEDAD:
 
