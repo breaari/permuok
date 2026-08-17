@@ -10,7 +10,7 @@ use App\Services\CompatibilityJobService;
 
 class PublicationAIAnalysisService
 {
-    private const PROMPT_VERSION = '1.6';
+    private const PROMPT_VERSION = '1.7';
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const ALLOWED_QUESTION_FIELDS = [
@@ -1318,29 +1318,76 @@ class PublicationAIAnalysisService
         ]);
 
         try {
-            /*
-         * Preparamos los datos inmediatamente
-         * antes de llamar a OpenAI.
-         */
+            $totalStartedAt = microtime(true);
+
+            $prepareStartedAt = microtime(true);
+
             $input =
                 self::preparePropertyInput(
                     $propertyId
                 );
+
+            $prepareSeconds =
+                microtime(true) -
+                $prepareStartedAt;
+
+            $openAIStartedAt = microtime(true);
 
             $result =
                 self::callOpenAIForProperty(
                     $input
                 );
 
+            $openAISeconds =
+                microtime(true) -
+                $openAIStartedAt;
+
+            $persistStartedAt = microtime(true);
+
             /*
-         * La llamada a OpenAI puede ser larga.
-         * Renovamos la conexión antes de guardar.
-         */
+     * La llamada a OpenAI puede ser larga.
+     * Renovamos la conexión antes de guardar.
+     */
             self::db(true);
 
             self::completeAnalysis(
                 $analysisId,
                 $result
+            );
+
+            $persistSeconds =
+                microtime(true) -
+                $persistStartedAt;
+
+            $totalSeconds =
+                microtime(true) -
+                $totalStartedAt;
+
+            echo PHP_EOL;
+            echo "[AI ANALYSIS #{$analysisId}]" . PHP_EOL;
+
+            echo sprintf(
+                "  Preparar datos: %.2f s%s",
+                $prepareSeconds,
+                PHP_EOL
+            );
+
+            echo sprintf(
+                "  OpenAI:        %.2f s%s",
+                $openAISeconds,
+                PHP_EOL
+            );
+
+            echo sprintf(
+                "  Persistencia:  %.2f s%s",
+                $persistSeconds,
+                PHP_EOL
+            );
+
+            echo sprintf(
+                "  TOTAL IA:      %.2f s%s",
+                $totalSeconds,
+                PHP_EOL
             );
 
             return [
@@ -1466,6 +1513,8 @@ class PublicationAIAnalysisService
                 'effort' =>
                 'low',
             ],
+            'max_output_tokens' =>
+            1200,
 
             'input' => [
                 [
@@ -1481,6 +1530,7 @@ class PublicationAIAnalysisService
          * Structured Outputs.
          */
             'text' => [
+                'verbosity' => 'low',
                 'format' => [
                     'type' =>
                     'json_schema',
