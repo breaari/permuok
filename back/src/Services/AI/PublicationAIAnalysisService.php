@@ -5,6 +5,8 @@ namespace App\Services\AI;
 use PDO;
 use Exception;
 use JsonException;
+use Throwable;
+use App\Services\CompatibilityJobService;
 
 class PublicationAIAnalysisService
 {
@@ -670,6 +672,295 @@ class PublicationAIAnalysisService
     public static function getPromptVersion(): string
     {
         return self::PROMPT_VERSION;
+    }
+
+    /**
+     * Solicita un análisis IA para el estado actual
+     * de una propiedad.
+     *
+     * Todavía no ejecuta la IA:
+     * crea/reutiliza el registro y encola el trabajo.
+     */
+    public static function requestPropertyAnalysis(
+        int $propertyId
+    ): array {
+        if ($propertyId <= 0) {
+            throw new Exception(
+                'El ID de la propiedad no es válido.'
+            );
+        }
+
+        $pdo = self::db();
+
+        /*
+     * Generamos el hash del estado actual.
+     */
+        $inputHash =
+            self::buildPropertyInputHash(
+                $propertyId
+            );
+
+        /*
+     * Buscamos si este mismo contenido ya fue
+     * solicitado anteriormente.
+     */
+        $stExisting = $pdo->prepare("
+        SELECT *
+        FROM publication_ai_analyses
+
+        WHERE entity_type = 'property'
+          AND entity_id = :entity_id
+          AND input_hash = :input_hash
+          AND prompt_version = :prompt_version
+
+        ORDER BY id DESC
+
+        LIMIT 1
+    ");
+
+        $stExisting->execute([
+            'entity_id' =>
+            $propertyId,
+
+            'input_hash' =>
+            $inputHash,
+
+            'prompt_version' =>
+            self::PROMPT_VERSION,
+        ]);
+
+        $existing =
+            $stExisting->fetch(
+                PDO::FETCH_ASSOC
+            ) ?: null;
+
+        /*
+     * Ya fue analizado exactamente este contenido.
+     *
+     * No gastamos otra llamada IA.
+     */
+        if (
+            $existing &&
+            $existing['status'] === 'completed'
+        ) {
+            return [
+                'analysis_id' =>
+                (int)$existing['id'],
+
+                'status' =>
+                'completed',
+
+                'input_hash' =>
+                $inputHash,
+
+                'reused' =>
+                true,
+
+                'queued' =>
+                false,
+            ];
+        }
+
+        /*
+     * Ya existe un trabajo pendiente o procesándose.
+     *
+     * Tampoco generamos otro.
+     */
+        if (
+            $existing &&
+            in_array(
+                $existing['status'],
+                ['pending', 'processing'],
+                true
+            )
+        ) {
+            return [
+                'analysis_id' =>
+                (int)$existing['id'],
+
+                'status' =>
+                (string)$existing['status'],
+
+                'input_hash' =>
+                $inputHash,
+
+                'reused' =>
+                true,
+
+                'queued' =>
+                false,
+            ];
+        }
+
+        /*
+     * Si anteriormente falló el mismo análisis,
+     * reutilizamos su fila y permitimos reintentar.
+     */
+        if (
+            $existing &&
+            $existing['status'] === 'failed'
+        ) {
+            $analysisId =
+                (int)$existing['id'];
+
+            $stRetry = $pdo->prepare("
+            UPDATE publication_ai_analyses
+
+            SET
+                status = 'pending',
+                error_message = NULL,
+                analyzed_at = NULL,
+                updated_at = CURRENT_TIMESTAMP
+
+            WHERE id = :id
+
+            LIMIT 1
+        ");
+
+            $stRetry->execute([
+                'id' =>
+                $analysisId,
+            ]);
+
+            try {
+                $job =
+                    CompatibilityJobService::enqueuePropertyAIAnalysis(
+                        $propertyId
+                    );
+            } catch (Throwable $e) {
+                self::markAnalysisFailed(
+                    $analysisId,
+                    $e->getMessage()
+                );
+
+                throw $e;
+            }
+
+            return [
+                'analysis_id' =>
+                $analysisId,
+
+                'status' =>
+                'pending',
+
+                'input_hash' =>
+                $inputHash,
+
+                'reused' =>
+                true,
+
+                'queued' =>
+                true,
+
+                'job_id' =>
+                (int)($job['id'] ?? 0),
+            ];
+        }
+
+        /*
+     * No existe análisis para este contenido.
+     *
+     * Creamos uno nuevo.
+     */
+        $stInsert = $pdo->prepare("
+        INSERT INTO publication_ai_analyses (
+            entity_type,
+            entity_id,
+            status,
+            prompt_version,
+            input_hash
+        ) VALUES (
+            'property',
+            :entity_id,
+            'pending',
+            :prompt_version,
+            :input_hash
+        )
+    ");
+
+        $stInsert->execute([
+            'entity_id' =>
+            $propertyId,
+
+            'prompt_version' =>
+            self::PROMPT_VERSION,
+
+            'input_hash' =>
+            $inputHash,
+        ]);
+
+        $analysisId =
+            (int)$pdo->lastInsertId();
+
+        try {
+            $job =
+                CompatibilityJobService::enqueuePropertyAIAnalysis(
+                    $propertyId
+                );
+        } catch (Throwable $e) {
+            self::markAnalysisFailed(
+                $analysisId,
+                $e->getMessage()
+            );
+
+            throw $e;
+        }
+
+        return [
+            'analysis_id' =>
+            $analysisId,
+
+            'status' =>
+            'pending',
+
+            'input_hash' =>
+            $inputHash,
+
+            'reused' =>
+            false,
+
+            'queued' =>
+            true,
+
+            'job_id' =>
+            (int)($job['id'] ?? 0),
+        ];
+    }
+
+    private static function markAnalysisFailed(
+        int $analysisId,
+        string $message
+    ): void {
+        if ($analysisId <= 0) {
+            return;
+        }
+
+        $pdo = self::db();
+
+        $st = $pdo->prepare("
+        UPDATE publication_ai_analyses
+
+        SET
+            status = 'failed',
+            error_message = :error_message,
+            updated_at = CURRENT_TIMESTAMP
+
+        WHERE id = :id
+
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'error_message' =>
+            mb_substr(
+                $message,
+                0,
+                6000
+            ),
+
+            'id' =>
+            $analysisId,
+        ]);
     }
 
     private static function stringValue(
