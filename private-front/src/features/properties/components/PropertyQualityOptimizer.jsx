@@ -55,8 +55,6 @@ export default function PropertyQualityOptimizer({
   aiAnalysisLoading = false,
   aiAnalysisRequesting = false,
   onRequestAIAnalysis,
-  onApplyTitle,
-  onApplyDescription,
 }) {
   if (!quality) {
     return null;
@@ -238,18 +236,6 @@ export default function PropertyQualityOptimizer({
                 {aiAnalysis?.status === "processing" && (
                   <p className="mt-1 text-sm text-slate-600">
                     Estamos analizando la publicación.
-                  </p>
-                )}
-
-                {aiAnalysis?.status === "completed" && (
-                  <p className="mt-1 text-sm font-medium text-emerald-700">
-                    Análisis IA disponible.
-                  </p>
-                )}
-
-                {aiAnalysis?.status === "failed" && (
-                  <p className="mt-1 text-sm text-rose-700">
-                    No se pudo completar el análisis.
                   </p>
                 )}
 

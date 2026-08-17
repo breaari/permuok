@@ -65,6 +65,14 @@ export default function PropertyForm() {
     aiAnalysisLoading,
     aiAnalysisRequesting,
     handleRequestAIAnalysis,
+    aiTitleSuggestion,
+    aiDescriptionSuggestion,
+    aiTitleLoading,
+    aiDescriptionLoading,
+    handleGenerateAITitle,
+    handleGenerateAIDescription,
+    handleApplyAITitle,
+    handleApplyAIDescription,
     showError,
     showSuccess,
   } = usePropertyForm({ googleMapsLoaded });
@@ -164,7 +172,19 @@ export default function PropertyForm() {
                   onPreview={handlePreview}
                 />
 
-                <PropertyBasicSection form={form} setField={setField} />
+                <PropertyBasicSection
+                  form={form}
+                  setField={setField}
+                  isEditMode={isEditMode}
+                  aiTitleSuggestion={aiTitleSuggestion}
+                  aiDescriptionSuggestion={aiDescriptionSuggestion}
+                  aiTitleLoading={aiTitleLoading}
+                  aiDescriptionLoading={aiDescriptionLoading}
+                  onGenerateAITitle={handleGenerateAITitle}
+                  onGenerateAIDescription={handleGenerateAIDescription}
+                  onApplyAITitle={handleApplyAITitle}
+                  onApplyAIDescription={handleApplyAIDescription}
+                />
 
                 <PropertyLocationSection
                   form={form}
@@ -219,14 +239,6 @@ export default function PropertyForm() {
                     aiAnalysisLoading={aiAnalysisLoading}
                     aiAnalysisRequesting={aiAnalysisRequesting}
                     onRequestAIAnalysis={handleRequestAIAnalysis}
-                    onApplyTitle={(title) => {
-                      setField("title", title);
-                      showSuccess("Se aplicó el título sugerido.");
-                    }}
-                    onApplyDescription={(description) => {
-                      setField("description", description);
-                      showSuccess("Se aplicó la descripción sugerida.");
-                    }}
                   />
                 </aside>
               ) : (
