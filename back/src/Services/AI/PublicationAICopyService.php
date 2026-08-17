@@ -10,8 +10,8 @@ class PublicationAICopyService
 {
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
-    private const TITLE_PROMPT_VERSION = '1.0';
-    private const DESCRIPTION_PROMPT_VERSION = '2.1';
+    private const TITLE_PROMPT_VERSION = '1.1';
+    private const DESCRIPTION_PROMPT_VERSION = '2.2';
 
     private static function db(
         bool $forceReconnect = false
@@ -293,6 +293,43 @@ REGLAS:
   atributo diferencial confirmado,
   zona o barrio.
 - No inventar atributos.
+- No mencionar características estándar que no diferencian
+  comercialmente la propiedad.
+- En casas y departamentos, NO mencionar baños en el título
+  salvo que exista una característica realmente excepcional
+  relacionada con ellos.
+- Si ya expresaste la cantidad de ambientes, no repetir la cantidad
+  de dormitorios en el título.
+- No mencionar superficies solamente para generar variedad.
+- No mencionar valores cero ni características ausentes.
+- Un buen título puede ser breve. No agregar datos irrelevantes
+  solamente para hacerlo más largo.
+
+EJEMPLOS DE DATOS QUE NORMALMENTE NO SON DIFERENCIALES:
+
+- 1 baño en un departamento.
+- 1 dormitorio cuando ya se indicó "2 ambientes".
+- superficie total o cubierta.
+- ausencia de cochera.
+- moneda.
+- antigüedad, salvo que sea comercialmente relevante.
+
+ATRIBUTOS DIFERENCIALES VÁLIDOS, SI ESTÁN CONFIRMADOS:
+
+- cochera;
+- balcón;
+- terraza;
+- patio;
+- jardín;
+- pileta;
+- parrilla;
+- vista;
+- frente al mar;
+- apto profesional;
+- apto crédito;
+- amenities relevantes;
+- ubicación especialmente específica o reconocible.
+
 
 AMBIENTES:
 
@@ -324,7 +361,22 @@ OPCIONES GENERADAS ANTERIORMENTE:
 {$previousJson}
 
 Si existen opciones anteriores, generá una alternativa
-naturalmente diferente sin perder calidad.
+REALMENTE diferente.
+
+No alcanza con:
+- cambiar "con baño" por "1 baño";
+- invertir dos palabras;
+- agregar una coma;
+- reemplazar "ubicado en" por "en".
+
+Buscá otro enfoque comercial utilizando únicamente atributos
+relevantes y confirmados.
+
+IMPORTANTE:
+si la propiedad tiene pocos atributos diferenciales, mantené
+un título breve y profesional. No agregues baños, dormitorios,
+superficies u otros datos triviales solamente para diferenciar
+la nueva opción.
 
 PROPIEDAD:
 
@@ -449,7 +501,16 @@ No inventes ni deduzcas:
   "zona tranquila",
   "cerca de todo",
   salvo que exista información concreta que las respalde.
-
+- No describir para qué tipo de persona sería adecuada la propiedad.
+- No utilizar frases como:
+  "pensado para quienes buscan",
+  "ideal para quienes buscan",
+  "una opción práctica",
+  "una alternativa funcional",
+  "perfecto para",
+  salvo que esa afirmación provenga explícitamente de información
+  confirmada y sea objetivamente verificable.
+  
 No afirmar algo solamente porque aparezca en una imagen.
 
 REGLAS DE CONTENIDO:

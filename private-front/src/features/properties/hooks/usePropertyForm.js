@@ -270,6 +270,9 @@ export function usePropertyForm({ googleMapsLoaded }) {
       amenities: refreshedAmenities,
     });
 
+    setAITitleSuggestion("");
+    setAIDescriptionSuggestion("");
+    
     setRequirements(
       mapRequirementsToState(
         requirementsData,
@@ -760,6 +763,8 @@ export function usePropertyForm({ googleMapsLoaded }) {
     }
 
     setField("title", aiTitleSuggestion);
+    setAITitleSuggestion("");
+
     showSuccess("Se aplicó el título sugerido.");
   }
 
@@ -769,6 +774,8 @@ export function usePropertyForm({ googleMapsLoaded }) {
     }
 
     setField("description", aiDescriptionSuggestion);
+    setAIDescriptionSuggestion("");
+
     showSuccess("Se aplicó la descripción sugerida.");
   }
 
