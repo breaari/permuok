@@ -11,7 +11,7 @@ class PublicationAICopyService
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const TITLE_PROMPT_VERSION = '1.1';
-    private const DESCRIPTION_PROMPT_VERSION = '2.2';
+    private const DESCRIPTION_PROMPT_VERSION = '2.3';
 
     private static function db(
         bool $forceReconnect = false
@@ -435,8 +435,10 @@ ESTILO DE REDACCIÓN:
 - Usá lenguaje natural, claro y comercial.
 - La descripción debe tener ritmo y continuidad.
 - Evitá enumerar campos de una base de datos.
-- No intentes incluir todos los datos disponibles.
-- Seleccioná únicamente la información que aporte valor comercial.
+- Seleccioná la información que aporte valor comercial o ayude al matching.
+- No omitas datos confirmados relevantes solamente para mantener el texto breve.
+- La descripción debe aprovechar especialmente los datos confirmados que
+  permitan comprender mejor la propiedad y comparar compatibilidades.
 - Preferí explicar cómo está compuesta la propiedad antes que
   enumerar números sin contexto.
 - Podés dividir el texto en 2 o 3 párrafos breves.
@@ -483,6 +485,40 @@ de dormitorios y no hay información que lo contradiga, podés utilizar:
 
 Esto es solamente una forma comercial de redactar el texto.
 No modifica el dato estructurado.
+
+INFORMACIÓN PRIORITARIA PARA MATCHING:
+
+Cuando estos datos estén confirmados y sean relevantes para la propiedad,
+intentá incorporarlos naturalmente en la descripción:
+
+- cantidad de ambientes;
+- dormitorios;
+- baños;
+- superficie total y cubierta;
+- cochera;
+- amenities relevantes;
+- características diferenciales;
+- antigüedad cuando aporte contexto;
+- condiciones de permuta;
+- ubicación a nivel zona o barrio.
+
+Si existieran datos confirmados sobre:
+- distribución de ambientes;
+- orientación;
+- estado de conservación;
+- balcón;
+- lavadero;
+- tipo de cochera;
+- ascensor;
+- expensas;
+- servicios;
+
+también priorizalos porque mejoran la calidad comercial y el matching.
+
+IMPORTANTE:
+si alguno de esos datos NO está confirmado en la ficha, no lo inventes ni
+lo deduzcas. El generador debe producir la mejor descripción posible con
+la información disponible.
 
 REGLAS DE VERACIDAD:
 
@@ -546,9 +582,10 @@ REGLAS DE CONTENIDO:
 - Las ausencias sólo deben mencionarse cuando sean realmente
   relevantes para comprender la propiedad.
 - No convertir la descripción en una lista exhaustiva de datos.
-- No es obligatorio mencionar superficie, dormitorios, baños,
-  antigüedad, cochera y permuta todos juntos.
-- Elegir los datos que permitan construir el texto más natural.
+- No convertir la descripción en una enumeración mecánica.
+- Incluir los datos relevantes disponibles, integrándolos de forma natural.
+- Evitar omitir información útil para matching solamente para acortar el texto.
+- Si existen pocos datos confirmados, no rellenar con información inventada.
 
 PERMUTA:
 
