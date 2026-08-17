@@ -9,7 +9,7 @@ import PropertyPublishChoiceModal from "../components/PropertyPublishChoiceModal
 import PropertyDeleteModal from "../components/PropertyDeleteModal";
 import PropertyFormHeaderActions from "../components/PropertyFormHeaderActions";
 import PropertyFormProgress from "../components/PropertyFormProgress";
-
+import PropertyQualityOptimizer from "../components/PropertyQualityOptimizer";
 import { Icon } from "../../../ui/icons/Index";
 import { useGoogleMaps } from "../../../ui/maps/UseGoogleMaps";
 import { usePropertyForm } from "../hooks/usePropertyForm";
@@ -60,7 +60,7 @@ export default function PropertyForm() {
 
     submitProperty,
     navigate,
-
+    quality,
     showError,
     showSuccess,
   } = usePropertyForm({ googleMapsLoaded });
@@ -128,75 +128,98 @@ export default function PropertyForm() {
     <>
       <form
         onSubmit={(e) => e.preventDefault()}
-        className="py-8 sm:py-10 md:py-12 px-4 sm:px-6 md:px-10 w-full max-w-4xl mx-auto space-y-6 sm:space-y-8"
+        className="py-8 sm:py-10 md:py-12 px-4 sm:px-6 md:px-10 w-full"
       >
         {currentStep === 1 && (
-          <>
-            <PropertyFormProgress
-              currentStep={currentStep}
-              isEditMode={isEditMode}
-            />
+          <div className="w-full max-w-[1240px] mx-auto">
+            {/* 
+            Desktop:
+            - formulario: 768px
+            - optimizador: 360px
+            - separación: 24px
 
-            <PropertyFormHeaderActions
-              status={propertyStatus}
-              isEditMode={isEditMode}
-              isSubmitting={isSubmitting}
-              onSaveDraft={handleSaveDraft}
-              onPublish={handlePublish}
-              onPause={handlePause}
-              onArchive={handleArchive}
-              onDelete={handleOpenDeleteModal}
-              onPreview={handlePreview}
-            />
+            En pantallas menores se apilan.
+          */}
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,768px)_360px] 2xl:grid-cols-[minmax(0,768px)_390px] xl:justify-center xl:items-start">
+              {/* COLUMNA IZQUIERDA: FORMULARIO */}
+              <div className="space-y-6 sm:space-y-8 min-w-0">
+                <PropertyFormProgress
+                  currentStep={currentStep}
+                  isEditMode={isEditMode}
+                />
 
-            <PropertyBasicSection form={form} setField={setField} />
+                <PropertyFormHeaderActions
+                  status={propertyStatus}
+                  isEditMode={isEditMode}
+                  isSubmitting={isSubmitting}
+                  onSaveDraft={handleSaveDraft}
+                  onPublish={handlePublish}
+                  onPause={handlePause}
+                  onArchive={handleArchive}
+                  onDelete={handleOpenDeleteModal}
+                  onPreview={handlePreview}
+                />
 
-            <PropertyLocationSection
-              form={form}
-              setField={setField}
-              onLocationValidityChange={setIsLocationValid}
-              googleMapsLoaded={googleMapsLoaded}
-            />
+                <PropertyBasicSection form={form} setField={setField} />
 
-            <PropertyFeaturesSection form={form} setField={setField} />
+                <PropertyLocationSection
+                  form={form}
+                  setField={setField}
+                  onLocationValidityChange={setIsLocationValid}
+                  googleMapsLoaded={googleMapsLoaded}
+                />
 
-            <PropertyImagesSection
-              images={images}
-              setImages={setImages}
-              existingImages={existingImages}
-              setExistingImages={setExistingImages}
-              onError={showError}
-              onSuccess={showSuccess}
-            />
+                <PropertyFeaturesSection form={form} setField={setField} />
 
-            <div className="pt-2 flex flex-col sm:flex-row gap-3">
-              {isEditMode && (
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={handleQuickUpdateStepOne}
-                  className="w-full sm:w-auto sm:min-w-[220px] bg-emerald-600 text-white py-4 px-6 rounded-lg font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  <Icon name="checkCircle" size={18} />
-                  {isSubmitting ? "Actualizando..." : "Actualizar datos"}
-                </button>
+                <PropertyImagesSection
+                  images={images}
+                  setImages={setImages}
+                  existingImages={existingImages}
+                  setExistingImages={setExistingImages}
+                  onError={showError}
+                  onSuccess={showSuccess}
+                />
+
+                <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                  {isEditMode && (
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={handleQuickUpdateStepOne}
+                      className="w-full sm:w-auto sm:min-w-[220px] bg-emerald-600 text-white py-4 px-6 rounded-lg font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <Icon name="checkCircle" size={18} />
+
+                      {isSubmitting ? "Actualizando..." : "Actualizar datos"}
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={handleContinueToStepTwo}
+                    className="w-full bg-slate-900 text-white py-4 rounded-lg font-bold text-base sm:text-lg flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    Continuar al Paso 2
+                    <Icon name="arrowRight" size={18} />
+                  </button>
+                </div>
+              </div>
+
+              {/* COLUMNA DERECHA: OPTIMIZADOR */}
+              {isEditMode && quality ? (
+                <aside className="self-start min-w-0">
+                  <PropertyQualityOptimizer quality={quality} />
+                </aside>
+              ) : (
+                <div className="hidden xl:block" />
               )}
-
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={handleContinueToStepTwo}
-                className="w-full bg-slate-900 text-white py-4 rounded-lg font-bold text-base sm:text-lg flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                Continuar al Paso 2
-                <Icon name="arrowRight" size={18} />
-              </button>
             </div>
-          </>
+          </div>
         )}
 
         {currentStep === 2 && (
-          <>
+          <div className="w-full max-w-4xl mx-auto space-y-6 sm:space-y-8">
             <PropertyFormProgress
               currentStep={currentStep}
               isEditMode={isEditMode}
@@ -230,6 +253,7 @@ export default function PropertyForm() {
                     <p className="text-sm font-semibold text-slate-900">
                       Último paso
                     </p>
+
                     <p className="text-xs sm:text-sm text-slate-500 mt-1">
                       Revisá las condiciones antes de finalizar la publicación.
                     </p>
@@ -253,6 +277,7 @@ export default function PropertyForm() {
                       className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 hover:opacity-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       <Icon name="checkCircle" size={18} />
+
                       {isSubmitting
                         ? isEditMode
                           ? "Actualizando..."
@@ -265,7 +290,7 @@ export default function PropertyForm() {
                 </div>
               </div>
             </div>
-          </>
+          </div>
         )}
       </form>
 
@@ -274,8 +299,16 @@ export default function PropertyForm() {
           open={publishChoiceOpen}
           busy={isSubmitting}
           onClose={() => setPublishChoiceOpen(false)}
-          onSaveDraft={() => submitProperty({ publishNow: false })}
-          onPublishNow={() => submitProperty({ publishNow: true })}
+          onSaveDraft={() =>
+            submitProperty({
+              publishNow: false,
+            })
+          }
+          onPublishNow={() =>
+            submitProperty({
+              publishNow: true,
+            })
+          }
         />
       )}
 

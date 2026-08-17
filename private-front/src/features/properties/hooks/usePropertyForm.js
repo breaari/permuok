@@ -70,6 +70,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [initialError, setInitialError] = useState("");
+  const [quality, setQuality] = useState(null);
 
   useEffect(() => {
     if (!isEditMode) return;
@@ -97,7 +98,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
           ? data.requirement_property_types
           : [];
         const serverImages = Array.isArray(data?.images) ? data.images : [];
-
+        const serverQuality = data?.quality || null;
         const serverAmenities = Array.isArray(data?.amenities)
           ? data.amenities
           : [];
@@ -117,6 +118,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
         );
 
         setExistingImages(serverImages);
+        setQuality(serverQuality);
         setInitialExistingImageIds(
           serverImages
             .map((img) => Number(img?.id))
@@ -213,7 +215,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
     const detail = unwrap(detailRes);
 
     const property = detail?.property || {};
-
+    setQuality(refreshedQuality);
     const refreshedImages = Array.isArray(detail?.images) ? detail.images : [];
 
     const refreshedAmenities = Array.isArray(detail?.amenities)
@@ -660,7 +662,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
     handleDelete,
     submitProperty,
     navigate,
-
+    quality,
     showError,
     showSuccess,
   };

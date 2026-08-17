@@ -477,7 +477,104 @@ class PropertyService
             $stLocations->execute(['property_requirement_id' => $requirementId]);
             $requirementLocations = $stLocations->fetchAll() ?: [];
         }
+        /*
+ * Último análisis determinístico de calidad
+ * de la publicación.
+ */
+        $stQuality = $pdo->prepare("
+    SELECT
+        score,
+        quality_level,
+        basic_score,
+        location_score,
+        features_score,
+        media_score,
+        matchability_score,
+        issues_json,
+        suggestions_json,
+        algorithm_version,
+        analyzed_at
+    FROM publication_quality_scores
+    WHERE entity_type = 'property'
+      AND entity_id = :entity_id
+    LIMIT 1
+");
 
+        $stQuality->execute([
+            'entity_id' => $propertyId,
+        ]);
+
+        $qualityRow = $stQuality->fetch() ?: null;
+
+        $quality = null;
+
+        if ($qualityRow) {
+            $issues = json_decode(
+                (string)($qualityRow['issues_json'] ?? '[]'),
+                true
+            );
+
+            $suggestions = json_decode(
+                (string)($qualityRow['suggestions_json'] ?? '[]'),
+                true
+            );
+
+            $quality = [
+                'score' =>
+                (float)$qualityRow['score'],
+
+                'quality_level' =>
+                (string)$qualityRow['quality_level'],
+
+                'sections' => [
+                    'basic' => [
+                        'score' =>
+                        (float)$qualityRow['basic_score'],
+                        'max_score' => 25,
+                    ],
+
+                    'location' => [
+                        'score' =>
+                        (float)$qualityRow['location_score'],
+                        'max_score' => 20,
+                    ],
+
+                    'features' => [
+                        'score' =>
+                        (float)$qualityRow['features_score'],
+                        'max_score' => 20,
+                    ],
+
+                    'media' => [
+                        'score' =>
+                        (float)$qualityRow['media_score'],
+                        'max_score' => 15,
+                    ],
+
+                    'matchability' => [
+                        'score' =>
+                        (float)$qualityRow['matchability_score'],
+                        'max_score' => 20,
+                    ],
+                ],
+
+                'issues' =>
+                is_array($issues)
+                    ? $issues
+                    : [],
+
+                'suggestions' =>
+                is_array($suggestions)
+                    ? $suggestions
+                    : [],
+
+                'algorithm_version' =>
+                (string)$qualityRow['algorithm_version'],
+
+                'analyzed_at' =>
+                $qualityRow['analyzed_at'],
+            ];
+        }
         return [
             'property' => $property,
             'images' => $images,
@@ -485,6 +582,7 @@ class PropertyService
             'requirement_property_types' => $requirementPropertyTypes,
             'requirement_locations' => $requirementLocations,
             'amenities' => $amenities,
+            'quality' => $quality,
         ];
     }
 
@@ -1321,7 +1419,7 @@ class PropertyService
             self::queueCompatibilityRecalculation(
                 $propertyId
             );
-            
+
             return self::getDetail(
                 $userId,
                 $propertyId
