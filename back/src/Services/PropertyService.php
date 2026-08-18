@@ -7,6 +7,7 @@ use Exception;
 use Throwable;
 use App\Services\AI\PublicationAIAnalysisService;
 use App\Services\AI\PublicationAICopyService;
+use App\Services\AI\PublicationQualityScoreService;
 
 class PropertyService
 {
@@ -653,6 +654,11 @@ class PropertyService
                 $qualityRow['analyzed_at'],
             ];
         }
+
+        $qualityV2 =
+            PublicationQualityScoreService::getPropertyScore(
+                $propertyId
+            );
         return [
             'property' => $property,
             'images' => $images,
@@ -660,7 +666,16 @@ class PropertyService
             'requirement_property_types' => $requirementPropertyTypes,
             'requirement_locations' => $requirementLocations,
             'amenities' => $amenities,
+
+            /*
+     * Calidad V1 temporal.
+     */
             'quality' => $quality,
+
+            /*
+     * Nuevo índice híbrido.
+     */
+            'quality_v2' => $qualityV2,
         ];
     }
 
