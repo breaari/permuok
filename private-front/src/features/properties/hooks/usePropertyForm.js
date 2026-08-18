@@ -801,7 +801,26 @@ export function usePropertyForm({ googleMapsLoaded }) {
     let cancelled = false;
     let timeoutId = null;
 
+    const startedAt = Date.now();
+
+    const POLL_INTERVAL_MS = 4000;
+    const MAX_POLLING_TIME_MS = 120000;
+
     async function checkAnalysis() {
+      if (cancelled) {
+        return;
+      }
+
+      const elapsed = Date.now() - startedAt;
+
+      if (elapsed >= MAX_POLLING_TIME_MS) {
+        console.warn(
+          "[PROPERTY AI] Se detuvo el polling por superar el tiempo máximo.",
+        );
+
+        return;
+      }
+
       try {
         const analysis = await getPropertyAIAnalysis(Number(id));
 
@@ -812,13 +831,13 @@ export function usePropertyForm({ googleMapsLoaded }) {
         setAIAnalysis(analysis);
 
         if (analysis && ["pending", "processing"].includes(analysis.status)) {
-          timeoutId = window.setTimeout(checkAnalysis, 3000);
+          timeoutId = window.setTimeout(checkAnalysis, POLL_INTERVAL_MS);
         }
       } catch (error) {
         console.error("[PROPERTY AI] Error consultando estado:", error);
 
         if (!cancelled) {
-          timeoutId = window.setTimeout(checkAnalysis, 3000);
+          timeoutId = window.setTimeout(checkAnalysis, POLL_INTERVAL_MS);
         }
       }
     }
