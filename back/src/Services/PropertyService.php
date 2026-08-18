@@ -560,6 +560,7 @@ class PropertyService
         features_score,
         media_score,
         matchability_score,
+        structure_score_v2,
         issues_json,
         suggestions_json,
         algorithm_version,
@@ -602,7 +603,14 @@ class PropertyService
                         (float)$qualityRow['basic_score'],
                         'max_score' => 25,
                     ],
+                    'structure_v2' => [
+                        'score' =>
+                        $qualityRow['structure_score_v2'] !== null
+                            ? (float)$qualityRow['structure_score_v2']
+                            : 0.0,
 
+                        'max_score' => 10,
+                    ],
                     'location' => [
                         'score' =>
                         (float)$qualityRow['location_score'],

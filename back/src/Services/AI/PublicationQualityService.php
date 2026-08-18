@@ -1506,10 +1506,11 @@ class PublicationQualityService
                 score,
                 quality_level,
                 basic_score,
-                location_score,
-                features_score,
-                media_score,
-                matchability_score,
+structure_score_v2,
+location_score,
+features_score,
+media_score,
+matchability_score,
                 issues_json,
                 suggestions_json,
                 algorithm_version,
@@ -1521,6 +1522,7 @@ class PublicationQualityService
                 :score,
                 :quality_level,
                 :basic_score,
+                :structure_score_v2,
                 :location_score,
                 :features_score,
                 :media_score,
@@ -1540,7 +1542,8 @@ class PublicationQualityService
 
                 basic_score =
                     VALUES(basic_score),
-
+structure_score_v2 =
+    VALUES(structure_score_v2),
                 location_score =
                     VALUES(location_score),
 
@@ -1581,7 +1584,8 @@ class PublicationQualityService
 
             'basic_score' =>
             $sections['basic']['score'],
-
+            'structure_score_v2' =>
+            $sections['structure_v2']['score'],
             'location_score' =>
             $sections['location']['score'],
 
