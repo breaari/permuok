@@ -10,7 +10,7 @@ use App\Services\CompatibilityJobService;
 
 class PublicationAIAnalysisService
 {
-    private const PROMPT_VERSION = '1.7';
+    private const PROMPT_VERSION = '1.8';
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const ALLOWED_QUESTION_FIELDS = [
@@ -1388,7 +1388,42 @@ class PublicationAIAnalysisService
                 $totalSeconds,
                 PHP_EOL
             );
+            $usage =
+                is_array($result['_usage'] ?? null)
+                ? $result['_usage']
+                : [];
 
+            echo "  Tokens:" . PHP_EOL;
+
+            echo sprintf(
+                "    Input:       %d%s",
+                (int)($usage['input_tokens'] ?? 0),
+                PHP_EOL
+            );
+
+            echo sprintf(
+                "    Cached:      %d%s",
+                (int)($usage['cached_tokens'] ?? 0),
+                PHP_EOL
+            );
+
+            echo sprintf(
+                "    Output:      %d%s",
+                (int)($usage['output_tokens'] ?? 0),
+                PHP_EOL
+            );
+
+            echo sprintf(
+                "    Reasoning:   %d%s",
+                (int)($usage['reasoning_tokens'] ?? 0),
+                PHP_EOL
+            );
+
+            echo sprintf(
+                "    Total:       %d%s",
+                (int)($usage['total_tokens'] ?? 0),
+                PHP_EOL
+            );
             return [
                 'ok' =>
                 true,
@@ -1681,6 +1716,38 @@ class PublicationAIAnalysisService
                 $decoded['model']
                 ?? $model
             );
+
+        $usage =
+            is_array($decoded['usage'] ?? null)
+            ? $decoded['usage']
+            : [];
+
+        $inputDetails =
+            is_array($usage['input_tokens_details'] ?? null)
+            ? $usage['input_tokens_details']
+            : [];
+
+        $outputDetails =
+            is_array($usage['output_tokens_details'] ?? null)
+            ? $usage['output_tokens_details']
+            : [];
+
+        $analysis['_usage'] = [
+            'input_tokens' =>
+            (int)($usage['input_tokens'] ?? 0),
+
+            'cached_tokens' =>
+            (int)($inputDetails['cached_tokens'] ?? 0),
+
+            'output_tokens' =>
+            (int)($usage['output_tokens'] ?? 0),
+
+            'reasoning_tokens' =>
+            (int)($outputDetails['reasoning_tokens'] ?? 0),
+
+            'total_tokens' =>
+            (int)($usage['total_tokens'] ?? 0),
+        ];
 
         return $analysis;
     }
@@ -1978,6 +2045,16 @@ Si detectás otro dato comercialmente útil que PermuOK todavía no permite
 guardar, podés mencionarlo en suggestions, pero no generes una question
 accionable sobre ese dato.
 
+REGLAS DE CONCISIÓN DE LA RESPUESTA:
+
+- La respuesta debe ser breve, concreta y accionable.
+- No repetir el mismo problema en questions, suggestions y contradictions
+  salvo que sea estrictamente necesario.
+- Cada reason o message debe expresarse en una sola frase breve.
+- Cada observación de imagen debe describir un único hallazgo.
+- Priorizá solamente los hallazgos de mayor impacto comercial o para matching.
+- No completar arrays con elementos de poco valor solamente para generar más contenido.
+
 PUBLICACIÓN:
 
 {$propertyJson}
@@ -2022,6 +2099,9 @@ PROMPT;
                     'type' =>
                     'array',
 
+                    'maxItems' =>
+                    5,
+
                     'items' => [
                         'type' =>
                         'object',
@@ -2054,6 +2134,9 @@ PROMPT;
                 'suggestions' => [
                     'type' =>
                     'array',
+
+                    'maxItems' =>
+                    5,
 
                     'items' => [
                         'type' =>
@@ -2092,6 +2175,9 @@ PROMPT;
                 'detected_features' => [
                     'type' =>
                     'array',
+
+                    'maxItems' =>
+                    5,
 
                     'items' => [
                         'type' =>
@@ -2133,6 +2219,9 @@ PROMPT;
                     'type' =>
                     'array',
 
+                    'maxItems' =>
+                    5,
+
                     'items' => [
                         'type' =>
                         'object',
@@ -2161,6 +2250,9 @@ PROMPT;
                     'type' =>
                     'array',
 
+                    'maxItems' =>
+                    5,
+
                     'items' => [
                         'type' =>
                         'object',
@@ -2177,6 +2269,9 @@ PROMPT;
                                 'type' =>
                                 'array',
 
+                                'maxItems' =>
+                                3,
+
                                 'items' => [
                                     'type' =>
                                     'string',
@@ -2186,6 +2281,9 @@ PROMPT;
                             'quality_notes' => [
                                 'type' =>
                                 'array',
+
+                                'maxItems' =>
+                                2,
 
                                 'items' => [
                                     'type' =>

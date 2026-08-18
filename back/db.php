@@ -10,8 +10,25 @@ function pdo(bool $forceReconnect = false): PDO
         $pdo = null;
     }
 
+    /*
+     * Si ya existe conexión, verificamos que siga viva.
+     *
+     * Esto es importante para workers permanentes:
+     * durante una llamada larga a OpenAI el servidor MySQL
+     * puede cerrar la conexión por inactividad.
+     */
     if ($pdo instanceof PDO) {
-        return $pdo;
+        try {
+            $pdo->query('SELECT 1');
+
+            return $pdo;
+        } catch (PDOException $e) {
+            /*
+             * La conexión dejó de ser utilizable.
+             * La descartamos y abrimos una nueva abajo.
+             */
+            $pdo = null;
+        }
     }
 
     $host = env('DB_HOST');
@@ -20,13 +37,24 @@ function pdo(bool $forceReconnect = false): PDO
     $user = env('DB_USER');
     $pass = env('DB_PASS');
 
-    $dsn = "mysql:host={$host};port={$port};dbname={$db};charset=utf8mb4";
+    $dsn =
+        "mysql:host={$host};port={$port};dbname={$db};charset=utf8mb4";
 
-    $pdo = new PDO($dsn, $user, $pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_TIMEOUT => 10,
-    ]);
+    $pdo = new PDO(
+        $dsn,
+        $user,
+        $pass,
+        [
+            PDO::ATTR_ERRMODE =>
+            PDO::ERRMODE_EXCEPTION,
+
+            PDO::ATTR_DEFAULT_FETCH_MODE =>
+            PDO::FETCH_ASSOC,
+
+            PDO::ATTR_TIMEOUT =>
+            10,
+        ]
+    );
 
     return $pdo;
 }
