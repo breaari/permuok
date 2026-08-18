@@ -18,6 +18,7 @@ class PublicationQualityService
     private const FEATURES_MAX = 20.0;
     private const MEDIA_MAX = 15.0;
     private const MATCHABILITY_MAX = 20.0;
+    private const STRUCTURE_V2_MAX = 10.0;
 
     private static function db(): PDO
     {
@@ -104,7 +105,10 @@ class PublicationQualityService
             self::evaluateBasicData(
                 $property
             );
-
+        $structureV2 =
+            self::evaluateStructureV2(
+                $property
+            );
         $location =
             self::evaluateLocation(
                 $property
@@ -201,7 +205,13 @@ class PublicationQualityService
                     'max_score' =>
                     self::BASIC_MAX,
                 ],
+                'structure_v2' => [
+                    'score' =>
+                    $structureV2['score'],
 
+                    'max_score' =>
+                    self::STRUCTURE_V2_MAX,
+                ],
                 'location' => [
                     'score' =>
                     $location['score'],
@@ -298,7 +308,117 @@ class PublicationQualityService
 
         return $qualityLevel;
     }
+    private static function evaluateStructureV2(
+        array $property
+    ): array {
+        $score = 0.0;
+        $issues = [];
+        $suggestions = [];
 
+        /*
+     * Esta evaluación NO juzga título ni descripción.
+     *
+     * Su único objetivo es determinar qué tan completa
+     * está la ficha estructurada de la propiedad.
+     */
+
+        /*
+     * Tipo de propiedad: 3 puntos.
+     */
+        if (
+            self::hasValue(
+                $property['property_type'] ?? null
+            )
+        ) {
+            $score += 3.0;
+        } else {
+            self::addIssue(
+                $issues,
+                'property_type_missing',
+                'property_type',
+                'high',
+                'Falta indicar el tipo de propiedad.'
+            );
+        }
+
+        /*
+     * Precio + moneda: 4 puntos.
+     */
+        $price =
+            self::nullableFloat(
+                $property['price'] ?? null
+            );
+
+        $currency = trim(
+            (string)(
+                $property['currency'] ?? ''
+            )
+        );
+
+        if (
+            $price !== null &&
+            $price > 0 &&
+            $currency !== ''
+        ) {
+            $score += 4.0;
+        } else {
+            self::addIssue(
+                $issues,
+                'price_incomplete',
+                'price',
+                'high',
+                'El precio o la moneda no están correctamente informados.'
+            );
+        }
+
+        /*
+     * Información estructural complementaria:
+     * superficie total, superficie cubierta y antigüedad.
+     *
+     * En conjunto aportan 3 puntos.
+     */
+        $additionalFields = [
+            'total_area',
+            'covered_area',
+            'antiquity',
+        ];
+
+        $completed = 0;
+
+        foreach (
+            $additionalFields
+            as $field
+        ) {
+            if (
+                self::positiveNumber(
+                    $property[$field] ?? null
+                )
+            ) {
+                $completed++;
+            }
+        }
+
+        $score +=
+            ($completed / count($additionalFields))
+            * 3.0;
+
+        return [
+            'score' =>
+            round(
+                min(
+                    self::STRUCTURE_V2_MAX,
+                    $score
+                ),
+                2
+            ),
+
+            'issues' =>
+            $issues,
+
+            'suggestions' =>
+            $suggestions,
+        ];
+    }
     private static function evaluateBasicData(
         array $property
     ): array {

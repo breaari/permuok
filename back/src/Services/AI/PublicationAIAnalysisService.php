@@ -10,7 +10,7 @@ use App\Services\CompatibilityJobService;
 
 class PublicationAIAnalysisService
 {
-    private const PROMPT_VERSION = '1.8';
+    private const PROMPT_VERSION = '1.9';
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const ALLOWED_QUESTION_FIELDS = [
@@ -1026,9 +1026,12 @@ class PublicationAIAnalysisService
             status,
 
             content_score,
-            title_score,
-            description_score,
-            image_score,
+title_score,
+description_score,
+image_score,
+consistency_score,
+professionalism_score,
+matchability_score,
 
             suggested_title,
             suggested_description,
@@ -1132,6 +1135,21 @@ class PublicationAIAnalysisService
                 'images' =>
                 $row['image_score'] !== null
                     ? (float)$row['image_score']
+                    : null,
+
+                'consistency' =>
+                $row['consistency_score'] !== null
+                    ? (float)$row['consistency_score']
+                    : null,
+
+                'professionalism' =>
+                $row['professionalism_score'] !== null
+                    ? (float)$row['professionalism_score']
+                    : null,
+
+                'matchability' =>
+                $row['matchability_score'] !== null
+                    ? (float)$row['matchability_score']
                     : null,
             ],
 
@@ -1951,6 +1969,78 @@ REGLAS DE CALIDAD DEL TÍTULO Y DESCRIPCIÓN:
 - No inventes características para recomendar cómo completar el texto.
   Indicá qué tipo de información sería útil agregar.
 
+  CRITERIOS DE PUNTUACIÓN ADICIONALES:
+
+CONSISTENCY_SCORE:
+
+Evalúa únicamente la coherencia interna de la publicación.
+
+Considerar:
+- contradicciones entre título, descripción y ficha;
+- contradicciones entre ubicación cargada y dirección;
+- incompatibilidades entre características informadas;
+- contradicciones entre requisitos de operación;
+- datos confirmados que se contradigan entre sí.
+
+No penalizar simplemente porque falte información.
+La falta de datos no es por sí sola una contradicción.
+
+Las inferencias obtenidas únicamente desde imágenes no deben considerarse
+contradicciones confirmadas.
+
+Referencia orientativa:
+90-100: información coherente, sin contradicciones relevantes.
+70-89: pequeñas inconsistencias o ambigüedades.
+50-69: varias inconsistencias que deberían revisarse.
+0-49: contradicciones importantes que afectan la confiabilidad de la publicación.
+
+
+PROFESSIONALISM_SCORE:
+
+Evalúa la calidad profesional del contenido que verá o utilizará una inmobiliaria.
+
+Considerar:
+- lenguaje profesional;
+- claridad;
+- ausencia de insultos;
+- ausencia de texto de prueba;
+- ausencia de contenido absurdo o irrelevante;
+- ausencia de spam o exageraciones impropias;
+- redacción apropiada para una publicación inmobiliaria.
+
+No penalizar por faltantes estructurales que corresponden a otros criterios.
+
+Referencia orientativa:
+90-100: contenido profesional y apropiado.
+70-89: correcto, con pequeños aspectos mejorables.
+50-69: problemas evidentes de redacción o presentación.
+0-49: contenido poco profesional, de prueba, ofensivo o claramente inadecuado.
+
+
+MATCHABILITY_SCORE:
+
+Evalúa qué tan interpretables, coherentes y útiles son los requisitos de
+operación para producir compatibilidades inmobiliarias.
+
+Considerar:
+- claridad de lo que la inmobiliaria acepta o busca;
+- coherencia entre modalidad y requisitos;
+- precisión de tipos de propiedad buscados;
+- precisión de zonas;
+- rangos económicos cuando correspondan;
+- características mínimas cuando sean relevantes;
+- utilidad real de las notas de búsqueda o permuta.
+
+No premiar simplemente por tener muchos campos cargados.
+Una búsqueda abierta puede ser válida si está configurada de forma coherente.
+No inventar requisitos que no fueron informados.
+
+Referencia orientativa:
+90-100: requisitos claros y altamente utilizables para matching.
+70-89: suficientemente claros, con mejoras menores posibles.
+50-69: útiles pero ambiguos o poco definidos.
+0-49: insuficientes, contradictorios o difíciles de utilizar para matching.
+
 REGLAS SOBRE PREGUNTAS:
 
 - Priorizá preguntas sobre datos que puedan ser confirmados y cargados
@@ -2094,7 +2184,23 @@ PROMPT;
                     'minimum' => 0,
                     'maximum' => 100,
                 ],
+                'consistency_score' => [
+                    'type' => 'number',
+                    'minimum' => 0,
+                    'maximum' => 100,
+                ],
 
+                'professionalism_score' => [
+                    'type' => 'number',
+                    'minimum' => 0,
+                    'maximum' => 100,
+                ],
+
+                'matchability_score' => [
+                    'type' => 'number',
+                    'minimum' => 0,
+                    'maximum' => 100,
+                ],
                 'questions' => [
                     'type' =>
                     'array',
@@ -2306,6 +2412,9 @@ PROMPT;
                 'title_score',
                 'description_score',
                 'image_score',
+                'consistency_score',
+                'professionalism_score',
+                'matchability_score',
                 'questions',
                 'suggestions',
                 'detected_features',
@@ -2464,7 +2573,14 @@ PROMPT;
 
             image_score =
                 :image_score,
+consistency_score =
+    :consistency_score,
 
+professionalism_score =
+    :professionalism_score,
+
+matchability_score =
+    :matchability_score,
             questions_json =
                 :questions_json,
 
@@ -2518,7 +2634,14 @@ PROMPT;
 
             'image_score' =>
             (float)$result['image_score'],
+            'consistency_score' =>
+            (float)$result['consistency_score'],
 
+            'professionalism_score' =>
+            (float)$result['professionalism_score'],
+
+            'matchability_score' =>
+            (float)$result['matchability_score'],
             'questions_json' =>
             $encode(
                 self::filterAllowedQuestions(
