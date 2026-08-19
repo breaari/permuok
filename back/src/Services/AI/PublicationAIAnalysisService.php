@@ -1048,11 +1048,12 @@ matchability_score,
             suggested_title,
             suggested_description,
 
-            questions_json,
-            suggestions_json,
-            detected_features_json,
-            contradictions_json,
-            image_analysis_json,
+           questions_json,
+suggestions_json,
+detected_features_json,
+contradictions_json,
+quality_flags_json,
+image_analysis_json,
 
             model_name,
             prompt_version,
@@ -1185,10 +1186,14 @@ matchability_score,
             $decodeJson(
                 $row['detected_features_json']
             ),
-
             'contradictions' =>
             $decodeJson(
                 $row['contradictions_json']
+            ),
+
+            'quality_flags' =>
+            $decodeJson(
+                $row['quality_flags_json']
             ),
 
             'image_analysis' =>
@@ -2650,44 +2655,45 @@ PROMPT;
                         ],
                     ],
                 ],
-            ],
-            'quality_flags' => [
-                'type' => 'array',
-                'maxItems' => 5,
 
-                'items' => [
-                    'type' => 'object',
+                'quality_flags' => [
+                    'type' => 'array',
+                    'maxItems' => 5,
 
-                    'additionalProperties' => false,
+                    'items' => [
+                        'type' => 'object',
 
-                    'properties' => [
-                        'code' => [
-                            'type' => 'string',
-                            'enum' => [
-                                'critical_contradiction',
-                                'junk_content',
-                                'severe_unprofessional_content',
-                                'unusable_matchability',
+                        'additionalProperties' => false,
+
+                        'properties' => [
+                            'code' => [
+                                'type' => 'string',
+                                'enum' => [
+                                    'critical_contradiction',
+                                    'junk_content',
+                                    'severe_unprofessional_content',
+                                    'unusable_matchability',
+                                ],
+                            ],
+
+                            'severity' => [
+                                'type' => 'string',
+                                'enum' => [
+                                    'high',
+                                    'critical',
+                                ],
+                            ],
+
+                            'message' => [
+                                'type' => 'string',
                             ],
                         ],
 
-                        'severity' => [
-                            'type' => 'string',
-                            'enum' => [
-                                'high',
-                                'critical',
-                            ],
+                        'required' => [
+                            'code',
+                            'severity',
+                            'message',
                         ],
-
-                        'message' => [
-                            'type' => 'string',
-                        ],
-                    ],
-
-                    'required' => [
-                        'code',
-                        'severity',
-                        'message',
                     ],
                 ],
             ],
@@ -2874,13 +2880,14 @@ matchability_score =
 
             detected_features_json =
                 :detected_features_json,
+contradictions_json =
+    :contradictions_json,
 
-            contradictions_json =
-                :contradictions_json,
+quality_flags_json =
+    :quality_flags_json,
 
-            image_analysis_json =
-                :image_analysis_json,
-
+image_analysis_json =
+    :image_analysis_json,
             model_name =
                 :model_name,
 
@@ -2946,6 +2953,11 @@ matchability_score =
             'contradictions_json' =>
             $encode(
                 $result['contradictions'] ?? []
+            ),
+
+            'quality_flags_json' =>
+            $encode(
+                $result['quality_flags'] ?? []
             ),
 
             'image_analysis_json' =>
