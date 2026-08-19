@@ -1312,7 +1312,17 @@ matchability_score,
                 'La publicación cambió después de solicitar el análisis.',
             ];
         }
-
+        /*
+ * Antes del análisis IA garantizamos que
+ * la evaluación objetiva corresponda al
+ * estado actual de la propiedad.
+ *
+ * Así el índice híbrido nunca combina una
+ * IA nueva con un score objetivo anterior.
+ */
+        PublicationQualityService::analyzeProperty(
+            $propertyId
+        );
         /*
      * Marcamos exactamente esta fila
      * como processing.
