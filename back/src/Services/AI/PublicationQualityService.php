@@ -805,18 +805,13 @@ class PublicationQualityService
             );
         }
 
-        /*
-         * Terrenos se evalúan distinto.
-         * No tendría sentido penalizarlos por no tener
-         * dormitorios, baños o superficie cubierta.
-         */
         if ($propertyType === 'land') {
             if (
                 self::hasValue(
                     $property['zone'] ?? null
                 )
             ) {
-                $score += 5;
+                $score += 7;
             }
 
             if (
@@ -827,15 +822,7 @@ class PublicationQualityService
                     $property['longitude'] ?? null
                 )
             ) {
-                $score += 5;
-            }
-
-            if (
-                self::hasValue(
-                    $property['description'] ?? null
-                )
-            ) {
-                $score += 4;
+                $score += 7;
             }
 
             return [

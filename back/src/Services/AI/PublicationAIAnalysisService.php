@@ -2452,7 +2452,7 @@ PROMPT;
                     'array',
 
                     'maxItems' =>
-                    5,
+                    3,
 
                     'items' => [
                         'type' =>
