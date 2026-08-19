@@ -738,14 +738,23 @@ export function usePropertyForm({ googleMapsLoaded }) {
       }
 
       /*
-       * Si fue encolado, mostramos inmediatamente
-       * el estado correspondiente.
+       * Si se inició un análisis nuevo,
+       * dejamos de mostrar inmediatamente
+       * los resultados del análisis anterior.
        */
-      setAIAnalysis((prev) => ({
-        ...(prev || {}),
-        id: result?.analysis_id ?? prev?.id ?? null,
+      setAIAnalysis({
+        id: result?.analysis_id ?? null,
         status: result?.status || "pending",
-      }));
+      });
+
+      /*
+       * Actualizamos quality_v2 para que pase
+       * de completed a waiting_ai.
+       *
+       * Así no mostramos como vigente un índice
+       * calculado con el análisis anterior.
+       */
+      await refreshQualityState(Number(id));
     } catch (error) {
       showError(getErrorMessage(error, "No se pudo iniciar el análisis IA."));
     } finally {
