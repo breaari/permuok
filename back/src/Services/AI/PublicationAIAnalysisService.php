@@ -10,7 +10,7 @@ use App\Services\CompatibilityJobService;
 
 class PublicationAIAnalysisService
 {
-    private const PROMPT_VERSION = '1.9';
+    private const PROMPT_VERSION = '2.0';
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const ALLOWED_QUESTION_FIELDS = [
@@ -2075,6 +2075,57 @@ REGLAS SOBRE PREGUNTAS:
   property_type o criteria_mode.
 - Explicar siempre las inconsistencias usando lenguaje natural.
 
+REGLAS SOBRE SUGERENCIAS:
+
+- Cada suggestion debe representar una acción concreta que el usuario pueda realizar.
+- field debe identificar el área principal a mejorar, por ejemplo:
+  title,
+  description,
+  images,
+  amenities,
+  location,
+  features,
+  requirements,
+  matchability,
+  professionalism.
+
+- action debe ser un título breve, concreto y accionable.
+
+Buenos ejemplos de action:
+"Agregar amenities"
+"Mejorar la descripción"
+"Completar la galería"
+"Definir mejor la permuta buscada"
+"Corregir una inconsistencia"
+"Agregar características relevantes"
+
+Malos ejemplos:
+"Mejorar este aspecto"
+"Revisar publicación"
+"Optimizar"
+"Información faltante"
+
+- message debe explicar brevemente qué conviene hacer y por qué.
+
+- No generar más de una suggestion para el mismo problema o field salvo que
+  sean acciones claramente diferentes.
+
+- Evitar repetir en suggestions una mejora ya expresada de forma equivalente.
+
+- Si varios detalles pertenecen a la misma acción, agruparlos en una sola
+  suggestion.
+
+Ejemplo:
+En lugar de generar por separado:
+"Agregar orientación"
+"Agregar calefacción"
+"Agregar expensas"
+
+generar:
+action: "Completar la descripción"
+message: "Podés agregar orientación, calefacción, expensas y otros diferenciales confirmados."
+
+
 REGLAS SOBRE IMÁGENES:
 
 - detected_features contiene solamente características potenciales
@@ -2252,7 +2303,11 @@ PROMPT;
                         false,
 
                         'properties' => [
-                            'type' => [
+                            'field' => [
+                                'type' => 'string',
+                            ],
+
+                            'action' => [
                                 'type' => 'string',
                             ],
 
@@ -2271,13 +2326,13 @@ PROMPT;
                         ],
 
                         'required' => [
-                            'type',
+                            'field',
+                            'action',
                             'priority',
                             'message',
                         ],
                     ],
                 ],
-
                 'detected_features' => [
                     'type' =>
                     'array',
