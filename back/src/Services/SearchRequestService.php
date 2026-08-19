@@ -6,6 +6,7 @@ use App\DB;
 use PDO;
 use Exception;
 use Throwable;
+use App\Services\AI\SearchRequestQualityService;
 
 class SearchRequestService
 {
@@ -329,7 +330,10 @@ class SearchRequestService
 
         $item['property_types'] = self::getPropertyTypes($pdo, (int)$item['id']);
         $item['amenities'] = self::getAmenities($pdo, (int)$item['id']);
-
+        $quality =
+            SearchRequestQualityService::analyze(
+                $id
+            );
         return [
             'search_request' => $item,
             'property_types' => $item['property_types'],
@@ -341,6 +345,7 @@ class SearchRequestService
                 'can_archive' => in_array($item['status'], ['draft', 'paused', 'published'], true),
                 'can_delete' => $item['status'] !== 'deleted',
             ],
+            'quality' => $quality,
         ];
     }
 

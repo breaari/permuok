@@ -11,7 +11,7 @@ class PublicationAICopyService
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const TITLE_PROMPT_VERSION = '1.2';
-    private const DESCRIPTION_PROMPT_VERSION = '2.4';
+    private const DESCRIPTION_PROMPT_VERSION = '2.5';
 
     private static function db(
         bool $forceReconnect = false
@@ -580,7 +580,31 @@ REGLAS:
   "permuta disponible",
   "permuta habilitada",
   "permuta admitida".
+- No inferir beneficios, perfil de comprador ni cualidades subjetivas
+  a partir de datos estructurados.
 
+- No utilizar frases como:
+  "ideal para",
+  "perfecto para",
+  "pensado para",
+  "una excelente opción",
+  "aporta comodidad",
+  "aporta amplitud",
+  "aporta luminosidad",
+  "aporta una distribución clara",
+  salvo que esa cualidad haya sido expresamente indicada por el usuario.
+
+- No describir una zona como:
+  "consolidada",
+  "residencial",
+  "tranquila",
+  "comercial",
+  "estratégica",
+  "privilegiada"
+  salvo que esa información haya sido expresamente confirmada.
+
+- Cuando un dato objetivo no permita afirmar una consecuencia,
+  limitarse a mencionar el dato sin interpretar su beneficio.
 EJEMPLOS DE DATOS QUE NORMALMENTE NO SON DIFERENCIALES:
 
 - 1 baño en un departamento.
@@ -849,7 +873,8 @@ No inventes ni deduzcas:
   "zona tranquila",
   "cerca de todo",
   salvo que exista información concreta que las respalde.
-- No describir para qué tipo de persona sería adecuada la propiedad.
+- No inferir ni mencionar para qué tipo de persona, familia,
+  inversor o comprador sería adecuada la propiedad.
 - No utilizar frases como:
   "pensado para quienes buscan",
   "ideal para quienes buscan",
