@@ -10,7 +10,7 @@ use App\Services\CompatibilityJobService;
 
 class PublicationAIAnalysisService
 {
-    private const PROMPT_VERSION = '2.0';
+    private const PROMPT_VERSION = '2.1';
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const ALLOWED_QUESTION_FIELDS = [
@@ -2043,37 +2043,73 @@ Referencia orientativa:
 
 REGLAS SOBRE PREGUNTAS:
 
-- Priorizá preguntas sobre datos que puedan ser confirmados y cargados
-  actualmente en la ficha.
-- Un valor 0 confirmado no significa que el dato esté faltante.
-- No preguntes por cocheras si la ficha indica 0, salvo que exista
-  evidencia visual concreta que sugiera una cochera.
-- No generes preguntas genéricas solamente porque un campo comercial
-  podría ser útil.
-- Máximo 5 preguntas, priorizadas por impacto.
-- Evitá preguntas redundantes.
-- Las preguntas están dirigidas a usuarios inmobiliarios, no a programadores.
-- Nunca mencionar nombres internos de campos, variables o datos técnicos.
-- No usar términos como:
-  "formatted_address",
-  "country_code",
-  "place_id",
-  "latitude",
-  "longitude",
-  "property_type",
-  "criteria_mode"
-  ni ningún otro nombre interno del sistema.
-- Cuando exista una inconsistencia, describirla con lenguaje natural.
-- Por ejemplo, en lugar de:
-  "La ciudad indica Lanús pero formatted_address indica Lomas de Zamora"
-  escribir:
-  "La ciudad cargada es Lanús, pero la dirección seleccionada corresponde a Lomas de Zamora. ¿Podés confirmar cuál es la ubicación correcta?"
-- La pregunta debe poder entenderse sin conocer cómo funciona PermuOK internamente.
-- Las preguntas están dirigidas a usuarios inmobiliarios, no a programadores.
-- Nunca mencionar nombres internos de campos, variables o atributos técnicos
-  como formatted_address, country_code, place_id, latitude, longitude,
-  property_type o criteria_mode.
-- Explicar siempre las inconsistencias usando lenguaje natural.
+Las questions NO son una lista de datos faltantes.
+
+Generar una question únicamente cuando exista una incertidumbre real que
+requiera confirmación del usuario.
+
+Una question está justificada solamente en estos casos:
+
+1. Una imagen sugiere una característica que no está confirmada en la ficha.
+   Ejemplo:
+   una imagen parece mostrar un balcón, pero no hay información suficiente
+   para afirmarlo.
+   Pregunta válida:
+   "¿La propiedad cuenta con balcón?"
+
+2. Dos datos confirmados parecen contradecirse y es necesario saber cuál es
+   correcto.
+   Ejemplo:
+   la descripción indica dos baños pero la ficha estructurada indica uno.
+   Pregunta válida:
+   "La descripción menciona dos baños, pero la ficha indica uno.
+   ¿Podés confirmar cuántos baños tiene la propiedad?"
+
+NO generar questions simplemente porque:
+
+- falta un dato;
+- una búsqueda o permuta podría ser más específica;
+- no se cargaron amenities;
+- no se definieron tipos de propiedad buscados;
+- no se definieron zonas;
+- no existe un rango económico;
+- la descripción podría contener más información;
+- un campo opcional está vacío.
+
+Esos casos deben resolverse mediante suggestions cuando representen
+una mejora útil.
+
+Si un problema puede expresarse como una acción concreta que el usuario
+puede realizar, debe ir en suggestions y NO en questions.
+
+No generar una question sobre un tema que ya esté cubierto por una suggestion.
+
+Un valor 0 confirmado no significa que el dato esté faltante.
+
+No preguntes por cocheras si la ficha indica 0, salvo que exista evidencia
+visual concreta que sugiera una cochera.
+
+Máximo 3 questions.
+Es válido y preferible devolver questions=[] cuando no exista ninguna
+incertidumbre real que necesite confirmación.
+
+Las preguntas están dirigidas a usuarios inmobiliarios, no a programadores.
+
+Nunca mencionar nombres internos de campos, variables o datos técnicos.
+
+No usar términos como:
+"formatted_address",
+"country_code",
+"place_id",
+"latitude",
+"longitude",
+"property_type",
+"criteria_mode"
+ni ningún otro nombre interno del sistema.
+
+Cuando exista una inconsistencia, describirla con lenguaje natural.
+
+La pregunta debe poder entenderse sin conocer cómo funciona PermuOK.
 
 REGLAS SOBRE SUGERENCIAS:
 
@@ -2106,7 +2142,37 @@ Malos ejemplos:
 "Información faltante"
 
 - message debe explicar brevemente qué conviene hacer y por qué.
+- Cada suggestion debe corresponder a una acción realmente disponible
+  para el usuario en PermuOK o a una mejora que pueda realizar directamente
+  sobre el título o la descripción.
 
+- Nunca recomendar completar datos técnicos que PermuOK obtiene o puede
+  obtener automáticamente de Google Maps.
+
+- No recomendar agregar:
+  código postal,
+  coordenadas,
+  latitud,
+  longitud,
+  place_id,
+  identificadores de Google,
+  ni otros datos técnicos de geolocalización.
+
+- No recomendar "completar la ubicación" si país, provincia, ciudad, zona,
+  dirección seleccionada y geolocalización son coherentes.
+
+- Sólo generar una suggestion de ubicación cuando exista un problema real
+  que el usuario pueda corregir, por ejemplo:
+  ciudad y dirección seleccionada no coinciden,
+  provincia y ciudad son incompatibles,
+  o la zona informada contradice claramente la dirección.
+
+- No recomendar información que el usuario no tenga forma razonable de
+  cargar o modificar desde PermuOK.
+
+- Si un dato comercial no tiene un campo estructurado específico pero puede
+  incorporarse naturalmente en la descripción, la acción debe ser
+  "Mejorar la descripción", no inventar un campo inexistente.
 - No generar más de una suggestion para el mismo problema o field salvo que
   sean acciones claramente diferentes.
 
@@ -2125,6 +2191,42 @@ generar:
 action: "Completar la descripción"
 message: "Podés agregar orientación, calefacción, expensas y otros diferenciales confirmados."
 
+REGLA DE SEPARACIÓN ENTRE ACCIONES:
+
+Cada suggestion debe tratar un único tema principal.
+
+Si generás una suggestion específica para amenities:
+- no vuelvas a pedir amenities dentro de "Mejorar la descripción".
+
+Si generás una suggestion específica para imágenes:
+- no repitas recomendaciones de imágenes en otras suggestions.
+
+Si generás una suggestion específica para requisitos o matching:
+- no repitas tipos, zonas o rangos económicos en otra suggestion.
+
+Usá el campo estructurado correspondiente cuando exista.
+
+Ejemplo:
+
+Correcto:
+
+field: "description"
+action: "Mejorar la descripción"
+message: "Sumá información confirmada sobre distribución, orientación,
+estado, luminosidad y otros diferenciales comerciales."
+
+field: "amenities"
+action: "Agregar amenities"
+message: "Cargá los amenities confirmados para mejorar filtros y
+compatibilidades."
+
+Incorrecto:
+
+field: "description"
+action: "Completar la descripción"
+message: "Agregá orientación, expensas y amenities."
+
+si además existe una suggestion específica para amenities.
 
 REGLAS SOBRE IMÁGENES:
 
@@ -2182,9 +2284,12 @@ REGLA:
 Las preguntas de questions deben referirse únicamente a datos que el
 usuario pueda confirmar y luego cargar en alguno de estos campos.
 
-Si detectás otro dato comercialmente útil que PermuOK todavía no permite
-guardar, podés mencionarlo en suggestions, pero no generes una question
-accionable sobre ese dato.
+Si detectás información comercial útil que no tenga un campo estructurado
+específico pero pueda incorporarse razonablemente en el título o la descripción,
+podés sugerir incorporarla allí.
+
+No sugerir datos técnicos, administrativos o de geolocalización que PermuOK
+no permita editar y que puedan obtenerse automáticamente por el sistema.
 
 REGLAS DE CONCISIÓN DE LA RESPUESTA:
 
