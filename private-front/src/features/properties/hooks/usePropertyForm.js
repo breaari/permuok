@@ -777,7 +777,12 @@ export function usePropertyForm({ googleMapsLoaded }) {
     try {
       setAITitleLoading(true);
 
-      const result = await generatePropertyAITitle(Number(id));
+      const draft = {
+        property: buildPropertyPayload(form),
+        requirements: buildRequirementsPayload(requirements),
+      };
+
+      const result = await generatePropertyAITitle(Number(id), draft);
 
       const content = String(result?.content || "").trim();
 
@@ -801,7 +806,12 @@ export function usePropertyForm({ googleMapsLoaded }) {
     try {
       setAIDescriptionLoading(true);
 
-      const result = await generatePropertyAIDescription(Number(id));
+      const draft = {
+        property: buildPropertyPayload(form),
+        requirements: buildRequirementsPayload(requirements),
+      };
+
+      const result = await generatePropertyAIDescription(Number(id), draft);
 
       const content = String(result?.content || "").trim();
 

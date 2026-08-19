@@ -76,12 +76,18 @@ export async function requestPropertyAIAnalysis(id) {
   const res = await http.post(`/properties/${id}/ai-analysis`, {});
   return unwrap(res);
 }
-export async function generatePropertyAITitle(id) {
-  const res = await http.post(`/properties/${id}/ai-copy/title`, {});
+export async function generatePropertyAITitle(id, draft = {}) {
+  const res = await http.post(`/properties/${id}/ai-copy/title`, {
+    draft,
+  });
+
   return unwrap(res);
 }
 
-export async function generatePropertyAIDescription(id) {
-  const res = await http.post(`/properties/${id}/ai-copy/description`, {});
+export async function generatePropertyAIDescription(id, draft = {}) {
+  const res = await http.post(`/properties/${id}/ai-copy/description`, {
+    draft,
+  });
+
   return unwrap(res);
 }

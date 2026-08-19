@@ -10,8 +10,8 @@ class PublicationAICopyService
 {
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
-    private const TITLE_PROMPT_VERSION = '1.1';
-    private const DESCRIPTION_PROMPT_VERSION = '2.3';
+    private const TITLE_PROMPT_VERSION = '1.2';
+    private const DESCRIPTION_PROMPT_VERSION = '2.4';
 
     private static function db(
         bool $forceReconnect = false
@@ -23,30 +23,35 @@ class PublicationAICopyService
 
     public static function generatePropertyTitle(
         int $propertyId,
-        ?int $userId = null
+        ?int $userId = null,
+        array $draft = []
     ): array {
         return self::generatePropertyCopy(
             $propertyId,
             'title',
-            $userId
+            $userId,
+            $draft
         );
     }
 
     public static function generatePropertyDescription(
         int $propertyId,
-        ?int $userId = null
+        ?int $userId = null,
+        array $draft = []
     ): array {
         return self::generatePropertyCopy(
             $propertyId,
             'description',
-            $userId
+            $userId,
+            $draft
         );
     }
 
     private static function generatePropertyCopy(
         int $propertyId,
         string $copyType,
-        ?int $userId
+        ?int $userId,
+        array $draft = []
     ): array {
         if ($propertyId <= 0) {
             throw new Exception(
@@ -73,7 +78,18 @@ class PublicationAICopyService
             PublicationAIAnalysisService::preparePropertyInput(
                 $propertyId
             );
-
+        /*
+ * La base de datos funciona como fallback.
+ *
+ * Si el frontend envió un snapshot del formulario,
+ * sus valores tienen prioridad aunque todavía
+ * no hayan sido guardados.
+ */
+        $input =
+            self::applyDraftOverrides(
+                $input,
+                $draft
+            );
         $promptVersion =
             $copyType === 'title'
             ? self::TITLE_PROMPT_VERSION
@@ -169,7 +185,258 @@ class PublicationAICopyService
             $promptVersion,
         ];
     }
+    private static function applyDraftOverrides(
+        array $input,
+        array $draft
+    ): array {
+        $draftProperty =
+            is_array($draft['property'] ?? null)
+            ? $draft['property']
+            : [];
 
+        if ($draftProperty !== []) {
+            if (!isset($input['property'])) {
+                $input['property'] = [];
+            }
+
+            /*
+         * Datos principales.
+         */
+            foreach (
+                [
+                    'title',
+                    'description',
+                    'property_type',
+                    'price',
+                    'currency',
+                ]
+                as $field
+            ) {
+                if (
+                    array_key_exists(
+                        $field,
+                        $draftProperty
+                    )
+                ) {
+                    $input['property'][$field] =
+                        $draftProperty[$field];
+                }
+            }
+
+            /*
+         * Ubicación.
+         */
+            if (
+                !isset($input['property']['location']) ||
+                !is_array($input['property']['location'])
+            ) {
+                $input['property']['location'] = [];
+            }
+
+            foreach (
+                [
+                    'country_code',
+                    'country',
+                    'province',
+                    'city',
+                    'zone',
+                    'address',
+                    'formatted_address',
+                    'postal_code',
+                    'latitude',
+                    'longitude',
+                ]
+                as $field
+            ) {
+                if (
+                    array_key_exists(
+                        $field,
+                        $draftProperty
+                    )
+                ) {
+                    $input['property']['location'][$field] =
+                        $draftProperty[$field];
+                }
+            }
+
+            /*
+         * Características.
+         */
+            if (
+                !isset($input['property']['features']) ||
+                !is_array($input['property']['features'])
+            ) {
+                $input['property']['features'] = [];
+            }
+
+            foreach (
+                [
+                    'total_area',
+                    'covered_area',
+                    'bedrooms',
+                    'bathrooms',
+                    'garages',
+                    'antiquity',
+                    'amenities',
+                ]
+                as $field
+            ) {
+                if (
+                    array_key_exists(
+                        $field,
+                        $draftProperty
+                    )
+                ) {
+                    $input['property']['features'][$field] =
+                        $draftProperty[$field];
+                }
+            }
+        }
+
+        /*
+     * Requisitos actuales del formulario.
+     *
+     * También tienen prioridad sobre la versión
+     * guardada para que la IA pueda trabajar con
+     * cambios todavía no persistidos.
+     */
+        $draftRequirements =
+            is_array($draft['requirements'] ?? null)
+            ? $draft['requirements']
+            : null;
+
+        if ($draftRequirements !== null) {
+            $input['requirements'] = [
+                'criteria_mode' =>
+                $draftRequirements['criteria_mode']
+                    ?? null,
+
+                'accepts_total_swap' =>
+                (bool)(
+                    $draftRequirements['accepts_total_swap']
+                    ?? false
+                ),
+
+                'accepts_swap_plus_cash' =>
+                (bool)(
+                    $draftRequirements['accepts_swap_plus_cash']
+                    ?? false
+                ),
+
+                'accepts_multiple_swap' =>
+                (bool)(
+                    $draftRequirements['accepts_multiple_swap']
+                    ?? false
+                ),
+
+                'accepts_open_proposals' =>
+                (bool)(
+                    $draftRequirements['accepts_open_proposals']
+                    ?? false
+                ),
+
+                'accepts_cash_only' =>
+                (bool)(
+                    $draftRequirements['accepts_cash_only']
+                    ?? false
+                ),
+
+                'cash_difference' => [
+                    'direction' =>
+                    $draftRequirements['cash_difference_direction'] ?? null,
+
+                    'min' =>
+                    $draftRequirements['cash_difference_min'] ?? null,
+
+                    'max' =>
+                    $draftRequirements['cash_difference_max'] ?? null,
+
+                    'currency' =>
+                    $draftRequirements['cash_difference_currency'] ?? null,
+                ],
+
+                'price' => [
+                    'min' =>
+                    $draftRequirements['price_min']
+                        ?? null,
+
+                    'max' =>
+                    $draftRequirements['price_max']
+                        ?? null,
+
+                    'currency' =>
+                    $draftRequirements['price_currency']
+                        ?? null,
+                ],
+
+                'features' => [
+                    'min_total_area' =>
+                    $draftRequirements['min_total_area']
+                        ?? null,
+
+                    'max_total_area' =>
+                    $draftRequirements['max_total_area']
+                        ?? null,
+
+                    'min_covered_area' =>
+                    $draftRequirements['min_covered_area']
+                        ?? null,
+
+                    'max_covered_area' =>
+                    $draftRequirements['max_covered_area']
+                        ?? null,
+
+                    'min_bedrooms' =>
+                    $draftRequirements['min_bedrooms']
+                        ?? null,
+
+                    'min_bathrooms' =>
+                    $draftRequirements['min_bathrooms']
+                        ?? null,
+
+                    'min_garages' =>
+                    $draftRequirements['min_garages']
+                        ?? null,
+
+                    'max_antiquity' =>
+                    $draftRequirements['max_antiquity']
+                        ?? null,
+                ],
+
+                'property_types' =>
+                is_array(
+                    $draftRequirements['property_types']
+                        ?? null
+                )
+                    ? $draftRequirements['property_types']
+                    : [],
+
+                'locations' =>
+                is_array(
+                    $draftRequirements['locations']
+                        ?? null
+                )
+                    ? $draftRequirements['locations']
+                    : [],
+
+                'open_to_other_zones' =>
+                (bool)(
+                    $draftRequirements['open_to_other_zones']
+                    ?? false
+                ),
+
+                'property_condition' =>
+                $draftRequirements['property_condition']
+                    ?? null,
+
+                'notes' =>
+                $draftRequirements['notes']
+                    ?? null,
+            ];
+        }
+
+        return $input;
+    }
     private static function buildInputHash(
         array $input,
         string $copyType,
@@ -520,9 +787,43 @@ si alguno de esos datos NO está confirmado en la ficha, no lo inventes ni
 lo deduzcas. El generador debe producir la mejor descripción posible con
 la información disponible.
 
+TRATAMIENTO DE LA DESCRIPCIÓN ACTUAL:
+
+La descripción actual escrita por el usuario es una fuente de información
+confirmada sobre la propiedad.
+
+Al optimizarla:
+
+- Detectá los hechos inmobiliarios concretos que el usuario escribió.
+- Conservá los datos útiles aunque no exista un campo estructurado específico.
+- Podés reorganizarlos y redactarlos mejor, pero no eliminarlos sin motivo.
+- Esto incluye, cuando hayan sido expresamente indicados:
+  distribución,
+  orientación,
+  estado,
+  luminosidad,
+  expensas,
+  calefacción,
+  servicios,
+  lavadero,
+  balcón,
+  terraza,
+  patio,
+  jardín,
+  vistas,
+  reformas,
+  materiales
+  y otros diferenciales comerciales.
+- Si la descripción contradice un dato estructurado actual, priorizá
+  el dato estructurado.
+- No consideres como hechos las exageraciones, opiniones, slogans
+  ni lenguaje puramente publicitario.
+- No conserves texto basura, pruebas ni repeticiones.
+
 REGLAS DE VERACIDAD:
 
-Usá solamente información confirmada en la ficha.
+Usá solamente información confirmada en los datos estructurados actuales
+o expresamente indicada por el usuario en la descripción actual.
 
 No inventes ni deduzcas:
 - luminosidad;
@@ -636,6 +937,16 @@ OPCIONES GENERADAS ANTERIORMENTE:
 
 Si existen opciones anteriores, redactá una alternativa diferente
 manteniendo el mismo nivel profesional.
+
+La descripción actual escrita por el usuario también puede contener
+atributos confirmados que no tengan un campo estructurado específico.
+
+Podés utilizar esos atributos como diferenciales en el título cuando sean
+hechos concretos, no contradigan los datos estructurados y sean
+comercialmente relevantes.
+
+No utilizar opiniones, exageraciones ni frases promocionales de la
+descripción como si fueran características objetivas.
 
 PROPIEDAD:
 

@@ -23,7 +23,8 @@ class PropertyService
 
     public static function generateAITitle(
         int $userId,
-        int $propertyId
+        int $propertyId,
+        array $draft = []
     ): array {
         self::getOwnedProperty(
             $userId,
@@ -32,13 +33,15 @@ class PropertyService
 
         return PublicationAICopyService::generatePropertyTitle(
             $propertyId,
-            $userId
+            $userId,
+            $draft
         );
     }
 
     public static function generateAIDescription(
         int $userId,
-        int $propertyId
+        int $propertyId,
+        array $draft = []
     ): array {
         self::getOwnedProperty(
             $userId,
@@ -47,9 +50,11 @@ class PropertyService
 
         return PublicationAICopyService::generatePropertyDescription(
             $propertyId,
-            $userId
+            $userId,
+            $draft
         );
     }
+
     private static function imageViewUrl(?int $imageId): ?string
     {
         if (!$imageId) {
