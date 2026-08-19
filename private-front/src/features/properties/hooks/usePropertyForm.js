@@ -258,10 +258,19 @@ export function usePropertyForm({ googleMapsLoaded }) {
     const property = detail?.property || {};
     const refreshedQuality = detail?.quality || null;
     const refreshedQualityV2 = detail?.quality_v2 || null;
+    let refreshedAIAnalysis = null;
 
+    try {
+      refreshedAIAnalysis = await getPropertyAIAnalysis(propertyId);
+    } catch (error) {
+      console.error(
+        "[PROPERTY AI] No se pudo refrescar el análisis actual:",
+        error,
+      );
+    }
     setQuality(refreshedQuality);
     setQualityV2(refreshedQualityV2);
-
+    setAIAnalysis(refreshedAIAnalysis);
     const refreshedImages = Array.isArray(detail?.images) ? detail.images : [];
 
     const refreshedAmenities = Array.isArray(detail?.amenities)
