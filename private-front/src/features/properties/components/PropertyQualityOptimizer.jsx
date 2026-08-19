@@ -98,9 +98,9 @@ function formatAnalysisDate(value) {
   }).format(date);
 }
 
-function buildUnifiedSuggestions(quality, aiAnalysis) {
-  const objectiveSuggestions = Array.isArray(quality?.suggestions)
-    ? quality.suggestions
+function buildUnifiedSuggestions(qualityV2, aiAnalysis) {
+  const objectiveSuggestions = Array.isArray(qualityV2?.suggestions)
+    ? qualityV2.suggestions
     : [];
 
   const aiSuggestions = Array.isArray(aiAnalysis?.suggestions)
@@ -215,14 +215,13 @@ function buildUnifiedSuggestions(quality, aiAnalysis) {
 }
 
 export default function PropertyQualityOptimizer({
-  quality,
   qualityV2,
   aiAnalysis,
   aiAnalysisLoading = false,
   aiAnalysisRequesting = false,
   onRequestAIAnalysis,
 }) {
-  if (!quality && !qualityV2) {
+  if (!qualityV2) {
     return null;
   }
 
@@ -240,7 +239,7 @@ export default function PropertyQualityOptimizer({
 
   const sections = qualityV2?.sections || {};
 
-  const unifiedSuggestions = buildUnifiedSuggestions(quality, aiAnalysis);
+  const unifiedSuggestions = buildUnifiedSuggestions(qualityV2, aiAnalysis);
 
   const questions = Array.isArray(aiAnalysis?.questions)
     ? aiAnalysis.questions

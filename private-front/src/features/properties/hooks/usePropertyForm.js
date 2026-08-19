@@ -74,7 +74,6 @@ export function usePropertyForm({ googleMapsLoaded }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [initialError, setInitialError] = useState("");
-  const [quality, setQuality] = useState(null);
   const [qualityV2, setQualityV2] = useState(null);
   const [aiAnalysis, setAIAnalysis] = useState(null);
   const [aiAnalysisLoading, setAIAnalysisLoading] = useState(false);
@@ -110,7 +109,6 @@ export function usePropertyForm({ googleMapsLoaded }) {
           ? data.requirement_property_types
           : [];
         const serverImages = Array.isArray(data?.images) ? data.images : [];
-        const serverQuality = data?.quality || null;
         const serverQualityV2 = data?.quality_v2 || null;
         const serverAmenities = Array.isArray(data?.amenities)
           ? data.amenities
@@ -131,7 +129,6 @@ export function usePropertyForm({ googleMapsLoaded }) {
         );
 
         setExistingImages(serverImages);
-        setQuality(serverQuality);
         setQualityV2(serverQualityV2);
         try {
           let analysis = await getPropertyAIAnalysis(Number(id));
@@ -256,7 +253,6 @@ export function usePropertyForm({ googleMapsLoaded }) {
     const detail = unwrap(detailRes);
 
     const property = detail?.property || {};
-    const refreshedQuality = detail?.quality || null;
     const refreshedQualityV2 = detail?.quality_v2 || null;
     let refreshedAIAnalysis = null;
 
@@ -268,7 +264,6 @@ export function usePropertyForm({ googleMapsLoaded }) {
         error,
       );
     }
-    setQuality(refreshedQuality);
     setQualityV2(refreshedQualityV2);
     setAIAnalysis(refreshedAIAnalysis);
     const refreshedImages = Array.isArray(detail?.images) ? detail.images : [];
@@ -306,7 +301,6 @@ export function usePropertyForm({ googleMapsLoaded }) {
     );
 
     setPropertyStatus(property?.status || propertyStatus);
-    setQuality(refreshedQuality);
     setQualityV2(refreshedQualityV2);
     setExistingImages(refreshedImages);
 
@@ -688,8 +682,6 @@ export function usePropertyForm({ googleMapsLoaded }) {
 
       const detail = unwrap(response);
 
-      setQuality(detail?.quality || null);
-
       setQualityV2(detail?.quality_v2 || null);
 
       return detail?.quality_v2 || null;
@@ -964,7 +956,6 @@ export function usePropertyForm({ googleMapsLoaded }) {
     handleDelete,
     submitProperty,
     navigate,
-    quality,
     qualityV2,
     aiAnalysis,
     aiAnalysisLoading,

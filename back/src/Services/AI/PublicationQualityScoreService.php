@@ -33,7 +33,10 @@ class PublicationQualityScoreService
         if ($objective === null) {
             return null;
         }
-
+        $objectiveSuggestions =
+            self::decodeJsonArray(
+                $objective['suggestions_json'] ?? null
+            );
         /*
          * getCurrentPropertyAnalysis() ya verifica
          * que el análisis corresponda exactamente
@@ -54,7 +57,8 @@ class PublicationQualityScoreService
         ) {
             return [
                 'status' => 'waiting_ai',
-
+                'suggestions' =>
+                $objectiveSuggestions,
                 'score' => null,
 
                 'quality_level' => null,
@@ -185,6 +189,8 @@ class PublicationQualityScoreService
                 'status' => 'waiting_ai',
 
                 'score' => null,
+                'suggestions' =>
+                $objectiveSuggestions,
 
                 'quality_level' => null,
 
@@ -491,7 +497,8 @@ class PublicationQualityScoreService
                     ),
                 ],
             ],
-
+            'suggestions' =>
+            $objectiveSuggestions,
             'sources' => [
                 'objective_algorithm_version' =>
                 $objective['algorithm_version'] ?? null,
@@ -613,6 +620,7 @@ official_calculated_at =
                 features_score,
                 media_score,
                 matchability_score,
+                suggestions_json,
                 algorithm_version,
                 analyzed_at
             FROM publication_quality_scores
@@ -633,7 +641,26 @@ official_calculated_at =
 
         return $row ?: null;
     }
+    private static function decodeJsonArray(
+        mixed $value
+    ): array {
+        if (
+            $value === null ||
+            trim((string)$value) === ''
+        ) {
+            return [];
+        }
 
+        $decoded =
+            json_decode(
+                (string)$value,
+                true
+            );
+
+        return is_array($decoded)
+            ? $decoded
+            : [];
+    }
     private static function normalize(
         float $score,
         float $currentMax,

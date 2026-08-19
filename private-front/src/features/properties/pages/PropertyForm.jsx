@@ -60,7 +60,6 @@ export default function PropertyForm() {
 
     submitProperty,
     navigate,
-    quality,
     qualityV2,
     aiAnalysis,
     aiAnalysisLoading,
@@ -232,10 +231,9 @@ export default function PropertyForm() {
               </div>
 
               {/* COLUMNA DERECHA: OPTIMIZADOR */}
-              {isEditMode && quality ? (
+              {isEditMode && qualityV2 ? (
                 <aside className="self-start min-w-0">
                   <PropertyQualityOptimizer
-                    quality={quality}
                     aiAnalysis={aiAnalysis}
                     qualityV2={qualityV2}
                     aiAnalysisLoading={aiAnalysisLoading}
