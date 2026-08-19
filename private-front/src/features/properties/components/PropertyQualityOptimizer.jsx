@@ -246,6 +246,8 @@ export default function PropertyQualityOptimizer({
     ? aiAnalysis.questions
     : [];
 
+  const qualityFlags = Array.isArray(qualityV2?.flags) ? qualityV2.flags : [];
+
   const isAnalyzing = aiPending || aiProcessing;
 
   const buttonDisabled =
@@ -315,7 +317,40 @@ export default function PropertyQualityOptimizer({
                 relevantes.
               </p>
             </div>
+            {qualityFlags.length > 0 && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 text-rose-600">
+                    <Icon name="warning" size={18} />
+                  </div>
 
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-rose-900">
+                      El puntaje está limitado por un problema crítico
+                    </p>
+
+                    <div className="mt-2 space-y-2">
+                      {qualityFlags.map((flag, index) => (
+                        <div key={`${flag?.code || "flag"}-${index}`}>
+                          {flag?.message && (
+                            <p className="text-sm leading-5 text-rose-800">
+                              {flag.message}
+                            </p>
+                          )}
+
+                          {flag?.max_score && (
+                            <p className="mt-1 text-xs font-medium text-rose-700">
+                              El índice no puede superar {flag.max_score}/100
+                              hasta corregirlo.
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="grid gap-5">
               <SectionScore
                 label="Ficha y datos"

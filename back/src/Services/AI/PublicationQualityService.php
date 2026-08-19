@@ -1583,6 +1583,9 @@ official_ai_analysis_id =
 official_ai_prompt_version =
     NULL,
 
+official_flags_json =
+    NULL,
+
 official_calculated_at =
     NULL
         ");
