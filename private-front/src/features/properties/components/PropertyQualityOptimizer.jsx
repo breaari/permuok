@@ -228,8 +228,6 @@ export default function PropertyQualityOptimizer({
 
   const completed = qualityV2?.status === "completed";
 
-  const waitingAI = qualityV2?.status === "waiting_ai";
-
   const aiPending = aiAnalysis?.status === "pending";
 
   const aiProcessing = aiAnalysis?.status === "processing";
@@ -247,8 +245,6 @@ export default function PropertyQualityOptimizer({
   const questions = Array.isArray(aiAnalysis?.questions)
     ? aiAnalysis.questions
     : [];
-
-  const objectiveProgress = Number(qualityV2?.objective_progress || 0);
 
   const isAnalyzing = aiPending || aiProcessing;
 
@@ -377,32 +373,37 @@ export default function PropertyQualityOptimizer({
             </div>
           </>
         ) : (
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Preparación de la ficha
-            </p>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-slate-600">
+                <Icon name={isAnalyzing ? "sparkles" : "warning"} size={18} />
+              </div>
 
-            <p className="mt-1 text-3xl font-black tracking-tight text-slate-900">
-              {Math.round(objectiveProgress)}
-              <span className="text-base font-semibold text-slate-400">%</span>
-            </p>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-900">
+                  {isAnalyzing
+                    ? "Analizando publicación"
+                    : aiFailed
+                      ? "No se pudo completar el análisis"
+                      : "Análisis pendiente"}
+                </p>
 
-            <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                style={{
-                  width: `${Math.max(0, Math.min(100, objectiveProgress))}%`,
-                }}
-              />
+                <p className="mt-1 text-sm leading-5 text-slate-600">
+                  {isAnalyzing
+                    ? "Estamos evaluando el contenido, las imágenes, la coherencia y el potencial de matching."
+                    : aiFailed
+                      ? "Volvé a intentarlo para calcular el índice actualizado."
+                      : "La publicación cambió o todavía no fue analizada. Ejecutá el análisis para obtener su índice de calidad."}
+                </p>
+
+                {isAnalyzing && (
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    El nuevo puntaje estará disponible cuando finalice el
+                    análisis.
+                  </p>
+                )}
+              </div>
             </div>
-
-            <p className="mt-3 text-sm leading-5 text-slate-600">
-              {isAnalyzing
-                ? "Estamos analizando la calidad del contenido, las imágenes y el potencial de matching."
-                : aiFailed
-                  ? "El análisis no pudo completarse. Podés volver a intentarlo."
-                  : "La ficha ya fue evaluada. Falta completar el análisis inteligente para calcular el índice final."}
-            </p>
           </div>
         )}
 
@@ -501,12 +502,6 @@ export default function PropertyQualityOptimizer({
                       ? "Reintentar análisis"
                       : "Analizar publicación"}
           </button>
-
-          {!completed && waitingAI && !isAnalyzing && (
-            <p className="mt-2 text-center text-xs text-slate-400">
-              El índice final se calculará cuando termine el análisis.
-            </p>
-          )}
         </div>
 
         {aiAnalysis?.analyzed_at && (
