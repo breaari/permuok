@@ -222,8 +222,7 @@ class PublicationQualityScoreService
             $consistency +
             $professionalism +
             $matchability;
-
-        $score =
+        $rawScore =
             round(
                 self::clamp(
                     $rawScore,
@@ -234,10 +233,138 @@ class PublicationQualityScoreService
             );
 
         /*
-         * Los caps críticos los agregaremos
-         * posteriormente cuando tengamos flags
-         * explícitos y confiables.
-         */
+ * ================================
+ * FLAGS CRÍTICOS
+ * ================================
+ *
+ * Los flags pueden surgir de:
+ *
+ * 1. reglas objetivas verificables;
+ * 2. análisis semántico IA.
+ *
+ * No interpretamos textos de sugerencias
+ * para decidir caps.
+ */
+        $flags = [];
+
+        /*
+ * Sin imágenes.
+ *
+ * Una publicación sin ninguna imagen
+ * no puede alcanzar un nivel de calidad
+ * normal aunque el resto esté completo.
+ *
+ * media_score = 0 implica que no hay
+ * imágenes válidas cargadas.
+ */
+        if (
+            (float)($objective['media_score'] ?? 0) <= 0
+        ) {
+            $flags[] = [
+                'code' =>
+                'no_images',
+
+                'severity' =>
+                'critical',
+
+                'message' =>
+                'La publicación no tiene imágenes cargadas.',
+
+                'max_score' =>
+                49,
+            ];
+        }
+
+        /*
+ * Flags semánticos detectados por IA.
+ */
+        $aiFlags =
+            is_array($ai['quality_flags'] ?? null)
+            ? $ai['quality_flags']
+            : [];
+
+        $aiCaps = [
+            'critical_contradiction' => 69,
+            'junk_content' => 69,
+            'severe_unprofessional_content' => 69,
+            'unusable_matchability' => 69,
+        ];
+
+        foreach ($aiFlags as $flag) {
+            if (!is_array($flag)) {
+                continue;
+            }
+
+            $code =
+                trim(
+                    (string)($flag['code'] ?? '')
+                );
+
+            if (
+                $code === '' ||
+                !array_key_exists(
+                    $code,
+                    $aiCaps
+                )
+            ) {
+                continue;
+            }
+
+            $flags[] = [
+                'code' =>
+                $code,
+
+                'severity' =>
+                trim(
+                    (string)(
+                        $flag['severity']
+                        ?? 'high'
+                    )
+                ),
+
+                'message' =>
+                trim(
+                    (string)(
+                        $flag['message']
+                        ?? ''
+                    )
+                ),
+
+                'max_score' =>
+                $aiCaps[$code],
+            ];
+        }
+
+        /*
+ * Partimos del score calculado normalmente.
+ */
+        $score = $rawScore;
+
+        /*
+ * Si existen varios flags, se aplica
+ * siempre el límite más restrictivo.
+ */
+        foreach ($flags as $flag) {
+            $maxScore =
+                (float)($flag['max_score'] ?? 100);
+
+            $score =
+                min(
+                    $score,
+                    $maxScore
+                );
+        }
+
+        $score =
+            round(
+                self::clamp(
+                    $score,
+                    0,
+                    100
+                ),
+                2
+            );
+
         $qualityLevel =
             self::resolveQualityLevel(
                 $score
@@ -250,9 +377,14 @@ class PublicationQualityScoreService
             'score' =>
             $score,
 
+            'raw_score' =>
+            $rawScore,
+
             'quality_level' =>
             $qualityLevel,
 
+            'flags' =>
+            $flags,
             'sections' => [
                 'structure' => [
                     'score' =>
@@ -398,7 +530,21 @@ class PublicationQualityScoreService
 
         $sources =
             $result['sources'] ?? [];
-
+        try {
+            $flagsJson =
+                json_encode(
+                    $result['flags'] ?? [],
+                    JSON_UNESCAPED_UNICODE |
+                        JSON_UNESCAPED_SLASHES |
+                        JSON_THROW_ON_ERROR
+                );
+        } catch (\JsonException $e) {
+            throw new Exception(
+                'No se pudieron serializar los flags oficiales de calidad.',
+                0,
+                $e
+            );
+        }
         $pdo = self::db();
 
         $st = $pdo->prepare("
@@ -416,13 +562,14 @@ class PublicationQualityScoreService
 
             official_ai_analysis_id =
                 :official_ai_analysis_id,
+official_ai_prompt_version =
+    :official_ai_prompt_version,
 
-            official_ai_prompt_version =
-                :official_ai_prompt_version,
+official_flags_json =
+    :official_flags_json,
 
-            official_calculated_at =
-                NOW()
-
+official_calculated_at =
+    NOW()
         WHERE entity_type = 'property'
           AND entity_id = :entity_id
 
@@ -444,7 +591,8 @@ class PublicationQualityScoreService
 
             'official_ai_prompt_version' =>
             $sources['ai_prompt_version'] ?? null,
-
+            'official_flags_json' =>
+            $flagsJson,
             'entity_id' =>
             $propertyId,
         ]);
