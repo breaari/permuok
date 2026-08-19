@@ -10,7 +10,7 @@ use App\Services\CompatibilityJobService;
 
 class PublicationAIAnalysisService
 {
-    private const PROMPT_VERSION = '2.1';
+    private const PROMPT_VERSION = '2.2';
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const ALLOWED_QUESTION_FIELDS = [
@@ -801,8 +801,8 @@ class PublicationAIAnalysisService
      * quede persistido.
      */
             PublicationQualityScoreService::recalculateAndPersistPropertyScore(
-                    $propertyId
-                );
+                $propertyId
+            );
 
             return [
                 'analysis_id' =>
@@ -2333,6 +2333,59 @@ REGLAS DE CONCISIÓN DE LA RESPUESTA:
 - Priorizá solamente los hallazgos de mayor impacto comercial o para matching.
 - No completar arrays con elementos de poco valor solamente para generar más contenido.
 
+REGLAS SOBRE QUALITY_FLAGS:
+
+quality_flags se utiliza exclusivamente para problemas graves que deben
+limitar la calidad global de la publicación.
+
+No generar flags por mejoras normales, campos opcionales faltantes ni
+aspectos comerciales que simplemente podrían optimizarse.
+
+Códigos permitidos:
+
+critical_contradiction:
+Usar únicamente cuando existan datos confirmados claramente incompatibles
+entre sí y la contradicción afecte de manera importante la confiabilidad
+de la publicación.
+
+Ejemplos:
+- la ficha indica 1 dormitorio y la descripción afirma 4;
+- dos ubicaciones confirmadas son claramente incompatibles;
+- las condiciones de operación se contradicen de forma imposible.
+
+junk_content:
+Usar cuando el título o la descripción sean claramente texto de prueba,
+basura, contenido absurdo o no constituyan una publicación inmobiliaria real.
+
+Ejemplos:
+"asdf asdf"
+"prueba prueba"
+"casa blanca test 123"
+texto aleatorio o contenido sin sentido comercial.
+
+No usar por una descripción simplemente breve o mejorable.
+
+severe_unprofessional_content:
+Usar solamente cuando exista contenido gravemente impropio para una
+publicación inmobiliaria profesional, como insultos, agresiones, spam
+evidente o lenguaje claramente inapropiado.
+
+No usar por errores menores de redacción.
+
+unusable_matchability:
+Usar solamente cuando las condiciones de búsqueda, permuta u operación sean
+tan contradictorias o incoherentes que no puedan utilizarse razonablemente
+para producir matches.
+
+Una búsqueda abierta es válida y NO debe recibir este flag.
+
+IMPORTANTE:
+
+- quality_flags debe ser [] en una publicación normal.
+- No crear flags para aumentar artificialmente la severidad del análisis.
+- Una suggestion no implica necesariamente un quality_flag.
+- Un score bajo tampoco implica automáticamente un quality_flag.
+
 PUBLICACIÓN:
 
 {$propertyJson}
@@ -2598,7 +2651,46 @@ PROMPT;
                     ],
                 ],
             ],
+            'quality_flags' => [
+                'type' => 'array',
+                'maxItems' => 5,
 
+                'items' => [
+                    'type' => 'object',
+
+                    'additionalProperties' => false,
+
+                    'properties' => [
+                        'code' => [
+                            'type' => 'string',
+                            'enum' => [
+                                'critical_contradiction',
+                                'junk_content',
+                                'severe_unprofessional_content',
+                                'unusable_matchability',
+                            ],
+                        ],
+
+                        'severity' => [
+                            'type' => 'string',
+                            'enum' => [
+                                'high',
+                                'critical',
+                            ],
+                        ],
+
+                        'message' => [
+                            'type' => 'string',
+                        ],
+                    ],
+
+                    'required' => [
+                        'code',
+                        'severity',
+                        'message',
+                    ],
+                ],
+            ],
             'required' => [
                 'content_score',
                 'title_score',
@@ -2608,6 +2700,7 @@ PROMPT;
                 'professionalism_score',
                 'matchability_score',
                 'questions',
+                'quality_flags',
                 'suggestions',
                 'detected_features',
                 'contradictions',

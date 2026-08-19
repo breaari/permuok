@@ -7,7 +7,7 @@ use Exception;
 
 class PublicationQualityScoreService
 {
-    private const VERSION = '2.0';
+    private const VERSION = '2.1';
 
     private static function db(): PDO
     {
