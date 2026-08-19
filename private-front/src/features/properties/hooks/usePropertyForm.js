@@ -75,6 +75,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
   const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [initialError, setInitialError] = useState("");
   const [quality, setQuality] = useState(null);
+  const [qualityV2, setQualityV2] = useState(null);
   const [aiAnalysis, setAIAnalysis] = useState(null);
   const [aiAnalysisLoading, setAIAnalysisLoading] = useState(false);
   const [aiAnalysisRequesting, setAIAnalysisRequesting] = useState(false);
@@ -110,6 +111,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
           : [];
         const serverImages = Array.isArray(data?.images) ? data.images : [];
         const serverQuality = data?.quality || null;
+        const serverQualityV2 = data?.quality_v2 || null;
         const serverAmenities = Array.isArray(data?.amenities)
           ? data.amenities
           : [];
@@ -130,6 +132,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
 
         setExistingImages(serverImages);
         setQuality(serverQuality);
+        setQualityV2(serverQualityV2);
         try {
           let analysis = await getPropertyAIAnalysis(Number(id));
 
@@ -254,8 +257,10 @@ export function usePropertyForm({ googleMapsLoaded }) {
 
     const property = detail?.property || {};
     const refreshedQuality = detail?.quality || null;
+    const refreshedQualityV2 = detail?.quality_v2 || null;
 
     setQuality(refreshedQuality);
+    setQualityV2(refreshedQualityV2);
 
     const refreshedImages = Array.isArray(detail?.images) ? detail.images : [];
 
@@ -293,6 +298,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
 
     setPropertyStatus(property?.status || propertyStatus);
     setQuality(refreshedQuality);
+    setQualityV2(refreshedQualityV2);
     setExistingImages(refreshedImages);
 
     setInitialExistingImageIds(
@@ -660,6 +666,33 @@ export function usePropertyForm({ googleMapsLoaded }) {
 
     handleOpenPublishChoice();
   }
+
+  async function refreshQualityState(propertyId = Number(id)) {
+    if (!propertyId) {
+      return null;
+    }
+
+    try {
+      const response = await api.get(
+        `/properties/${propertyId}?_=${Date.now()}`,
+      );
+
+      const detail = unwrap(response);
+
+      setQuality(detail?.quality || null);
+
+      setQualityV2(detail?.quality_v2 || null);
+
+      return detail?.quality_v2 || null;
+    } catch (error) {
+      console.error(
+        "[PROPERTY QUALITY] No se pudo refrescar el índice:",
+        error,
+      );
+
+      return null;
+    }
+  }
   async function refreshAIAnalysis(propertyId = Number(id)) {
     if (!propertyId) {
       return null;
@@ -698,6 +731,9 @@ export function usePropertyForm({ googleMapsLoaded }) {
        */
       if (result?.status === "completed") {
         await refreshAIAnalysis(Number(id));
+
+        await refreshQualityState(Number(id));
+
         return;
       }
 
@@ -832,6 +868,12 @@ export function usePropertyForm({ googleMapsLoaded }) {
 
         if (analysis && ["pending", "processing"].includes(analysis.status)) {
           timeoutId = window.setTimeout(checkAnalysis, POLL_INTERVAL_MS);
+
+          return;
+        }
+
+        if (analysis?.status === "completed") {
+          await refreshQualityState(Number(id));
         }
       } catch (error) {
         console.error("[PROPERTY AI] Error consultando estado:", error);
@@ -899,7 +941,7 @@ export function usePropertyForm({ googleMapsLoaded }) {
     submitProperty,
     navigate,
     quality,
-
+    qualityV2,
     aiAnalysis,
     aiAnalysisLoading,
     aiAnalysisRequesting,

@@ -61,6 +61,7 @@ export default function PropertyForm() {
     submitProperty,
     navigate,
     quality,
+    qualityV2,
     aiAnalysis,
     aiAnalysisLoading,
     aiAnalysisRequesting,
@@ -236,6 +237,7 @@ export default function PropertyForm() {
                   <PropertyQualityOptimizer
                     quality={quality}
                     aiAnalysis={aiAnalysis}
+                    qualityV2={qualityV2}
                     aiAnalysisLoading={aiAnalysisLoading}
                     aiAnalysisRequesting={aiAnalysisRequesting}
                     onRequestAIAnalysis={handleRequestAIAnalysis}
