@@ -26,6 +26,9 @@ class CompatibilityJobService
     private const TYPE_PROPERTY_AI_ANALYZE =
     'property_ai_analyze';
 
+    private const TYPE_SEARCH_REQUEST_AI_ANALYZE =
+    'search_request_ai_analyze';
+
     private const STALE_LOCK_MINUTES = 10;
 
     private static function db(
@@ -34,6 +37,19 @@ class CompatibilityJobService
         require_once __DIR__ . '/../../db.php';
 
         return pdo($forceReconnect);
+    }
+
+    public static function enqueueSearchRequestAIAnalysis(
+        int $searchRequestId,
+        int $analysisId,
+        int $priority = 7
+    ): array {
+        return self::enqueue(
+            self::TYPE_SEARCH_REQUEST_AI_ANALYZE,
+            $searchRequestId,
+            $priority,
+            $analysisId
+        );
     }
 
     public static function enqueuePropertyQualityRecalculation(
@@ -123,6 +139,7 @@ class CompatibilityJobService
             self::TYPE_SEARCH_ARCHIVE,
             self::TYPE_PROPERTY_QUALITY_RECALCULATE,
             self::TYPE_PROPERTY_AI_ANALYZE,
+            self::TYPE_SEARCH_REQUEST_AI_ANALYZE,
         ];
 
         if (!in_array($jobType, $validTypes, true)) {
@@ -139,7 +156,14 @@ class CompatibilityJobService
         $pdo = self::db();
 
         if (
-            $jobType === self::TYPE_PROPERTY_AI_ANALYZE &&
+            in_array(
+                $jobType,
+                [
+                    self::TYPE_PROPERTY_AI_ANALYZE,
+                    self::TYPE_SEARCH_REQUEST_AI_ANALYZE,
+                ],
+                true
+            ) &&
             $referenceId !== null
         ) {
             $activeKey =

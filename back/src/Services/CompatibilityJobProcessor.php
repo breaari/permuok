@@ -6,6 +6,7 @@ use Exception;
 use App\Services\AI\CompatibilityEngine;
 use App\Services\AI\PublicationQualityService;
 use App\Services\AI\PublicationAIAnalysisService;
+use App\Services\AI\SearchRequestAIAnalysisService;
 
 class CompatibilityJobProcessor
 {
