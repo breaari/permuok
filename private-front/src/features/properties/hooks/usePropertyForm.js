@@ -743,6 +743,12 @@ export function usePropertyForm({ googleMapsLoaded }) {
 
         await refreshQualityState(Number(id));
 
+        if (result?.reused === true) {
+          showSuccess(
+            "La publicación no tiene cambios desde el último análisis.",
+          );
+        }
+
         return;
       }
 

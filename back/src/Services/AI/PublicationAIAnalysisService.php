@@ -792,6 +792,18 @@ class PublicationAIAnalysisService
             $existing &&
             $existing['status'] === 'completed'
         ) {
+            /*
+     * El análisis IA ya existe para exactamente
+     * el contenido actual.
+     *
+     * No volvemos a gastar una llamada a OpenAI,
+     * pero garantizamos que el score oficial V2
+     * quede persistido.
+     */
+            PublicationQualityScoreService::recalculateAndPersistPropertyScore(
+                    $propertyId
+                );
+
             return [
                 'analysis_id' =>
                 (int)$existing['id'],
@@ -1382,10 +1394,20 @@ matchability_score,
                 $result
             );
 
+            /*
+ * La IA ya quedó persistida.
+ *
+ * Ahora calculamos y guardamos el índice
+ * oficial híbrido correspondiente exactamente
+ * a esta versión de la publicación.
+ */
+            PublicationQualityScoreService::recalculateAndPersistPropertyScore(
+                $propertyId
+            );
+
             $persistSeconds =
                 microtime(true) -
                 $persistStartedAt;
-
             $totalSeconds =
                 microtime(true) -
                 $totalStartedAt;

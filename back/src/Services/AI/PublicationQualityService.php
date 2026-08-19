@@ -1563,10 +1563,28 @@ structure_score_v2 =
                     VALUES(suggestions_json),
 
                 algorithm_version =
-                    VALUES(algorithm_version),
+    VALUES(algorithm_version),
 
-                analyzed_at =
-                    NOW()
+analyzed_at =
+    NOW(),
+
+official_score =
+    NULL,
+
+official_quality_level =
+    NULL,
+
+official_score_version =
+    NULL,
+
+official_ai_analysis_id =
+    NULL,
+
+official_ai_prompt_version =
+    NULL,
+
+official_calculated_at =
+    NULL
         ");
 
         $st->execute([

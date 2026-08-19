@@ -40,10 +40,9 @@ class PublicationQualityScoreService
          * al contenido actual de la propiedad.
          */
         $ai =
-            PublicationAIAnalysisService::
-                getCurrentPropertyAnalysis(
-                    $propertyId
-                );
+            PublicationAIAnalysisService::getCurrentPropertyAnalysis(
+                $propertyId
+            );
 
         /*
          * Mientras la IA no terminó, todavía no
@@ -61,12 +60,12 @@ class PublicationQualityScoreService
                 'quality_level' => null,
 
                 'objective_progress' =>
-                    self::calculateObjectiveProgress(
-                        $objective
-                    ),
+                self::calculateObjectiveProgress(
+                    $objective
+                ),
 
                 'version' =>
-                    self::VERSION,
+                self::VERSION,
             ];
         }
 
@@ -81,27 +80,21 @@ class PublicationQualityScoreService
 
         $structure =
             self::clamp(
-                (float)$objective[
-                    'structure_score_v2'
-                ],
+                (float)$objective['structure_score_v2'],
                 0,
                 10
             );
 
         $location =
             self::normalize(
-                (float)$objective[
-                    'location_score'
-                ],
+                (float)$objective['location_score'],
                 20,
                 10
             );
 
         $features =
             self::normalize(
-                (float)$objective[
-                    'features_score'
-                ],
+                (float)$objective['features_score'],
                 20,
                 10
             );
@@ -115,9 +108,7 @@ class PublicationQualityScoreService
          */
         $mediaObjective =
             self::normalize(
-                (float)$objective[
-                    'media_score'
-                ],
+                (float)$objective['media_score'],
                 15,
                 5
             );
@@ -131,9 +122,7 @@ class PublicationQualityScoreService
          */
         $matchingObjective =
             self::normalize(
-                (float)$objective[
-                    'matchability_score'
-                ],
+                (float)$objective['matchability_score'],
                 20,
                 5
             );
@@ -200,12 +189,12 @@ class PublicationQualityScoreService
                 'quality_level' => null,
 
                 'objective_progress' =>
-                    self::calculateObjectiveProgress(
-                        $objective
-                    ),
+                self::calculateObjectiveProgress(
+                    $objective
+                ),
 
                 'version' =>
-                    self::VERSION,
+                self::VERSION,
             ];
         }
 
@@ -256,141 +245,212 @@ class PublicationQualityScoreService
 
         return [
             'status' =>
-                'completed',
+            'completed',
 
             'score' =>
-                $score,
+            $score,
 
             'quality_level' =>
-                $qualityLevel,
+            $qualityLevel,
 
             'sections' => [
                 'structure' => [
                     'score' =>
-                        round($structure, 2),
+                    round($structure, 2),
 
                     'max_score' =>
-                        10,
+                    10,
                 ],
 
                 'location' => [
                     'score' =>
-                        round($location, 2),
+                    round($location, 2),
 
                     'max_score' =>
-                        10,
+                    10,
                 ],
 
                 'features' => [
                     'score' =>
-                        round($features, 2),
+                    round($features, 2),
 
                     'max_score' =>
-                        10,
+                    10,
                 ],
 
                 'title' => [
                     'score' =>
-                        round($title, 2),
+                    round($title, 2),
 
                     'max_score' =>
-                        10,
+                    10,
                 ],
 
                 'description' => [
                     'score' =>
-                        round($description, 2),
+                    round($description, 2),
 
                     'max_score' =>
-                        15,
+                    15,
                 ],
 
                 'images' => [
                     'score' =>
-                        round($images, 2),
+                    round($images, 2),
 
                     'max_score' =>
-                        15,
+                    15,
 
                     'objective_score' =>
-                        round(
-                            $mediaObjective,
-                            2
-                        ),
+                    round(
+                        $mediaObjective,
+                        2
+                    ),
 
                     'ai_score' =>
-                        round(
-                            $mediaAI,
-                            2
-                        ),
+                    round(
+                        $mediaAI,
+                        2
+                    ),
                 ],
 
                 'consistency' => [
                     'score' =>
-                        round(
-                            $consistency,
-                            2
-                        ),
+                    round(
+                        $consistency,
+                        2
+                    ),
 
                     'max_score' =>
-                        10,
+                    10,
                 ],
 
                 'professionalism' => [
                     'score' =>
-                        round(
-                            $professionalism,
-                            2
-                        ),
+                    round(
+                        $professionalism,
+                        2
+                    ),
 
                     'max_score' =>
-                        10,
+                    10,
                 ],
 
                 'matchability' => [
                     'score' =>
-                        round(
-                            $matchability,
-                            2
-                        ),
+                    round(
+                        $matchability,
+                        2
+                    ),
 
                     'max_score' =>
-                        10,
+                    10,
 
                     'objective_score' =>
-                        round(
-                            $matchingObjective,
-                            2
-                        ),
+                    round(
+                        $matchingObjective,
+                        2
+                    ),
 
                     'ai_score' =>
-                        round(
-                            $matchingAI,
-                            2
-                        ),
+                    round(
+                        $matchingAI,
+                        2
+                    ),
                 ],
             ],
 
             'sources' => [
                 'objective_algorithm_version' =>
-                    $objective[
-                        'algorithm_version'
-                    ] ?? null,
+                $objective['algorithm_version'] ?? null,
 
                 'ai_analysis_id' =>
-                    $ai['id'] ?? null,
+                $ai['id'] ?? null,
 
                 'ai_prompt_version' =>
-                    $ai[
-                        'prompt_version'
-                    ] ?? null,
+                $ai['prompt_version'] ?? null,
             ],
 
             'version' =>
-                self::VERSION,
+            self::VERSION,
         ];
     }
+    public static function recalculateAndPersistPropertyScore(
+        int $propertyId
+    ): ?array {
+        if ($propertyId <= 0) {
+            throw new Exception(
+                'El ID de la propiedad no es válido.'
+            );
+        }
 
+        $result =
+            self::getPropertyScore(
+                $propertyId
+            );
+
+        if (
+            $result === null ||
+            ($result['status'] ?? null) !== 'completed'
+        ) {
+            return $result;
+        }
+
+        $sources =
+            $result['sources'] ?? [];
+
+        $pdo = self::db();
+
+        $st = $pdo->prepare("
+        UPDATE publication_quality_scores
+
+        SET
+            official_score =
+                :official_score,
+
+            official_quality_level =
+                :official_quality_level,
+
+            official_score_version =
+                :official_score_version,
+
+            official_ai_analysis_id =
+                :official_ai_analysis_id,
+
+            official_ai_prompt_version =
+                :official_ai_prompt_version,
+
+            official_calculated_at =
+                NOW()
+
+        WHERE entity_type = 'property'
+          AND entity_id = :entity_id
+
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'official_score' =>
+            $result['score'],
+
+            'official_quality_level' =>
+            $result['quality_level'],
+
+            'official_score_version' =>
+            self::VERSION,
+
+            'official_ai_analysis_id' =>
+            $sources['ai_analysis_id'] ?? null,
+
+            'official_ai_prompt_version' =>
+            $sources['ai_prompt_version'] ?? null,
+
+            'entity_id' =>
+            $propertyId,
+        ]);
+
+        return $result;
+    }
     private static function getObjectiveQuality(
         int $propertyId
     ): ?array {
@@ -415,7 +475,7 @@ class PublicationQualityScoreService
 
         $st->execute([
             'entity_id' =>
-                $propertyId,
+            $propertyId,
         ]);
 
         $row =
@@ -488,9 +548,7 @@ class PublicationQualityScoreService
         $score =
             self::clamp(
                 (float)(
-                    $objective[
-                        'structure_score_v2'
-                    ] ?? 0
+                    $objective['structure_score_v2'] ?? 0
                 ),
                 0,
                 10
@@ -499,9 +557,7 @@ class PublicationQualityScoreService
         $score +=
             self::normalize(
                 (float)(
-                    $objective[
-                        'location_score'
-                    ] ?? 0
+                    $objective['location_score'] ?? 0
                 ),
                 20,
                 10
@@ -510,9 +566,7 @@ class PublicationQualityScoreService
         $score +=
             self::normalize(
                 (float)(
-                    $objective[
-                        'features_score'
-                    ] ?? 0
+                    $objective['features_score'] ?? 0
                 ),
                 20,
                 10
@@ -521,9 +575,7 @@ class PublicationQualityScoreService
         $score +=
             self::normalize(
                 (float)(
-                    $objective[
-                        'media_score'
-                    ] ?? 0
+                    $objective['media_score'] ?? 0
                 ),
                 15,
                 5
@@ -532,9 +584,7 @@ class PublicationQualityScoreService
         $score +=
             self::normalize(
                 (float)(
-                    $objective[
-                        'matchability_score'
-                    ] ?? 0
+                    $objective['matchability_score'] ?? 0
                 ),
                 20,
                 5
