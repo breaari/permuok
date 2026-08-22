@@ -39,3 +39,14 @@ export async function deleteSearchRequest(id) {
   const res = await http.post(`/search-requests/${id}/delete`, {});
   return unwrap(res);
 }
+
+export async function getSearchRequestQuality(id) {
+  const res = await http.get(`/search-requests/${id}/quality`);
+  return unwrap(res);
+}
+
+export async function requestSearchRequestAIAnalysis(id) {
+  const res = await http.post(`/search-requests/${id}/ai-analysis`, {});
+
+  return unwrap(res);
+}

@@ -372,7 +372,21 @@ if ($method === 'GET' && preg_match('#^/search-requests/(\d+)$#', $uri, $m)) {
     SearchRequestController::detail();
     exit;
 }
+if (
+    $method === 'GET' &&
+    preg_match(
+        '#^/search-requests/(\d+)/quality$#',
+        $uri,
+        $m
+    )
+) {
+    $_GET['id'] =
+        (int)$m[1];
 
+    SearchRequestController::getQuality();
+
+    exit;
+}
 if ($method === 'PATCH' && preg_match('#^/search-requests/(\d+)$#', $uri, $m)) {
     $_GET['id'] = (int)$m[1];
     SearchRequestController::update();

@@ -7,6 +7,7 @@ use App\Helpers\ResponseHelper;
 use App\Services\SearchRequestService;
 use App\Services\MembershipGuard;
 use App\Services\AI\SearchRequestAIAnalysisService;
+use App\Services\AI\SearchRequestQualityScoreService;
 
 class SearchRequestController
 {
@@ -192,6 +193,55 @@ class SearchRequestController
                 );
 
             ResponseHelper::ok($result);
+        } catch (\Throwable $e) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                400
+            );
+        }
+    }
+
+    public static function getQuality(): void
+    {
+        try {
+            $auth =
+                AuthHelper::requireUser();
+
+            $id =
+                (int)($_GET['id'] ?? 0);
+
+            if ($id <= 0) {
+                throw new \Exception(
+                    'El ID de la búsqueda no es válido.'
+                );
+            }
+
+            /*
+         * Verifica que la búsqueda pertenezca
+         * a la inmobiliaria del usuario.
+         */
+            SearchRequestService::getDetail(
+                (int)$auth['id'],
+                $id
+            );
+
+            /*
+         * Calcula el estado actual.
+         *
+         * Si no existe IA válida para el hash actual,
+         * devolverá waiting_ai.
+         *
+         * Si existe, devolverá el score oficial
+         * completo /100.
+         */
+            $result =
+                SearchRequestQualityScoreService::getScore(
+                    $id
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
         } catch (\Throwable $e) {
             ResponseHelper::fail(
                 $e->getMessage(),
