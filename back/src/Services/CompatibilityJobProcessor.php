@@ -41,6 +41,13 @@ class CompatibilityJobProcessor
                 (int)($job['attempts'] ?? 1),
                 (int)($job['max_attempts'] ?? 3)
             ),
+            'search_request_ai_analyze' =>
+            SearchRequestAIAnalysisService::processAnalysis(
+                $entityId,
+                (int)($job['reference_id'] ?? 0),
+                (int)($job['attempts'] ?? 1),
+                (int)($job['max_attempts'] ?? 3)
+            ),
             'search_request_recalculate' =>
             CompatibilityEngine::calculateForSearchRequest(
                 $entityId
