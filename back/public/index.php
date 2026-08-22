@@ -378,7 +378,20 @@ if ($method === 'PATCH' && preg_match('#^/search-requests/(\d+)$#', $uri, $m)) {
     SearchRequestController::update();
     exit;
 }
+if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/search-requests/(\d+)/ai-analysis$#',
+        $uri,
+        $m
+    )
+) {
+    $_GET['id'] = (int)$m[1];
 
+    SearchRequestController::requestAIAnalysis();
+
+    exit;
+}
 if ($method === 'POST' && preg_match('#^/search-requests/(\d+)/publish$#', $uri, $m)) {
     $_GET['id'] = (int)$m[1];
     SearchRequestController::publish();

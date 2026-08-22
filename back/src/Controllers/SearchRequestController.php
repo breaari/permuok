@@ -6,6 +6,7 @@ use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
 use App\Services\SearchRequestService;
 use App\Services\MembershipGuard;
+use App\Services\AI\SearchRequestAIAnalysisService;
 
 class SearchRequestController
 {
@@ -110,7 +111,7 @@ class SearchRequestController
         try {
             $auth = AuthHelper::requireUser();
             MembershipGuard::requireActiveMembership((int)$auth['id']);
-            
+
             $id = (int)($_GET['id'] ?? 0);
 
             $result = SearchRequestService::publish((int)$auth['id'], $id);
@@ -156,6 +157,46 @@ class SearchRequestController
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             ResponseHelper::fail($e->getMessage(), 400);
+        }
+    }
+
+    public static function requestAIAnalysis(): void
+    {
+        try {
+            $auth = AuthHelper::requireUser();
+
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
+
+            $id = (int)($_GET['id'] ?? 0);
+
+            if ($id <= 0) {
+                throw new \Exception(
+                    'El ID de la búsqueda no es válido.'
+                );
+            }
+
+            /*
+         * Valida que la búsqueda pertenezca
+         * a la inmobiliaria del usuario.
+         */
+            SearchRequestService::getDetail(
+                (int)$auth['id'],
+                $id
+            );
+
+            $result =
+                SearchRequestAIAnalysisService::requestAnalysis(
+                    $id
+                );
+
+            ResponseHelper::ok($result);
+        } catch (\Throwable $e) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                400
+            );
         }
     }
 }
