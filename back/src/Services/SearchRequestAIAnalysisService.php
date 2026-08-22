@@ -80,94 +80,94 @@ class SearchRequestAIAnalysisService
 
         return [
             'entity_type' =>
-                'search_request',
+            'search_request',
 
             'entity_id' =>
-                $searchRequestId,
+            $searchRequestId,
 
             'search_request' => [
                 'title' =>
-                    trim((string)$request['title']),
+                trim((string)$request['title']),
 
                 'description' =>
-                    trim((string)$request['description']),
+                trim((string)$request['description']),
 
                 'location' => [
                     'country' =>
-                        $request['country'],
+                    $request['country'],
 
                     'province' =>
-                        $request['province'],
+                    $request['province'],
 
                     'city' =>
-                        $request['city'],
+                    $request['city'],
 
                     'zone' =>
-                        $request['zone'],
+                    $request['zone'],
 
                     'open_to_other_zones' =>
-                        (bool)$request['open_to_other_zones'],
+                    (bool)$request['open_to_other_zones'],
                 ],
 
                 'property_types' =>
-                    $propertyTypes,
+                $propertyTypes,
 
                 'property_condition' =>
-                    $request['property_condition'],
+                $request['property_condition'],
 
                 'budget' => [
                     'currency' =>
-                        $request['currency'],
+                    $request['currency'],
 
                     'min' =>
-                        $request['min_value'],
+                    $request['min_value'],
 
                     'max' =>
-                        $request['max_value'],
+                    $request['max_value'],
                 ],
 
                 'criteria' => [
                     'min_total_area' =>
-                        $request['min_total_area'],
+                    $request['min_total_area'],
 
                     'min_covered_area' =>
-                        $request['min_covered_area'],
+                    $request['min_covered_area'],
 
                     'min_bedrooms' =>
-                        $request['min_bedrooms'],
+                    $request['min_bedrooms'],
 
                     'min_bathrooms' =>
-                        $request['min_bathrooms'],
+                    $request['min_bathrooms'],
 
                     'min_garages' =>
-                        $request['min_garages'],
+                    $request['min_garages'],
 
                     'max_antiquity' =>
-                        $request['max_antiquity'],
+                    $request['max_antiquity'],
 
                     'amenities' =>
-                        $amenities,
+                    $amenities,
                 ],
 
                 'payment' => [
                     'cash' =>
-                        (bool)$request['payment_mode_cash'],
+                    (bool)$request['payment_mode_cash'],
 
                     'swap' =>
-                        (bool)$request['payment_mode_swap'],
+                    (bool)$request['payment_mode_swap'],
 
                     'cash_difference_max' =>
-                        $request['cash_difference_max'],
+                    $request['cash_difference_max'],
 
                     'cash_difference_currency' =>
-                        $request['cash_difference_currency'],
+                    $request['cash_difference_currency'],
                 ],
 
                 'urgency' =>
-                    $request['urgency'],
+                $request['urgency'],
 
                 'notes' =>
-                    $request['notes'],
+                $request['notes'],
             ],
         ];
     }
@@ -177,21 +177,21 @@ class SearchRequestAIAnalysisService
     ): string {
         $payload = [
             'prompt_version' =>
-                self::PROMPT_VERSION,
+            self::PROMPT_VERSION,
 
             'input' =>
-                self::prepareInput(
-                    $searchRequestId
-                ),
+            self::prepareInput(
+                $searchRequestId
+            ),
         ];
 
         try {
             $json = json_encode(
                 $payload,
                 JSON_UNESCAPED_UNICODE |
-                JSON_UNESCAPED_SLASHES |
-                JSON_PRESERVE_ZERO_FRACTION |
-                JSON_THROW_ON_ERROR
+                    JSON_UNESCAPED_SLASHES |
+                    JSON_PRESERVE_ZERO_FRACTION |
+                    JSON_THROW_ON_ERROR
             );
         } catch (JsonException $e) {
             throw new Exception(
@@ -205,5 +205,124 @@ class SearchRequestAIAnalysisService
             'sha256',
             $json
         );
+    }
+
+    public static function requestAnalysis(
+        int $searchRequestId
+    ): array {
+        if ($searchRequestId <= 0) {
+            throw new Exception(
+                'El ID de la búsqueda no es válido.'
+            );
+        }
+
+        $pdo = self::db();
+
+        $inputHash =
+            self::buildInputHash(
+                $searchRequestId
+            );
+
+        $st = $pdo->prepare("
+        SELECT *
+        FROM publication_ai_analyses
+        WHERE entity_type = 'search_request'
+          AND entity_id = :entity_id
+          AND input_hash = :input_hash
+          AND prompt_version = :prompt_version
+        ORDER BY id DESC
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'entity_id' => $searchRequestId,
+            'input_hash' => $inputHash,
+            'prompt_version' => self::PROMPT_VERSION,
+        ]);
+
+        $existing =
+            $st->fetch(PDO::FETCH_ASSOC)
+            ?: null;
+
+        if (
+            $existing &&
+            $existing['status'] === 'completed'
+        ) {
+            return [
+                'analysis_id' => (int)$existing['id'],
+                'status' => 'completed',
+                'reused' => true,
+                'queued' => false,
+            ];
+        }
+
+        if (
+            $existing &&
+            in_array(
+                $existing['status'],
+                ['pending', 'processing'],
+                true
+            )
+        ) {
+            $analysisId =
+                (int)$existing['id'];
+        } elseif (
+            $existing &&
+            $existing['status'] === 'failed'
+        ) {
+            $analysisId =
+                (int)$existing['id'];
+
+            $pdo->prepare("
+            UPDATE publication_ai_analyses
+            SET
+                status = 'pending',
+                error_message = NULL,
+                analyzed_at = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :id
+        ")->execute([
+                'id' => $analysisId,
+            ]);
+        } else {
+            $stInsert = $pdo->prepare("
+            INSERT INTO publication_ai_analyses (
+                entity_type,
+                entity_id,
+                status,
+                prompt_version,
+                input_hash
+            ) VALUES (
+                'search_request',
+                :entity_id,
+                'pending',
+                :prompt_version,
+                :input_hash
+            )
+        ");
+
+            $stInsert->execute([
+                'entity_id' => $searchRequestId,
+                'prompt_version' => self::PROMPT_VERSION,
+                'input_hash' => $inputHash,
+            ]);
+
+            $analysisId =
+                (int)$pdo->lastInsertId();
+        }
+
+        $job =
+            CompatibilityJobService::enqueueSearchRequestAIAnalysis(
+                $searchRequestId,
+                $analysisId
+            );
+
+        return [
+            'analysis_id' => $analysisId,
+            'status' => 'pending',
+            'reused' => $existing !== null,
+            'queued' => true,
+            'job_id' => (int)($job['id'] ?? 0),
+        ];
     }
 }
