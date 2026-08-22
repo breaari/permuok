@@ -84,6 +84,15 @@ export default function SearchRequestForm() {
     qualityLoading,
     aiAnalysisRequesting,
     handleRequestAIAnalysis,
+
+    aiTitleSuggestion,
+    aiDescriptionSuggestion,
+    aiTitleLoading,
+    aiDescriptionLoading,
+    handleGenerateAITitle,
+    handleGenerateAIDescription,
+    handleApplyAITitle,
+    handleApplyAIDescription,
   } = useSearchRequestForm();
 
   function openDeleteModal() {
@@ -148,6 +157,15 @@ export default function SearchRequestForm() {
                   setField={setField}
                   togglePropertyType={togglePropertyType}
                   toggleAmenity={toggleAmenity}
+                  isEditMode={isEditMode}
+                  aiTitleSuggestion={aiTitleSuggestion}
+                  aiDescriptionSuggestion={aiDescriptionSuggestion}
+                  aiTitleLoading={aiTitleLoading}
+                  aiDescriptionLoading={aiDescriptionLoading}
+                  onGenerateAITitle={handleGenerateAITitle}
+                  onGenerateAIDescription={handleGenerateAIDescription}
+                  onApplyAITitle={handleApplyAITitle}
+                  onApplyAIDescription={handleApplyAIDescription}
                 />
 
                 <SearchRequestLocationAndCriteriaSection
@@ -228,7 +246,7 @@ export default function SearchRequestForm() {
               onBack={handleBackToStepOne}
               onSubmit={handleFinalPrimaryAction}
             />
-           </div>
+          </div>
         )}
       </form>
 
