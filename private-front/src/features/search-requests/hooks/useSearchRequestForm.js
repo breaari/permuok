@@ -9,6 +9,8 @@ import {
   pauseSearchRequest,
   publishSearchRequest,
   updateSearchRequestDraft,
+  getSearchRequestQuality,
+  requestSearchRequestAIAnalysis,
 } from "../api/searchRequests.api";
 import {
   buildSearchRequestPayload,
@@ -60,6 +62,9 @@ export function useSearchRequestForm() {
   const [loading, setLoading] = useState(isEditMode);
   const [initialError, setInitialError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [quality, setQuality] = useState(null);
+  const [qualityLoading, setQualityLoading] = useState(false);
+  const [aiAnalysisRequesting, setAIAnalysisRequesting] = useState(false);
 
   useEffect(() => {
     if (!isEditMode) return;
@@ -87,6 +92,19 @@ export function useSearchRequestForm() {
             can_delete: true,
           },
         );
+        try {
+          const currentQuality = await getSearchRequestQuality(Number(id));
+
+          if (!cancelled) {
+            setQuality(currentQuality);
+          }
+        } catch (error) {
+          console.error("[SEARCH QUALITY] No se pudo cargar el índice:", error);
+
+          if (!cancelled) {
+            setQuality(null);
+          }
+        }
       } catch (error) {
         if (cancelled) return;
         setInitialError(
@@ -172,19 +190,16 @@ export function useSearchRequestForm() {
   }
 
   function handleContinueToStepTwo() {
-
-
     try {
       validateForStepOne();
       setCurrentStep(2);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
-        toast.error(error.message || "No se pudo avanzar al paso 2.");
+      toast.error(error.message || "No se pudo avanzar al paso 2.");
     }
   }
 
   function handleBackToStepOne() {
-
     setPublishChoiceOpen(false);
     setCurrentStep(1);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -206,14 +221,32 @@ export function useSearchRequestForm() {
       },
     );
   }
+  async function refreshQualityState(requestId = Number(id)) {
+    if (!requestId) {
+      return null;
+    }
 
+    try {
+      setQualityLoading(true);
+
+      const result = await getSearchRequestQuality(requestId);
+
+      setQuality(result);
+
+      return result;
+    } catch (error) {
+      console.error("[SEARCH QUALITY] No se pudo refrescar el índice:", error);
+
+      return null;
+    } finally {
+      setQualityLoading(false);
+    }
+  }
   async function submitRequest({
     publishNow = false,
     redirectAfterSave = true,
     successMessageOverride = "",
   } = {}) {
-
-
     try {
       validateSearchRequestForm(form, { requireFull: true });
       setIsSubmitting(true);
@@ -261,6 +294,7 @@ export function useSearchRequestForm() {
         }, 600);
       } else if (isEditMode) {
         await refreshDetail(requestId);
+        await refreshQualityState(requestId);
       }
     } catch (error) {
       toast.error(getErrorMessage(error, "No se pudo guardar la búsqueda."));
@@ -270,8 +304,6 @@ export function useSearchRequestForm() {
   }
 
   function handleOpenPublishChoice() {
-
-
     try {
       validateSearchRequestForm(form, { requireFull: true });
       setPublishChoiceOpen(true);
@@ -335,7 +367,6 @@ export function useSearchRequestForm() {
     try {
       setIsSubmitting(true);
 
-
       await pauseSearchRequest(id);
       await refreshDetail(Number(id));
 
@@ -354,16 +385,13 @@ export function useSearchRequestForm() {
     try {
       setIsSubmitting(true);
 
-
       await archiveSearchRequest(id);
       await refreshDetail(Number(id));
 
       setRequestStatus("archived");
       toast.success("La búsqueda fue archivada correctamente.");
     } catch (error) {
-      toast.error(
-        getErrorMessage(error, "No se pudo archivar la búsqueda."),
-      );
+      toast.error(getErrorMessage(error, "No se pudo archivar la búsqueda."));
     } finally {
       setIsSubmitting(false);
     }
@@ -383,11 +411,49 @@ export function useSearchRequestForm() {
         navigate("/search-requests");
       }, 600);
     } catch (error) {
-      toast.error(
-        getErrorMessage(error, "No se pudo eliminar la búsqueda."),
-      );
+      toast.error(getErrorMessage(error, "No se pudo eliminar la búsqueda."));
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleRequestAIAnalysis() {
+    if (!isEditMode || aiAnalysisRequesting) {
+      return;
+    }
+
+    try {
+      setAIAnalysisRequesting(true);
+
+      const result = await requestSearchRequestAIAnalysis(Number(id));
+
+      /*
+       * Si ya existía un análisis vigente,
+       * el backend también recalcula y devuelve
+       * el quality directamente.
+       */
+      if (result?.status === "completed" && result?.quality) {
+        setQuality(result.quality);
+
+        if (result?.reused === true) {
+          toast.success(
+            "La búsqueda no tiene cambios desde el último análisis.",
+          );
+        }
+
+        return;
+      }
+
+      /*
+       * Análisis nuevo encolado.
+       * Al consultar quality nuevamente
+       * debería quedar waiting_ai.
+       */
+      await refreshQualityState(Number(id));
+    } catch (error) {
+      toast.error(getErrorMessage(error, "No se pudo iniciar el análisis IA."));
+    } finally {
+      setAIAnalysisRequesting(false);
     }
   }
 
@@ -395,6 +461,63 @@ export function useSearchRequestForm() {
     console.log("Vista previa búsqueda", form);
   }
 
+  useEffect(() => {
+    if (!isEditMode || !id || quality?.status !== "waiting_ai") {
+      return;
+    }
+
+    let cancelled = false;
+    let timeoutId = null;
+
+    const startedAt = Date.now();
+
+    const POLL_INTERVAL_MS = 4000;
+    const MAX_POLLING_TIME_MS = 120000;
+
+    async function checkQuality() {
+      if (cancelled) {
+        return;
+      }
+
+      if (Date.now() - startedAt >= MAX_POLLING_TIME_MS) {
+        console.warn(
+          "[SEARCH QUALITY] Se detuvo el polling por tiempo máximo.",
+        );
+
+        return;
+      }
+
+      try {
+        const result = await getSearchRequestQuality(Number(id));
+
+        if (cancelled) {
+          return;
+        }
+
+        setQuality(result);
+
+        if (result?.status === "waiting_ai") {
+          timeoutId = window.setTimeout(checkQuality, POLL_INTERVAL_MS);
+        }
+      } catch (error) {
+        console.error("[SEARCH QUALITY] Error durante polling:", error);
+
+        if (!cancelled) {
+          timeoutId = window.setTimeout(checkQuality, POLL_INTERVAL_MS);
+        }
+      }
+    }
+
+    timeoutId = window.setTimeout(checkQuality, 1000);
+
+    return () => {
+      cancelled = true;
+
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [id, isEditMode, quality?.status]);
   return {
     id,
     isEditMode,
@@ -431,5 +554,11 @@ export function useSearchRequestForm() {
 
     submitRequest,
     navigate,
+
+    quality,
+    qualityLoading,
+    aiAnalysisRequesting,
+    refreshQualityState,
+    handleRequestAIAnalysis,
   };
 }
