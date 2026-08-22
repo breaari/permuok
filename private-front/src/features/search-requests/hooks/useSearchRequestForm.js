@@ -11,6 +11,8 @@ import {
   updateSearchRequestDraft,
   getSearchRequestQuality,
   requestSearchRequestAIAnalysis,
+  generateSearchRequestAITitle,
+  generateSearchRequestAIDescription,
 } from "../api/searchRequests.api";
 import {
   buildSearchRequestPayload,
@@ -18,6 +20,7 @@ import {
   mapSearchRequestToForm,
   resolveCountryCode,
   validateSearchRequestForm,
+  buildSearchRequestAIDraft,
 } from "../utils/SearchRequestHelpers";
 import { useToast } from "../../../ui/toast/ToastProvider";
 
@@ -65,6 +68,11 @@ export function useSearchRequestForm() {
   const [quality, setQuality] = useState(null);
   const [qualityLoading, setQualityLoading] = useState(false);
   const [aiAnalysisRequesting, setAIAnalysisRequesting] = useState(false);
+  const [aiTitleSuggestion, setAITitleSuggestion] = useState("");
+  const [aiDescriptionSuggestion, setAIDescriptionSuggestion] = useState("");
+
+  const [aiTitleLoading, setAITitleLoading] = useState(false);
+  const [aiDescriptionLoading, setAIDescriptionLoading] = useState(false);
 
   useEffect(() => {
     if (!isEditMode) return;
@@ -210,6 +218,8 @@ export function useSearchRequestForm() {
     const mapped = mapSearchRequestToForm(detail);
 
     setForm(mapped);
+    setAITitleSuggestion("");
+    setAIDescriptionSuggestion("");
     setRequestStatus(mapped.status || "draft");
     setAccess(
       detail?.access || {
@@ -457,6 +467,89 @@ export function useSearchRequestForm() {
     }
   }
 
+  async function handleGenerateAITitle() {
+    if (!isEditMode || aiTitleLoading) {
+      return;
+    }
+
+    try {
+      setAITitleLoading(true);
+
+      const draft = buildSearchRequestAIDraft(form);
+
+      const result = await generateSearchRequestAITitle(Number(id), draft);
+
+      const content = String(result?.content || "").trim();
+
+      if (!content) {
+        throw new Error("La IA no generó un título.");
+      }
+
+      setAITitleSuggestion(content);
+    } catch (error) {
+      toast.error(
+        getErrorMessage(error, "No se pudo generar el título con IA."),
+      );
+    } finally {
+      setAITitleLoading(false);
+    }
+  }
+
+  async function handleGenerateAIDescription() {
+    if (!isEditMode || aiDescriptionLoading) {
+      return;
+    }
+
+    try {
+      setAIDescriptionLoading(true);
+
+      const draft = buildSearchRequestAIDraft(form);
+
+      const result = await generateSearchRequestAIDescription(
+        Number(id),
+        draft,
+      );
+
+      const content = String(result?.content || "").trim();
+
+      if (!content) {
+        throw new Error("La IA no generó una descripción.");
+      }
+
+      setAIDescriptionSuggestion(content);
+    } catch (error) {
+      toast.error(
+        getErrorMessage(error, "No se pudo generar la descripción con IA."),
+      );
+    } finally {
+      setAIDescriptionLoading(false);
+    }
+  }
+
+  function handleApplyAITitle() {
+    if (!aiTitleSuggestion) {
+      return;
+    }
+
+    setField("title", aiTitleSuggestion);
+
+    setAITitleSuggestion("");
+
+    toast.success("Se aplicó el título sugerido.");
+  }
+
+  function handleApplyAIDescription() {
+    if (!aiDescriptionSuggestion) {
+      return;
+    }
+
+    setField("description", aiDescriptionSuggestion);
+
+    setAIDescriptionSuggestion("");
+
+    toast.success("Se aplicó la descripción sugerida.");
+  }
+
   function handlePreview() {
     console.log("Vista previa búsqueda", form);
   }
@@ -560,5 +653,16 @@ export function useSearchRequestForm() {
     aiAnalysisRequesting,
     refreshQualityState,
     handleRequestAIAnalysis,
+    aiTitleSuggestion,
+    aiDescriptionSuggestion,
+
+    aiTitleLoading,
+    aiDescriptionLoading,
+
+    handleGenerateAITitle,
+    handleGenerateAIDescription,
+
+    handleApplyAITitle,
+    handleApplyAIDescription,
   };
 }
