@@ -98,9 +98,7 @@ class SearchRequestQualityScoreService
                 null,
 
                 'quality_level' =>
-                self::resolveObjectiveQualityLevel(
-                    $objectiveScore
-                ),
+                null,
 
                 'objective_progress' =>
                 $objectiveScore,
@@ -627,7 +625,9 @@ class SearchRequestQualityScoreService
              * no usamos acá los niveles /100.
              */
             'quality_level' =>
-            null,
+            self::resolveObjectiveQualityLevel(
+                $objectiveScore
+            ),
 
             'suggestions_json' =>
             $suggestionsJson,
