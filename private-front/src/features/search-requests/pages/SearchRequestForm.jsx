@@ -13,8 +13,8 @@ import {
   SearchRequestFormHeaderActions,
   SearchRequestLocationAndCriteriaSection,
   SearchRequestPaymentSection,
+  SearchRequestQualityOptimizer,
 } from "../components";
-
 
 function LoadingState() {
   return (
@@ -79,6 +79,11 @@ export default function SearchRequestForm() {
 
     submitRequest,
     navigate,
+
+    quality,
+    qualityLoading,
+    aiAnalysisRequesting,
+    handleRequestAIAnalysis,
   } = useSearchRequestForm();
 
   function openDeleteModal() {
@@ -113,70 +118,90 @@ export default function SearchRequestForm() {
     <>
       <form
         onSubmit={(e) => e.preventDefault()}
-        className="py-8 sm:py-10 md:py-12 px-4 sm:px-6 md:px-10 w-full max-w-4xl mx-auto space-y-6 sm:space-y-8"
+        className="py-8 sm:py-10 md:py-12 px-4 sm:px-6 md:px-10 w-full"
       >
         {currentStep === 1 && (
-          <>
-            <PropertyFormProgress
-              currentStep={currentStep}
-              isEditMode={isEditMode}
-              variant="search"
-            />
+          <div className="w-full max-w-[1240px] mx-auto">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,768px)_360px] 2xl:grid-cols-[minmax(0,768px)_390px] xl:justify-center xl:items-start">
+              {/* COLUMNA IZQUIERDA */}
+              <div className="space-y-6 sm:space-y-8 min-w-0">
+                <PropertyFormProgress
+                  currentStep={currentStep}
+                  isEditMode={isEditMode}
+                  variant="search"
+                />
 
-            <SearchRequestFormHeaderActions
-              status={requestStatus}
-              isEditMode={isEditMode}
-              isSubmitting={isSubmitting}
-              onSaveDraft={handleSaveDraft}
-              onPublish={handlePublish}
-              onPause={handlePause}
-              onArchive={handleArchive}
-              onDelete={openDeleteModal}
-              onPreview={handlePreview}
-            />
+                <SearchRequestFormHeaderActions
+                  status={requestStatus}
+                  isEditMode={isEditMode}
+                  isSubmitting={isSubmitting}
+                  onSaveDraft={handleSaveDraft}
+                  onPublish={handlePublish}
+                  onPause={handlePause}
+                  onArchive={handleArchive}
+                  onDelete={openDeleteModal}
+                  onPreview={handlePreview}
+                />
 
-            <SearchRequestBasicSection
-              form={form}
-              setField={setField}
-              togglePropertyType={togglePropertyType}
-              toggleAmenity={toggleAmenity}
-            />
+                <SearchRequestBasicSection
+                  form={form}
+                  setField={setField}
+                  togglePropertyType={togglePropertyType}
+                  toggleAmenity={toggleAmenity}
+                />
 
-            <SearchRequestLocationAndCriteriaSection
-              form={form}
-              setField={setField}
-              mapsLoaded={mapsLoaded}
-              mapsError={mapsError}
-            />
+                <SearchRequestLocationAndCriteriaSection
+                  form={form}
+                  setField={setField}
+                  mapsLoaded={mapsLoaded}
+                  mapsError={mapsError}
+                />
 
-            <div className="pt-2 flex flex-col sm:flex-row gap-3">
-              {isEditMode && (
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={handleQuickUpdateStepOne}
-                  className="w-full sm:w-auto sm:min-w-[220px] bg-emerald-600 text-white py-4 px-6 rounded-lg font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  <Icon name="checkCircle" size={18} />
-                  {isSubmitting ? "Actualizando..." : "Actualizar datos"}
-                </button>
+                <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                  {isEditMode && (
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={handleQuickUpdateStepOne}
+                      className="w-full sm:w-auto sm:min-w-[220px] bg-emerald-600 text-white py-4 px-6 rounded-lg font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <Icon name="checkCircle" size={18} />
+
+                      {isSubmitting ? "Actualizando..." : "Actualizar datos"}
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={handleContinueToStepTwo}
+                    className="w-full bg-slate-900 text-white py-4 rounded-lg font-bold text-base sm:text-lg flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    Continuar al Paso 2
+                    <Icon name="arrowRight" size={18} />
+                  </button>
+                </div>
+              </div>
+
+              {/* COLUMNA DERECHA: OPTIMIZADOR */}
+              {isEditMode && quality ? (
+                <aside className="self-start min-w-0">
+                  <SearchRequestQualityOptimizer
+                    quality={quality}
+                    qualityLoading={qualityLoading}
+                    aiAnalysisRequesting={aiAnalysisRequesting}
+                    onRequestAIAnalysis={handleRequestAIAnalysis}
+                  />
+                </aside>
+              ) : (
+                <div className="hidden xl:block" />
               )}
-
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={handleContinueToStepTwo}
-                className="w-full bg-slate-900 text-white py-4 rounded-lg font-bold text-base sm:text-lg flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                Continuar al Paso 2
-                <Icon name="arrowRight" size={18} />
-              </button>
             </div>
-          </>
+          </div>
         )}
 
         {currentStep === 2 && (
-          <>
+          <div className="w-full max-w-4xl mx-auto space-y-6 sm:space-y-8">
             <PropertyFormProgress
               currentStep={currentStep}
               isEditMode={isEditMode}
@@ -195,10 +220,7 @@ export default function SearchRequestForm() {
               onPreview={handlePreview}
             />
 
-            <SearchRequestPaymentSection
-              form={form}
-              setField={setField}
-            />
+            <SearchRequestPaymentSection form={form} setField={setField} />
 
             <SearchRequestFormFooterActions
               isSubmitting={isSubmitting}
@@ -206,7 +228,7 @@ export default function SearchRequestForm() {
               onBack={handleBackToStepOne}
               onSubmit={handleFinalPrimaryAction}
             />
-          </>
+           </div>
         )}
       </form>
 
