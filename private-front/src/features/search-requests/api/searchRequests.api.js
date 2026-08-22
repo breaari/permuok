@@ -50,3 +50,19 @@ export async function requestSearchRequestAIAnalysis(id) {
 
   return unwrap(res);
 }
+
+export async function generateSearchRequestAITitle(id, draft = {}) {
+  const res = await http.post(`/search-requests/${id}/ai-copy/title`, {
+    draft,
+  });
+
+  return unwrap(res);
+}
+
+export async function generateSearchRequestAIDescription(id, draft = {}) {
+  const res = await http.post(`/search-requests/${id}/ai-copy/description`, {
+    draft,
+  });
+
+  return unwrap(res);
+}

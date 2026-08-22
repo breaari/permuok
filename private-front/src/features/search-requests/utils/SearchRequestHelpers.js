@@ -170,6 +170,72 @@ export function buildSearchRequestPayload(form) {
   };
 }
 
+export function buildSearchRequestAIDraft(form) {
+  return {
+    search_request: {
+      title: String(form.title || "").trim(),
+
+      description: String(form.description || "").trim(),
+
+      property_condition: form.property_condition || "any",
+
+      urgency: form.urgency || "medium",
+
+      notes: String(form.notes || "").trim() || null,
+
+      property_types: Array.isArray(form.property_types)
+        ? form.property_types
+        : [],
+
+      location: {
+        country: String(form.country || "").trim(),
+
+        province: String(form.province || "").trim(),
+
+        city: String(form.city || "").trim() || null,
+
+        zone: String(form.zone || "").trim() || null,
+
+        open_to_other_zones: !!form.open_to_other_zones,
+      },
+
+      budget: {
+        currency: form.currency || "USD",
+
+        min: form.min_value || null,
+
+        max: form.max_value || null,
+      },
+
+      criteria: {
+        min_total_area: form.min_total_area || null,
+
+        min_covered_area: form.min_covered_area || null,
+
+        min_bedrooms: form.min_bedrooms || null,
+
+        min_bathrooms: form.min_bathrooms || null,
+
+        min_garages: form.min_garages || null,
+
+        max_antiquity: form.max_antiquity || null,
+
+        amenities: normalizeAmenities(form.amenities),
+      },
+
+      payment: {
+        cash: !!form.payment_mode_cash,
+
+        swap: !!form.payment_mode_swap,
+
+        cash_difference_max: form.cash_difference_max || null,
+
+        cash_difference_currency: form.cash_difference_currency || "USD",
+      },
+    },
+  };
+}
+
 export function validateSearchRequestForm(form, { requireFull = true } = {}) {
   if (!String(form.title || "").trim()) {
     throw new Error("Completá el título de la búsqueda.");
