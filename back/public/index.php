@@ -387,6 +387,8 @@ if (
 
     exit;
 }
+
+
 if ($method === 'PATCH' && preg_match('#^/search-requests/(\d+)$#', $uri, $m)) {
     $_GET['id'] = (int)$m[1];
     SearchRequestController::update();
@@ -403,6 +405,38 @@ if (
     $_GET['id'] = (int)$m[1];
 
     SearchRequestController::requestAIAnalysis();
+
+    exit;
+}
+
+if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/search-requests/(\d+)/ai-copy/title$#',
+        $uri,
+        $m
+    )
+) {
+    $_GET['id'] =
+        (int)$m[1];
+
+    SearchRequestController::generateAITitle();
+
+    exit;
+}
+
+if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/search-requests/(\d+)/ai-copy/description$#',
+        $uri,
+        $m
+    )
+) {
+    $_GET['id'] =
+        (int)$m[1];
+
+    SearchRequestController::generateAIDescription();
 
     exit;
 }

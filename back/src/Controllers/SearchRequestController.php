@@ -8,6 +8,7 @@ use App\Services\SearchRequestService;
 use App\Services\MembershipGuard;
 use App\Services\AI\SearchRequestAIAnalysisService;
 use App\Services\AI\SearchRequestQualityScoreService;
+use App\Services\AI\SearchRequestAICopyService;
 
 class SearchRequestController
 {
@@ -237,6 +238,124 @@ class SearchRequestController
             $result =
                 SearchRequestQualityScoreService::getScore(
                     $id
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
+        } catch (\Throwable $e) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                400
+            );
+        }
+    }
+
+    public static function generateAITitle(): void
+    {
+        try {
+            $auth =
+                AuthHelper::requireUser();
+
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
+
+            $id =
+                (int)($_GET['id'] ?? 0);
+
+            if ($id <= 0) {
+                throw new \Exception(
+                    'El ID de la búsqueda no es válido.'
+                );
+            }
+
+            /*
+         * Verificamos ownership antes de
+         * generar contenido con IA.
+         */
+            SearchRequestService::getDetail(
+                (int)$auth['id'],
+                $id
+            );
+
+            $data =
+                json_decode(
+                    file_get_contents('php://input'),
+                    true
+                ) ?? [];
+
+            $draft =
+                is_array(
+                    $data['draft'] ?? null
+                )
+                ? $data['draft']
+                : [];
+
+            $result =
+                SearchRequestAICopyService::generateTitle(
+                    $id,
+                    (int)$auth['id'],
+                    $draft
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
+        } catch (\Throwable $e) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                400
+            );
+        }
+    }
+
+    public static function generateAIDescription(): void
+    {
+        try {
+            $auth =
+                AuthHelper::requireUser();
+
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
+
+            $id =
+                (int)($_GET['id'] ?? 0);
+
+            if ($id <= 0) {
+                throw new \Exception(
+                    'El ID de la búsqueda no es válido.'
+                );
+            }
+
+            /*
+         * Verificamos ownership antes de
+         * generar contenido con IA.
+         */
+            SearchRequestService::getDetail(
+                (int)$auth['id'],
+                $id
+            );
+
+            $data =
+                json_decode(
+                    file_get_contents('php://input'),
+                    true
+                ) ?? [];
+
+            $draft =
+                is_array(
+                    $data['draft'] ?? null
+                )
+                ? $data['draft']
+                : [];
+
+            $result =
+                SearchRequestAICopyService::generateDescription(
+                    $id,
+                    (int)$auth['id'],
+                    $draft
                 );
 
             ResponseHelper::ok(
