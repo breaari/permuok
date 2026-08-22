@@ -325,4 +325,113 @@ class SearchRequestAIAnalysisService
             'job_id' => (int)($job['id'] ?? 0),
         ];
     }
+    public static function processAnalysis(
+    int $searchRequestId,
+    int $analysisId,
+    int $attempt = 1,
+    int $maxAttempts = 3
+): array {
+    if ($searchRequestId <= 0) {
+        throw new Exception(
+            'El ID de la búsqueda no es válido.'
+        );
+    }
+
+    if ($analysisId <= 0) {
+        throw new Exception(
+            'El analysis_id no es válido.'
+        );
+    }
+
+    $pdo = self::db();
+
+    $st = $pdo->prepare("
+        SELECT *
+        FROM publication_ai_analyses
+        WHERE id = :id
+          AND entity_type = 'search_request'
+          AND entity_id = :entity_id
+        LIMIT 1
+    ");
+
+    $st->execute([
+        'id' => $analysisId,
+        'entity_id' => $searchRequestId,
+    ]);
+
+    $analysis =
+        $st->fetch(PDO::FETCH_ASSOC);
+
+    if (!$analysis) {
+        throw new Exception(
+            'No se encontró el análisis IA de la búsqueda.'
+        );
+    }
+
+    if ($analysis['status'] === 'completed') {
+        return [
+            'ok' => true,
+            'skipped' => true,
+            'analysis_id' => $analysisId,
+            'reason' => 'El análisis ya estaba completado.',
+        ];
+    }
+
+    $currentHash =
+        self::buildInputHash(
+            $searchRequestId
+        );
+
+    $requestedHash =
+        (string)($analysis['input_hash'] ?? '');
+
+    if (
+        $requestedHash === '' ||
+        !hash_equals(
+            $requestedHash,
+            $currentHash
+        )
+    ) {
+        $pdo->prepare("
+            UPDATE publication_ai_analyses
+            SET
+                status = 'failed',
+                error_message = :message,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :id
+        ")->execute([
+            'message' =>
+                'La búsqueda cambió después de solicitar el análisis.',
+            'id' =>
+                $analysisId,
+        ]);
+
+        return [
+            'ok' => true,
+            'skipped' => true,
+            'analysis_id' => $analysisId,
+            'reason' =>
+                'La búsqueda cambió después de solicitar el análisis.',
+        ];
+    }
+
+    $pdo->prepare("
+        UPDATE publication_ai_analyses
+        SET
+            status = 'processing',
+            error_message = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = :id
+    ")->execute([
+        'id' => $analysisId,
+    ]);
+
+    return [
+        'ok' => true,
+        'analysis_id' => $analysisId,
+        'status' => 'processing',
+        'attempt' => $attempt,
+        'max_attempts' => $maxAttempts,
+    ];
+}
 }
