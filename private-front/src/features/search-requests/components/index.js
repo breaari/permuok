@@ -6,3 +6,4 @@ export { default as SearchRequestFormFooterActions } from "./SearchRequestFormFo
 export { default as SearchRequestFormHeaderActions } from "./SearchRequestFormHeaderActions";
 export { default as SearchRequestLocationAndCriteriaSection } from "./SearchRequestLocationAndCriteriaSection";
 export { default as SearchRequestPaymentSection } from "./SearchRequestPaymentSection";
+export { default as SearchRequestQualityOptimizer } from "./SearchRequestQualityOptimizer";
