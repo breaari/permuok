@@ -41,39 +41,22 @@ function formatScore(value) {
   return number.toFixed(1);
 }
 
-function SectionScore({
-  label,
-  score,
-  maxScore,
-}) {
-  const safeScore =
-    Number(score || 0);
+function SectionScore({ label, score, maxScore }) {
+  const safeScore = Number(score || 0);
 
-  const safeMax =
-    Number(maxScore || 1);
+  const safeMax = Number(maxScore || 1);
 
-  const percent =
-    Math.max(
-      0,
-      Math.min(
-        100,
-        (safeScore / safeMax) * 100,
-      ),
-    );
+  const percent = Math.max(0, Math.min(100, (safeScore / safeMax) * 100));
 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-4">
-        <span className="text-sm font-medium text-slate-700">
-          {label}
-        </span>
+        <span className="text-sm font-medium text-slate-700">{label}</span>
 
         <span className="text-sm font-bold text-slate-900">
           {formatScore(safeScore)}
-          <span className="font-semibold text-slate-400">
-            {" "}
-            / {safeMax}
-          </span>
+
+          <span className="font-semibold text-slate-400"> / {safeMax}</span>
         </span>
       </div>
 
@@ -89,44 +72,53 @@ function SectionScore({
   );
 }
 
-function SuggestionItem({ item }) {
-  const priority =
-    item?.priority || "medium";
+function buildUnifiedSuggestions(quality) {
+  const suggestions = Array.isArray(quality?.suggestions)
+    ? quality.suggestions
+    : [];
 
-  const priorityClass = {
-    high:
-      "border-rose-200 bg-rose-50/70",
-    medium:
-      "border-amber-200 bg-amber-50/70",
-    low:
-      "border-slate-200 bg-slate-50",
-  }[priority];
+  const contradictions = Array.isArray(quality?.contradictions)
+    ? quality.contradictions
+    : [];
 
-  return (
-    <div
-      className={`rounded-xl border p-3 ${priorityClass}`}
-    >
-      <div className="flex items-start gap-2">
-        <Icon
-          name="sparkles"
-          size={16}
-          className="mt-0.5 shrink-0"
-        />
+  const normalized = [
+    ...contradictions.map((message) => ({
+      field: "contradiction",
 
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-800">
-            {item?.action ||
-              item?.title ||
-              "Mejorar búsqueda"}
-          </p>
+      priority: "high",
 
-          <p className="mt-1 text-sm leading-5 text-slate-600">
-            {item?.message || ""}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+      title: "Corregir una inconsistencia",
+
+      message,
+
+      source: "contradiction",
+    })),
+
+    ...suggestions.map((item) => ({
+      field: item?.field || "general",
+
+      priority: item?.priority || "medium",
+
+      title: item?.title || "Mejorar la búsqueda",
+
+      message: item?.message || "",
+
+      source: "suggestion",
+    })),
+  ];
+
+  const priorityOrder = {
+    high: 1,
+    medium: 2,
+    low: 3,
+  };
+
+  return normalized
+    .sort(
+      (a, b) =>
+        (priorityOrder[a?.priority] || 99) - (priorityOrder[b?.priority] || 99),
+    )
+    .slice(0, 7);
 }
 
 export default function SearchRequestQualityOptimizer({
@@ -139,96 +131,68 @@ export default function SearchRequestQualityOptimizer({
     return null;
   }
 
-  const completed =
-    quality?.status === "completed";
+  const completed = quality?.status === "completed";
 
-  const waitingAI =
-    quality?.status === "waiting_ai";
+  const waitingAI = quality?.status === "waiting_ai";
 
-  const score =
-    completed
-      ? Number(quality?.score || 0)
-      : null;
+  const score = completed ? Number(quality?.score || 0) : null;
 
-  const meta =
-    completed
-      ? getQualityMeta(
-          quality?.quality_level,
-        )
-      : null;
+  const meta = completed ? getQualityMeta(quality?.quality_level) : null;
 
-  const sections =
-    quality?.sections || {};
+  const sections = quality?.sections || {};
 
-  const suggestions =
-    Array.isArray(quality?.suggestions)
-      ? quality.suggestions.slice(0, 5)
-      : [];
+  const unifiedSuggestions = buildUnifiedSuggestions(quality);
 
-  const contradictions =
-    Array.isArray(
-      quality?.contradictions,
-    )
-      ? quality.contradictions
-      : [];
+  const qualityFlags = Array.isArray(quality?.flags) ? quality.flags : [];
 
-  const disabled =
-    qualityLoading ||
-    aiAnalysisRequesting ||
-    waitingAI;
+  const buttonDisabled = qualityLoading || aiAnalysisRequesting || waitingAI;
 
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 bg-slate-50/70 px-5 py-5">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-            <Icon
-              name="sparkles"
-              size={20}
-            />
+      <div className="border-b border-slate-100 bg-slate-50/70 px-5 py-5 sm:px-6">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+              <Icon name="sparkles" size={20} />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base font-bold text-slate-900">
+                Optimizador de búsqueda
+              </h2>
+
+              <p className="mt-1 text-sm leading-5 text-slate-500">
+                Analizamos los criterios, el contenido y el potencial de
+                matching para medir la calidad real de la búsqueda.
+              </p>
+            </div>
           </div>
 
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-              Optimizador IA
-            </p>
-
-            <h2 className="mt-0.5 text-lg font-bold text-slate-900">
-              Calidad de búsqueda
-            </h2>
-
-            <p className="mt-1 text-sm leading-5 text-slate-500">
-              Analizamos qué tan clara,
-              completa y útil es esta
-              búsqueda para generar
-              matches.
-            </p>
-          </div>
+          {completed && meta && (
+            <span
+              className={`inline-flex w-fit items-center rounded-full border px-3 py-1.5 text-xs font-bold ${meta.badge}`}
+            >
+              {meta.label}
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="space-y-6 p-5">
+      <div className="space-y-7 px-5 py-6 sm:px-6">
         {completed ? (
           <>
             <div>
-              <div className="flex items-end justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-slate-500">
-                    Índice de calidad
-                  </p>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Calidad de búsqueda
+              </p>
 
-                  <p className="mt-1 text-4xl font-black tracking-tight text-slate-900">
-                    {formatScore(score)}
-                    <span className="ml-1 text-lg font-semibold text-slate-400">
-                      /100
-                    </span>
-                  </p>
-                </div>
+              <div className="mt-1 flex items-end gap-2">
+                <p className="text-4xl font-black tracking-tight text-slate-900">
+                  {formatScore(score)}
+                </p>
 
-                <span
-                  className={`rounded-full border px-3 py-1 text-xs font-bold ${meta.badge}`}
-                >
-                  {meta.label}
+                <span className="pb-1 text-base font-semibold text-slate-400">
+                  /100
                 </span>
               </div>
 
@@ -236,201 +200,184 @@ export default function SearchRequestQualityOptimizer({
                 <div
                   className="h-full rounded-full bg-emerald-500 transition-all duration-500"
                   style={{
-                    width: `${Math.max(
-                      0,
-                      Math.min(
-                        100,
-                        score,
-                      ),
-                    )}%`,
+                    width: `${Math.max(0, Math.min(100, score))}%`,
                   }}
                 />
               </div>
+
+              <p className="mt-3 text-sm leading-5 text-slate-600">
+                El índice combina la calidad de los criterios, ubicación,
+                presupuesto, contenido, coherencia y capacidad de generar
+                matches relevantes.
+              </p>
             </div>
 
-            <div className="space-y-4">
+            {qualityFlags.length > 0 && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 text-rose-600">
+                    <Icon name="warning" size={18} />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-rose-900">
+                      El puntaje está limitado por un problema crítico
+                    </p>
+
+                    <div className="mt-2 space-y-2">
+                      {qualityFlags.map((flag, index) => (
+                        <div key={`${flag?.code || "flag"}-${index}`}>
+                          {flag?.message && (
+                            <p className="text-sm leading-5 text-rose-800">
+                              {flag.message}
+                            </p>
+                          )}
+
+                          {flag?.max_score && (
+                            <p className="mt-1 text-xs font-medium text-rose-700">
+                              El índice no puede superar {flag.max_score}
+                              /100 hasta corregirlo.
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid gap-5">
               <SectionScore
                 label="Criterios"
-                score={
-                  sections?.criteria
-                    ?.score
-                }
-                maxScore={
-                  sections?.criteria
-                    ?.max_score
-                }
+                score={sections?.criteria?.score}
+                maxScore={sections?.criteria?.max_score}
               />
 
               <SectionScore
                 label="Ubicación"
-                score={
-                  sections?.location
-                    ?.score
-                }
-                maxScore={
-                  sections?.location
-                    ?.max_score
-                }
+                score={sections?.location?.score}
+                maxScore={sections?.location?.max_score}
               />
 
               <SectionScore
                 label="Presupuesto y pago"
-                score={
-                  sections?.payment
-                    ?.score
-                }
-                maxScore={
-                  sections?.payment
-                    ?.max_score
-                }
+                score={sections?.payment?.score}
+                maxScore={sections?.payment?.max_score}
               />
 
               <SectionScore
                 label="Título"
-                score={
-                  sections?.title?.score
-                }
-                maxScore={
-                  sections?.title
-                    ?.max_score
-                }
+                score={sections?.title?.score}
+                maxScore={sections?.title?.max_score}
               />
 
               <SectionScore
                 label="Descripción"
-                score={
-                  sections
-                    ?.description
-                    ?.score
-                }
-                maxScore={
-                  sections
-                    ?.description
-                    ?.max_score
-                }
+                score={sections?.description?.score}
+                maxScore={sections?.description?.max_score}
               />
 
               <SectionScore
                 label="Coherencia"
-                score={
-                  sections
-                    ?.consistency
-                    ?.score
-                }
-                maxScore={
-                  sections
-                    ?.consistency
-                    ?.max_score
-                }
+                score={sections?.consistency?.score}
+                maxScore={sections?.consistency?.max_score}
               />
 
               <SectionScore
-                label="Matching"
-                score={
-                  sections
-                    ?.matchability
-                    ?.score
-                }
-                maxScore={
-                  sections
-                    ?.matchability
-                    ?.max_score
-                }
+                label="Potencial de matching"
+                score={sections?.matchability?.score}
+                maxScore={sections?.matchability?.max_score}
               />
             </div>
           </>
         ) : (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <div className="flex gap-3">
-              <Icon
-                name="clock"
-                size={18}
-                className="mt-0.5 shrink-0 text-amber-700"
-              />
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-slate-600">
+                <Icon name="sparkles" size={18} />
+              </div>
 
-              <div>
-                <p className="text-sm font-bold text-amber-800">
-                  Falta actualizar el análisis IA
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-900">
+                  {waitingAI ? "Analizando búsqueda" : "Análisis pendiente"}
                 </p>
 
-                <p className="mt-1 text-sm leading-5 text-amber-700">
-                  La búsqueda cambió desde
-                  el último análisis. Generá
-                  uno nuevo para obtener el
-                  índice oficial actualizado.
+                <p className="mt-1 text-sm leading-5 text-slate-600">
+                  {waitingAI
+                    ? "Estamos evaluando los criterios, el contenido, la coherencia y el potencial de matching."
+                    : "La búsqueda cambió o todavía no fue analizada. Ejecutá el análisis para obtener su índice de calidad."}
                 </p>
+
+                {waitingAI && (
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    El nuevo puntaje estará disponible cuando finalice el
+                    análisis.
+                  </p>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {contradictions.length > 0 && (
-          <div>
-            <p className="mb-3 text-sm font-bold text-slate-900">
-              Inconsistencias detectadas
-            </p>
+        {unifiedSuggestions.length > 0 && completed && (
+          <div className="border-t border-slate-100 pt-6">
+            <div className="mb-4">
+              <h3 className="text-sm font-bold text-slate-900">
+                Mejoras recomendadas
+              </h3>
 
-            <div className="space-y-2">
-              {contradictions.map(
-                (item, index) => (
-                  <div
-                    key={`${index}-${item}`}
-                    className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm leading-5 text-rose-700"
-                  >
-                    {item}
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Priorizamos los cambios que más pueden mejorar la búsqueda y sus
+                compatibilidades.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {unifiedSuggestions.map((suggestion, index) => (
+                <div
+                  key={`${suggestion?.field || "suggestion"}-${index}`}
+                  className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4"
+                >
+                  <div className="mt-0.5 text-amber-600">
+                    <Icon name="warning" size={18} />
                   </div>
-                ),
-              )}
+
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900">
+                      {suggestion?.title || "Mejorá este aspecto"}
+                    </p>
+
+                    {suggestion?.message && (
+                      <p className="mt-1 text-sm leading-5 text-slate-600">
+                        {suggestion.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {suggestions.length > 0 && (
-          <div>
-            <p className="mb-3 text-sm font-bold text-slate-900">
-              Recomendaciones
-            </p>
+        <div className="border-t border-slate-100 pt-6">
+          <button
+            type="button"
+            onClick={onRequestAIAnalysis}
+            disabled={buttonDisabled}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Icon name={completed ? "refresh" : "sparkles"} size={17} />
 
-            <div className="space-y-2.5">
-              {suggestions.map(
-                (item, index) => (
-                  <SuggestionItem
-                    key={`${item?.field || "suggestion"}-${index}`}
-                    item={item}
-                  />
-                ),
-              )}
-            </div>
-          </div>
-        )}
-
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={
-            onRequestAIAnalysis
-          }
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <Icon
-            name="sparkles"
-            size={17}
-          />
-
-          {aiAnalysisRequesting
-            ? "Solicitando análisis..."
-            : waitingAI
-              ? "Analizando búsqueda..."
-              : "Analizar nuevamente"}
-        </button>
-
-        {waitingAI && (
-          <p className="text-center text-xs leading-5 text-slate-500">
-            El análisis se está procesando
-            en segundo plano. El índice se
-            actualizará automáticamente.
-          </p>
-        )}
+            {aiAnalysisRequesting
+              ? "Solicitando..."
+              : waitingAI
+                ? "Analizando búsqueda..."
+                : completed
+                  ? "Actualizar análisis"
+                  : "Analizar búsqueda"}
+          </button>
+        </div>
       </div>
     </section>
   );

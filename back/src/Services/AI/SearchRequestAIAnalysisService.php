@@ -10,7 +10,7 @@ use App\Services\CompatibilityJobService;
 
 class SearchRequestAIAnalysisService
 {
-    private const PROMPT_VERSION = '1.0';
+    private const PROMPT_VERSION = '1.1';
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private static function db(
@@ -530,6 +530,10 @@ Sos un especialista en búsquedas inmobiliarias B2B.
 
 Analizá esta búsqueda publicada en PermuOK.
 
+Tu análisis será mostrado directamente a un usuario de una inmobiliaria.
+Por eso, todo texto visible debe estar escrito en lenguaje inmobiliario claro,
+natural y accionable.
+
 Evaluá:
 
 - claridad y calidad del título;
@@ -537,7 +541,7 @@ Evaluá:
 - coherencia entre los criterios cargados;
 - utilidad de la búsqueda para generar matches.
 
-REGLAS:
+REGLAS DE EVALUACIÓN:
 
 - No inventes datos.
 - No penalices por campos opcionales vacíos.
@@ -547,6 +551,120 @@ REGLAS:
 - La descripción debe aportar contexto útil sin repetir mecánicamente la ficha.
 - Priorizá la utilidad para matching inmobiliario.
 - Escribí en español rioplatense profesional.
+
+REGLAS DE LENGUAJE PARA EL USUARIO:
+
+- Nunca muestres nombres técnicos de campos, variables, claves JSON ni nombres de base de datos.
+- Nunca escribas términos como:
+  payment.cash,
+  payment.swap,
+  cash_difference_max,
+  cash_difference_currency,
+  min_total_area,
+  min_covered_area,
+  property_condition,
+  payment_mode_cash,
+  payment_mode_swap.
+- Nunca muestres valores internos como "new", "any", "true", "false", "null" o "0.00".
+- Traducí siempre esos conceptos al lenguaje que entiende el usuario.
+
+Usá estas equivalencias conceptuales:
+
+- payment.cash / payment_mode_cash:
+  "Pago con dinero".
+
+- payment.swap / payment_mode_swap:
+  "Acepta permuta".
+
+- cash_difference_max:
+  "Diferencia máxima en dinero".
+
+- cash_difference_currency:
+  "Moneda de la diferencia".
+
+- property_condition = new:
+  "Propiedad nueva".
+
+- property_condition = used:
+  "Propiedad usada".
+
+- property_condition = any:
+  "Cualquier estado de la propiedad".
+
+- min_total_area:
+  "Superficie total mínima".
+
+- min_covered_area:
+  "Superficie cubierta mínima".
+
+- min_bedrooms:
+  "Dormitorios mínimos".
+
+- min_bathrooms:
+  "Baños mínimos".
+
+- min_garages:
+  "Cocheras mínimas".
+
+Las contradicciones deben explicar el problema como lo explicaría
+un asesor inmobiliario a otro.
+
+MAL:
+"'payment.cash' está en false pero existe 'payment.cash_difference_max'."
+
+BIEN:
+"Indicás que la operación no contempla pago con dinero, pero también cargaste
+una diferencia máxima en dinero para la permuta. Revisá la modalidad de pago
+para que no quede información contradictoria."
+
+MAL:
+"'property_condition' está en 'new'."
+
+BIEN:
+"Indicás que buscás únicamente propiedades nuevas. Si también considerarías
+usadas, ampliar este criterio puede generar más coincidencias."
+
+MAL:
+"min_total_area está en 0.00."
+
+BIEN:
+"No definiste una superficie total mínima. Si el cliente tiene un mínimo
+necesario, cargarlo puede mejorar la precisión de los matches."
+
+REGLAS PARA LAS SUGERENCIAS:
+
+Cada sugerencia debe tener:
+
+- field:
+  identificador técnico interno. Puede contener el nombre real del campo
+  porque NO se mostrará directamente al usuario.
+
+- action:
+  categoría interna de la acción. Usá solamente:
+  rewrite, clarify, fix, review o complete.
+
+- title:
+  título breve y claro para el usuario.
+  Debe explicar qué debería mejorar.
+  No uses palabras sueltas como "editar", "clarificar", "corregir",
+  "revisar" o "completar".
+
+- message:
+  explicación concreta de qué debería cambiar y por qué.
+  Nunca debe contener nombres técnicos ni valores internos.
+
+Ejemplos de buenos títulos:
+
+- "Mejorá el título de la búsqueda"
+- "Aclará qué cantidad de ambientes acepta"
+- "Revisá la modalidad de pago"
+- "Definí el estado de la propiedad buscada"
+- "Indicá una superficie mínima"
+- "Acotá el rango de presupuesto"
+- "Sumá contexto a la descripción"
+
+Las sugerencias tienen que servir para que el usuario pueda actuar
+inmediatamente sobre el formulario.
 
 Devolvé puntajes de 0 a 100.
 
@@ -598,6 +716,17 @@ PROMPT;
 
                             'action' => [
                                 'type' => 'string',
+                                'enum' => [
+                                    'rewrite',
+                                    'clarify',
+                                    'fix',
+                                    'review',
+                                    'complete',
+                                ],
+                            ],
+
+                            'title' => [
+                                'type' => 'string',
                             ],
 
                             'message' => [
@@ -617,6 +746,7 @@ PROMPT;
                         'required' => [
                             'field',
                             'action',
+                            'title',
                             'message',
                             'priority',
                         ],
