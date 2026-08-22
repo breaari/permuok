@@ -71,8 +71,8 @@ class SearchRequestQualityScoreService
         $objectiveScore =
             round(
                 $criteria +
-                $location +
-                $payment,
+                    $location +
+                    $payment,
                 2
             );
 
@@ -92,49 +92,51 @@ class SearchRequestQualityScoreService
         ) {
             return [
                 'status' =>
-                    'waiting_ai',
+                'waiting_ai',
 
                 'score' =>
-                    null,
+                null,
 
                 'quality_level' =>
-                    null,
+                self::resolveObjectiveQualityLevel(
+                    $objectiveScore
+                ),
 
                 'objective_progress' =>
-                    $objectiveScore,
+                $objectiveScore,
 
                 'suggestions' =>
-                    $objective['suggestions']
+                $objective['suggestions']
                     ?? [],
 
                 'sections' => [
                     'criteria' => [
                         'score' =>
-                            $criteria,
+                        $criteria,
 
                         'max_score' =>
-                            30,
+                        30,
                     ],
 
                     'location' => [
                         'score' =>
-                            $location,
+                        $location,
 
                         'max_score' =>
-                            15,
+                        15,
                     ],
 
                     'payment' => [
                         'score' =>
-                            $payment,
+                        $payment,
 
                         'max_score' =>
-                            15,
+                        15,
                     ],
                 ],
 
                 'version' =>
-                    self::VERSION,
+                self::VERSION,
             ];
         }
 
@@ -157,28 +159,28 @@ class SearchRequestQualityScoreService
         $title =
             self::aiWeightedScore(
                 $ai['title_score']
-                ?? null,
+                    ?? null,
                 10
             );
 
         $description =
             self::aiWeightedScore(
                 $ai['description_score']
-                ?? null,
+                    ?? null,
                 15
             );
 
         $consistency =
             self::aiWeightedScore(
                 $ai['consistency_score']
-                ?? null,
+                    ?? null,
                 10
             );
 
         $matchability =
             self::aiWeightedScore(
                 $ai['matchability_score']
-                ?? null,
+                    ?? null,
                 5
             );
 
@@ -190,23 +192,23 @@ class SearchRequestQualityScoreService
         ) {
             return [
                 'status' =>
-                    'waiting_ai',
+                'waiting_ai',
 
                 'score' =>
-                    null,
+                null,
 
                 'quality_level' =>
-                    null,
+                null,
 
                 'objective_progress' =>
-                    $objectiveScore,
+                $objectiveScore,
 
                 'suggestions' =>
-                    $objective['suggestions']
+                $objective['suggestions']
                     ?? [],
 
                 'version' =>
-                    self::VERSION,
+                self::VERSION,
             ];
         }
 
@@ -252,142 +254,142 @@ class SearchRequestQualityScoreService
         $objectiveSuggestions =
             is_array(
                 $objective['suggestions']
-                ?? null
+                    ?? null
             )
-                ? $objective['suggestions']
-                : [];
+            ? $objective['suggestions']
+            : [];
 
         $aiSuggestions =
             self::decodeJsonArray(
                 $ai['suggestions_json']
-                ?? null
+                    ?? null
             );
 
         $contradictions =
             self::decodeJsonArray(
                 $ai['contradictions_json']
-                ?? null
+                    ?? null
             );
 
         return [
             'status' =>
-                'completed',
+            'completed',
 
             'score' =>
-                $score,
+            $score,
 
             'raw_score' =>
-                $rawScore,
+            $rawScore,
 
             'quality_level' =>
-                $qualityLevel,
+            $qualityLevel,
 
             'flags' =>
-                $flags,
+            $flags,
 
             'sections' => [
                 'criteria' => [
                     'score' =>
-                        round($criteria, 2),
+                    round($criteria, 2),
 
                     'max_score' =>
-                        30,
+                    30,
                 ],
 
                 'location' => [
                     'score' =>
-                        round($location, 2),
+                    round($location, 2),
 
                     'max_score' =>
-                        15,
+                    15,
                 ],
 
                 'payment' => [
                     'score' =>
-                        round($payment, 2),
+                    round($payment, 2),
 
                     'max_score' =>
-                        15,
+                    15,
                 ],
 
                 'title' => [
                     'score' =>
-                        round($title, 2),
+                    round($title, 2),
 
                     'max_score' =>
-                        10,
+                    10,
 
                     'raw_ai_score' =>
-                        (float)$ai['title_score'],
+                    (float)$ai['title_score'],
                 ],
 
                 'description' => [
                     'score' =>
-                        round(
-                            $description,
-                            2
-                        ),
+                    round(
+                        $description,
+                        2
+                    ),
 
                     'max_score' =>
-                        15,
+                    15,
 
                     'raw_ai_score' =>
-                        (float)$ai['description_score'],
+                    (float)$ai['description_score'],
                 ],
 
                 'consistency' => [
                     'score' =>
-                        round(
-                            $consistency,
-                            2
-                        ),
+                    round(
+                        $consistency,
+                        2
+                    ),
 
                     'max_score' =>
-                        10,
+                    10,
 
                     'raw_ai_score' =>
-                        (float)$ai['consistency_score'],
+                    (float)$ai['consistency_score'],
                 ],
 
                 'matchability' => [
                     'score' =>
-                        round(
-                            $matchability,
-                            2
-                        ),
+                    round(
+                        $matchability,
+                        2
+                    ),
 
                     'max_score' =>
-                        5,
+                    5,
 
                     'raw_ai_score' =>
-                        (float)$ai['matchability_score'],
+                    (float)$ai['matchability_score'],
                 ],
             ],
 
             'suggestions' =>
-                array_merge(
-                    $objectiveSuggestions,
-                    $aiSuggestions
-                ),
+            array_merge(
+                $objectiveSuggestions,
+                $aiSuggestions
+            ),
 
             'contradictions' =>
-                $contradictions,
+            $contradictions,
 
             'sources' => [
                 'objective_algorithm_version' =>
-                    $objective['version']
+                $objective['version']
                     ?? null,
 
                 'ai_analysis_id' =>
-                    (int)$ai['id'],
+                (int)$ai['id'],
 
                 'ai_prompt_version' =>
-                    $ai['prompt_version']
+                $ai['prompt_version']
                     ?? null,
             ],
 
             'version' =>
-                self::VERSION,
+            self::VERSION,
         ];
     }
 
@@ -432,15 +434,15 @@ class SearchRequestQualityScoreService
          */
         $objectiveSections = [
             'criteria' =>
-                $sections['criteria']
+            $sections['criteria']
                 ?? null,
 
             'location' =>
-                $sections['location']
+            $sections['location']
                 ?? null,
 
             'payment' =>
-                $sections['payment']
+            $sections['payment']
                 ?? null,
         ];
 
@@ -449,39 +451,39 @@ class SearchRequestQualityScoreService
                 json_encode(
                     $objectiveSections,
                     JSON_UNESCAPED_UNICODE |
-                    JSON_UNESCAPED_SLASHES |
-                    JSON_THROW_ON_ERROR
+                        JSON_UNESCAPED_SLASHES |
+                        JSON_THROW_ON_ERROR
                 );
 
             $suggestionsJson =
                 json_encode(
                     $result['suggestions']
-                    ?? [],
+                        ?? [],
                     JSON_UNESCAPED_UNICODE |
-                    JSON_UNESCAPED_SLASHES |
-                    JSON_THROW_ON_ERROR
+                        JSON_UNESCAPED_SLASHES |
+                        JSON_THROW_ON_ERROR
                 );
 
             $officialSectionsJson =
                 $status === 'completed'
-                    ? json_encode(
-                        $sections,
-                        JSON_UNESCAPED_UNICODE |
+                ? json_encode(
+                    $sections,
+                    JSON_UNESCAPED_UNICODE |
                         JSON_UNESCAPED_SLASHES |
                         JSON_THROW_ON_ERROR
-                    )
-                    : null;
+                )
+                : null;
 
             $flagsJson =
                 $status === 'completed'
-                    ? json_encode(
-                        $result['flags']
+                ? json_encode(
+                    $result['flags']
                         ?? [],
-                        JSON_UNESCAPED_UNICODE |
+                    JSON_UNESCAPED_UNICODE |
                         JSON_UNESCAPED_SLASHES |
                         JSON_THROW_ON_ERROR
-                    )
-                    : null;
+                )
+                : null;
         } catch (JsonException $e) {
             throw new Exception(
                 'No se pudo serializar el score de la búsqueda.',
@@ -610,13 +612,13 @@ class SearchRequestQualityScoreService
 
         $st->execute([
             'entity_id' =>
-                $searchRequestId,
+            $searchRequestId,
 
             'score' =>
-                round(
-                    $objectiveScore,
-                    2
-                ),
+            round(
+                $objectiveScore,
+                2
+            ),
 
             /*
              * quality_level legacy/objective.
@@ -625,62 +627,62 @@ class SearchRequestQualityScoreService
              * no usamos acá los niveles /100.
              */
             'quality_level' =>
-                null,
+            null,
 
             'suggestions_json' =>
-                $suggestionsJson,
+            $suggestionsJson,
 
             'objective_sections_json' =>
-                $objectiveSectionsJson,
+            $objectiveSectionsJson,
 
             'algorithm_version' =>
-                'search-' .
+            'search-' .
                 (
                     $result['sources']['objective_algorithm_version']
                     ?? self::VERSION
                 ),
 
             'official_score' =>
-                $completed
-                    ? $result['score']
-                    : null,
+            $completed
+                ? $result['score']
+                : null,
 
             'official_quality_level' =>
-                $completed
-                    ? $result['quality_level']
-                    : null,
+            $completed
+                ? $result['quality_level']
+                : null,
 
             'official_score_version' =>
-                $completed
-                    ? self::VERSION
-                    : null,
+            $completed
+                ? self::VERSION
+                : null,
 
             'official_ai_analysis_id' =>
-                $completed
-                    ? (
-                        $sources['ai_analysis_id']
-                        ?? null
-                    )
-                    : null,
+            $completed
+                ? (
+                    $sources['ai_analysis_id']
+                    ?? null
+                )
+                : null,
 
             'official_ai_prompt_version' =>
-                $completed
-                    ? (
-                        $sources['ai_prompt_version']
-                        ?? null
-                    )
-                    : null,
+            $completed
+                ? (
+                    $sources['ai_prompt_version']
+                    ?? null
+                )
+                : null,
 
             'official_flags_json' =>
-                $flagsJson,
+            $flagsJson,
 
             'official_sections_json' =>
-                $officialSectionsJson,
+            $officialSectionsJson,
 
             'official_calculated_at' =>
-                $completed
-                    ? date('Y-m-d H:i:s')
-                    : null,
+            $completed
+                ? date('Y-m-d H:i:s')
+                : null,
         ]);
     }
 
@@ -715,10 +717,10 @@ class SearchRequestQualityScoreService
 
         $st->execute([
             'entity_id' =>
-                $searchRequestId,
+            $searchRequestId,
 
             'input_hash' =>
-                $inputHash,
+            $inputHash,
         ]);
 
         $row =
@@ -772,6 +774,37 @@ class SearchRequestQualityScoreService
             $max;
     }
 
+    private static function resolveObjectiveQualityLevel(
+        float $objectiveScore
+    ): string {
+        /*
+     * La parte objetiva vale 60 puntos.
+     * La convertimos proporcionalmente a 100
+     * únicamente para mantener compatible
+     * el quality_level legacy.
+     */
+        $normalized =
+            self::clamp(
+                ($objectiveScore / 60) * 100,
+                0,
+                100
+            );
+
+        if ($normalized >= 85) {
+            return 'excellent';
+        }
+
+        if ($normalized >= 60) {
+            return 'good';
+        }
+
+        if ($normalized >= 40) {
+            return 'basic';
+        }
+
+        return 'poor';
+    }
+
     private static function resolveQualityLevel(
         float $score
     ): string {
@@ -812,8 +845,8 @@ class SearchRequestQualityScoreService
 
         return
             is_array($decoded)
-                ? $decoded
-                : [];
+            ? $decoded
+            : [];
     }
 
     private static function clamp(
