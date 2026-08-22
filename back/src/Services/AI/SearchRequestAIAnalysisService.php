@@ -10,7 +10,7 @@ use App\Services\CompatibilityJobService;
 
 class SearchRequestAIAnalysisService
 {
-    private const PROMPT_VERSION = '1.1';
+    private const PROMPT_VERSION = '1.2';
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private static function db(
@@ -631,6 +631,32 @@ BIEN:
 "No definiste una superficie total mínima. Si el cliente tiene un mínimo
 necesario, cargarlo puede mejorar la precisión de los matches."
 
+REGLAS PARA EVITAR REPETICIONES:
+
+- No repitas el mismo problema en "contradictions" y en "suggestions".
+- Si detectás una contradicción, informala solamente en "contradictions".
+- No generes además una sugerencia sobre ese mismo conflicto.
+- Cada sugerencia debe tratar un aspecto diferente de la búsqueda.
+- No generes dos sugerencias que conduzcan esencialmente a la misma corrección.
+- Priorizá pocas recomendaciones útiles antes que muchas recomendaciones parecidas.
+
+Ejemplo:
+
+Si el título dice "1 ambiente" pero la descripción habla de "1,5 y 2 ambientes":
+
+CORRECTO:
+- incluir la inconsistencia en "contradictions";
+- NO agregar además una sugerencia sobre corregir el título por ese mismo motivo;
+- sí podés sugerir mejorar la descripción si existe otro problema diferente,
+  como falta de contexto relevante.
+
+Si la modalidad de pago es contradictoria:
+
+CORRECTO:
+- incluir el conflicto en "contradictions";
+- NO agregar también sugerencias sobre modalidad de pago,
+  diferencia en dinero o moneda si todas derivan de la misma contradicción.
+  
 REGLAS PARA LAS SUGERENCIAS:
 
 Cada sugerencia debe tener:

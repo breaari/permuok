@@ -72,6 +72,73 @@ function SectionScore({ label, score, maxScore }) {
   );
 }
 
+function normalizeTopic(value) {
+  const text = String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  if (
+    text.includes("payment") ||
+    text.includes("pago") ||
+    text.includes("permuta") ||
+    text.includes("diferencia") ||
+    text.includes("efectivo") ||
+    text.includes("dinero") ||
+    text.includes("moneda")
+  ) {
+    return "payment";
+  }
+
+  if (text.includes("title") || text.includes("titulo")) {
+    return "title";
+  }
+
+  if (text.includes("description") || text.includes("descripcion")) {
+    return "description";
+  }
+
+  if (text.includes("ambiente") || text.includes("dormitorio")) {
+    return "rooms";
+  }
+
+  if (
+    text.includes("surface") ||
+    text.includes("superficie") ||
+    text.includes("area")
+  ) {
+    return "surface";
+  }
+
+  if (
+    text.includes("condition") ||
+    text.includes("estado") ||
+    text.includes("nueva") ||
+    text.includes("usada")
+  ) {
+    return "condition";
+  }
+
+  if (
+    text.includes("budget") ||
+    text.includes("presupuesto") ||
+    text.includes("valor")
+  ) {
+    return "budget";
+  }
+
+  if (
+    text.includes("location") ||
+    text.includes("ubicacion") ||
+    text.includes("zona") ||
+    text.includes("ciudad")
+  ) {
+    return "location";
+  }
+
+  return text.slice(0, 80);
+}
+
 function buildUnifiedSuggestions(quality) {
   const suggestions = Array.isArray(quality?.suggestions)
     ? quality.suggestions
@@ -81,31 +148,67 @@ function buildUnifiedSuggestions(quality) {
     ? quality.contradictions
     : [];
 
-  const normalized = [
-    ...contradictions.map((message) => ({
-      field: "contradiction",
+  const result = [];
+  const usedTopics = new Set();
 
+  /*
+   * Las contradicciones tienen prioridad.
+   *
+   * Si un conflicto ya fue explicado acá,
+   * no mostramos después otra sugerencia
+   * que hable esencialmente del mismo tema.
+   */
+  for (const message of contradictions) {
+    const topic = normalizeTopic(message);
+
+    if (!topic || usedTopics.has(topic)) {
+      continue;
+    }
+
+    usedTopics.add(topic);
+
+    result.push({
+      field: topic,
       priority: "high",
-
-      title: "Corregir una inconsistencia",
-
+      title:
+        topic === "payment"
+          ? "Revisá la modalidad de pago"
+          : topic === "rooms" || topic === "title"
+            ? "Aclará qué propiedad está buscando el cliente"
+            : "Revisá esta inconsistencia",
       message,
-
       source: "contradiction",
-    })),
+    });
+  }
 
-    ...suggestions.map((item) => ({
-      field: item?.field || "general",
+  /*
+   * Después agregamos sugerencias,
+   * únicamente cuando aportan un tema
+   * nuevo.
+   */
+  for (const item of suggestions) {
+    const topic = normalizeTopic(
+      `${item?.field || ""} ${item?.title || ""} ${item?.message || ""}`,
+    );
+
+    if (!topic || usedTopics.has(topic)) {
+      continue;
+    }
+
+    usedTopics.add(topic);
+
+    result.push({
+      field: item?.field || topic,
 
       priority: item?.priority || "medium",
 
-      title: item?.title || "Mejorar la búsqueda",
+      title: item?.title || "Mejorá este aspecto",
 
       message: item?.message || "",
 
       source: "suggestion",
-    })),
-  ];
+    });
+  }
 
   const priorityOrder = {
     high: 1,
@@ -113,14 +216,13 @@ function buildUnifiedSuggestions(quality) {
     low: 3,
   };
 
-  return normalized
+  return result
     .sort(
       (a, b) =>
         (priorityOrder[a?.priority] || 99) - (priorityOrder[b?.priority] || 99),
     )
-    .slice(0, 7);
+    .slice(0, 5);
 }
-
 export default function SearchRequestQualityOptimizer({
   quality,
   qualityLoading = false,
