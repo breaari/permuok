@@ -11,7 +11,7 @@ class SearchRequestAICopyService
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const TITLE_PROMPT_VERSION = '1.0';
-    private const DESCRIPTION_PROMPT_VERSION = '1.0';
+    private const DESCRIPTION_PROMPT_VERSION = '1.1';
 
     private static function db(
         bool $forceReconnect = false
@@ -625,6 +625,21 @@ REGLAS:
 - No usar lenguaje publicitario exagerado.
 - No escribir como aviso dirigido al comprador final.
 - Escribir como una búsqueda inmobiliaria profesional.
+- No incluir llamados a la acción.
+- No terminar con frases como:
+  "contactar",
+  "enviar información",
+  "enviar opciones",
+  "consultar",
+  "comunicarse",
+  "presentar propuestas"
+  o similares.
+- La descripción debe limitarse a explicar qué inmueble se busca
+  y qué condiciones son relevantes para evaluar una compatibilidad.
+- No pedir documentación ni información adicional que no figure
+  expresamente como requisito de la búsqueda.
+- No solicitar datos sobre escritura, documentación, antigüedad,
+  superficie u otros aspectos solamente porque sería útil conocerlos.
 - Usar español rioplatense natural.
 - Evitar frases vacías.
 - No asumir motivaciones del cliente.

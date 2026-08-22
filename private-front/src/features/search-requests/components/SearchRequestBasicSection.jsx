@@ -3,7 +3,7 @@ import {
   SEARCH_REQUEST_PROPERTY_TYPES,
   SEARCH_REQUEST_URGENCY_OPTIONS,
 } from "../utils";
-
+import { Icon } from "../../../ui/icons/Index";
 import { AMENITIES } from "../../shared/helpers/amenities";
 
 function Field({ label, children, hint = "" }) {
@@ -64,151 +64,157 @@ export default function SearchRequestBasicSection({
       </div>
 
       <div className="space-y-6">
-        <div className="space-y-4">
-          <div>
-            <div className="mb-1.5 flex items-center justify-between gap-3">
-              <label className="block text-sm font-medium text-slate-700">
-                Título
-              </label>
+       <div className="space-y-6">
+  {/* TÍTULO */}
+  <div>
+    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+      Título de la búsqueda
+    </label>
 
-              {isEditMode && (
-                <button
-                  type="button"
-                  onClick={onGenerateAITitle}
-                  disabled={aiTitleLoading}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 transition hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {aiTitleLoading
-                    ? "Generando..."
-                    : aiTitleSuggestion
-                      ? "Generar otra opción"
-                      : "Mejorar con IA"}
-                </button>
-              )}
+    <input
+      type="text"
+      value={form.title}
+      onChange={(e) => setField("title", e.target.value)}
+      placeholder="Ej. Departamento de 2 ambientes en Lanús"
+      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+    />
+
+    <p className="mt-1.5 text-xs text-slate-400">
+      Resumí qué propiedad está buscando el cliente en una sola frase.
+    </p>
+
+    {isEditMode && (
+      <div className="mt-3">
+        {!aiTitleSuggestion ? (
+          <button
+            type="button"
+            onClick={onGenerateAITitle}
+            disabled={aiTitleLoading}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 hover:text-violet-800 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Icon name="sparkles" size={16} />
+
+            {aiTitleLoading
+              ? "Generando título..."
+              : "Generar título con IA"}
+          </button>
+        ) : (
+          <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-violet-700">
+              <Icon name="sparkles" size={14} />
+              Sugerencia IA
             </div>
 
-            <input
-              type="text"
-              value={form.title}
-              onChange={(e) => setField("title", e.target.value)}
-              placeholder="Ej. Departamento de 2 ambientes en Lanús"
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-            />
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-900">
+              {aiTitleSuggestion}
+            </p>
 
-            {aiTitleSuggestion && (
-              <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-                    <span className="text-sm">✦</span>
-                  </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={onApplyAITitle}
+                className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-violet-700"
+              >
+                <Icon name="check" size={15} />
+                Usar sugerencia
+              </button>
 
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">
-                      Sugerencia IA
-                    </p>
+              <button
+                type="button"
+                onClick={onGenerateAITitle}
+                disabled={aiTitleLoading}
+                className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm font-bold text-violet-700 transition hover:bg-violet-50 disabled:opacity-50"
+              >
+                <Icon name="refresh" size={15} />
 
-                    <p className="mt-1 text-sm font-semibold leading-5 text-slate-900">
-                      {aiTitleSuggestion}
-                    </p>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={onApplyAITitle}
-                        className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
-                      >
-                        Usar este título
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={onGenerateAITitle}
-                        disabled={aiTitleLoading}
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                      >
-                        {aiTitleLoading
-                          ? "Generando..."
-                          : "Generar otra opción"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+                {aiTitleLoading ? "Generando..." : "Generar otra opción"}
+              </button>
+            </div>
           </div>
+        )}
+      </div>
+    )}
+  </div>
 
-          <div>
-            <div className="mb-1.5 flex items-center justify-between gap-3">
-              <label className="block text-sm font-medium text-slate-700">
-                Descripción
-              </label>
+  {/* DESCRIPCIÓN */}
+  <div>
+    <div className="flex items-center justify-between gap-3 mb-1.5">
+      <label className="block text-sm font-medium text-slate-700">
+        Descripción
+      </label>
 
-              {isEditMode && (
-                <button
-                  type="button"
-                  onClick={onGenerateAIDescription}
-                  disabled={aiDescriptionLoading}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 transition hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {aiDescriptionLoading
-                    ? "Generando..."
-                    : aiDescriptionSuggestion
-                      ? "Generar otra opción"
-                      : "Mejorar con IA"}
-                </button>
-              )}
+      <span className="text-xs text-slate-400">
+        {String(form.description || "").length} caracteres
+      </span>
+    </div>
+
+    <textarea
+      rows={6}
+      value={form.description}
+      onChange={(e) => setField("description", e.target.value)}
+      placeholder="Contá el contexto de la búsqueda y los criterios realmente importantes."
+      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none resize-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+    />
+
+    <p className="mt-1.5 text-xs text-slate-400">
+      Podés aclarar flexibilidad de zona, características importantes o modalidad de operación.
+    </p>
+
+    {isEditMode && (
+      <div className="mt-3">
+        {!aiDescriptionSuggestion ? (
+          <button
+            type="button"
+            onClick={onGenerateAIDescription}
+            disabled={aiDescriptionLoading}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 hover:text-violet-800 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Icon name="sparkles" size={16} />
+
+            {aiDescriptionLoading
+              ? "Generando descripción..."
+              : "Generar descripción con IA"}
+          </button>
+        ) : (
+          <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-violet-700">
+              <Icon name="sparkles" size={14} />
+              Sugerencia IA
             </div>
 
-            <textarea
-              rows={4}
-              value={form.description}
-              onChange={(e) => setField("description", e.target.value)}
-              placeholder="Contá el contexto de la búsqueda y los criterios realmente importantes."
-              className="w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-            />
+            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">
+              {aiDescriptionSuggestion}
+            </p>
 
-            {aiDescriptionSuggestion && (
-              <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-                    <span className="text-sm">✦</span>
-                  </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={onApplyAIDescription}
+                className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-violet-700"
+              >
+                <Icon name="check" size={15} />
+                Usar descripción
+              </button>
 
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">
-                      Sugerencia IA
-                    </p>
+              <button
+                type="button"
+                onClick={onGenerateAIDescription}
+                disabled={aiDescriptionLoading}
+                className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm font-bold text-violet-700 transition hover:bg-violet-50 disabled:opacity-50"
+              >
+                <Icon name="refresh" size={15} />
 
-                    <p className="mt-1 whitespace-pre-line text-sm leading-6 text-slate-700">
-                      {aiDescriptionSuggestion}
-                    </p>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={onApplyAIDescription}
-                        className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
-                      >
-                        Usar esta descripción
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={onGenerateAIDescription}
-                        disabled={aiDescriptionLoading}
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                      >
-                        {aiDescriptionLoading
-                          ? "Generando..."
-                          : "Generar otra opción"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+                {aiDescriptionLoading
+                  ? "Generando..."
+                  : "Generar otra opción"}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+      </div>
+    )}
+  </div>
+</div>
 
         <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-4">
           <p className="text-sm font-semibold text-emerald-900">
