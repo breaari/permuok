@@ -326,26 +326,26 @@ class SearchRequestAIAnalysisService
         ];
     }
     public static function processAnalysis(
-    int $searchRequestId,
-    int $analysisId,
-    int $attempt = 1,
-    int $maxAttempts = 3
-): array {
-    if ($searchRequestId <= 0) {
-        throw new Exception(
-            'El ID de la búsqueda no es válido.'
-        );
-    }
+        int $searchRequestId,
+        int $analysisId,
+        int $attempt = 1,
+        int $maxAttempts = 3
+    ): array {
+        if ($searchRequestId <= 0) {
+            throw new Exception(
+                'El ID de la búsqueda no es válido.'
+            );
+        }
 
-    if ($analysisId <= 0) {
-        throw new Exception(
-            'El analysis_id no es válido.'
-        );
-    }
+        if ($analysisId <= 0) {
+            throw new Exception(
+                'El analysis_id no es válido.'
+            );
+        }
 
-    $pdo = self::db();
+        $pdo = self::db();
 
-    $st = $pdo->prepare("
+        $st = $pdo->prepare("
         SELECT *
         FROM publication_ai_analyses
         WHERE id = :id
@@ -354,45 +354,45 @@ class SearchRequestAIAnalysisService
         LIMIT 1
     ");
 
-    $st->execute([
-        'id' => $analysisId,
-        'entity_id' => $searchRequestId,
-    ]);
+        $st->execute([
+            'id' => $analysisId,
+            'entity_id' => $searchRequestId,
+        ]);
 
-    $analysis =
-        $st->fetch(PDO::FETCH_ASSOC);
+        $analysis =
+            $st->fetch(PDO::FETCH_ASSOC);
 
-    if (!$analysis) {
-        throw new Exception(
-            'No se encontró el análisis IA de la búsqueda.'
-        );
-    }
+        if (!$analysis) {
+            throw new Exception(
+                'No se encontró el análisis IA de la búsqueda.'
+            );
+        }
 
-    if ($analysis['status'] === 'completed') {
-        return [
-            'ok' => true,
-            'skipped' => true,
-            'analysis_id' => $analysisId,
-            'reason' => 'El análisis ya estaba completado.',
-        ];
-    }
+        if ($analysis['status'] === 'completed') {
+            return [
+                'ok' => true,
+                'skipped' => true,
+                'analysis_id' => $analysisId,
+                'reason' => 'El análisis ya estaba completado.',
+            ];
+        }
 
-    $currentHash =
-        self::buildInputHash(
-            $searchRequestId
-        );
+        $currentHash =
+            self::buildInputHash(
+                $searchRequestId
+            );
 
-    $requestedHash =
-        (string)($analysis['input_hash'] ?? '');
+        $requestedHash =
+            (string)($analysis['input_hash'] ?? '');
 
-    if (
-        $requestedHash === '' ||
-        !hash_equals(
-            $requestedHash,
-            $currentHash
-        )
-    ) {
-        $pdo->prepare("
+        if (
+            $requestedHash === '' ||
+            !hash_equals(
+                $requestedHash,
+                $currentHash
+            )
+        ) {
+            $pdo->prepare("
             UPDATE publication_ai_analyses
             SET
                 status = 'failed',
@@ -400,22 +400,22 @@ class SearchRequestAIAnalysisService
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = :id
         ")->execute([
-            'message' =>
+                'message' =>
                 'La búsqueda cambió después de solicitar el análisis.',
-            'id' =>
+                'id' =>
                 $analysisId,
-        ]);
+            ]);
 
-        return [
-            'ok' => true,
-            'skipped' => true,
-            'analysis_id' => $analysisId,
-            'reason' =>
+            return [
+                'ok' => true,
+                'skipped' => true,
+                'analysis_id' => $analysisId,
+                'reason' =>
                 'La búsqueda cambió después de solicitar el análisis.',
-        ];
-    }
+            ];
+        }
 
-    $pdo->prepare("
+        $pdo->prepare("
         UPDATE publication_ai_analyses
         SET
             status = 'processing',
@@ -423,15 +423,432 @@ class SearchRequestAIAnalysisService
             updated_at = CURRENT_TIMESTAMP
         WHERE id = :id
     ")->execute([
-        'id' => $analysisId,
-    ]);
+            'id' => $analysisId,
+        ]);
 
-    return [
-        'ok' => true,
-        'analysis_id' => $analysisId,
-        'status' => 'processing',
-        'attempt' => $attempt,
-        'max_attempts' => $maxAttempts,
+        try {
+            $input =
+                self::prepareInput(
+                    $searchRequestId
+                );
+
+            $result =
+                self::callOpenAI(
+                    $input
+                );
+
+            self::completeAnalysis(
+                $analysisId,
+                $result
+            );
+
+            return [
+                'ok' => true,
+                'analysis_id' => $analysisId,
+                'status' => 'completed',
+            ];
+        } catch (Throwable $e) {
+            if ($attempt < $maxAttempts) {
+                self::markPending(
+                    $analysisId,
+                    $e->getMessage()
+                );
+            } else {
+                self::markFailed(
+                    $analysisId,
+                    $e->getMessage()
+                );
+            }
+
+            throw $e;
+        }
+    }
+
+    private static function callOpenAI(
+    array $input
+): array {
+    $apiKey =
+        trim(
+            (string)(
+                $_ENV['OPENAI_API_KEY']
+                ?? getenv('OPENAI_API_KEY')
+                ?: ''
+            )
+        );
+
+    if ($apiKey === '') {
+        throw new Exception(
+            'OPENAI_API_KEY no está configurada.'
+        );
+    }
+
+    $model =
+        trim(
+            (string)(
+                $_ENV['OPENAI_MODEL']
+                ?? getenv('OPENAI_MODEL')
+                ?: self::DEFAULT_MODEL
+            )
+        );
+
+    $inputJson =
+        json_encode(
+            $input,
+            JSON_PRETTY_PRINT |
+            JSON_UNESCAPED_UNICODE |
+            JSON_UNESCAPED_SLASHES
+        );
+
+    $prompt = <<<PROMPT
+Sos un especialista en búsquedas inmobiliarias B2B.
+
+Analizá esta búsqueda publicada en PermuOK.
+
+Evaluá:
+
+- claridad y calidad del título;
+- claridad y utilidad de la descripción;
+- coherencia entre los criterios cargados;
+- utilidad de la búsqueda para generar matches.
+
+REGLAS:
+
+- No inventes datos.
+- No penalices por campos opcionales vacíos.
+- Una búsqueda abierta puede ser perfectamente válida.
+- Penalizá contradicciones reales, no simples faltantes.
+- El título debe permitir entender rápidamente qué se busca.
+- La descripción debe aportar contexto útil sin repetir mecánicamente la ficha.
+- Priorizá la utilidad para matching inmobiliario.
+- Escribí en español rioplatense profesional.
+
+Devolvé puntajes de 0 a 100.
+
+BÚSQUEDA:
+
+{$inputJson}
+PROMPT;
+
+    $schema = [
+        'type' => 'object',
+        'additionalProperties' => false,
+
+        'properties' => [
+            'title_score' => [
+                'type' => 'number',
+                'minimum' => 0,
+                'maximum' => 100,
+            ],
+
+            'description_score' => [
+                'type' => 'number',
+                'minimum' => 0,
+                'maximum' => 100,
+            ],
+
+            'consistency_score' => [
+                'type' => 'number',
+                'minimum' => 0,
+                'maximum' => 100,
+            ],
+
+            'matchability_score' => [
+                'type' => 'number',
+                'minimum' => 0,
+                'maximum' => 100,
+            ],
+
+            'suggestions' => [
+                'type' => 'array',
+                'maxItems' => 5,
+                'items' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+
+                    'properties' => [
+                        'field' => [
+                            'type' => 'string',
+                        ],
+
+                        'action' => [
+                            'type' => 'string',
+                        ],
+
+                        'message' => [
+                            'type' => 'string',
+                        ],
+
+                        'priority' => [
+                            'type' => 'string',
+                            'enum' => [
+                                'low',
+                                'medium',
+                                'high',
+                            ],
+                        ],
+                    ],
+
+                    'required' => [
+                        'field',
+                        'action',
+                        'message',
+                        'priority',
+                    ],
+                ],
+            ],
+
+            'contradictions' => [
+                'type' => 'array',
+                'maxItems' => 5,
+                'items' => [
+                    'type' => 'string',
+                ],
+            ],
+        ],
+
+        'required' => [
+            'title_score',
+            'description_score',
+            'consistency_score',
+            'matchability_score',
+            'suggestions',
+            'contradictions',
+        ],
     ];
+
+    $body = [
+        'model' => $model,
+
+        'reasoning' => [
+            'effort' => 'low',
+        ],
+
+        'input' => $prompt,
+
+        'text' => [
+            'verbosity' => 'low',
+
+            'format' => [
+                'type' => 'json_schema',
+                'name' => 'search_request_analysis',
+                'strict' => true,
+                'schema' => $schema,
+            ],
+        ],
+    ];
+
+    $ch =
+        curl_init(
+            'https://api.openai.com/v1/responses'
+        );
+
+    curl_setopt_array(
+        $ch,
+        [
+            CURLOPT_POST => true,
+            CURLOPT_RETURNTRANSFER => true,
+
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $apiKey,
+                'Content-Type: application/json',
+            ],
+
+            CURLOPT_POSTFIELDS =>
+                json_encode(
+                    $body,
+                    JSON_UNESCAPED_UNICODE |
+                    JSON_UNESCAPED_SLASHES |
+                    JSON_THROW_ON_ERROR
+                ),
+
+            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_TIMEOUT => 120,
+        ]
+    );
+
+    $response =
+        curl_exec($ch);
+
+    if ($response === false) {
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        throw new Exception(
+            'Error conectando con OpenAI: ' .
+            $error
+        );
+    }
+
+    $httpCode =
+        (int)curl_getinfo(
+            $ch,
+            CURLINFO_HTTP_CODE
+        );
+
+    curl_close($ch);
+
+    $decoded =
+        json_decode(
+            $response,
+            true,
+            512,
+            JSON_THROW_ON_ERROR
+        );
+
+    if (
+        $httpCode < 200 ||
+        $httpCode >= 300
+    ) {
+        throw new Exception(
+            'OpenAI API: ' .
+            (
+                $decoded['error']['message']
+                ?? 'Error desconocido.'
+            )
+        );
+    }
+
+    $outputText = '';
+
+    foreach (
+        $decoded['output'] ?? []
+        as $output
+    ) {
+        foreach (
+            $output['content'] ?? []
+            as $content
+        ) {
+            if (
+                ($content['type'] ?? '') ===
+                'output_text'
+            ) {
+                $outputText .=
+                    (string)($content['text'] ?? '');
+            }
+        }
+    }
+
+    if ($outputText === '') {
+        throw new Exception(
+            'OpenAI no devolvió el análisis esperado.'
+        );
+    }
+
+    $result =
+        json_decode(
+            $outputText,
+            true,
+            512,
+            JSON_THROW_ON_ERROR
+        );
+
+    $result['_model'] =
+        $decoded['model']
+        ?? $model;
+
+    return $result;
+}
+
+private static function completeAnalysis(
+    int $analysisId,
+    array $result
+): void {
+    $pdo = self::db(true);
+
+    $st = $pdo->prepare("
+        UPDATE publication_ai_analyses
+        SET
+            status = 'completed',
+
+            title_score = :title_score,
+            description_score = :description_score,
+            consistency_score = :consistency_score,
+            matchability_score = :matchability_score,
+
+            suggestions_json = :suggestions_json,
+            contradictions_json = :contradictions_json,
+
+            model_name = :model_name,
+            error_message = NULL,
+            analyzed_at = NOW(),
+            updated_at = CURRENT_TIMESTAMP
+
+        WHERE id = :id
+        LIMIT 1
+    ");
+
+    $st->execute([
+        'title_score' =>
+            $result['title_score'],
+
+        'description_score' =>
+            $result['description_score'],
+
+        'consistency_score' =>
+            $result['consistency_score'],
+
+        'matchability_score' =>
+            $result['matchability_score'],
+
+        'suggestions_json' =>
+            json_encode(
+                $result['suggestions'] ?? [],
+                JSON_UNESCAPED_UNICODE |
+                JSON_UNESCAPED_SLASHES
+            ),
+
+        'contradictions_json' =>
+            json_encode(
+                $result['contradictions'] ?? [],
+                JSON_UNESCAPED_UNICODE |
+                JSON_UNESCAPED_SLASHES
+            ),
+
+        'model_name' =>
+            $result['_model'] ?? null,
+
+        'id' =>
+            $analysisId,
+    ]);
+}
+
+private static function markPending(
+    int $analysisId,
+    string $message
+): void {
+    self::db()->prepare("
+        UPDATE publication_ai_analyses
+        SET
+            status = 'pending',
+            error_message = :message,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = :id
+    ")->execute([
+        'message' =>
+            mb_substr($message, 0, 6000),
+
+        'id' =>
+            $analysisId,
+    ]);
+}
+
+private static function markFailed(
+    int $analysisId,
+    string $message
+): void {
+    self::db()->prepare("
+        UPDATE publication_ai_analyses
+        SET
+            status = 'failed',
+            error_message = :message,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = :id
+    ")->execute([
+        'message' =>
+            mb_substr($message, 0, 6000),
+
+        'id' =>
+            $analysisId,
+    ]);
 }
 }
