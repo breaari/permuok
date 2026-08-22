@@ -90,9 +90,36 @@ class SearchRequestQualityScoreService
             $ai === null ||
             ($ai['status'] ?? null) !== 'completed'
         ) {
+            $aiStatus =
+                $ai['status']
+                ?? null;
+
+            $isProcessing =
+                in_array(
+                    $aiStatus,
+                    [
+                        'pending',
+                        'processing',
+                    ],
+                    true
+                );
+
             return [
+                /*
+         * waiting_ai:
+         * hay un análisis realmente en curso.
+         *
+         * needs_ai:
+         * no existe uno vigente, falló
+         * o fue descartado.
+         */
                 'status' =>
-                'waiting_ai',
+                $isProcessing
+                    ? 'waiting_ai'
+                    : 'needs_ai',
+
+                'ai_status' =>
+                $aiStatus,
 
                 'score' =>
                 null,
@@ -190,7 +217,10 @@ class SearchRequestQualityScoreService
         ) {
             return [
                 'status' =>
-                'waiting_ai',
+                'needs_ai',
+
+                'ai_status' =>
+                'invalid',
 
                 'score' =>
                 null,
@@ -209,7 +239,6 @@ class SearchRequestQualityScoreService
                 self::VERSION,
             ];
         }
-
         $rawScore =
             $criteria +
             $location +

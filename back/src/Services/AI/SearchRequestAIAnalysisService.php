@@ -10,7 +10,7 @@ use App\Services\CompatibilityJobService;
 
 class SearchRequestAIAnalysisService
 {
-    private const PROMPT_VERSION = '1.2';
+    private const PROMPT_VERSION = '1.3';
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private static function db(
@@ -583,13 +583,13 @@ Usá estas equivalencias conceptuales:
   "Moneda de la diferencia".
 
 - property_condition = new:
-  "Propiedad nueva".
+  "Propiedad a estrenar".
 
 - property_condition = used:
-  "Propiedad usada".
+  "Propiedad con antigüedad".
 
 - property_condition = any:
-  "Cualquier estado de la propiedad".
+  "Sin preferencia respecto del estado de la propiedad".
 
 - min_total_area:
   "Superficie total mínima".
@@ -621,8 +621,8 @@ MAL:
 "'property_condition' está en 'new'."
 
 BIEN:
-"Indicás que buscás únicamente propiedades nuevas. Si también considerarías
-usadas, ampliar este criterio puede generar más coincidencias."
+"Indicás que buscás únicamente propiedades a estrenar. Si también considerarías
+propiedades con antigüedad, ampliar este criterio puede generar más coincidencias."
 
 MAL:
 "min_total_area está en 0.00."
@@ -630,6 +630,14 @@ MAL:
 BIEN:
 "No definiste una superficie total mínima. Si el cliente tiene un mínimo
 necesario, cargarlo puede mejorar la precisión de los matches."
+
+VOCABULARIO INMOBILIARIO:
+
+- No uses la expresión "propiedad usada".
+- Para inmuebles nuevos usá "a estrenar".
+- Para inmuebles que no son nuevos usá "con antigüedad".
+- Cuando se aceptan ambos casos, hablá de "sin preferencia respecto del estado".
+- Usá vocabulario habitual de una inmobiliaria argentina.
 
 REGLAS PARA EVITAR REPETICIONES:
 
@@ -656,7 +664,7 @@ CORRECTO:
 - incluir el conflicto en "contradictions";
 - NO agregar también sugerencias sobre modalidad de pago,
   diferencia en dinero o moneda si todas derivan de la misma contradicción.
-  
+
 REGLAS PARA LAS SUGERENCIAS:
 
 Cada sugerencia debe tener:

@@ -78,6 +78,22 @@ function normalizeTopic(value) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
+  /*
+   * Primero detectamos el problema concreto.
+   *
+   * Por ejemplo:
+   * "el título dice 1 ambiente"
+   * y
+   * "la descripción menciona 2 ambientes"
+   *
+   * son ambos un problema de ambientes,
+   * no dos problemas independientes
+   * de título y descripción.
+   */
+  if (text.includes("ambiente") || text.includes("dormitorio")) {
+    return "rooms";
+  }
+
   if (
     text.includes("payment") ||
     text.includes("pago") ||
@@ -88,18 +104,6 @@ function normalizeTopic(value) {
     text.includes("moneda")
   ) {
     return "payment";
-  }
-
-  if (text.includes("title") || text.includes("titulo")) {
-    return "title";
-  }
-
-  if (text.includes("description") || text.includes("descripcion")) {
-    return "description";
-  }
-
-  if (text.includes("ambiente") || text.includes("dormitorio")) {
-    return "rooms";
   }
 
   if (
@@ -113,6 +117,8 @@ function normalizeTopic(value) {
   if (
     text.includes("condition") ||
     text.includes("estado") ||
+    text.includes("estrenar") ||
+    text.includes("antiguedad") ||
     text.includes("nueva") ||
     text.includes("usada")
   ) {
@@ -134,6 +140,14 @@ function normalizeTopic(value) {
     text.includes("ciudad")
   ) {
     return "location";
+  }
+
+  if (text.includes("title") || text.includes("titulo")) {
+    return "title";
+  }
+
+  if (text.includes("description") || text.includes("descripcion")) {
+    return "description";
   }
 
   return text.slice(0, 80);
@@ -236,6 +250,8 @@ export default function SearchRequestQualityOptimizer({
   const completed = quality?.status === "completed";
 
   const waitingAI = quality?.status === "waiting_ai";
+
+  const needsAI = quality?.status === "needs_ai";
 
   const score = completed ? Number(quality?.score || 0) : null;
 
@@ -402,13 +418,19 @@ export default function SearchRequestQualityOptimizer({
 
               <div className="min-w-0">
                 <p className="text-sm font-bold text-slate-900">
-                  {waitingAI ? "Analizando búsqueda" : "Análisis pendiente"}
+                  {waitingAI
+                    ? "Analizando búsqueda"
+                    : needsAI
+                      ? "Necesita un nuevo análisis"
+                      : "Análisis pendiente"}
                 </p>
 
                 <p className="mt-1 text-sm leading-5 text-slate-600">
                   {waitingAI
                     ? "Estamos evaluando los criterios, el contenido, la coherencia y el potencial de matching."
-                    : "La búsqueda cambió o todavía no fue analizada. Ejecutá el análisis para obtener su índice de calidad."}
+                    : needsAI
+                      ? "La búsqueda cambió desde el último análisis o el análisis anterior no pudo completarse. Ejecutá uno nuevo para actualizar el índice."
+                      : "Ejecutá el análisis para obtener el índice de calidad."}
                 </p>
 
                 {waitingAI && (
