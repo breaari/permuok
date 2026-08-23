@@ -25,6 +25,8 @@ import {
   pauseDevelopment,
   archiveDevelopment,
   replaceDevelopmentAmenities,
+  getDevelopmentQuality,
+  requestDevelopmentAIAnalysis,
 } from "../api/developments.api";
 
 import DevelopmentFormProgress from "../components/DevelopmentFormProgress";
@@ -167,6 +169,10 @@ export default function DevelopmentForm() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [quality, setQuality] = useState(null);
+  const [qualityLoading, setQualityLoading] = useState(false);
+  const [aiAnalysisRequesting, setAIAnalysisRequesting] = useState(false);
+
   const backPath = useMemo(() => {
     return location.state?.from || "/developments";
   }, [location.state]);
@@ -257,6 +263,31 @@ export default function DevelopmentForm() {
     setIsLocationValid(hasValidLocation(fresh?.development || {}));
 
     return fresh;
+  }
+
+  async function refreshQualityState(developmentId = Number(id)) {
+    if (!developmentId) {
+      return null;
+    }
+
+    try {
+      setQualityLoading(true);
+
+      const result = await getDevelopmentQuality(developmentId);
+
+      setQuality(result);
+
+      return result;
+    } catch (error) {
+      console.error(
+        "[DEVELOPMENT QUALITY] No se pudo refrescar el índice:",
+        error,
+      );
+
+      return null;
+    } finally {
+      setQualityLoading(false);
+    }
   }
 
   async function syncImagesForEdit(developmentId) {
@@ -410,6 +441,22 @@ export default function DevelopmentForm() {
         setUnitTypes(normalizeUnitTypes(data));
         setAmenities(normalizeAmenities(data));
         setIsLocationValid(hasValidLocation(data?.development || {}));
+        try {
+          const currentQuality = await getDevelopmentQuality(Number(id));
+
+          if (!cancelled) {
+            setQuality(currentQuality);
+          }
+        } catch (error) {
+          console.error(
+            "[DEVELOPMENT QUALITY] No se pudo cargar el índice:",
+            error,
+          );
+
+          if (!cancelled) {
+            setQuality(null);
+          }
+        }
 
         if (location.state?.startStep === 2) {
           setCurrentStep(2);
@@ -432,6 +479,50 @@ export default function DevelopmentForm() {
       cancelled = true;
     };
   }, [id, isEditMode, location.state]);
+
+  useEffect(() => {
+    if (!isEditMode || !id || quality?.status !== "waiting_ai") {
+      return;
+    }
+
+    let cancelled = false;
+    let timeoutId = null;
+
+    const startedAt = Date.now();
+
+    const POLL_INTERVAL_MS = 4000;
+    const MAX_POLLING_TIME_MS = 120000;
+
+    async function checkQuality() {
+      if (cancelled) {
+        return;
+      }
+
+      if (Date.now() - startedAt > MAX_POLLING_TIME_MS) {
+        return;
+      }
+
+      const result = await refreshQualityState(Number(id));
+
+      if (cancelled) {
+        return;
+      }
+
+      if (result?.status === "waiting_ai") {
+        timeoutId = window.setTimeout(checkQuality, POLL_INTERVAL_MS);
+      }
+    }
+
+    timeoutId = window.setTimeout(checkQuality, POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [id, isEditMode, quality?.status]);
 
   if (!canAccess) {
     return <Navigate to="/" replace />;
@@ -630,6 +721,36 @@ export default function DevelopmentForm() {
         </button>
       </div>
     );
+  }
+
+  async function handleRequestAIAnalysis() {
+    if (!isEditMode || aiAnalysisRequesting) {
+      return;
+    }
+
+    try {
+      setAIAnalysisRequesting(true);
+
+      const result = await requestDevelopmentAIAnalysis(Number(id));
+
+      if (result?.status === "completed" && result?.quality) {
+        setQuality(result.quality);
+
+        if (result?.reused === true) {
+          showSuccess(
+            "El desarrollo no tiene cambios desde el último análisis.",
+          );
+        }
+
+        return;
+      }
+
+      await refreshQualityState(Number(id));
+    } catch (error) {
+      showError(getErrorMessage(error, "No se pudo iniciar el análisis IA."));
+    } finally {
+      setAIAnalysisRequesting(false);
+    }
   }
 
   return (
