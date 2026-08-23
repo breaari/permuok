@@ -30,7 +30,7 @@ class CompatibilityJobProcessor
 
         return match ($jobType) {
             'property_recalculate' =>
-            CompatibilityEngine::calculateForProperty(
+            self::processPropertyRecalculation(
                 $entityId
             ),
             'property_quality_recalculate' =>
@@ -63,7 +63,7 @@ class CompatibilityJobProcessor
                 (int)($job['max_attempts'] ?? 3)
             ),
             'search_request_recalculate' =>
-            CompatibilityEngine::calculateForSearchRequest(
+            self::processSearchRequestRecalculation(
                 $entityId
             ),
 
@@ -118,8 +118,8 @@ class CompatibilityJobProcessor
             );
 
         CompatibilityJobService::enqueueMultilateralRecalculation(
-                3
-            );
+            3
+        );
 
         return $result;
     }
@@ -133,8 +133,8 @@ class CompatibilityJobProcessor
             );
 
         CompatibilityJobService::enqueueMultilateralRecalculation(
-                3
-            );
+            3
+        );
 
         return $result;
     }
