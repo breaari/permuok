@@ -215,44 +215,6 @@ class CompatibilityEngine
         ];
     }
 
-    private static function createMatchEvent(
-        PDO $pdo,
-        string $eventType,
-        int $compatibilityId,
-        array $payload = []
-    ): void {
-        $st = $pdo->prepare("
-        INSERT INTO match_events (
-            event_type,
-            entity_type,
-            entity_id,
-            payload_json,
-            occurred_at
-        ) VALUES (
-            :event_type,
-            'compatibility',
-            :entity_id,
-            :payload_json,
-            NOW()
-        )
-    ");
-
-        $st->execute([
-            'event_type' =>
-            $eventType,
-
-            'entity_id' =>
-            $compatibilityId,
-
-            'payload_json' =>
-            json_encode(
-                $payload,
-                JSON_UNESCAPED_UNICODE |
-                    JSON_UNESCAPED_SLASHES
-            ),
-        ]);
-    }
-
     private static function getPropertyAmenitiesBatch(
         PDO $pdo,
         array $propertyIds
@@ -3398,7 +3360,6 @@ updated_at = CURRENT_TIMESTAMP
         }
 
         return $compatibilityId;
-        return (int)$pdo->lastInsertId();
     }
     private static function archiveStaleCompatibilities(
         PDO $pdo,
@@ -3622,6 +3583,46 @@ updated_at = CURRENT_TIMESTAMP
             'params' => $params,
         ];
     }
+
+    private static function createMatchEvent(
+        PDO $pdo,
+        string $eventType,
+        int $compatibilityId,
+        array $payload = []
+    ): void {
+        $st = $pdo->prepare("
+        INSERT INTO match_events (
+            event_type,
+            entity_type,
+            entity_id,
+            payload_json,
+            occurred_at
+        ) VALUES (
+            :event_type,
+            'compatibility',
+            :entity_id,
+            :payload_json,
+            NOW()
+        )
+    ");
+
+        $st->execute([
+            'event_type' =>
+            $eventType,
+
+            'entity_id' =>
+            $compatibilityId,
+
+            'payload_json' =>
+            json_encode(
+                $payload,
+                JSON_UNESCAPED_UNICODE |
+                    JSON_UNESCAPED_SLASHES |
+                    JSON_THROW_ON_ERROR
+            ),
+        ]);
+    }
+
     private static function db(): PDO
     {
         require_once __DIR__ . '/../../../db.php';
