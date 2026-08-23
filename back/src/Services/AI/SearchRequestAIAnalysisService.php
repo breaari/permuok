@@ -10,7 +10,7 @@ use App\Services\CompatibilityJobService;
 
 class SearchRequestAIAnalysisService
 {
-    private const PROMPT_VERSION = '1.3';
+    private const PROMPT_VERSION = '1.7';
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private static function db(
@@ -550,7 +550,93 @@ REGLAS DE EVALUACIÓN:
 - El título debe permitir entender rápidamente qué se busca.
 - La descripción debe aportar contexto útil sin repetir mecánicamente la ficha.
 - Priorizá la utilidad para matching inmobiliario.
+- El rango de valor de la propiedad NO representa necesariamente
+  una modalidad de pago con dinero.
+  Puede existir un rango de valor aunque la operación sea por permuta.
+
+- Si "Acepta permuta" está activo y existe una diferencia máxima
+  en dinero, eso NO es una contradicción aunque "Pago con dinero"
+  no esté habilitado.
+
+- Interpretá "Pago con dinero" como la posibilidad de realizar
+  la operación directamente mediante dinero, no como la existencia
+  de cualquier componente monetario dentro de una permuta.
+
+- Una permuta con diferencia en dinero es una modalidad coherente
+  por sí misma y no debe generar una recomendación de corrección.
+
+- Sólo marcá contradicción de modalidad cuando los datos sean
+  realmente incompatibles entre sí.
 - Escribí en español rioplatense profesional.
+- No generes recomendaciones por errores menores de mayúsculas,
+  minúsculas, puntuación o estilo si no afectan la comprensión.
+
+- Priorizá problemas que realmente afecten claridad,
+  coherencia o matching.
+
+- El texto libre puede aportar contexto, pero no debe convertirse
+  automáticamente en un criterio estructurado.
+
+- Si título o descripción contienen información adicional
+  que no contradice los criterios estructurados, no la trates
+  como contradicción por sí sola.
+
+- Cuando título y descripción expresen diferentes niveles
+  de flexibilidad, sugerí mejorar la claridad sólo si esa diferencia
+  puede cambiar qué propiedades considera compatibles el usuario.
+
+  - Si un rango de valor es muy amplio, podés sugerir acotarlo
+  únicamente como mejora de precisión de matching.
+
+- No lo trates como error ni contradicción.
+
+- Formulá la recomendación de forma condicional:
+  "Si el cliente tiene un rango prioritario más acotado,
+  definirlo puede mejorar la relevancia de los matches."
+
+- Una búsqueda amplia puede ser intencional y válida.
+
+- Si existe una zona preferida y además está habilitada
+  la apertura a otras zonas, considerá esa configuración válida.
+
+- No sugieras agregar zonas secundarias ni prioridades adicionales
+  salvo que exista una señal clara de que esa información mejoraría
+  significativamente el matching.
+
+- Una preferencia principal + apertura geográfica puede ser
+  una estrategia intencional y no debe tratarse automáticamente
+  como información incompleta.
+
+- Priorizá recomendaciones que corrijan ambigüedades reales
+  antes que recomendaciones orientadas a agregar más filtros.
+
+  - No sugieras habilitar modalidades de operación que el usuario
+  no seleccionó expresamente.
+
+- Si una modalidad está desactivada y las modalidades activas
+  forman una combinación coherente, asumí que la exclusión
+  puede ser intencional.
+
+- No recomiendes aceptar pago directo con dinero, permuta,
+  financiación u otra modalidad únicamente para ampliar
+  la cantidad de coincidencias.
+
+- El objetivo del optimizador es mejorar la calidad y coherencia
+  de la búsqueda existente, no modificar la estrategia comercial
+  definida por el usuario.
+
+- Una búsqueda puede ser más restrictiva de manera deliberada.
+  No penalices ni recomiendes flexibilizar criterios solamente
+  porque eso aumentaría el número potencial de matches.
+
+  - El potencial de matching debe evaluar qué tan bien definidos
+  están los criterios para encontrar coincidencias relevantes.
+
+- No otorgues mejor puntuación simplemente porque una búsqueda
+  acepta más modalidades, más zonas o más tipos de propiedad.
+
+- Una búsqueda específica y coherente puede tener excelente
+  potencial de matching aunque deliberadamente sea restrictiva.
 
 REGLAS DE LENGUAJE PARA EL USUARIO:
 
@@ -611,11 +697,6 @@ un asesor inmobiliario a otro.
 
 MAL:
 "'payment.cash' está en false pero existe 'payment.cash_difference_max'."
-
-BIEN:
-"Indicás que la operación no contempla pago con dinero, pero también cargaste
-una diferencia máxima en dinero para la permuta. Revisá la modalidad de pago
-para que no quede información contradictoria."
 
 MAL:
 "'property_condition' está en 'new'."
