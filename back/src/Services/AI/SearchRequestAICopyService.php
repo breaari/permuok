@@ -11,7 +11,7 @@ class SearchRequestAICopyService
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const TITLE_PROMPT_VERSION = '1.0';
-    private const DESCRIPTION_PROMPT_VERSION = '1.5';
+    private const DESCRIPTION_PROMPT_VERSION = '1.6';
 
     private static function db(
         bool $forceReconnect = false
@@ -518,8 +518,9 @@ class SearchRequestAICopyService
 Sos un redactor inmobiliario profesional especializado
 en búsquedas inmobiliarias entre inmobiliarias de Argentina.
 
-Tu tarea es REDACTAR, no analizar, completar ni mejorar
-los criterios de búsqueda.
+Tu tarea es REDACTAR los criterios existentes.
+No los interpretes, no los completes, no los reduzcas
+y no los reemplaces por criterios que consideres equivalentes.
 
 Generá UNA descripción clara y natural a partir de los
 datos proporcionados.
@@ -927,6 +928,95 @@ REGLAS:
 - El resultado debe parecer escrito directamente
   por una inmobiliaria, sin referencias al formulario,
   al sistema, a la ficha ni a las reglas de generación.
+
+  FIDELIDAD DE LOS CRITERIOS
+
+- Conservá todas las alternativas expresamente indicadas por el usuario
+  siempre que no contradigan los datos estructurados.
+
+- Si el usuario indica que considera 1 ambiente,
+  1 ambiente y medio y 2 ambientes, deben mantenerse
+  las tres alternativas en la descripción.
+
+- No reemplaces esas alternativas por una categoría equivalente.
+
+- No inventes equivalencias inmobiliarias.
+  Por ejemplo:
+  "1 ambiente" no debe transformarse en
+  "apto monoambiente",
+  "tipo monoambiente",
+  "monoambiente equivalente"
+  ni expresiones similares,
+  salvo que el usuario haya utilizado explícitamente ese término.
+
+- No agregues condiciones circunstanciales como:
+  "según disponibilidad",
+  "según distribución",
+  "de acuerdo con la oferta"
+  o similares si no fueron expresadas por el usuario.
+
+
+REDACCIÓN NATURAL
+
+- Integrá las características dentro de las oraciones.
+
+- No uses etiquetas o construcciones de ficha como:
+  "Requisito:",
+  "Relevante:",
+  "Preferencia:",
+  "Condición:",
+  "Modalidad:"
+  ni similares.
+
+- Evitá el punto y coma cuando una oración simple
+  o un punto produzcan una redacción más natural.
+
+- Para flexibilidad geográfica, preferí construcciones como:
+  "preferentemente en X, aunque también se consideran otras zonas de Y."
+
+- Para una característica obligatoria, preferí:
+  "Debe contar con balcón."
+  o integrala naturalmente:
+  "departamento a estrenar con balcón."
+
+
+VALORES Y OPERACIÓN
+
+- Cuando exista un valor mínimo y máximo,
+  preferí la expresión:
+  "Rango de referencia entre USD X y USD Y."
+
+- No presentes automáticamente esos valores como
+  "presupuesto" salvo que el usuario los haya descripto así.
+
+- Si se acepta permuta y existe una diferencia máxima,
+  preferí exactamente esta estructura conceptual:
+  "Se acepta permuta con una diferencia en dinero de hasta USD X."
+
+- No determines a favor de quién es la diferencia.
+
+- No escribas:
+  "a favor del propietario",
+  "a favor del comprador",
+  "saldo a favor",
+  "diferencia a entregar"
+  ni ninguna dirección de la diferencia,
+  salvo que esté expresamente indicada en los datos.
+
+
+ESTRUCTURA PREFERIDA
+
+- En búsquedas con información suficiente, organizá el texto así:
+
+  Primer párrafo:
+  inmueble + ambientes + condición + ubicación +
+  flexibilidad geográfica + características relevantes.
+
+  Segundo párrafo:
+  rango de referencia + modalidad de operación.
+
+- No mezcles todos los criterios en una única oración larga.
+
 ESTILO:
 
 - 1 a 2 párrafos.
@@ -936,6 +1026,28 @@ ESTILO:
 - Sin títulos internos.
 - Sin viñetas.
 - Sin emojis.
+
+EJEMPLO DE ESTILO
+
+Buen resultado:
+
+"Buscamos departamento a estrenar con balcón en Lanús Oeste,
+preferentemente en Villa Caraza, aunque también se consideran
+otras zonas de Lanús. Se evalúan opciones de 1 ambiente,
+1 ambiente y medio o 2 ambientes.
+
+Rango de referencia entre USD 80.000 y USD 120.000.
+Se acepta permuta con una diferencia en dinero de hasta USD 15.000."
+
+Observá el estilo:
+- no inventa equivalencias;
+- conserva todas las alternativas;
+- no usa etiquetas como "Requisito:" o "Modalidad:";
+- no interpreta hacia qué parte va la diferencia;
+- separa naturalmente el inmueble de las condiciones económicas.
+
+El ejemplo define solamente el estilo.
+Nunca copies sus valores o ubicaciones.
 
 DATOS ACTUALES:
 
