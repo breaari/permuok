@@ -53,50 +53,49 @@ class CompatibilityEngine
         $candidatesEvaluated = 0;
         $lastPropertyId = 0;
 
-        $pdo->beginTransaction();
-
-        try {
-            while (true) {
-                $properties =
-                    self::getCandidateProperties(
-                        $pdo,
-                        (int)$searchRequest['real_estate_id'],
-                        $propertyTypes,
-                        $lastPropertyId,
-                        self::BATCH_SIZE
-                    );
-
-                if ($properties === []) {
-                    break;
-                }
-
-                $propertyIds = array_map(
-                    static fn(array $property): int =>
-                    (int)$property['id'],
-                    $properties
+        while (true) {
+            $properties =
+                self::getCandidateProperties(
+                    $pdo,
+                    (int)$searchRequest['real_estate_id'],
+                    $propertyTypes,
+                    $lastPropertyId,
+                    self::BATCH_SIZE
                 );
 
-                $amenitiesByProperty =
-                    self::getPropertyAmenitiesBatch(
-                        $pdo,
-                        $propertyIds
-                    );
+            if ($properties === []) {
+                break;
+            }
 
-                $requirementsByProperty =
-                    self::getPropertyRequirementsBatch(
-                        $pdo,
-                        $propertyIds
-                    );
+            $propertyIds = array_map(
+                static fn(array $property): int =>
+                (int)$property['id'],
+                $properties
+            );
 
+            $amenitiesByProperty =
+                self::getPropertyAmenitiesBatch(
+                    $pdo,
+                    $propertyIds
+                );
+
+            $requirementsByProperty =
+                self::getPropertyRequirementsBatch(
+                    $pdo,
+                    $propertyIds
+                );
+
+            $pdo->beginTransaction();
+
+            try {
                 foreach ($properties as $property) {
                     $propertyId =
                         (int)$property['id'];
 
-                    $lastPropertyId =
-                        max(
-                            $lastPropertyId,
-                            $propertyId
-                        );
+                    $lastPropertyId = max(
+                        $lastPropertyId,
+                        $propertyId
+                    );
 
                     $candidatesEvaluated++;
 
@@ -154,14 +153,26 @@ class CompatibilityEngine
                     ];
                 }
 
-                if (
-                    count($properties) <
-                    self::BATCH_SIZE
-                ) {
-                    break;
+                $pdo->commit();
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
                 }
+
+                throw $e;
             }
 
+            if (
+                count($properties) <
+                self::BATCH_SIZE
+            ) {
+                break;
+            }
+        }
+
+        $pdo->beginTransaction();
+
+        try {
             $archivedCount =
                 self::archiveStaleCompatibilities(
                     $pdo,
@@ -170,29 +181,6 @@ class CompatibilityEngine
                 );
 
             $pdo->commit();
-
-            usort(
-                $results,
-                static fn(array $a, array $b): int =>
-                $b['score'] <=> $a['score']
-            );
-
-            return [
-                'search_request_id' =>
-                $searchRequestId,
-
-                'candidates_evaluated' =>
-                $candidatesEvaluated,
-
-                'compatibilities_saved' =>
-                count($results),
-
-                'compatibilities_archived' =>
-                $archivedCount,
-
-                'results' =>
-                $results,
-            ];
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -200,6 +188,29 @@ class CompatibilityEngine
 
             throw $e;
         }
+
+        usort(
+            $results,
+            static fn(array $a, array $b): int =>
+            $b['score'] <=> $a['score']
+        );
+
+        return [
+            'search_request_id' =>
+            $searchRequestId,
+
+            'candidates_evaluated' =>
+            $candidatesEvaluated,
+
+            'compatibilities_saved' =>
+            count($results),
+
+            'compatibilities_archived' =>
+            $archivedCount,
+
+            'results' =>
+            $results,
+        ];
     }
 
     private static function getPropertyAmenitiesBatch(
@@ -491,34 +502,34 @@ class CompatibilityEngine
     }
 
     private static function getCandidateSearchRequestsForProperty(
-    PDO $pdo,
-    array $property,
-    int $afterId = 0,
-    int $limit = self::BATCH_SIZE
-): array {
-    $propertyId =
-        (int)$property['id'];
+        PDO $pdo,
+        array $property,
+        int $afterId = 0,
+        int $limit = self::BATCH_SIZE
+    ): array {
+        $propertyId =
+            (int)$property['id'];
 
-    $realEstateId =
-        (int)$property['real_estate_id'];
+        $realEstateId =
+            (int)$property['real_estate_id'];
 
-    $propertyType =
-        trim(
-            (string)(
-                $property['property_type']
-                ?? ''
+        $propertyType =
+            trim(
+                (string)(
+                    $property['property_type']
+                    ?? ''
+                )
+            );
+
+        $limit = max(
+            1,
+            min(
+                self::BATCH_SIZE,
+                $limit
             )
         );
 
-    $limit = max(
-        1,
-        min(
-            self::BATCH_SIZE,
-            $limit
-        )
-    );
-
-    $sql = "
+        $sql = "
         SELECT sr.*
 
         FROM search_requests sr
@@ -572,26 +583,26 @@ class CompatibilityEngine
         LIMIT {$limit}
     ";
 
-    $st = $pdo->prepare($sql);
+        $st = $pdo->prepare($sql);
 
-    $st->execute([
-        'real_estate_id' =>
+        $st->execute([
+            'real_estate_id' =>
             $realEstateId,
 
-        'property_type' =>
+            'property_type' =>
             $propertyType,
 
-        'property_id' =>
+            'property_id' =>
             $propertyId,
 
-        'after_id' =>
+            'after_id' =>
             $afterId,
-    ]);
+        ]);
 
-    return $st->fetchAll(
-        PDO::FETCH_ASSOC
-    ) ?: [];
-}
+        return $st->fetchAll(
+            PDO::FETCH_ASSOC
+        ) ?: [];
+    }
     private static function calculatePropertySearchPair(
         PDO $pdo,
         array $property,
