@@ -5,6 +5,7 @@ namespace App\Services\AI;
 use PDO;
 use Exception;
 use Throwable;
+use App\Services\CurrencyConversionService;
 
 class CompatibilityEngine
 {
@@ -500,7 +501,46 @@ class CompatibilityEngine
             $errors,
         ];
     }
+    private static function convertAmount(
+        float $amount,
+        string $fromCurrency,
+        string $toCurrency
+    ): ?float {
+        $fromCurrency =
+            strtoupper(trim($fromCurrency));
 
+        $toCurrency =
+            strtoupper(trim($toCurrency));
+
+        if ($amount < 0) {
+            return null;
+        }
+
+        if (
+            $fromCurrency === '' ||
+            $toCurrency === ''
+        ) {
+            return null;
+        }
+
+        if ($fromCurrency === $toCurrency) {
+            return round($amount, 2);
+        }
+
+        try {
+            return CurrencyConversionService::convert(
+                $amount,
+                $fromCurrency,
+                $toCurrency
+            );
+        } catch (Throwable $e) {
+            /*
+         * Si no hay cotización disponible,
+         * no inventamos ninguna conversión.
+         */
+            return null;
+        }
+    }
     private static function getCandidateSearchRequestsForProperty(
         PDO $pdo,
         array $property,
@@ -1752,37 +1792,59 @@ class CompatibilityEngine
      * Si ambas están informadas y son distintas,
      * no consideramos comparable el precio.
      */
+        $originalPropertyPrice =
+            (float)($property['price'] ?? 0);
+
+        $propertyPrice =
+            $originalPropertyPrice;
+
+        $conversionApplied = false;
+
         if (
             $searchCurrency !== '' &&
             $propertyCurrency !== '' &&
             $searchCurrency !== $propertyCurrency
         ) {
-            return [
-                'score' => 0.0,
-
-                'reason' => [
-                    'code' =>
-                    'currency_mismatch',
-
-                    'label' =>
-                    'La moneda del precio no coincide con la búsqueda',
-
-                    'weight' =>
-                    20,
-
-                    'matched' =>
-                    false,
-
-                    'search_currency' =>
-                    $searchCurrency,
-
-                    'property_currency' =>
+            $convertedPrice =
+                self::convertAmount(
+                    $originalPropertyPrice,
                     $propertyCurrency,
-                ],
+                    $searchCurrency
+                );
 
-                'has_significant_mismatch' =>
-                true,
-            ];
+            if ($convertedPrice === null) {
+                return [
+                    'score' => 0.0,
+
+                    'reason' => [
+                        'code' =>
+                        'currency_conversion_unavailable',
+
+                        'label' =>
+                        'No hay una cotización disponible para comparar los precios',
+
+                        'weight' =>
+                        20,
+
+                        'matched' =>
+                        false,
+
+                        'search_currency' =>
+                        $searchCurrency,
+
+                        'property_currency' =>
+                        $propertyCurrency,
+                    ],
+
+                    'has_significant_mismatch' =>
+                    true,
+                ];
+            }
+
+            $propertyPrice =
+                $convertedPrice;
+
+            $conversionApplied = true;
         }
 
         /*
@@ -1817,7 +1879,22 @@ class CompatibilityEngine
 
                     'price' =>
                     $propertyPrice,
+                    'original_price' =>
+                    $originalPropertyPrice,
 
+                    'original_currency' =>
+                    $propertyCurrency,
+
+                    'comparison_price' =>
+                    $propertyPrice,
+
+                    'comparison_currency' =>
+                    $searchCurrency !== ''
+                        ? $searchCurrency
+                        : $propertyCurrency,
+
+                    'currency_conversion_applied' =>
+                    $conversionApplied,
                     'min_value' =>
                     $minValue,
 
