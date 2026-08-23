@@ -53,7 +53,7 @@ class MultilateralMatchingService
         usort(
             $cycles,
             static fn(array $a, array $b): int =>
-                $b['score'] <=> $a['score']
+            $b['score'] <=> $a['score']
         );
 
         return $cycles;
@@ -85,7 +85,7 @@ class MultilateralMatchingService
                 if (
                     count($participants) >= 3 &&
                     count($participants) <=
-                        self::MAX_PARTICIPANTS
+                    self::MAX_PARTICIPANTS
                 ) {
                     $cycleEdges =
                         array_merge(
@@ -95,7 +95,7 @@ class MultilateralMatchingService
 
                     $key =
                         self::buildCycleKey(
-                            $participants
+                            $cycleEdges
                         );
 
                     if (
@@ -188,8 +188,22 @@ class MultilateralMatchingService
                 sr.cash_difference_currency,
 
                 pr.accepts_total_swap,
-                pr.accepts_swap_plus_cash,
-                pr.accepts_open_proposals
+pr.accepts_swap_plus_cash,
+pr.accepts_multiple_swap,
+pr.accepts_open_proposals,
+pr.accepts_cash_only,
+
+pr.cash_difference_direction
+    AS owner_difference_direction,
+
+pr.cash_difference_min
+    AS owner_difference_min,
+
+pr.cash_difference_max
+    AS owner_difference_max,
+
+pr.cash_difference_currency
+    AS owner_difference_currency
 
             FROM compatibilities c
 
@@ -265,7 +279,7 @@ class MultilateralMatchingService
 
         $st->execute([
             'min_score' =>
-                self::MIN_EDGE_SCORE,
+            self::MIN_EDGE_SCORE,
         ]);
 
         return $st->fetchAll(
@@ -293,23 +307,19 @@ class MultilateralMatchingService
 
             $offeredPropertyId =
                 (int)(
-                    $currentEdge[
-                        'offered_property_id'
-                    ] ?? 0
+                    $currentEdge['offered_property_id'] ?? 0
                 );
 
             $previousTargetPropertyId =
                 (int)(
-                    $previousEdge[
-                        'property_id'
-                    ] ?? 0
+                    $previousEdge['property_id'] ?? 0
                 );
 
             if (
                 $offeredPropertyId <= 0 ||
                 $previousTargetPropertyId <= 0 ||
                 $offeredPropertyId !==
-                    $previousTargetPropertyId
+                $previousTargetPropertyId
             ) {
                 return false;
             }
@@ -323,9 +333,9 @@ class MultilateralMatchingService
     ): bool {
         foreach ($edges as $edge) {
             /*
-             * Una operación multilateral necesita
-             * que la búsqueda acepte permuta.
-             */
+         * El participante que busca debe aceptar
+         * resolver la operación mediante permuta.
+         */
             if (
                 (int)($edge['payment_mode_swap'] ?? 0)
                 !== 1
@@ -356,9 +366,7 @@ class MultilateralMatchingService
                 strtoupper(
                     trim(
                         (string)(
-                            $edge[
-                                'offered_property_currency'
-                            ] ?? ''
+                            $edge['offered_property_currency'] ?? ''
                         )
                     )
                 );
@@ -367,22 +375,21 @@ class MultilateralMatchingService
                 strtoupper(
                     trim(
                         (string)(
-                            $edge[
-                                'target_property_currency'
-                            ] ?? ''
+                            $edge['target_property_currency'] ?? ''
                         )
                     )
                 );
 
             /*
-             * Por ahora no hacemos conversión
-             * automática entre monedas.
-             */
+         * Regla de producto:
+         * una operación multilateral se calcula
+         * solamente en una misma moneda.
+         */
             if (
                 $offeredCurrency === '' ||
                 $targetCurrency === '' ||
                 $offeredCurrency !==
-                    $targetCurrency
+                $targetCurrency
             ) {
                 return false;
             }
@@ -395,16 +402,12 @@ class MultilateralMatchingService
 
             $acceptsSwapPlusCash =
                 (int)(
-                    $edge[
-                        'accepts_swap_plus_cash'
-                    ] ?? 0
+                    $edge['accepts_swap_plus_cash'] ?? 0
                 ) === 1;
 
             $acceptsOpenProposals =
                 (int)(
-                    $edge[
-                        'accepts_open_proposals'
-                    ] ?? 0
+                    $edge['accepts_open_proposals'] ?? 0
                 ) === 1;
 
             if (
@@ -416,21 +419,24 @@ class MultilateralMatchingService
             }
 
             /*
-             * Diferencia que debe agregar quien
-             * está buscando la propiedad.
-             */
-            $requiredCash =
-                max(
-                    0,
-                    $targetPrice - $offeredPrice
+         * Diferencia firmada desde el punto de
+         * vista del dueño de la propiedad objetivo.
+         *
+         * > 0 = recibe dinero (a favor).
+         * < 0 = debe entregar dinero (en contra).
+         * = 0 = permuta pareja.
+         */
+            $signedDifference =
+                round(
+                    $targetPrice -
+                        $offeredPrice,
+                    2
                 );
 
-            /*
-             * Si no necesita agregar dinero,
-             * puede resolverse como permuta total
-             * o propuesta abierta.
-             */
-            if ($requiredCash <= 0) {
+            $differenceAmount =
+                abs($signedDifference);
+
+            if ($differenceAmount <= 0) {
                 if (
                     !$acceptsTotalSwap &&
                     !$acceptsOpenProposals
@@ -441,10 +447,6 @@ class MultilateralMatchingService
                 continue;
             }
 
-            /*
-             * Si necesita agregar dinero,
-             * debe admitirse permuta + efectivo.
-             */
             if (
                 !$acceptsSwapPlusCash &&
                 !$acceptsOpenProposals
@@ -452,48 +454,130 @@ class MultilateralMatchingService
                 return false;
             }
 
-            if (
-                (int)($edge['payment_mode_cash'] ?? 0)
-                !== 1
-            ) {
-                return false;
-            }
+            $actualDirection =
+                $signedDifference > 0
+                ? 'a_favor'
+                : 'en_contra';
 
-            $cashDifferenceMax =
-                (float)(
-                    $edge['cash_difference_max']
-                    ?? 0
+            $ownerDirection =
+                trim(
+                    (string)(
+                        $edge['owner_difference_direction'] ?? ''
+                    )
                 );
 
             if (
-                $cashDifferenceMax <= 0 ||
-                $requiredCash >
-                    $cashDifferenceMax
+                $ownerDirection !== '' &&
+                $ownerDirection !== 'indistinto' &&
+                $ownerDirection !==
+                $actualDirection
             ) {
                 return false;
             }
 
-            $cashCurrency =
+            $ownerCurrency =
                 strtoupper(
                     trim(
                         (string)(
-                            $edge[
-                                'cash_difference_currency'
-                            ] ?? ''
+                            $edge['owner_difference_currency'] ?? ''
                         )
                     )
                 );
 
             if (
-                $cashCurrency !== '' &&
-                $cashCurrency !==
-                    $targetCurrency
+                $ownerCurrency !== '' &&
+                $ownerCurrency !==
+                $targetCurrency
             ) {
                 return false;
+            }
+
+            $ownerMin =
+                self::nullablePositiveFloat(
+                    $edge['owner_difference_min'] ?? null
+                );
+
+            $ownerMax =
+                self::nullablePositiveFloat(
+                    $edge['owner_difference_max'] ?? null
+                );
+
+            if (
+                $ownerMin !== null &&
+                $differenceAmount < $ownerMin
+            ) {
+                return false;
+            }
+
+            if (
+                $ownerMax !== null &&
+                $differenceAmount > $ownerMax
+            ) {
+                return false;
+            }
+
+            /*
+         * Si la diferencia es a favor del dueño
+         * objetivo, quien busca debe aportar dinero.
+         */
+            if ($actualDirection === 'a_favor') {
+                if (
+                    (int)(
+                        $edge['payment_mode_cash'] ?? 0
+                    ) !== 1
+                ) {
+                    return false;
+                }
+
+                $availableCash =
+                    self::nullablePositiveFloat(
+                        $edge['cash_difference_max'] ?? null
+                    );
+
+                if (
+                    $availableCash === null ||
+                    $availableCash <
+                    $differenceAmount
+                ) {
+                    return false;
+                }
+
+                $availableCurrency =
+                    strtoupper(
+                        trim(
+                            (string)(
+                                $edge['cash_difference_currency'] ?? ''
+                            )
+                        )
+                    );
+
+                if (
+                    $availableCurrency !==
+                    $targetCurrency
+                ) {
+                    return false;
+                }
             }
         }
 
         return true;
+    }
+
+    private static function nullablePositiveFloat(
+        mixed $value
+    ): ?float {
+        if (
+            $value === null ||
+            $value === ''
+        ) {
+            return null;
+        }
+
+        $number = (float)$value;
+
+        return $number >= 0
+            ? $number
+            : null;
     }
 
     private static function buildCycleResult(
@@ -502,131 +586,135 @@ class MultilateralMatchingService
     ): array {
         $scores = array_map(
             static fn(array $edge): float =>
-                (float)$edge['score'],
+            (float)$edge['score'],
             $edges
         );
 
-        $score = $scores !== []
-            ? round(
-                array_sum($scores) /
-                count($scores),
-                2
-            )
+        $averageScore =
+            $scores !== []
+            ? array_sum($scores) /
+            count($scores)
             : 0.0;
+
+        $minimumScore =
+            $scores !== []
+            ? min($scores)
+            : 0.0;
+
+        /*
+ * En una operación circular importa mucho
+ * el eslabón más débil.
+ *
+ * 60% peor compatibilidad
+ * 40% promedio general.
+ */
+        $score = round(
+            ($minimumScore * 0.60) +
+                ($averageScore * 0.40),
+            2
+        );
 
         return [
             'participants_count' =>
-                count($participants),
+            count($participants),
 
             'real_estate_ids' =>
-                array_values($participants),
+            array_values($participants),
 
             'score' =>
-                $score,
+            $score,
+            'minimum_edge_score' =>
+            round($minimumScore, 2),
 
+            'average_edge_score' =>
+            round($averageScore, 2),
             'compatibilities' =>
-                array_map(
-                    static function (
-                        array $edge
-                    ): array {
-                        $offeredPrice =
-                            (float)(
-                                $edge[
-                                    'offered_property_price'
-                                ] ?? 0
-                            );
+            array_map(
+                static function (
+                    array $edge
+                ): array {
+                    $offeredPrice =
+                        (float)(
+                            $edge['offered_property_price'] ?? 0
+                        );
 
-                        $targetPrice =
-                            (float)(
-                                $edge[
-                                    'target_property_price'
-                                ] ?? 0
-                            );
+                    $targetPrice =
+                        (float)(
+                            $edge['target_property_price'] ?? 0
+                        );
 
-                        return [
-                            'compatibility_id' =>
-                                (int)$edge['id'],
+                    return [
+                        'compatibility_id' =>
+                        (int)$edge['id'],
 
-                            'property_id' =>
-                                (int)$edge[
-                                    'property_id'
-                                ],
+                        'property_id' =>
+                        (int)$edge['property_id'],
 
-                            'search_request_id' =>
-                                (int)$edge[
-                                    'search_request_id'
-                                ],
+                        'search_request_id' =>
+                        (int)$edge['search_request_id'],
 
-                            'source_real_estate_id' =>
-                                (int)$edge[
-                                    'source_real_estate_id'
-                                ],
+                        'source_real_estate_id' =>
+                        (int)$edge['source_real_estate_id'],
 
-                            'target_real_estate_id' =>
-                                (int)$edge[
-                                    'target_real_estate_id'
-                                ],
+                        'target_real_estate_id' =>
+                        (int)$edge['target_real_estate_id'],
 
-                            'exchange_offer_id' =>
-                                (int)$edge[
-                                    'exchange_offer_id'
-                                ],
+                        'exchange_offer_id' =>
+                        (int)$edge['exchange_offer_id'],
 
-                            'offered_property_id' =>
-                                (int)$edge[
-                                    'offered_property_id'
-                                ],
+                        'offered_property_id' =>
+                        (int)$edge['offered_property_id'],
 
-                            'offered_value' =>
-                                $offeredPrice,
+                        'offered_value' =>
+                        $offeredPrice,
 
-                            'target_value' =>
-                                $targetPrice,
+                        'target_value' =>
+                        $targetPrice,
 
-                            'currency' =>
-                                (string)$edge[
-                                    'target_property_currency'
-                                ],
+                        'currency' =>
+                        (string)$edge['target_property_currency'],
 
-                            'cash_difference' =>
-                                round(
-                                    max(
-                                        0,
-                                        $targetPrice -
-                                        $offeredPrice
-                                    ),
-                                    2
-                                ),
+                        'cash_difference' =>
+                        round(
+                            max(
+                                0,
+                                $targetPrice -
+                                    $offeredPrice
+                            ),
+                            2
+                        ),
 
-                            'score' =>
-                                (float)$edge['score'],
-                        ];
-                    },
-                    $edges
-                ),
+                        'score' =>
+                        (float)$edge['score'],
+                    ];
+                },
+                $edges
+            ),
         ];
     }
 
     private static function buildCycleKey(
-        array $participants
+        array $edges
     ): string {
-        $ids = array_map(
-            'intval',
-            $participants
+        $tokens = array_map(
+            static fn(array $edge): string =>
+            (int)$edge['id'] . ':' .
+                (int)$edge['property_id'] . ':' .
+                (int)$edge['offered_property_id'],
+            $edges
         );
 
         $variants = [];
-
-        $count = count($ids);
+        $count = count($tokens);
 
         for ($i = 0; $i < $count; $i++) {
             $variant = array_merge(
-                array_slice($ids, $i),
-                array_slice($ids, 0, $i)
+                array_slice($tokens, $i),
+                array_slice($tokens, 0, $i)
             );
 
             $variants[] =
-                implode('-', $variant);
+                implode('|', $variant);
         }
 
         sort(
