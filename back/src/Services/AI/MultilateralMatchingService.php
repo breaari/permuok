@@ -32,9 +32,6 @@ class MultilateralMatchingService
             $source =
                 (int)$edge['source_real_estate_id'];
 
-            $target =
-                (int)$edge['target_real_estate_id'];
-
             $graph[$source][] = $edge;
         }
 
@@ -56,7 +53,7 @@ class MultilateralMatchingService
         usort(
             $cycles,
             static fn(array $a, array $b): int =>
-            $b['score'] <=> $a['score']
+                $b['score'] <=> $a['score']
         );
 
         return $cycles;
@@ -84,15 +81,11 @@ class MultilateralMatchingService
             $next =
                 (int)$edge['target_real_estate_id'];
 
-            /*
-             * Cerramos un ciclo solamente con
-             * 3 o 4 inmobiliarias.
-             */
             if ($next === $start) {
                 if (
                     count($participants) >= 3 &&
                     count($participants) <=
-                    self::MAX_PARTICIPANTS
+                        self::MAX_PARTICIPANTS
                 ) {
                     $cycleEdges =
                         array_merge(
@@ -109,6 +102,9 @@ class MultilateralMatchingService
                         !isset($seen[$key]) &&
                         self::isStructurallyContinuous(
                             $cycleEdges
+                        ) &&
+                        self::isEconomicallyViable(
+                            $cycleEdges
                         )
                     ) {
                         $seen[$key] = true;
@@ -124,10 +120,6 @@ class MultilateralMatchingService
                 continue;
             }
 
-            /*
-             * Una inmobiliaria no puede aparecer
-             * dos veces dentro de la misma operación.
-             */
             if (
                 in_array(
                     $next,
@@ -164,66 +156,116 @@ class MultilateralMatchingService
         PDO $pdo
     ): array {
         $st = $pdo->prepare("
-        SELECT
-            c.id,
-            c.property_id,
-            c.search_request_id,
+            SELECT
+                c.id,
+                c.property_id,
+                c.search_request_id,
 
-            c.source_real_estate_id,
-            c.target_real_estate_id,
+                c.source_real_estate_id,
+                c.target_real_estate_id,
 
-            c.score,
-            c.match_level,
+                c.score,
+                c.match_level,
 
-            seo.id AS exchange_offer_id,
-            seo.property_id AS offered_property_id
+                seo.id AS exchange_offer_id,
+                seo.property_id AS offered_property_id,
 
-        FROM compatibilities c
+                offered_property.price
+                    AS offered_property_price,
 
-        INNER JOIN search_request_exchange_offers seo
-            ON seo.search_request_id =
-                c.search_request_id
+                offered_property.currency
+                    AS offered_property_currency,
 
-            AND seo.deleted_at IS NULL
+                target_property.price
+                    AS target_property_price,
 
-            AND seo.property_id IS NOT NULL
+                target_property.currency
+                    AS target_property_currency,
 
-        INNER JOIN properties offered_property
-            ON offered_property.id =
-                seo.property_id
+                sr.payment_mode_cash,
+                sr.payment_mode_swap,
+                sr.cash_difference_max,
+                sr.cash_difference_currency,
 
-            AND offered_property.real_estate_id =
-                c.source_real_estate_id
+                pr.accepts_total_swap,
+                pr.accepts_swap_plus_cash,
+                pr.accepts_open_proposals
 
-            AND offered_property.deleted_at IS NULL
+            FROM compatibilities c
 
-        WHERE
-            c.compatibility_type =
-                'property_search_request'
+            INNER JOIN search_requests sr
+                ON sr.id = c.search_request_id
 
-            AND c.deleted_at IS NULL
+                AND sr.deleted_at IS NULL
 
-            AND c.status IN (
-                'detected',
-                'one_side_interested',
-                'mutual_interest',
-                'chat_enabled'
-            )
+                AND sr.status = 'published'
 
-            AND c.score >= :min_score
+                AND sr.is_visible = 1
 
-            AND c.source_real_estate_id
-                <> c.target_real_estate_id
+            INNER JOIN search_request_exchange_offers seo
+                ON seo.search_request_id =
+                    c.search_request_id
 
-        ORDER BY
-            c.source_real_estate_id ASC,
-            c.score DESC,
-            c.id ASC
-    ");
+                AND seo.deleted_at IS NULL
+
+                AND seo.property_id IS NOT NULL
+
+            INNER JOIN properties offered_property
+                ON offered_property.id =
+                    seo.property_id
+
+                AND offered_property.real_estate_id =
+                    c.source_real_estate_id
+
+                AND offered_property.deleted_at IS NULL
+
+            INNER JOIN properties target_property
+                ON target_property.id =
+                    c.property_id
+
+                AND target_property.real_estate_id =
+                    c.target_real_estate_id
+
+                AND target_property.deleted_at IS NULL
+
+                AND target_property.status =
+                    'published'
+
+                AND target_property.is_visible = 1
+
+            LEFT JOIN property_requirements pr
+                ON pr.property_id =
+                    target_property.id
+
+                AND pr.deleted_at IS NULL
+
+            WHERE
+                c.compatibility_type =
+                    'property_search_request'
+
+                AND c.deleted_at IS NULL
+
+                AND c.status IN (
+                    'detected',
+                    'one_side_interested',
+                    'mutual_interest',
+                    'chat_enabled'
+                )
+
+                AND c.score >= :min_score
+
+                AND c.source_real_estate_id
+                    <> c.target_real_estate_id
+
+            ORDER BY
+                c.source_real_estate_id ASC,
+                c.score DESC,
+                c.id ASC
+        ");
 
         $st->execute([
             'min_score' =>
-            self::MIN_EDGE_SCORE,
+                self::MIN_EDGE_SCORE,
         ]);
 
         return $st->fetchAll(
@@ -250,16 +292,202 @@ class MultilateralMatchingService
                 $edges[$previousIndex];
 
             $offeredPropertyId =
-                (int)($currentEdge['offered_property_id'] ?? 0);
+                (int)(
+                    $currentEdge[
+                        'offered_property_id'
+                    ] ?? 0
+                );
 
             $previousTargetPropertyId =
-                (int)($previousEdge['property_id'] ?? 0);
+                (int)(
+                    $previousEdge[
+                        'property_id'
+                    ] ?? 0
+                );
 
             if (
                 $offeredPropertyId <= 0 ||
                 $previousTargetPropertyId <= 0 ||
                 $offeredPropertyId !==
-                $previousTargetPropertyId
+                    $previousTargetPropertyId
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function isEconomicallyViable(
+        array $edges
+    ): bool {
+        foreach ($edges as $edge) {
+            /*
+             * Una operación multilateral necesita
+             * que la búsqueda acepte permuta.
+             */
+            if (
+                (int)($edge['payment_mode_swap'] ?? 0)
+                !== 1
+            ) {
+                return false;
+            }
+
+            $offeredPrice =
+                (float)(
+                    $edge['offered_property_price']
+                    ?? 0
+                );
+
+            $targetPrice =
+                (float)(
+                    $edge['target_property_price']
+                    ?? 0
+                );
+
+            if (
+                $offeredPrice <= 0 ||
+                $targetPrice <= 0
+            ) {
+                return false;
+            }
+
+            $offeredCurrency =
+                strtoupper(
+                    trim(
+                        (string)(
+                            $edge[
+                                'offered_property_currency'
+                            ] ?? ''
+                        )
+                    )
+                );
+
+            $targetCurrency =
+                strtoupper(
+                    trim(
+                        (string)(
+                            $edge[
+                                'target_property_currency'
+                            ] ?? ''
+                        )
+                    )
+                );
+
+            /*
+             * Por ahora no hacemos conversión
+             * automática entre monedas.
+             */
+            if (
+                $offeredCurrency === '' ||
+                $targetCurrency === '' ||
+                $offeredCurrency !==
+                    $targetCurrency
+            ) {
+                return false;
+            }
+
+            $acceptsTotalSwap =
+                (int)(
+                    $edge['accepts_total_swap']
+                    ?? 0
+                ) === 1;
+
+            $acceptsSwapPlusCash =
+                (int)(
+                    $edge[
+                        'accepts_swap_plus_cash'
+                    ] ?? 0
+                ) === 1;
+
+            $acceptsOpenProposals =
+                (int)(
+                    $edge[
+                        'accepts_open_proposals'
+                    ] ?? 0
+                ) === 1;
+
+            if (
+                !$acceptsTotalSwap &&
+                !$acceptsSwapPlusCash &&
+                !$acceptsOpenProposals
+            ) {
+                return false;
+            }
+
+            /*
+             * Diferencia que debe agregar quien
+             * está buscando la propiedad.
+             */
+            $requiredCash =
+                max(
+                    0,
+                    $targetPrice - $offeredPrice
+                );
+
+            /*
+             * Si no necesita agregar dinero,
+             * puede resolverse como permuta total
+             * o propuesta abierta.
+             */
+            if ($requiredCash <= 0) {
+                if (
+                    !$acceptsTotalSwap &&
+                    !$acceptsOpenProposals
+                ) {
+                    return false;
+                }
+
+                continue;
+            }
+
+            /*
+             * Si necesita agregar dinero,
+             * debe admitirse permuta + efectivo.
+             */
+            if (
+                !$acceptsSwapPlusCash &&
+                !$acceptsOpenProposals
+            ) {
+                return false;
+            }
+
+            if (
+                (int)($edge['payment_mode_cash'] ?? 0)
+                !== 1
+            ) {
+                return false;
+            }
+
+            $cashDifferenceMax =
+                (float)(
+                    $edge['cash_difference_max']
+                    ?? 0
+                );
+
+            if (
+                $cashDifferenceMax <= 0 ||
+                $requiredCash >
+                    $cashDifferenceMax
+            ) {
+                return false;
+            }
+
+            $cashCurrency =
+                strtoupper(
+                    trim(
+                        (string)(
+                            $edge[
+                                'cash_difference_currency'
+                            ] ?? ''
+                        )
+                    )
+                );
+
+            if (
+                $cashCurrency !== '' &&
+                $cashCurrency !==
+                    $targetCurrency
             ) {
                 return false;
             }
@@ -274,64 +502,108 @@ class MultilateralMatchingService
     ): array {
         $scores = array_map(
             static fn(array $edge): float =>
-            (float)$edge['score'],
+                (float)$edge['score'],
             $edges
         );
 
-        /*
-         * Usamos el promedio de las aristas
-         * como primer score global.
-         *
-         * Después agregaremos viabilidad económica.
-         */
         $score = $scores !== []
             ? round(
                 array_sum($scores) /
-                    count($scores),
+                count($scores),
                 2
             )
             : 0.0;
 
         return [
             'participants_count' =>
-            count($participants),
+                count($participants),
 
             'real_estate_ids' =>
-            array_values($participants),
+                array_values($participants),
 
             'score' =>
-            $score,
+                $score,
 
             'compatibilities' =>
-            array_map(
-                static fn(array $edge): array => [
-                    'compatibility_id' =>
-                    (int)$edge['id'],
+                array_map(
+                    static function (
+                        array $edge
+                    ): array {
+                        $offeredPrice =
+                            (float)(
+                                $edge[
+                                    'offered_property_price'
+                                ] ?? 0
+                            );
 
-                    'property_id' =>
-                    (int)$edge['property_id'],
+                        $targetPrice =
+                            (float)(
+                                $edge[
+                                    'target_property_price'
+                                ] ?? 0
+                            );
 
-                    'search_request_id' =>
-                    (int)$edge['search_request_id'],
+                        return [
+                            'compatibility_id' =>
+                                (int)$edge['id'],
 
-                    'source_real_estate_id' =>
-                    (int)$edge['source_real_estate_id'],
+                            'property_id' =>
+                                (int)$edge[
+                                    'property_id'
+                                ],
 
-                    'exchange_offer_id' =>
-                    (int)$edge['exchange_offer_id'],
+                            'search_request_id' =>
+                                (int)$edge[
+                                    'search_request_id'
+                                ],
 
-                    'offered_property_id' =>
-                    (int)$edge['offered_property_id'],
+                            'source_real_estate_id' =>
+                                (int)$edge[
+                                    'source_real_estate_id'
+                                ],
 
+                            'target_real_estate_id' =>
+                                (int)$edge[
+                                    'target_real_estate_id'
+                                ],
 
-                    'target_real_estate_id' =>
-                    (int)$edge['target_real_estate_id'],
+                            'exchange_offer_id' =>
+                                (int)$edge[
+                                    'exchange_offer_id'
+                                ],
 
-                    'score' =>
-                    (float)$edge['score'],
-                ],
-                $edges
-            ),
+                            'offered_property_id' =>
+                                (int)$edge[
+                                    'offered_property_id'
+                                ],
+
+                            'offered_value' =>
+                                $offeredPrice,
+
+                            'target_value' =>
+                                $targetPrice,
+
+                            'currency' =>
+                                (string)$edge[
+                                    'target_property_currency'
+                                ],
+
+                            'cash_difference' =>
+                                round(
+                                    max(
+                                        0,
+                                        $targetPrice -
+                                        $offeredPrice
+                                    ),
+                                    2
+                                ),
+
+                            'score' =>
+                                (float)$edge['score'],
+                        ];
+                    },
+                    $edges
+                ),
         ];
     }
 
