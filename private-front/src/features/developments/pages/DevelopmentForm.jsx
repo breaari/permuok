@@ -760,170 +760,181 @@ export default function DevelopmentForm() {
         onSubmit={(e) => e.preventDefault()}
         className="py-8 sm:py-10 md:py-12 px-4 sm:px-6 md:px-10 w-full"
       >
-        {currentStep === 1 && (
-          <div className="w-full max-w-[1240px] mx-auto">
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,768px)_360px] 2xl:grid-cols-[minmax(0,768px)_390px] xl:justify-center xl:items-start">
-              {/* COLUMNA IZQUIERDA */}
-              <div className="space-y-6 sm:space-y-8 min-w-0">
-                <DevelopmentFormProgress
-                  currentStep={currentStep}
-                  isEditMode={isEditMode}
-                />
+        <div className="w-full max-w-[1240px] mx-auto">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,768px)_360px] 2xl:grid-cols-[minmax(0,768px)_390px] xl:justify-center xl:items-start">
+            {/* COLUMNA IZQUIERDA */}
+            <div className="space-y-6 sm:space-y-8 min-w-0">
+              {currentStep === 1 && (
+                <>
+                  <DevelopmentFormProgress
+                    currentStep={currentStep}
+                    isEditMode={isEditMode}
+                  />
 
-                <DevelopmentFormHeaderActions
-                  status={developmentStatus}
-                  isEditMode={isEditMode}
-                  isSubmitting={isSubmitting}
-                  onSaveDraft={handleSaveDraft}
-                  onPublish={handlePublish}
-                  onPause={handlePause}
-                  onArchive={handleArchive}
-                  onDelete={handleDelete}
-                  onPreview={handlePreview}
-                  canPreview={canPreview}
-                />
+                  <DevelopmentFormHeaderActions
+                    status={developmentStatus}
+                    isEditMode={isEditMode}
+                    isSubmitting={isSubmitting}
+                    onSaveDraft={handleSaveDraft}
+                    onPublish={handlePublish}
+                    onPause={handlePause}
+                    onArchive={handleArchive}
+                    onDelete={handleDelete}
+                    onPreview={handlePreview}
+                    canPreview={canPreview}
+                  />
 
-                <DevelopmentBasicSection form={form} setField={setField} />
+                  <DevelopmentBasicSection form={form} setField={setField} />
 
-                <PropertyLocationSection
-                  form={form}
-                  setField={setField}
-                  googleMapsLoaded={googleMapsLoaded}
-                  onLocationValidityChange={setIsLocationValid}
-                />
+                  <PropertyLocationSection
+                    form={form}
+                    setField={setField}
+                    googleMapsLoaded={googleMapsLoaded}
+                    onLocationValidityChange={setIsLocationValid}
+                  />
 
-                <DevelopmentCommercialSection form={form} setField={setField} />
+                  <DevelopmentCommercialSection
+                    form={form}
+                    setField={setField}
+                  />
 
-                <DevelopmentImagesSection
-                  onWarning={showWarning}
-                  images={images}
-                  setImages={setImages}
-                  existingImages={existingImages}
-                  setExistingImages={setExistingImages}
-                  onError={showError}
-                  onSuccess={showSuccess}
-                />
+                  <DevelopmentImagesSection
+                    onWarning={showWarning}
+                    images={images}
+                    setImages={setImages}
+                    existingImages={existingImages}
+                    setExistingImages={setExistingImages}
+                    onError={showError}
+                    onSuccess={showSuccess}
+                  />
 
-                <div className="pt-2 flex flex-col sm:flex-row gap-3">
-                  {isEditMode && (
+                  <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                    {isEditMode && (
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={handleQuickUpdateStepOne}
+                        className="w-full sm:w-auto sm:min-w-[220px] bg-emerald-600 text-white py-4 px-6 rounded-lg font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <Icon name="checkCircle" size={18} />
+
+                        {isSubmitting ? "Actualizando..." : "Actualizar datos"}
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       disabled={isSubmitting}
-                      onClick={handleQuickUpdateStepOne}
-                      className="w-full sm:w-auto sm:min-w-[220px] bg-emerald-600 text-white py-4 px-6 rounded-lg font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                      onClick={handleContinueToStepTwo}
+                      className="w-full bg-slate-900 text-white py-4 rounded-lg font-bold text-base sm:text-lg flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      <Icon name="checkCircle" size={18} />
-                      {isSubmitting ? "Actualizando..." : "Actualizar datos"}
+                      Continuar al Paso 2
+                      <Icon name="arrowRight" size={18} />
                     </button>
-                  )}
+                  </div>
+                </>
+              )}
 
-                  <button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={handleContinueToStepTwo}
-                    className="w-full bg-slate-900 text-white py-4 rounded-lg font-bold text-base sm:text-lg flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    Continuar al Paso 2
-                    <Icon name="arrowRight" size={18} />
-                  </button>
-                </div>
-              </div>
-
-              {/* COLUMNA DERECHA: OPTIMIZADOR */}
-              {isEditMode && quality ? (
-                <aside className="self-start min-w-0">
-                  <DevelopmentQualityOptimizer
-                    quality={quality}
-                    qualityLoading={qualityLoading}
-                    aiAnalysisRequesting={aiAnalysisRequesting}
-                    onRequestAIAnalysis={handleRequestAIAnalysis}
+              {currentStep === 2 && (
+                <>
+                  <DevelopmentFormProgress
+                    currentStep={currentStep}
+                    isEditMode={isEditMode}
                   />
-                </aside>
-              ) : (
-                <div className="hidden xl:block" />
+
+                  <DevelopmentFormHeaderActions
+                    status={developmentStatus}
+                    isEditMode={isEditMode}
+                    isSubmitting={isSubmitting}
+                    onSaveDraft={handleSaveDraft}
+                    onPublish={handlePublish}
+                    onPause={handlePause}
+                    onArchive={handleArchive}
+                    onDelete={handleDelete}
+                    onPreview={handlePreview}
+                    canPreview={canPreview}
+                  />
+
+                  <DevelopmentUnitTypesSection
+                    developmentId={
+                      detail?.development?.id ||
+                      (isEditMode ? Number(id) : null)
+                    }
+                    unitTypes={unitTypes}
+                    setUnitTypes={setUnitTypes}
+                    onError={showError}
+                    onSuccess={showSuccess}
+                  />
+
+                  <DevelopmentAmenitiesSection
+                    amenities={amenities}
+                    setAmenities={setAmenities}
+                  />
+
+                  <div className="sticky bottom-4">
+                    <div className="rounded-2xl border border-slate-200 bg-white/95 backdrop-blur px-4 sm:px-5 py-4 shadow-lg">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">
+                            Último paso
+                          </p>
+
+                          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                            Revisá las tipologías y amenities antes de
+                            finalizar.
+                          </p>
+                        </div>
+
+                        <div className="flex flex-col-reverse sm:flex-row gap-3">
+                          <button
+                            type="button"
+                            disabled={isSubmitting}
+                            onClick={handleBackToStepOne}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            <Icon name="chevronLeft" size={18} />
+                            Volver al Paso 1
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={isSubmitting}
+                            onClick={handleFinalPrimaryAction}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 hover:opacity-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            <Icon name="checkCircle" size={18} />
+
+                            {isSubmitting
+                              ? isEditMode
+                                ? "Actualizando..."
+                                : "Guardando..."
+                              : isEditMode
+                                ? "Actualizar datos"
+                                : "Finalizar desarrollo"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
+
+            {/* COLUMNA DERECHA — SIEMPRE PRESENTE */}
+            {isEditMode && quality ? (
+              <aside className="self-start min-w-0 xl:sticky xl:top-6">
+                <DevelopmentQualityOptimizer
+                  quality={quality}
+                  qualityLoading={qualityLoading}
+                  aiAnalysisRequesting={aiAnalysisRequesting}
+                  onRequestAIAnalysis={handleRequestAIAnalysis}
+                />
+              </aside>
+            ) : (
+              <div className="hidden xl:block" />
+            )}
           </div>
-        )}
-        {currentStep === 2 && (
-           <div className="w-full max-w-4xl mx-auto space-y-6 sm:space-y-8">
-            <DevelopmentFormProgress
-              currentStep={currentStep}
-              isEditMode={isEditMode}
-            />
-
-            <DevelopmentFormHeaderActions
-              status={developmentStatus}
-              isEditMode={isEditMode}
-              isSubmitting={isSubmitting}
-              onSaveDraft={handleSaveDraft}
-              onPublish={handlePublish}
-              onPause={handlePause}
-              onArchive={handleArchive}
-              onDelete={handleDelete}
-              onPreview={handlePreview}
-              canPreview={canPreview}
-            />
-
-            <DevelopmentUnitTypesSection
-              developmentId={
-                detail?.development?.id || (isEditMode ? Number(id) : null)
-              }
-              unitTypes={unitTypes}
-              setUnitTypes={setUnitTypes}
-              onError={showError}
-              onSuccess={showSuccess}
-            />
-
-            <DevelopmentAmenitiesSection
-              amenities={amenities}
-              setAmenities={setAmenities}
-            />
-
-            <div className="sticky bottom-4">
-              <div className="rounded-2xl border border-slate-200 bg-white/95 backdrop-blur px-4 sm:px-5 py-4 shadow-lg">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      Último paso
-                    </p>
-                    <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                      Revisá las tipologías y amenities antes de finalizar.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col-reverse sm:flex-row gap-3">
-                    <button
-                      type="button"
-                      disabled={isSubmitting}
-                      onClick={handleBackToStepOne}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      <Icon name="chevronLeft" size={18} />
-                      Volver al Paso 1
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={isSubmitting}
-                      onClick={handleFinalPrimaryAction}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 hover:opacity-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      <Icon name="checkCircle" size={18} />
-                      {isSubmitting
-                        ? isEditMode
-                          ? "Actualizando..."
-                          : "Guardando..."
-                        : isEditMode
-                          ? "Actualizar datos"
-                          : "Finalizar desarrollo"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </form>
     </>
   );

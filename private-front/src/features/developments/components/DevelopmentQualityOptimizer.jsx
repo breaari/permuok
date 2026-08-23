@@ -45,24 +45,16 @@ function SectionScore({ label, score, maxScore }) {
   const safeScore = Number(score || 0);
   const safeMax = Number(maxScore || 1);
 
-  const percent = Math.max(
-    0,
-    Math.min(100, (safeScore / safeMax) * 100),
-  );
+  const percent = Math.max(0, Math.min(100, (safeScore / safeMax) * 100));
 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-4">
-        <span className="text-sm font-medium text-slate-700">
-          {label}
-        </span>
+        <span className="text-sm font-medium text-slate-700">{label}</span>
 
         <span className="text-sm font-bold text-slate-900">
           {formatScore(safeScore)}
-          <span className="font-semibold text-slate-400">
-            {" "}
-            / {safeMax}
-          </span>
+          <span className="font-semibold text-slate-400"> / {safeMax}</span>
         </span>
       </div>
 
@@ -78,6 +70,108 @@ function SectionScore({ label, score, maxScore }) {
   );
 }
 
+function normalizeDevelopmentTopic(value) {
+  const text = String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  // Superficies / m² / áreas de tipologías
+  if (
+    text.includes("superficie") ||
+    text.includes(" m²") ||
+    text.includes("m2") ||
+    text.includes("area_from") ||
+    text.includes("area_to")
+  ) {
+    return "unit_surface";
+  }
+
+  // Cantidad/disponibilidad de unidades
+  if (
+    text.includes("unidad disponible") ||
+    text.includes("unidades disponibles") ||
+    text.includes("disponibilidad") ||
+    text.includes("available_units")
+  ) {
+    return "availability";
+  }
+
+  // Precios
+  if (
+    text.includes("precio") ||
+    text.includes("valor") ||
+    text.includes("price_from") ||
+    text.includes("price_to")
+  ) {
+    return "price";
+  }
+
+  // Tipología/configuración
+  if (
+    text.includes("tipologia") ||
+    text.includes("ambiente") ||
+    text.includes("dormitorio") ||
+    text.includes("habitacion")
+  ) {
+    return "unit_type";
+  }
+
+  // Título
+  if (text.includes("titulo") || text.includes("nombre del proyecto")) {
+    return "title";
+  }
+
+  // Descripción
+  if (
+    text.includes("descripcion") ||
+    text.includes("texto comercial") ||
+    text.includes("texto de relleno")
+  ) {
+    return "description";
+  }
+
+  // Imágenes
+  if (
+    text.includes("imagen") ||
+    text.includes("foto") ||
+    text.includes("material visual")
+  ) {
+    return "images";
+  }
+
+  // Ubicación
+  if (
+    text.includes("ubicacion") ||
+    text.includes("direccion") ||
+    text.includes("ciudad") ||
+    text.includes("zona")
+  ) {
+    return "location";
+  }
+
+  // Amenities
+  if (
+    text.includes("amenity") ||
+    text.includes("amenities") ||
+    text.includes("servicio")
+  ) {
+    return "amenities";
+  }
+
+  // Etapa / entrega
+  if (
+    text.includes("etapa") ||
+    text.includes("entrega") ||
+    text.includes("posesion") ||
+    text.includes("development_stage")
+  ) {
+    return "stage";
+  }
+
+  return text.slice(0, 100);
+}
+
 function buildSuggestions(quality) {
   const suggestions = Array.isArray(quality?.suggestions)
     ? quality.suggestions
@@ -88,24 +182,58 @@ function buildSuggestions(quality) {
     : [];
 
   const result = [];
+  const usedTopics = new Set();
 
+  /*
+   * Las contradicciones tienen prioridad.
+   *
+   * Si ya detectamos una contradicción sobre superficies,
+   * disponibilidad, precio, etc., no repetimos después
+   * una sugerencia sobre exactamente ese mismo problema.
+   */
   for (const message of contradictions) {
+    const topic = normalizeDevelopmentTopic(message);
+
+    if (!topic || usedTopics.has(topic)) {
+      continue;
+    }
+
+    usedTopics.add(topic);
+
     result.push({
+      field: topic,
       priority: "high",
       title: "Revisá esta inconsistencia",
       message,
+      source: "contradiction",
     });
   }
 
+  /*
+   * Incorporamos únicamente sugerencias que aporten
+   * un tema nuevo.
+   */
   for (const item of suggestions) {
+    const topic = normalizeDevelopmentTopic(
+      `${item?.field || ""} ${item?.title || ""} ${item?.message || ""}`,
+    );
+
+    if (!topic || usedTopics.has(topic)) {
+      continue;
+    }
+
+    usedTopics.add(topic);
+
     result.push({
+      field: item?.field || topic,
       priority: item?.priority || "medium",
       title: item?.title || "Mejorá este aspecto",
       message: item?.message || "",
+      source: "suggestion",
     });
   }
 
-  const order = {
+  const priorityOrder = {
     high: 1,
     medium: 2,
     low: 3,
@@ -114,8 +242,7 @@ function buildSuggestions(quality) {
   return result
     .sort(
       (a, b) =>
-        (order[a?.priority] || 99) -
-        (order[b?.priority] || 99),
+        (priorityOrder[a?.priority] || 99) - (priorityOrder[b?.priority] || 99),
     )
     .slice(0, 5);
 }
@@ -134,21 +261,14 @@ export default function DevelopmentQualityOptimizer({
   const waitingAI = quality?.status === "waiting_ai";
   const needsAI = quality?.status === "needs_ai";
 
-  const score = completed
-    ? Number(quality?.score || 0)
-    : null;
+  const score = completed ? Number(quality?.score || 0) : null;
 
-  const meta = completed
-    ? getQualityMeta(quality?.quality_level)
-    : null;
+  const meta = completed ? getQualityMeta(quality?.quality_level) : null;
 
   const sections = quality?.sections || {};
   const suggestions = buildSuggestions(quality);
 
-  const buttonDisabled =
-    qualityLoading ||
-    aiAnalysisRequesting ||
-    waitingAI;
+  const buttonDisabled = qualityLoading || aiAnalysisRequesting || waitingAI;
 
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -165,9 +285,9 @@ export default function DevelopmentQualityOptimizer({
               </h2>
 
               <p className="mt-1 text-sm leading-5 text-slate-500">
-                Analizamos la calidad de la publicación, la
-                información comercial, las tipologías, la
-                coherencia y el potencial de matching.
+                Analizamos la calidad de la publicación, la información
+                comercial, las tipologías, la coherencia y el potencial de
+                matching.
               </p>
             </div>
           </div>
@@ -204,18 +324,14 @@ export default function DevelopmentQualityOptimizer({
                 <div
                   className="h-full rounded-full bg-emerald-500 transition-all duration-500"
                   style={{
-                    width: `${Math.max(
-                      0,
-                      Math.min(100, score),
-                    )}%`,
+                    width: `${Math.max(0, Math.min(100, score))}%`,
                   }}
                 />
               </div>
 
               <p className="mt-3 text-sm leading-5 text-slate-600">
-                El índice combina la calidad objetiva del
-                proyecto con el análisis IA del contenido,
-                coherencia y capacidad de generar
+                El índice combina la calidad objetiva del proyecto con el
+                análisis IA del contenido, coherencia y capacidad de generar
                 compatibilidades relevantes.
               </p>
             </div>
@@ -318,8 +434,8 @@ export default function DevelopmentQualityOptimizer({
               </h3>
 
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                Priorizamos los cambios que más pueden mejorar
-                la publicación y sus compatibilidades.
+                Priorizamos los cambios que más pueden mejorar la publicación y
+                sus compatibilidades.
               </p>
             </div>
 
@@ -357,10 +473,7 @@ export default function DevelopmentQualityOptimizer({
             disabled={buttonDisabled}
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <Icon
-              name={completed ? "refresh" : "sparkles"}
-              size={17}
-            />
+            <Icon name={completed ? "refresh" : "sparkles"} size={17} />
 
             {aiAnalysisRequesting
               ? "Solicitando..."
