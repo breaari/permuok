@@ -1065,7 +1065,7 @@ class CompatibilityEngine
                 id,
                 search_request_id,
                 title,
-                search_request_id,
+                property_id,
                 property_type,
                 estimated_price,
                 currency,

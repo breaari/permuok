@@ -161,6 +161,10 @@ export function buildSearchRequestPayload(form) {
     urgency: form.urgency || "medium",
     payment_mode_cash: !!form.payment_mode_cash,
     payment_mode_swap: !!form.payment_mode_swap,
+    exchange_property_id:
+      form.payment_mode_swap && form.exchange_property_id
+        ? Number(form.exchange_property_id)
+        : null,
     cash_difference_max: form.cash_difference_max || null,
     cash_difference_currency: form.cash_difference_currency || "USD",
     open_to_other_zones: !!form.open_to_other_zones,
