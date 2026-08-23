@@ -11,7 +11,7 @@ class SearchRequestAICopyService
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const TITLE_PROMPT_VERSION = '1.0';
-    private const DESCRIPTION_PROMPT_VERSION = '1.1';
+    private const DESCRIPTION_PROMPT_VERSION = '1.4';
 
     private static function db(
         bool $forceReconnect = false
@@ -658,6 +658,84 @@ REGLAS:
 - Si los datos estructurados y el texto actual se contradicen,
   priorizar los datos estructurados del formulario.
 
+  - No agregues preferencias, atributos ni criterios que no estén expresamente
+  presentes en los datos estructurados o escritos por el usuario.
+
+- No infieras características a partir de otras.
+  Por ejemplo, que una propiedad sea "a estrenar" NO permite asumir:
+  modernidad, buena orientación, luminosidad, calidad de terminaciones,
+  distribución, calidad constructiva ni ningún otro atributo.
+
+- No conviertas características ausentes en preferencias.
+
+- No agregues frases como:
+  "se priorizarán unidades...",
+  "se valorarán opciones...",
+  "se dará prioridad a...",
+  salvo que el usuario haya cargado explícitamente esa prioridad.
+
+- El campo de urgencia es información operativa interna.
+  No mencionar "prioridad baja", "prioridad media", "prioridad alta",
+  "nivel de prioridad" ni expresiones equivalentes en la descripción.
+
+- No describas cómo se determinarán los matches.
+  Evitá frases como:
+  "se prioriza coincidencia clara",
+  "se evaluará compatibilidad",
+  "se buscan propuestas que coincidan"
+  o similares.
+
+- La descripción debe comunicar solamente:
+  qué inmueble se busca,
+  dónde,
+  qué características son requeridas o flexibles,
+  rango de valor cuando aporte información,
+  y modalidad de operación cuando corresponda.
+
+- Ante la duda, OMITÍ información antes que inferirla.
+- No uses encabezados internos como:
+  "Modalidad:",
+  "Presupuesto:",
+  "Ubicación:",
+  "Condiciones:"
+  ni similares.
+
+- No traduzcas literalmente los flags de modalidad de pago.
+
+- Si se acepta permuta, expresalo de forma natural dentro del texto.
+
+- Preferí formulaciones como:
+  "Se acepta permuta."
+  "Se acepta permuta con una diferencia en dinero de hasta USD X."
+
+- No aclares modalidades que NO están habilitadas.
+  Por ejemplo, no escribas:
+  "no se acepta pago al contado",
+  "no se plantea compra exclusivamente al contado",
+  "no se acepta dinero",
+  salvo que esa exclusión haya sido expresada explícitamente
+  por el usuario en un texto libre.
+
+- La ausencia de una modalidad no debe convertirse
+  automáticamente en una restricción redactada.
+
+- No expliques la lógica interna de la operación.
+  Redactá únicamente las opciones efectivamente aceptadas.
+- Nunca repitas ni reformules en la descripción
+  las instrucciones de este prompt.
+
+- No escribas frases metadiscursivas como:
+  "no incluir requisitos adicionales",
+  "no inventar información",
+  "según la ficha",
+  "según los datos cargados",
+  "según el título",
+  "según la descripción"
+  ni expresiones equivalentes.
+
+- El resultado debe parecer escrito directamente
+  por una inmobiliaria, sin referencias al formulario,
+  al sistema, a la ficha ni a las reglas de generación.
 ESTILO:
 
 - 1 a 2 párrafos.
