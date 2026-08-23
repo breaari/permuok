@@ -34,12 +34,101 @@ class CompatibilityJobService
 
     private const STALE_LOCK_MINUTES = 10;
 
+    private const TYPE_CURRENCY_RATE_UPDATE =
+    'currency_rate_update';
+
     private static function db(
         bool $forceReconnect = false
     ): PDO {
         require_once __DIR__ . '/../../db.php';
 
         return pdo($forceReconnect);
+    }
+
+    public static function enqueueCurrencyRateUpdate(
+        int $priority = 9
+    ): array {
+        return self::enqueue(
+            self::TYPE_CURRENCY_RATE_UPDATE,
+            1,
+            $priority
+        );
+    }
+
+    public static function enqueueAllPublishedSearchRequestRecalculations(
+        int $priority = 4
+    ): int {
+        $priority = max(
+            1,
+            min(10, $priority)
+        );
+
+        $pdo = self::db();
+
+        /*
+     * Una modificación del dólar puede alterar
+     * todos los matches que involucren ARS/USD.
+     *
+     * Encolamos las búsquedas publicadas mediante
+     * un único INSERT ... SELECT en lugar de hacer
+     * miles de INSERT individuales.
+     */
+        $st = $pdo->prepare("
+        INSERT INTO compatibility_jobs (
+            job_type,
+            entity_id,
+            reference_id,
+            status,
+            priority,
+            attempts,
+            max_attempts,
+            available_at,
+            active_key
+        )
+
+        SELECT
+            'search_request_recalculate',
+            sr.id,
+            NULL,
+            'pending',
+            :priority,
+            0,
+            3,
+            NOW(),
+            CONCAT(
+                'search_request_recalculate:',
+                sr.id
+            )
+
+        FROM search_requests sr
+
+        WHERE sr.status = 'published'
+          AND sr.is_visible = 1
+          AND sr.deleted_at IS NULL
+
+        ON DUPLICATE KEY UPDATE
+            priority = GREATEST(
+                priority,
+                VALUES(priority)
+            ),
+
+            available_at = CASE
+                WHEN status = 'pending'
+                THEN LEAST(
+                    available_at,
+                    NOW()
+                )
+                ELSE available_at
+            END,
+
+            updated_at = CURRENT_TIMESTAMP
+    ");
+
+        $st->execute([
+            'priority' => $priority,
+        ]);
+
+        return $st->rowCount();
     }
 
     public static function enqueueSearchRequestAIAnalysis(
@@ -157,6 +246,7 @@ class CompatibilityJobService
             self::TYPE_PROPERTY_AI_ANALYZE,
             self::TYPE_SEARCH_REQUEST_AI_ANALYZE,
             self::TYPE_DEVELOPMENT_AI_ANALYZE,
+            self::TYPE_CURRENCY_RATE_UPDATE,
         ];
 
         if (!in_array($jobType, $validTypes, true)) {

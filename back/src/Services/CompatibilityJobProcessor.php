@@ -8,6 +8,7 @@ use App\Services\AI\PublicationQualityService;
 use App\Services\AI\PublicationAIAnalysisService;
 use App\Services\AI\SearchRequestAIAnalysisService;
 use App\Services\AI\DevelopmentAIAnalysisService;
+use App\Services\CurrencyConversionService;
 
 class CompatibilityJobProcessor
 {
@@ -42,6 +43,8 @@ class CompatibilityJobProcessor
                 (int)($job['attempts'] ?? 1),
                 (int)($job['max_attempts'] ?? 3)
             ),
+            'currency_rate_update' =>
+            self::processCurrencyRateUpdate(),
             'search_request_ai_analyze' =>
             SearchRequestAIAnalysisService::processAnalysis(
                 $entityId,
@@ -77,5 +80,29 @@ class CompatibilityJobProcessor
                     $jobType
             ),
         };
+    }
+    private static function processCurrencyRateUpdate(): array
+    {
+        $result =
+            CurrencyConversionService::refreshOfficialRate();
+
+        /*
+     * Solamente recalculamos matches cuando
+     * efectivamente apareció una cotización nueva.
+     *
+     * Si DolarHoy devuelve el mismo valor,
+     * no generamos trabajo innecesario.
+     */
+        if (!empty($result['updated'])) {
+            $result['recalculation_jobs_affected'] =
+                CompatibilityJobService::enqueueAllPublishedSearchRequestRecalculations(
+                    4
+                );
+        } else {
+            $result['recalculation_jobs_affected'] =
+                0;
+        }
+
+        return $result;
     }
 }
