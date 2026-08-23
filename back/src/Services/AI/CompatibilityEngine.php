@@ -2222,21 +2222,37 @@ class CompatibilityEngine
         $reasons = [];
         $penalties = [];
 
+        /*
+     * --------------------------------------------------
+     * Validaciones iniciales
+     * --------------------------------------------------
+     */
+
         if ($exchangeOffers === []) {
             return [
                 'score' => 0.0,
+
                 'reasons' => [
                     [
-                        'code' => 'exchange_offer_missing',
+                        'code' =>
+                        'exchange_offer_missing',
+
                         'label' =>
                         'No hay un inmueble ofrecido para la permuta',
-                        'weight' => 20,
-                        'matched' => false,
+
+                        'weight' =>
+                        20,
+
+                        'matched' =>
+                        false,
                     ],
                 ],
+
                 'penalties' => [
                     [
-                        'code' => 'exchange_offer_missing',
+                        'code' =>
+                        'exchange_offer_missing',
+
                         'label' =>
                         'La búsqueda indica permuta, pero no tiene una oferta cargada',
                     ],
@@ -2247,18 +2263,28 @@ class CompatibilityEngine
         if (!$requirements) {
             return [
                 'score' => 0.0,
+
                 'reasons' => [
                     [
-                        'code' => 'swap_not_confirmed',
+                        'code' =>
+                        'swap_not_confirmed',
+
                         'label' =>
                         'La propiedad no informó condiciones de permuta',
-                        'weight' => 20,
-                        'matched' => false,
+
+                        'weight' =>
+                        20,
+
+                        'matched' =>
+                        false,
                     ],
                 ],
+
                 'penalties' => [
                     [
-                        'code' => 'property_requirements_missing',
+                        'code' =>
+                        'property_requirements_missing',
+
                         'label' =>
                         'No se puede confirmar que el propietario acepte permuta',
                     ],
@@ -2266,17 +2292,31 @@ class CompatibilityEngine
             ];
         }
 
+        /*
+     * --------------------------------------------------
+     * Modalidades aceptadas por el propietario
+     * --------------------------------------------------
+     */
+
         $acceptsTotalSwap =
-            (int)($requirements['accepts_total_swap'] ?? 0) === 1;
+            (int)(
+                $requirements['accepts_total_swap'] ?? 0
+            ) === 1;
 
         $acceptsSwapPlusCash =
-            (int)($requirements['accepts_swap_plus_cash'] ?? 0) === 1;
+            (int)(
+                $requirements['accepts_swap_plus_cash'] ?? 0
+            ) === 1;
 
         $acceptsMultipleSwap =
-            (int)($requirements['accepts_multiple_swap'] ?? 0) === 1;
+            (int)(
+                $requirements['accepts_multiple_swap'] ?? 0
+            ) === 1;
 
         $acceptsOpenProposals =
-            (int)($requirements['accepts_open_proposals'] ?? 0) === 1;
+            (int)(
+                $requirements['accepts_open_proposals'] ?? 0
+            ) === 1;
 
         $acceptsAnySwap =
             $acceptsTotalSwap ||
@@ -2287,31 +2327,32 @@ class CompatibilityEngine
         /*
      * 1. Modalidad aceptada: 5 puntos.
      */
-        if ($acceptsAnySwap) {
-            $score += 5;
 
-            $reasons[] = [
-                'code' => 'swap_mode_accepted',
-                'label' =>
-                'La propiedad acepta operaciones con permuta',
-                'weight' => 5,
-                'matched' => true,
-            ];
-        } else {
-            $reasons[] = [
-                'code' => 'swap_mode_rejected',
-                'label' =>
-                'La propiedad no tiene habilitada una modalidad de permuta',
-                'weight' => 5,
-                'matched' => false,
-            ];
-
+        if (!$acceptsAnySwap) {
             return [
                 'score' => 0.0,
-                'reasons' => $reasons,
+
+                'reasons' => [
+                    [
+                        'code' =>
+                        'swap_mode_rejected',
+
+                        'label' =>
+                        'La propiedad no tiene habilitada una modalidad de permuta',
+
+                        'weight' =>
+                        5,
+
+                        'matched' =>
+                        false,
+                    ],
+                ],
+
                 'penalties' => [
                     [
-                        'code' => 'swap_not_accepted',
+                        'code' =>
+                        'swap_not_accepted',
+
                         'label' =>
                         'La propiedad objetivo no acepta permuta',
                     ],
@@ -2319,254 +2360,708 @@ class CompatibilityEngine
             ];
         }
 
-        $propertyPrice = self::toNullableFloat(
-            $property['price'] ?? null
-        );
+        $score += 5;
 
-        $propertyCurrency = strtoupper(
-            trim((string)($property['currency'] ?? ''))
-        );
+        $reasons[] = [
+            'code' =>
+            'swap_mode_accepted',
 
-        $requirementCurrency = strtoupper(
-            trim((string)(
-                $requirements['price_currency']
-                ?? $propertyCurrency
-            ))
-        );
+            'label' =>
+            'La propiedad acepta operaciones con permuta',
+
+            'weight' =>
+            5,
+
+            'matched' =>
+            true,
+        ];
 
         /*
-     * Elegimos la mejor oferta comparable en la misma moneda.
+     * --------------------------------------------------
+     * Precio de propiedad objetivo
+     * --------------------------------------------------
      */
-        $selectedOffer = null;
 
-        foreach ($exchangeOffers as $offer) {
-            $offerPrice = self::toNullableFloat(
-                $offer['estimated_price'] ?? null
+        $propertyPrice =
+            self::toNullableFloat(
+                $property['price'] ?? null
             );
 
-            $offerCurrency = strtoupper(
-                trim((string)($offer['currency'] ?? ''))
+        $propertyCurrency =
+            strtoupper(
+                trim(
+                    (string)(
+                        $property['currency']
+                        ?? ''
+                    )
+                )
             );
 
-            if (
-                $offerPrice === null ||
-                $offerPrice <= 0 ||
-                $offerCurrency === '' ||
-                $offerCurrency !== $propertyCurrency
-            ) {
-                continue;
-            }
-
-            if (
-                $selectedOffer === null ||
-                $offerPrice >
-                (float)$selectedOffer['estimated_price']
-            ) {
-                $selectedOffer = $offer;
-            }
-        }
-
-        if (!$selectedOffer || $propertyPrice === null) {
-            $reasons[] = [
-                'code' => 'swap_values_not_comparable',
-                'label' =>
-                'No se pueden comparar los valores de la permuta',
-                'weight' => 15,
-                'matched' => false,
-            ];
-
+        if (
+            $propertyPrice === null ||
+            $propertyPrice <= 0 ||
+            $propertyCurrency === ''
+        ) {
             return [
-                'score' => $score,
-                'reasons' => $reasons,
+                'score' =>
+                $score,
+
+                'reasons' =>
+                array_merge(
+                    $reasons,
+                    [
+                        [
+                            'code' =>
+                            'target_property_value_missing',
+
+                            'label' =>
+                            'La propiedad objetivo no tiene un valor válido para evaluar la permuta',
+
+                            'weight' =>
+                            15,
+
+                            'matched' =>
+                            false,
+                        ],
+                    ]
+                ),
+
                 'penalties' => [
                     [
-                        'code' => 'swap_currency_or_price_missing',
+                        'code' =>
+                        'target_property_value_missing',
+
                         'label' =>
-                        'Falta precio comparable o las monedas no coinciden',
+                        'Falta precio o moneda de la propiedad objetivo',
                     ],
                 ],
             ];
         }
 
-        $offerPrice = (float)$selectedOffer['estimated_price'];
+        /*
+     * --------------------------------------------------
+     * Elegimos la mejor propiedad ofrecida.
+     *
+     * Todas las ofertas se convierten a la moneda
+     * de la propiedad objetivo antes de compararlas.
+     * --------------------------------------------------
+     */
+
+        $selectedOffer = null;
+        $selectedOfferComparablePrice = null;
+        $selectedOfferOriginalPrice = null;
+        $selectedOfferOriginalCurrency = null;
+        $selectedOfferConversionApplied = false;
+
+        foreach ($exchangeOffers as $offer) {
+            $offerPrice =
+                self::toNullableFloat(
+                    $offer['estimated_price'] ?? null
+                );
+
+            $offerCurrency =
+                strtoupper(
+                    trim(
+                        (string)(
+                            $offer['currency']
+                            ?? ''
+                        )
+                    )
+                );
+
+            if (
+                $offerPrice === null ||
+                $offerPrice <= 0 ||
+                $offerCurrency === ''
+            ) {
+                continue;
+            }
+
+            $comparablePrice =
+                self::convertAmount(
+                    $offerPrice,
+                    $offerCurrency,
+                    $propertyCurrency
+                );
+
+            if ($comparablePrice === null) {
+                continue;
+            }
+
+            if (
+                $selectedOffer === null ||
+                $selectedOfferComparablePrice === null ||
+                $comparablePrice >
+                $selectedOfferComparablePrice
+            ) {
+                $selectedOffer =
+                    $offer;
+
+                $selectedOfferComparablePrice =
+                    $comparablePrice;
+
+                $selectedOfferOriginalPrice =
+                    $offerPrice;
+
+                $selectedOfferOriginalCurrency =
+                    $offerCurrency;
+
+                $selectedOfferConversionApplied =
+                    $offerCurrency !==
+                    $propertyCurrency;
+            }
+        }
+
+        if (
+            $selectedOffer === null ||
+            $selectedOfferComparablePrice === null
+        ) {
+            $reasons[] = [
+                'code' =>
+                'swap_values_not_comparable',
+
+                'label' =>
+                'No se pueden comparar los valores de la permuta',
+
+                'weight' =>
+                15,
+
+                'matched' =>
+                false,
+            ];
+
+            $penalties[] = [
+                'code' =>
+                'swap_currency_conversion_unavailable',
+
+                'label' =>
+                'No hay precios válidos o una cotización disponible para comparar la permuta',
+            ];
+
+            return [
+                'score' =>
+                round($score, 2),
+
+                'reasons' =>
+                $reasons,
+
+                'penalties' =>
+                $penalties,
+            ];
+        }
+
+        $offerPrice =
+            $selectedOfferComparablePrice;
 
         /*
-     * 2. Valor del bien ofrecido dentro del rango aceptado:
+     * --------------------------------------------------
+     * 2. Valor del inmueble ofrecido:
      * 5 puntos.
+     *
+     * price_min / price_max pueden estar expresados
+     * en otra moneda.
+     * --------------------------------------------------
      */
-        $priceMin = self::toNullableFloat(
-            $requirements['price_min'] ?? null
-        );
 
-        $priceMax = self::toNullableFloat(
-            $requirements['price_max'] ?? null
-        );
+        $requirementCurrency =
+            strtoupper(
+                trim(
+                    (string)(
+                        $requirements['price_currency']
+                        ?? $propertyCurrency
+                    )
+                )
+            );
+
+        if ($requirementCurrency === '') {
+            $requirementCurrency =
+                $propertyCurrency;
+        }
+
+        $priceMinRaw =
+            self::toNullableFloat(
+                $requirements['price_min'] ?? null
+            );
+
+        $priceMaxRaw =
+            self::toNullableFloat(
+                $requirements['price_max'] ?? null
+            );
+
+        $priceMin = null;
+        $priceMax = null;
+
+        if ($priceMinRaw !== null) {
+            $priceMin =
+                self::convertAmount(
+                    $priceMinRaw,
+                    $requirementCurrency,
+                    $propertyCurrency
+                );
+        }
+
+        if ($priceMaxRaw !== null) {
+            $priceMax =
+                self::convertAmount(
+                    $priceMaxRaw,
+                    $requirementCurrency,
+                    $propertyCurrency
+                );
+        }
+
+        /*
+     * Si había un límite informado pero no
+     * pudimos convertirlo, no lo consideramos match.
+     */
+        $offerRangeConversionAvailable =
+            ($priceMinRaw === null ||
+                $priceMin !== null)
+            &&
+            ($priceMaxRaw === null ||
+                $priceMax !== null);
 
         $withinAcceptedOfferRange =
-            ($priceMin === null || $priceMin <= 0 || $offerPrice >= $priceMin) &&
-            ($priceMax === null || $priceMax <= 0 || $offerPrice <= $priceMax) &&
+            $offerRangeConversionAvailable &&
             (
-                $requirementCurrency === '' ||
-                $requirementCurrency === $propertyCurrency
+                $priceMin === null ||
+                $priceMin <= 0 ||
+                $offerPrice >= $priceMin
+            ) &&
+            (
+                $priceMax === null ||
+                $priceMax <= 0 ||
+                $offerPrice <= $priceMax
             );
 
         if ($withinAcceptedOfferRange) {
             $score += 5;
         } else {
             $penalties[] = [
-                'code' => 'exchange_offer_value_out_of_range',
+                'code' =>
+                'exchange_offer_value_out_of_range',
+
                 'label' =>
                 'El valor del inmueble ofrecido no está dentro del rango aceptado',
-                'offered_value' => $offerPrice,
-                'accepted_min' => $priceMin,
-                'accepted_max' => $priceMax,
-                'currency' => $propertyCurrency,
+
+                'offered_value' =>
+                $offerPrice,
+
+                'accepted_min' =>
+                $priceMin,
+
+                'accepted_max' =>
+                $priceMax,
+
+                'currency' =>
+                $propertyCurrency,
             ];
         }
 
         $reasons[] = [
-            'code' => 'exchange_offer_value_match',
+            'code' =>
+            'exchange_offer_value_match',
+
             'label' =>
             'Valor del inmueble ofrecido compatible',
-            'weight' => 5,
-            'matched' => $withinAcceptedOfferRange,
-            'offered_value' => $offerPrice,
-            'accepted_min' => $priceMin,
-            'accepted_max' => $priceMax,
-            'currency' => $propertyCurrency,
+
+            'weight' =>
+            5,
+
+            'matched' =>
+            $withinAcceptedOfferRange,
+
+            'offered_value' =>
+            $offerPrice,
+
+            'accepted_min' =>
+            $priceMin,
+
+            'accepted_max' =>
+            $priceMax,
+
+            'currency' =>
+            $propertyCurrency,
+
+            'original_offered_value' =>
+            $selectedOfferOriginalPrice,
+
+            'original_offered_currency' =>
+            $selectedOfferOriginalCurrency,
+
+            'currency_conversion_applied' =>
+            $selectedOfferConversionApplied,
         ];
 
-        $requiredDifference = round(
-            max(0, $propertyPrice - $offerPrice),
-            2
-        );
+        /*
+     * --------------------------------------------------
+     * Diferencia económica real.
+     *
+     * POSITIVA:
+     * propiedad buscada vale más.
+     * El buscador debe agregar dinero.
+     * Para el propietario objetivo es "a_favor".
+     *
+     * NEGATIVA:
+     * propiedad ofrecida vale más.
+     * El propietario objetivo debería agregar dinero.
+     * Para él es "en_contra".
+     *
+     * CERO:
+     * permuta total.
+     * --------------------------------------------------
+     */
 
-        $availableDifference = self::toNullableFloat(
-            $search['cash_difference_max'] ?? null
-        );
+        $signedDifference =
+            round(
+                $propertyPrice -
+                    $offerPrice,
+                2
+            );
 
-        $availableDifferenceCurrency = strtoupper(
-            trim((string)(
-                $search['cash_difference_currency'] ?? ''
-            ))
-        );
+        $absoluteDifference =
+            round(
+                abs($signedDifference),
+                2
+            );
+
+        if ($signedDifference > 0) {
+            $actualDirection =
+                'a_favor';
+        } elseif ($signedDifference < 0) {
+            $actualDirection =
+                'en_contra';
+        } else {
+            $actualDirection =
+                'total';
+        }
 
         /*
-     * 3. La búsqueda puede cubrir la diferencia:
+     * --------------------------------------------------
+     * 3. Capacidad económica del buscador:
      * 5 puntos.
+     *
+     * Sólo necesita aportar efectivo cuando
+     * signedDifference > 0.
+     * --------------------------------------------------
      */
-        $canCoverDifference =
-            $requiredDifference <= 0 ||
-            (
-                $availableDifference !== null &&
-                $availableDifferenceCurrency === $propertyCurrency &&
-                $availableDifference >= $requiredDifference
+
+        $availableDifferenceRaw =
+            self::toNullableFloat(
+                $search['cash_difference_max'] ?? null
             );
+
+        $availableDifferenceCurrency =
+            strtoupper(
+                trim(
+                    (string)(
+                        $search['cash_difference_currency'] ?? ''
+                    )
+                )
+            );
+
+        $availableDifference = null;
+
+        if (
+            $availableDifferenceRaw !== null &&
+            $availableDifferenceRaw >= 0
+        ) {
+            if (
+                $availableDifferenceCurrency === ''
+            ) {
+                $availableDifferenceCurrency =
+                    $propertyCurrency;
+            }
+
+            $availableDifference =
+                self::convertAmount(
+                    $availableDifferenceRaw,
+                    $availableDifferenceCurrency,
+                    $propertyCurrency
+                );
+        }
+
+        /*
+     * Sin diferencia o diferencia a favor
+     * del buscador: no necesita aportar efectivo.
+     */
+        if ($signedDifference <= 0) {
+            $canCoverDifference =
+                true;
+        } else {
+            $searchAcceptsCash =
+                (int)(
+                    $search['payment_mode_cash'] ?? 0
+                ) === 1;
+
+            $canCoverDifference =
+                $searchAcceptsCash &&
+                $availableDifference !== null &&
+                $availableDifference >=
+                $absoluteDifference;
+        }
 
         if ($canCoverDifference) {
             $score += 5;
         } else {
             $penalties[] = [
-                'code' => 'insufficient_cash_difference',
+                'code' =>
+                'insufficient_cash_difference',
+
                 'label' =>
                 'El efectivo disponible no alcanza para cubrir la diferencia',
-                'required_difference' => $requiredDifference,
-                'available_difference' => $availableDifference,
-                'currency' => $propertyCurrency,
+
+                'required_difference' =>
+                $absoluteDifference,
+
+                'available_difference' =>
+                $availableDifference,
+
+                'currency' =>
+                $propertyCurrency,
             ];
         }
 
         $reasons[] = [
-            'code' => 'cash_difference_capacity',
+            'code' =>
+            'cash_difference_capacity',
+
             'label' =>
             'Capacidad para cubrir la diferencia en efectivo',
-            'weight' => 5,
-            'matched' => $canCoverDifference,
-            'required_difference' => $requiredDifference,
-            'available_difference' => $availableDifference,
-            'currency' => $propertyCurrency,
+
+            'weight' =>
+            5,
+
+            'matched' =>
+            $canCoverDifference,
+
+            'required_difference' =>
+            $signedDifference > 0
+                ? $absoluteDifference
+                : 0.0,
+
+            'available_difference' =>
+            $availableDifference,
+
+            'currency' =>
+            $propertyCurrency,
         ];
 
         /*
-     * 4. Diferencia dentro de las condiciones del propietario:
+     * --------------------------------------------------
+     * 4. Condiciones económicas del propietario:
      * 5 puntos.
+     * --------------------------------------------------
      */
-        $differenceMin = self::toNullableFloat(
-            $requirements['cash_difference_min'] ?? null
-        );
 
-        $differenceMax = self::toNullableFloat(
-            $requirements['cash_difference_max'] ?? null
-        );
-
-        $differenceCurrency = strtoupper(
-            trim((string)(
-                $requirements['cash_difference_currency'] ?? ''
-            ))
-        );
-
-        $differenceDirection = (string)(
-            $requirements['cash_difference_direction'] ?? ''
-        );
-
-        $directionCompatible =
-            $requiredDifference === 0
-            ? $acceptsTotalSwap ||
-            $acceptsOpenProposals
-            : in_array(
-                $differenceDirection,
-                ['a_favor', 'indistinto'],
-                true
+        $differenceCurrency =
+            strtoupper(
+                trim(
+                    (string)(
+                        $requirements['cash_difference_currency'] ?? ''
+                    )
+                )
             );
 
+        if ($differenceCurrency === '') {
+            $differenceCurrency =
+                $propertyCurrency;
+        }
+
+        $differenceMinRaw =
+            self::toNullableFloat(
+                $requirements['cash_difference_min'] ?? null
+            );
+
+        $differenceMaxRaw =
+            self::toNullableFloat(
+                $requirements['cash_difference_max'] ?? null
+            );
+
+        $differenceMin = null;
+        $differenceMax = null;
+
+        if ($differenceMinRaw !== null) {
+            $differenceMin =
+                self::convertAmount(
+                    $differenceMinRaw,
+                    $differenceCurrency,
+                    $propertyCurrency
+                );
+        }
+
+        if ($differenceMaxRaw !== null) {
+            $differenceMax =
+                self::convertAmount(
+                    $differenceMaxRaw,
+                    $differenceCurrency,
+                    $propertyCurrency
+                );
+        }
+
+        $differenceRangeConversionAvailable =
+            ($differenceMinRaw === null ||
+                $differenceMin !== null)
+            &&
+            ($differenceMaxRaw === null ||
+                $differenceMax !== null);
+
+        $differenceDirection =
+            strtolower(
+                trim(
+                    (string)(
+                        $requirements['cash_difference_direction'] ?? ''
+                    )
+                )
+            );
+
+        /*
+     * Validamos primero la modalidad económica.
+     */
+        if ($actualDirection === 'total') {
+            $modeCompatible =
+                $acceptsTotalSwap ||
+                $acceptsOpenProposals;
+
+            $directionCompatible =
+                $modeCompatible;
+        } else {
+            $modeCompatible =
+                $acceptsSwapPlusCash ||
+                $acceptsOpenProposals;
+
+            $directionCompatible =
+                $modeCompatible &&
+                (
+                    $differenceDirection ===
+                    'indistinto' ||
+                    $differenceDirection ===
+                    $actualDirection ||
+                    (
+                        $differenceDirection === '' &&
+                        $acceptsOpenProposals
+                    )
+                );
+        }
+
         $differenceWithinOwnerRange =
+            $differenceRangeConversionAvailable &&
             $directionCompatible &&
             (
-                $differenceCurrency === '' ||
-                $differenceCurrency === $propertyCurrency
-            ) &&
-            (
                 $differenceMin === null ||
-                $requiredDifference >= $differenceMin
+                $differenceMin <= 0 ||
+                $absoluteDifference >=
+                $differenceMin
             ) &&
             (
                 $differenceMax === null ||
-                $requiredDifference <= $differenceMax
+                $differenceMax <= 0 ||
+                $absoluteDifference <=
+                $differenceMax
             );
 
         if ($differenceWithinOwnerRange) {
             $score += 5;
         } else {
             $penalties[] = [
-                'code' => 'owner_difference_conditions_mismatch',
+                'code' =>
+                'owner_difference_conditions_mismatch',
+
                 'label' =>
                 'La diferencia calculada no cumple las condiciones del propietario',
-                'required_difference' => $requiredDifference,
-                'accepted_min' => $differenceMin,
-                'accepted_max' => $differenceMax,
-                'direction' => $differenceDirection,
+
+                'difference' =>
+                $absoluteDifference,
+
+                'accepted_min' =>
+                $differenceMin,
+
+                'accepted_max' =>
+                $differenceMax,
+
+                'required_direction' =>
+                $differenceDirection,
+
+                'actual_direction' =>
+                $actualDirection,
+
+                'currency' =>
+                $propertyCurrency,
             ];
         }
 
         $reasons[] = [
-            'code' => 'owner_difference_conditions',
+            'code' =>
+            'owner_difference_conditions',
+
             'label' =>
             'Diferencia aceptada por el propietario',
-            'weight' => 5,
-            'matched' => $differenceWithinOwnerRange,
-            'required_difference' => $requiredDifference,
-            'accepted_min' => $differenceMin,
-            'accepted_max' => $differenceMax,
-            'direction' => $differenceDirection,
-            'currency' => $propertyCurrency,
+
+            'weight' =>
+            5,
+
+            'matched' =>
+            $differenceWithinOwnerRange,
+
+            'difference' =>
+            $absoluteDifference,
+
+            'signed_difference' =>
+            $signedDifference,
+
+            'accepted_min' =>
+            $differenceMin,
+
+            'accepted_max' =>
+            $differenceMax,
+
+            'required_direction' =>
+            $differenceDirection,
+
+            'actual_direction' =>
+            $actualDirection,
+
+            'currency' =>
+            $propertyCurrency,
+        ];
+
+        /*
+     * Metadatos de la cotización usada.
+     *
+     * Como CurrencyConversionService tiene cache,
+     * esto no genera consultas repetidas.
+     */
+        $rateInfo =
+            CurrencyConversionService::getCurrentRateInfo();
+
+        $reasons[] = [
+            'code' =>
+            'currency_reference',
+
+            'label' =>
+            'Cotización de referencia utilizada',
+
+            'weight' =>
+            0,
+
+            'matched' =>
+            true,
+
+            'rate' =>
+            $rateInfo,
         ];
 
         return [
-            'score' => round($score, 2),
-            'reasons' => $reasons,
-            'penalties' => $penalties,
+            'score' =>
+            round($score, 2),
+
+            'reasons' =>
+            $reasons,
+
+            'penalties' =>
+            $penalties,
         ];
     }
+    
     private static function saveCompatibility(
         PDO $pdo,
         array $search,
