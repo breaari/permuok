@@ -143,3 +143,12 @@ export async function replaceDevelopmentAmenities(id, amenities) {
     http.put(`/developments/${id}/amenities`, { amenities }),
   );
 }
+export async function getDevelopmentQuality(id) {
+  return safeRequest(() => http.get(`/developments/${id}/quality`));
+}
+
+export async function requestDevelopmentAIAnalysis(id) {
+  return safeRequest(() =>
+    http.post(`/developments/${id}/ai-analysis`, {}),
+  );
+}
