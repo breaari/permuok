@@ -12,6 +12,7 @@ import { getErrorMessage } from "../../../api/http";
 import { useAuth } from "../../auth/components/AuthContext";
 import { useGoogleMaps } from "../../../ui/maps/UseGoogleMaps";
 import { normalizeAmenities as normalizeAmenityList } from "../../shared/helpers/amenities";
+import DevelopmentQualityOptimizer from "../components/DevelopmentQualityOptimizer";
 
 import {
   createDevelopmentDraft,
@@ -778,6 +779,15 @@ export default function DevelopmentForm() {
               onPreview={handlePreview}
               canPreview={canPreview}
             />
+
+            {isEditMode && quality && (
+              <DevelopmentQualityOptimizer
+                quality={quality}
+                qualityLoading={qualityLoading}
+                aiAnalysisRequesting={aiAnalysisRequesting}
+                onRequestAIAnalysis={handleRequestAIAnalysis}
+              />
+            )}
 
             <DevelopmentBasicSection form={form} setField={setField} />
 
