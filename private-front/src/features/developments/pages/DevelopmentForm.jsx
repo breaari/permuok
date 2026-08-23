@@ -28,6 +28,8 @@ import {
   replaceDevelopmentAmenities,
   getDevelopmentQuality,
   requestDevelopmentAIAnalysis,
+  generateDevelopmentAITitle,
+  generateDevelopmentAIDescription,
 } from "../api/developments.api";
 
 import DevelopmentFormProgress from "../components/DevelopmentFormProgress";
@@ -137,6 +139,42 @@ function hasValidLocation(form) {
 function getDevelopmentIdFromResult(result) {
   return result?.development?.id || result?.item?.id || result?.id || null;
 }
+function buildDevelopmentAIDraft(form, unitTypes, amenities) {
+  return {
+    development: {
+      title: form.title ?? "",
+      short_description: form.short_description ?? "",
+      description: form.description ?? "",
+
+      developer_name: form.developer_name || null,
+      construction_company: form.construction_company || null,
+
+      stage: form.development_stage || null,
+      delivery_date_estimated: form.delivery_date_estimated || null,
+
+      location: {
+        country: form.country || null,
+        province: form.province || null,
+        city: form.city || null,
+        zone: form.zone || null,
+        address: form.address || null,
+        formatted_address: form.formatted_address || null,
+      },
+
+      commercial: {
+        currency: form.currency || null,
+        price_from: form.price_from || null,
+        price_to: form.price_to || null,
+        total_units: form.total_units || null,
+        available_units: form.available_units || null,
+      },
+
+      unit_types: Array.isArray(unitTypes) ? unitTypes : [],
+
+      amenities: Array.isArray(amenities) ? amenities : [],
+    },
+  };
+}
 
 export default function DevelopmentForm() {
   const { user } = useAuth();
@@ -174,6 +212,11 @@ export default function DevelopmentForm() {
   const [qualityLoading, setQualityLoading] = useState(false);
   const [aiAnalysisRequesting, setAIAnalysisRequesting] = useState(false);
 
+  const [aiTitleSuggestion, setAITitleSuggestion] = useState("");
+  const [aiDescriptionSuggestion, setAIDescriptionSuggestion] = useState("");
+
+  const [aiTitleLoading, setAITitleLoading] = useState(false);
+  const [aiDescriptionLoading, setAIDescriptionLoading] = useState(false);
   const backPath = useMemo(() => {
     return location.state?.from || "/developments";
   }, [location.state]);
@@ -754,6 +797,83 @@ export default function DevelopmentForm() {
     }
   }
 
+  async function handleGenerateAITitle() {
+    if (!isEditMode || aiTitleLoading) {
+      return;
+    }
+
+    try {
+      setAITitleLoading(true);
+
+      const draft = buildDevelopmentAIDraft(form, unitTypes, amenities);
+
+      const result = await generateDevelopmentAITitle(Number(id), draft);
+
+      const content = String(result?.content || "").trim();
+
+      if (!content) {
+        throw new Error("La IA no generó un título.");
+      }
+
+      setAITitleSuggestion(content);
+    } catch (error) {
+      showError(getErrorMessage(error, "No se pudo generar el título con IA."));
+    } finally {
+      setAITitleLoading(false);
+    }
+  }
+
+  async function handleGenerateAIDescription() {
+    if (!isEditMode || aiDescriptionLoading) {
+      return;
+    }
+
+    try {
+      setAIDescriptionLoading(true);
+
+      const draft = buildDevelopmentAIDraft(form, unitTypes, amenities);
+
+      const result = await generateDevelopmentAIDescription(Number(id), draft);
+
+      const content = String(result?.content || "").trim();
+
+      if (!content) {
+        throw new Error("La IA no generó una descripción.");
+      }
+
+      setAIDescriptionSuggestion(content);
+    } catch (error) {
+      showError(
+        getErrorMessage(error, "No se pudo generar la descripción con IA."),
+      );
+    } finally {
+      setAIDescriptionLoading(false);
+    }
+  }
+
+  function handleApplyAITitle() {
+    if (!aiTitleSuggestion) {
+      return;
+    }
+
+    setField("title", aiTitleSuggestion);
+    setAITitleSuggestion("");
+
+    showSuccess("Se aplicó el título sugerido.");
+  }
+
+  function handleApplyAIDescription() {
+    if (!aiDescriptionSuggestion) {
+      return;
+    }
+
+    setField("description", aiDescriptionSuggestion);
+
+    setAIDescriptionSuggestion("");
+
+    showSuccess("Se aplicó la descripción sugerida.");
+  }
+
   return (
     <>
       <form
@@ -784,7 +904,19 @@ export default function DevelopmentForm() {
                     canPreview={canPreview}
                   />
 
-                  <DevelopmentBasicSection form={form} setField={setField} />
+                  <DevelopmentBasicSection
+                    form={form}
+                    setField={setField}
+                    isEditMode={isEditMode}
+                    aiTitleSuggestion={aiTitleSuggestion}
+                    aiDescriptionSuggestion={aiDescriptionSuggestion}
+                    aiTitleLoading={aiTitleLoading}
+                    aiDescriptionLoading={aiDescriptionLoading}
+                    onGenerateAITitle={handleGenerateAITitle}
+                    onGenerateAIDescription={handleGenerateAIDescription}
+                    onApplyAITitle={handleApplyAITitle}
+                    onApplyAIDescription={handleApplyAIDescription}
+                  />
 
                   <PropertyLocationSection
                     form={form}

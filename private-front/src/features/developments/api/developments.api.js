@@ -152,3 +152,19 @@ export async function requestDevelopmentAIAnalysis(id) {
     http.post(`/developments/${id}/ai-analysis`, {}),
   );
 }
+
+export async function generateDevelopmentAITitle(id, draft) {
+  return safeRequest(() =>
+    http.post(`/developments/${id}/ai-copy/title`, {
+      draft,
+    }),
+  );
+}
+
+export async function generateDevelopmentAIDescription(id, draft) {
+  return safeRequest(() =>
+    http.post(`/developments/${id}/ai-copy/description`, {
+      draft,
+    }),
+  );
+}

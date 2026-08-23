@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Icon } from "../../../ui/icons/Index";
 
 const TITLE_MAX = 180;
 const SHORT_DESCRIPTION_MAX = 500;
@@ -18,7 +19,24 @@ function inputClass(hasError) {
   } bg-white text-slate-900`;
 }
 
-export default function DevelopmentBasicSection({ form, setField }) {
+export default function DevelopmentBasicSection({
+  form,
+  setField,
+
+  isEditMode = false,
+
+  aiTitleSuggestion = "",
+  aiDescriptionSuggestion = "",
+
+  aiTitleLoading = false,
+  aiDescriptionLoading = false,
+
+  onGenerateAITitle,
+  onGenerateAIDescription,
+
+  onApplyAITitle,
+  onApplyAIDescription,
+}) {
   const title = String(form.title || "");
   const shortDescription = String(form.short_description || "");
   const description = String(form.description || "");
@@ -68,10 +86,7 @@ export default function DevelopmentBasicSection({ form, setField }) {
             </label>
 
             <span
-              className={`text-xs ${getCounterClass(
-                title.length,
-                TITLE_MAX
-              )}`}
+              className={`text-xs ${getCounterClass(title.length, TITLE_MAX)}`}
             >
               {title.length}/{TITLE_MAX}
             </span>
@@ -91,6 +106,58 @@ export default function DevelopmentBasicSection({ form, setField }) {
           )}
         </div>
 
+        {isEditMode && (
+          <div className="mt-3">
+            {!aiTitleSuggestion ? (
+              <button
+                type="button"
+                onClick={onGenerateAITitle}
+                disabled={aiTitleLoading}
+                className="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 hover:text-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Icon name="sparkles" size={16} />
+
+                {aiTitleLoading
+                  ? "Generando título..."
+                  : "Generar título con IA"}
+              </button>
+            ) : (
+              <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-violet-700">
+                  <Icon name="sparkles" size={14} />
+                  Sugerencia IA
+                </div>
+
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-900">
+                  {aiTitleSuggestion}
+                </p>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={onApplyAITitle}
+                    className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-violet-700"
+                  >
+                    <Icon name="check" size={15} />
+                    Usar sugerencia
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={onGenerateAITitle}
+                    disabled={aiTitleLoading}
+                    className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm font-bold text-violet-700 transition hover:bg-violet-50 disabled:opacity-50"
+                  >
+                    <Icon name="refresh" size={15} />
+
+                    {aiTitleLoading ? "Generando..." : "Generar otra opción"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* SHORT DESCRIPTION */}
         <div>
           <div className="flex items-center justify-between gap-3 mb-1.5">
@@ -101,7 +168,7 @@ export default function DevelopmentBasicSection({ form, setField }) {
             <span
               className={`text-xs ${getCounterClass(
                 shortDescription.length,
-                SHORT_DESCRIPTION_MAX
+                SHORT_DESCRIPTION_MAX,
               )}`}
             >
               {shortDescription.length}/{SHORT_DESCRIPTION_MAX}
@@ -112,9 +179,7 @@ export default function DevelopmentBasicSection({ form, setField }) {
             maxLength={SHORT_DESCRIPTION_MAX}
             rows={3}
             value={shortDescription}
-            onChange={(e) =>
-              setField("short_description", e.target.value)
-            }
+            onChange={(e) => setField("short_description", e.target.value)}
             className={inputClass(errors.short_description) + " resize-none"}
             placeholder="Resumen breve para cards y vistas rápidas."
           />
@@ -136,7 +201,7 @@ export default function DevelopmentBasicSection({ form, setField }) {
             <span
               className={`text-xs ${getCounterClass(
                 description.length,
-                DESCRIPTION_MAX
+                DESCRIPTION_MAX,
               )}`}
             >
               {description.length}/{DESCRIPTION_MAX}
@@ -153,9 +218,61 @@ export default function DevelopmentBasicSection({ form, setField }) {
           />
 
           {errors.description && (
-            <p className="mt-1 text-xs text-rose-500">
-              {errors.description}
-            </p>
+            <p className="mt-1 text-xs text-rose-500">{errors.description}</p>
+          )}
+
+          {isEditMode && (
+            <div className="mt-3">
+              {!aiDescriptionSuggestion ? (
+                <button
+                  type="button"
+                  onClick={onGenerateAIDescription}
+                  disabled={aiDescriptionLoading}
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 hover:text-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Icon name="sparkles" size={16} />
+
+                  {aiDescriptionLoading
+                    ? "Generando descripción..."
+                    : "Generar descripción con IA"}
+                </button>
+              ) : (
+                <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-violet-700">
+                    <Icon name="sparkles" size={14} />
+                    Sugerencia IA
+                  </div>
+
+                  <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">
+                    {aiDescriptionSuggestion}
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={onApplyAIDescription}
+                      className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-violet-700"
+                    >
+                      <Icon name="check" size={15} />
+                      Usar descripción
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={onGenerateAIDescription}
+                      disabled={aiDescriptionLoading}
+                      className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm font-bold text-violet-700 transition hover:bg-violet-50 disabled:opacity-50"
+                    >
+                      <Icon name="refresh" size={15} />
+
+                      {aiDescriptionLoading
+                        ? "Generando..."
+                        : "Generar otra opción"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
