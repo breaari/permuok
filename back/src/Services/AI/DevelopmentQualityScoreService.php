@@ -5,6 +5,7 @@ namespace App\Services\AI;
 use PDO;
 use Exception;
 use JsonException;
+use App\Services\AI\DevelopmentAIAnalysisService;
 
 class DevelopmentQualityScoreService
 {

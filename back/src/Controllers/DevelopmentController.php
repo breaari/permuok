@@ -187,7 +187,7 @@ class DevelopmentController
          * Verifica que el desarrollo pertenezca
          * a la inmobiliaria del usuario.
          */
-            DevelopmentService::getDetail(
+            DevelopmentService::assertOwnedDevelopment(
                 (int)$auth['id'],
                 $id
             );
@@ -226,11 +226,10 @@ class DevelopmentController
             /*
          * Verifica propiedad del desarrollo.
          */
-            DevelopmentService::getDetail(
+            DevelopmentService::assertOwnedDevelopment(
                 (int)$auth['id'],
                 $id
             );
-
             $result =
                 DevelopmentQualityScoreService::getScore(
                     $id

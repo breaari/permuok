@@ -127,6 +127,19 @@ class DevelopmentService
         return [$user, $development];
     }
 
+    public static function assertOwnedDevelopment(
+        int $userId,
+        int $developmentId
+    ): array {
+        [, $development] =
+            self::getOwnedDevelopment(
+                $userId,
+                $developmentId
+            );
+
+        return $development;
+    }
+
     private static function getVisibleDevelopment(int $userId, int $developmentId): array
     {
         self::getValidUser($userId);
