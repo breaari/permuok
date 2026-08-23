@@ -9,6 +9,7 @@ use App\Services\AI\PublicationAIAnalysisService;
 use App\Services\AI\SearchRequestAIAnalysisService;
 use App\Services\AI\DevelopmentAIAnalysisService;
 use App\Services\CurrencyConversionService;
+use App\Services\AI\MultilateralOperationService;
 
 class CompatibilityJobProcessor
 {
@@ -43,6 +44,8 @@ class CompatibilityJobProcessor
                 (int)($job['attempts'] ?? 1),
                 (int)($job['max_attempts'] ?? 3)
             ),
+            'multilateral_recalculate' =>
+            MultilateralOperationService::recalculate(),
             'currency_rate_update' =>
             self::processCurrencyRateUpdate(),
             'search_request_ai_analyze' =>
@@ -102,6 +105,36 @@ class CompatibilityJobProcessor
             $result['recalculation_jobs_affected'] =
                 0;
         }
+
+        return $result;
+    }
+
+    private static function processPropertyRecalculation(
+        int $propertyId
+    ): array {
+        $result =
+            CompatibilityEngine::calculateForProperty(
+                $propertyId
+            );
+
+        CompatibilityJobService::enqueueMultilateralRecalculation(
+                3
+            );
+
+        return $result;
+    }
+
+    private static function processSearchRequestRecalculation(
+        int $searchRequestId
+    ): array {
+        $result =
+            CompatibilityEngine::calculateForSearchRequest(
+                $searchRequestId
+            );
+
+        CompatibilityJobService::enqueueMultilateralRecalculation(
+                3
+            );
 
         return $result;
     }

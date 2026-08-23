@@ -37,6 +37,9 @@ class CompatibilityJobService
     private const TYPE_CURRENCY_RATE_UPDATE =
     'currency_rate_update';
 
+    private const TYPE_MULTILATERAL_RECALCULATE =
+    'multilateral_recalculate';
+
     private static function db(
         bool $forceReconnect = false
     ): PDO {
@@ -50,6 +53,16 @@ class CompatibilityJobService
     ): array {
         return self::enqueue(
             self::TYPE_CURRENCY_RATE_UPDATE,
+            1,
+            $priority
+        );
+    }
+
+    public static function enqueueMultilateralRecalculation(
+        int $priority = 3
+    ): array {
+        return self::enqueue(
+            self::TYPE_MULTILATERAL_RECALCULATE,
             1,
             $priority
         );
@@ -247,6 +260,7 @@ class CompatibilityJobService
             self::TYPE_SEARCH_REQUEST_AI_ANALYZE,
             self::TYPE_DEVELOPMENT_AI_ANALYZE,
             self::TYPE_CURRENCY_RATE_UPDATE,
+            self::TYPE_MULTILATERAL_RECALCULATE,
         ];
 
         if (!in_array($jobType, $validTypes, true)) {
