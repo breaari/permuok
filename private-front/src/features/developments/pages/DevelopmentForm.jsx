@@ -77,7 +77,6 @@ function normalizeDetailToForm(detail) {
     title: development?.title ?? "",
     slug: development?.slug ?? "",
     description: development?.description ?? "",
-    short_description: development?.short_description ?? "",
     developer_name: development?.developer_name ?? "",
     construction_company: development?.construction_company ?? "",
     development_stage: development?.development_stage ?? "",
