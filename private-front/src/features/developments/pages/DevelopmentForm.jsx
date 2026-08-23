@@ -45,7 +45,6 @@ const initialForm = {
   title: "",
   slug: "",
   description: "",
-  short_description: "",
   developer_name: "",
   construction_company: "",
   development_stage: "",
@@ -143,7 +142,6 @@ function buildDevelopmentAIDraft(form, unitTypes, amenities) {
   return {
     development: {
       title: form.title ?? "",
-      short_description: form.short_description ?? "",
       description: form.description ?? "",
 
       developer_name: form.developer_name || null,

@@ -161,14 +161,55 @@ class DevelopmentService
 
         return $development;
     }
+    private static function buildShortDescription(
+        ?string $description,
+        int $maxLength = 240
+    ): string {
+        $text = trim(
+            preg_replace(
+                '/\s+/u',
+                ' ',
+                (string)$description
+            )
+        );
 
+        if ($text === '') {
+            return '';
+        }
+
+        $length = function_exists('mb_strlen')
+            ? mb_strlen($text, 'UTF-8')
+            : strlen($text);
+
+        if ($length <= $maxLength) {
+            return $text;
+        }
+
+        $cut = function_exists('mb_substr')
+            ? mb_substr($text, 0, $maxLength - 1, 'UTF-8')
+            : substr($text, 0, $maxLength - 1);
+
+        /*
+     * Evitamos cortar una palabra por la mitad.
+     */
+        $lastSpace = strrpos($cut, ' ');
+
+        if ($lastSpace !== false && $lastSpace > 120) {
+            $cut = substr($cut, 0, $lastSpace);
+        }
+
+        return rtrim($cut, " \t\n\r\0\x0B.,;:-") . '…';
+    }
     private static function validatePayload(array $data, bool $partial = false): array
     {
         $payload = [
             'title' => trim((string)($data['title'] ?? '')),
             'slug' => trim((string)($data['slug'] ?? '')),
             'description' => trim((string)($data['description'] ?? '')),
-            'short_description' => trim((string)($data['short_description'] ?? '')),
+            'short_description' =>
+            self::buildShortDescription(
+                $data['description'] ?? ''
+            ),
 
             'developer_name' => trim((string)($data['developer_name'] ?? '')),
             'construction_company' => trim((string)($data['construction_company'] ?? '')),
@@ -385,7 +426,6 @@ class DevelopmentService
             'title',
             'slug',
             'description',
-            'short_description',
             'developer_name',
             'construction_company',
             'development_stage',
@@ -418,7 +458,14 @@ class DevelopmentService
                 $params[$field] = $value === '' ? null : $value;
             }
         }
+        if (array_key_exists('description', $data)) {
+            $fields[] = "short_description = :short_description";
 
+            $params['short_description'] =
+                self::buildShortDescription(
+                    $payload['description']
+                );
+        }
         $fields[] = "updated_by_user_id = :updated_by_user_id";
 
         $sql = "

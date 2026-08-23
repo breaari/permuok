@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { Icon } from "../../../ui/icons/Index";
 
 const TITLE_MAX = 180;
-const SHORT_DESCRIPTION_MAX = 500;
 const DESCRIPTION_MAX = 3000;
 
 function getCounterClass(length, max) {
@@ -38,7 +37,6 @@ export default function DevelopmentBasicSection({
   onApplyAIDescription,
 }) {
   const title = String(form.title || "");
-  const shortDescription = String(form.short_description || "");
   const description = String(form.description || "");
 
   const errors = useMemo(() => {
@@ -50,11 +48,6 @@ export default function DevelopmentBasicSection({
             ? `Máximo ${TITLE_MAX} caracteres`
             : null,
 
-      short_description:
-        shortDescription.length > SHORT_DESCRIPTION_MAX
-          ? `Máximo ${SHORT_DESCRIPTION_MAX} caracteres`
-          : null,
-
       description:
         description.trim().length === 0
           ? "La descripción es obligatoria"
@@ -62,7 +55,7 @@ export default function DevelopmentBasicSection({
             ? `Máximo ${DESCRIPTION_MAX} caracteres`
             : null,
     };
-  }, [title, shortDescription, description]);
+  }, [title, description]);
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
@@ -157,39 +150,6 @@ export default function DevelopmentBasicSection({
             )}
           </div>
         )}
-
-        {/* SHORT DESCRIPTION */}
-        <div>
-          <div className="flex items-center justify-between gap-3 mb-1.5">
-            <label className="text-sm font-medium text-slate-700">
-              Descripción corta
-            </label>
-
-            <span
-              className={`text-xs ${getCounterClass(
-                shortDescription.length,
-                SHORT_DESCRIPTION_MAX,
-              )}`}
-            >
-              {shortDescription.length}/{SHORT_DESCRIPTION_MAX}
-            </span>
-          </div>
-
-          <textarea
-            maxLength={SHORT_DESCRIPTION_MAX}
-            rows={3}
-            value={shortDescription}
-            onChange={(e) => setField("short_description", e.target.value)}
-            className={inputClass(errors.short_description) + " resize-none"}
-            placeholder="Resumen breve para cards y vistas rápidas."
-          />
-
-          {errors.short_description && (
-            <p className="mt-1 text-xs text-rose-500">
-              {errors.short_description}
-            </p>
-          )}
-        </div>
 
         {/* DESCRIPTION */}
         <div>
