@@ -1062,26 +1062,45 @@ class CompatibilityEngine
 
             $st = $pdo->prepare("
             SELECT
-                id,
-                search_request_id,
-                title,
-                property_id,
-                property_type,
-                estimated_price,
-                currency,
-                country_code,
-                country,
-                province,
-                city,
-                zone,
-                total_area,
-                covered_area,
-                bedrooms,
-                bathrooms,
-                garages,
-                antiquity
-            FROM search_request_exchange_offers
-            WHERE search_request_id IN (
+                seo.id,
+                seo.search_request_id,
+                seo.property_id,
+                seo.title,
+                seo.property_type,
+
+                CASE
+                    WHEN seo.property_id IS NOT NULL
+                        THEN p.price
+                    ELSE seo.estimated_price
+                END AS estimated_price,
+
+                CASE
+                    WHEN seo.property_id IS NOT NULL
+                        THEN p.currency
+                    ELSE seo.currency
+                END AS currency,
+
+                seo.country_code,
+                seo.country,
+                seo.province,
+                seo.city,
+                seo.zone,
+                seo.total_area,
+                seo.covered_area,
+                seo.bedrooms,
+                seo.bathrooms,
+                seo.garages,
+                seo.antiquity
+
+            FROM search_request_exchange_offers seo
+
+            LEFT JOIN properties p
+                ON p.id = seo.property_id
+                AND p.deleted_at IS NULL
+                AND p.status = 'published'
+                AND p.is_visible = 1
+
+            WHERE seo.search_request_id IN (
                 " .
                 implode(
                     ', ',
@@ -1089,11 +1108,18 @@ class CompatibilityEngine
                 ) .
                 "
             )
-              AND deleted_at IS NULL
+
+              AND seo.deleted_at IS NULL
+
+              AND (
+                  seo.property_id IS NULL
+                  OR p.id IS NOT NULL
+              )
+
             ORDER BY
-                search_request_id ASC,
+                seo.search_request_id ASC,
                 estimated_price DESC,
-                id ASC
+                seo.id ASC
         ");
 
             $st->execute(
@@ -1247,36 +1273,69 @@ class CompatibilityEngine
     ): array {
         $st = $pdo->prepare("
         SELECT
-            id,
-            search_request_id,
-            title,
-            property_id,
-            property_type,
-            estimated_price,
-            currency,
-            country_code,
-            country,
-            province,
-            city,
-            zone,
-            total_area,
-            covered_area,
-            bedrooms,
-            bathrooms,
-            garages,
-            antiquity
-        FROM search_request_exchange_offers
-        WHERE search_request_id = :search_request_id
-          AND deleted_at IS NULL
-        ORDER BY estimated_price DESC, id ASC
+            seo.id,
+            seo.search_request_id,
+            seo.property_id,
+            seo.title,
+            seo.property_type,
+
+            CASE
+                WHEN seo.property_id IS NOT NULL
+                    THEN p.price
+                ELSE seo.estimated_price
+            END AS estimated_price,
+
+            CASE
+                WHEN seo.property_id IS NOT NULL
+                    THEN p.currency
+                ELSE seo.currency
+            END AS currency,
+
+            seo.country_code,
+            seo.country,
+            seo.province,
+            seo.city,
+            seo.zone,
+            seo.total_area,
+            seo.covered_area,
+            seo.bedrooms,
+            seo.bathrooms,
+            seo.garages,
+            seo.antiquity
+
+        FROM search_request_exchange_offers seo
+
+        LEFT JOIN properties p
+            ON p.id = seo.property_id
+            AND p.deleted_at IS NULL
+            AND p.status = 'published'
+            AND p.is_visible = 1
+
+        WHERE seo.search_request_id =
+            :search_request_id
+
+          AND seo.deleted_at IS NULL
+
+          AND (
+              seo.property_id IS NULL
+              OR p.id IS NOT NULL
+          )
+
+        ORDER BY
+            estimated_price DESC,
+            seo.id ASC
     ");
 
         $st->execute([
-            'search_request_id' => $searchRequestId,
+            'search_request_id' =>
+            $searchRequestId,
         ]);
 
-        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return $st->fetchAll(
+            PDO::FETCH_ASSOC
+        ) ?: [];
     }
+
     private static function getPropertyAmenities(
         PDO $pdo,
         int $propertyId
