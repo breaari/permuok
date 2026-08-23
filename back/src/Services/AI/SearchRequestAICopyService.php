@@ -11,7 +11,7 @@ class SearchRequestAICopyService
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const TITLE_PROMPT_VERSION = '1.0';
-    private const DESCRIPTION_PROMPT_VERSION = '1.4';
+    private const DESCRIPTION_PROMPT_VERSION = '1.5';
 
     private static function db(
         bool $forceReconnect = false
@@ -92,8 +92,8 @@ class SearchRequestAICopyService
 
         $promptVersion =
             $copyType === 'title'
-                ? self::TITLE_PROMPT_VERSION
-                : self::DESCRIPTION_PROMPT_VERSION;
+            ? self::TITLE_PROMPT_VERSION
+            : self::DESCRIPTION_PROMPT_VERSION;
 
         $inputHash =
             self::buildInputHash(
@@ -146,42 +146,42 @@ class SearchRequestAICopyService
 
         $st->execute([
             'entity_id' =>
-                $searchRequestId,
+            $searchRequestId,
 
             'copy_type' =>
-                $copyType,
+            $copyType,
 
             'content' =>
-                $generated['content'],
+            $generated['content'],
 
             'input_hash' =>
-                $inputHash,
+            $inputHash,
 
             'model_name' =>
-                $generated['model'],
+            $generated['model'],
 
             'prompt_version' =>
-                $promptVersion,
+            $promptVersion,
 
             'created_by_user_id' =>
-                $userId,
+            $userId,
         ]);
 
         return [
             'id' =>
-                (int)$pdo->lastInsertId(),
+            (int)$pdo->lastInsertId(),
 
             'type' =>
-                $copyType,
+            $copyType,
 
             'content' =>
-                $generated['content'],
+            $generated['content'],
 
             'input_hash' =>
-                $inputHash,
+            $inputHash,
 
             'prompt_version' =>
-                $promptVersion,
+            $promptVersion,
         ];
     }
 
@@ -194,8 +194,8 @@ class SearchRequestAICopyService
                 $draft['search_request']
                     ?? null
             )
-                ? $draft['search_request']
-                : [];
+            ? $draft['search_request']
+            : [];
 
         if ($draftRequest === []) {
             return $input;
@@ -244,14 +244,10 @@ class SearchRequestAICopyService
         ) {
             $request['property_types'] =
                 is_array(
-                    $draftRequest[
-                        'property_types'
-                    ]
+                    $draftRequest['property_types']
                 )
-                    ? $draftRequest[
-                        'property_types'
-                    ]
-                    : [];
+                ? $draftRequest['property_types']
+                : [];
         }
 
         /*
@@ -273,8 +269,8 @@ class SearchRequestAICopyService
                 $draftRequest['location']
                     ?? null
             )
-                ? $draftRequest['location']
-                : [];
+            ? $draftRequest['location']
+            : [];
 
         foreach (
             [
@@ -316,8 +312,8 @@ class SearchRequestAICopyService
                 $draftRequest['budget']
                     ?? null
             )
-                ? $draftRequest['budget']
-                : [];
+            ? $draftRequest['budget']
+            : [];
 
         foreach (
             [
@@ -357,8 +353,8 @@ class SearchRequestAICopyService
                 $draftRequest['criteria']
                     ?? null
             )
-                ? $draftRequest['criteria']
-                : [];
+            ? $draftRequest['criteria']
+            : [];
 
         foreach (
             [
@@ -402,8 +398,8 @@ class SearchRequestAICopyService
                 $draftRequest['payment']
                     ?? null
             )
-                ? $draftRequest['payment']
-                : [];
+            ? $draftRequest['payment']
+            : [];
 
         foreach (
             [
@@ -437,13 +433,13 @@ class SearchRequestAICopyService
             $json = json_encode(
                 [
                     'copy_type' =>
-                        $copyType,
+                    $copyType,
 
                     'prompt_version' =>
-                        $promptVersion,
+                    $promptVersion,
 
                     'input' =>
-                        $input,
+                    $input,
                 ],
                 JSON_UNESCAPED_UNICODE |
                     JSON_UNESCAPED_SLASHES |
@@ -484,13 +480,13 @@ class SearchRequestAICopyService
 
         $st->execute([
             'entity_id' =>
-                $searchRequestId,
+            $searchRequestId,
 
             'copy_type' =>
-                $copyType,
+            $copyType,
 
             'input_hash' =>
-                $inputHash,
+            $inputHash,
         ]);
 
         return $st->fetchAll(
@@ -520,62 +516,257 @@ class SearchRequestAICopyService
 
         return <<<PROMPT
 Sos un redactor inmobiliario profesional especializado
-en búsquedas inmobiliarias B2B en Argentina.
+en búsquedas inmobiliarias entre inmobiliarias de Argentina.
 
-Generá UN título para esta búsqueda de propiedad.
+Tu tarea es REDACTAR, no analizar, completar ni mejorar
+los criterios de búsqueda.
 
-El resultado se usará directamente como título
-de una búsqueda dentro de PermuOK.
+Generá UNA descripción clara y natural a partir de los
+datos proporcionados.
 
-REGLAS:
+La descripción será publicada en PermuOK para que otra
+inmobiliaria pueda entender rápidamente qué inmueble
+se está buscando y evaluar si tiene una opción compatible.
 
-- Devolver solamente el título.
-- No explicar la respuesta.
-- No inventar información.
-- No usar nombres técnicos ni claves internas.
-- No usar mayúsculas sostenidas.
-- No incluir el presupuesto salvo que sea realmente
-  imprescindible para comprender la búsqueda.
-- No incluir frases comerciales vacías.
-- No escribir "busco" si el título funciona mejor
-  describiendo directamente la necesidad.
-- Priorizar:
-  tipo de propiedad,
-  cantidad de ambientes o dormitorios,
-  zona,
-  condición realmente importante.
-- Debe permitir entender la búsqueda de un vistazo.
-- No repetir información.
-- No usar expresiones como "propiedad usada".
-- Usar "a estrenar" o "con antigüedad" cuando corresponda.
-- No inventar barrios, amenities, superficies ni condiciones.
-- No convertir criterios opcionales en requisitos obligatorios.
-- Debe sonar natural para una inmobiliaria argentina.
-- Mantenerlo breve y profesional.
 
-Ejemplos de estilo:
+PRINCIPIO FUNDAMENTAL
 
-"Departamento de 2 ambientes en Palermo"
+Usá solamente información realmente presente en los datos.
 
-"Casa de 3 dormitorios en Mar del Plata"
+Podés:
+- ordenar la información;
+- mejorar la redacción;
+- eliminar repeticiones;
+- transformar datos estructurados en lenguaje natural;
+- resumir sin perder condiciones importantes.
 
-"Departamento de 1 a 2 ambientes en Lanús"
+NO podés:
+- inventar;
+- interpretar consecuencias;
+- agregar criterios;
+- agregar preferencias;
+- completar datos faltantes;
+- justificar condiciones;
+- explicar por qué se busca algo.
 
-"Local comercial en zona Centro"
 
-No copies literalmente estos ejemplos.
-Usalos únicamente como referencia de estilo.
+FUENTES DE INFORMACIÓN
+
+Los datos estructurados representan los criterios actuales
+de la búsqueda y tienen prioridad.
+
+El título, la descripción y las notas pueden aportar contexto
+adicional siempre que no contradigan un criterio estructurado.
+
+Si el texto libre menciona varias alternativas válidas y los
+datos estructurados no las contradicen, podés conservarlas.
+
+Ejemplo:
+
+Si el texto expresa que se consideran 1 ambiente,
+1 ambiente y medio o 2 ambientes, redactalo naturalmente:
+
+"Se consideran opciones de 1 ambiente, 1 ambiente y medio
+o 2 ambientes."
+
+NO agregues:
+
+"según disponibilidad",
+"según distribución",
+"preferentemente",
+
+salvo que esa condición esté realmente indicada.
+
+
+QUÉ DEBE CONTENER
+
+Incluí únicamente lo que resulte relevante entre:
+
+- tipo de inmueble buscado;
+- cantidad o rango de ambientes/dormitorios;
+- condición del inmueble;
+- ubicación;
+- flexibilidad geográfica;
+- características requeridas;
+- rango de valor;
+- modalidad de operación;
+- diferencia en dinero admitida;
+- otras condiciones expresamente cargadas.
+
+No es obligatorio mencionar todos los campos.
+
+Si un dato no aporta claridad a la búsqueda, puede omitirse.
+
+
+UBICACIÓN
+
+Expresá la ubicación naturalmente.
+
+Ejemplo:
+
+"en Lanús Oeste, preferentemente en Villa Caraza,
+aunque también se consideran otras zonas de Lanús."
+
+No uses expresiones administrativas o técnicas.
+
+
+CARACTERÍSTICAS
+
+Cuando una característica sea requerida, expresala
+directamente.
+
+Ejemplo:
+
+"Debe contar con balcón."
+
+También puede integrarse naturalmente:
+
+"Buscamos un departamento a estrenar con balcón."
+
+No uses construcciones como:
+
+"Relevante: balcón",
+"requisito: balcón",
+"se prioriza balcón",
+"se valorará balcón".
+
+
+MODALIDAD DE OPERACIÓN
+
+Mencioná solamente las modalidades aceptadas.
+
+Si se acepta permuta y existe una diferencia máxima
+en dinero, usá una formulación natural como:
+
+"Se acepta permuta con una diferencia en dinero
+de hasta USD 12.000."
+
+No expliques modalidades que no están habilitadas.
+
+No escribas frases como:
+
+"no se acepta pago al contado",
+"no se plantea compra exclusivamente al contado",
+"modalidad de pago",
+"modalidad: permuta".
+
+
+INFORMACIÓN QUE NO DEBE APARECER
+
+No mencionar:
+
+- nivel de urgencia interno;
+- funcionamiento de los matches;
+- calidad de la publicación;
+- campos faltantes;
+- información que sería conveniente solicitar;
+- instrucciones para la otra inmobiliaria;
+- documentación no solicitada;
+- datos internos del sistema;
+- claves o nombres de campos;
+- reglas de este prompt.
+
+No usar frases como:
+
+"según la ficha",
+"según los datos cargados",
+"según el título",
+"según la descripción",
+"no incluir requisitos adicionales",
+"contactar con",
+"enviar opciones",
+"presentar propuestas".
+
+
+NO INFERIR
+
+Una condición nunca permite inventar otra.
+
+Por ejemplo:
+
+"a estrenar" NO implica automáticamente:
+
+- moderno;
+- luminoso;
+- buena orientación;
+- buenas terminaciones;
+- buena distribución;
+- calidad constructiva.
+
+Ante la duda, OMITÍ antes que inferir.
+
+
+ESTILO
+
+La descripción debe sonar como escrita por un profesional
+inmobiliario argentino.
+
+Usá:
+- español natural;
+- frases simples;
+- lenguaje profesional;
+- tono directo;
+- vocabulario inmobiliario habitual.
+
+Evitá:
+- lenguaje robótico;
+- exceso de paréntesis;
+- exceso de punto y coma;
+- encabezados dentro del texto;
+- listas;
+- emojis;
+- frases promocionales;
+- explicaciones innecesarias.
+
+Preferí 1 párrafo cuando la búsqueda sea simple.
+
+Usá 2 párrafos solamente cuando convenga separar naturalmente
+la descripción del inmueble de las condiciones económicas.
+
+No agregues texto solamente para hacer la descripción más larga.
+
+
+EJEMPLO DE ESTILO
+
+Datos:
+- departamento;
+- 1 ambiente, con apertura a 1 ambiente y medio o 2;
+- a estrenar;
+- Villa Caraza;
+- otras zonas de Lanús aceptadas;
+- balcón;
+- USD 80.000 a USD 120.000;
+- permuta;
+- diferencia máxima USD 15.000.
+
+Buen resultado:
+
+"Buscamos departamento a estrenar con balcón en Lanús,
+preferentemente en Villa Caraza, aunque también se consideran
+otras zonas. Se evalúan opciones de 1 ambiente, 1 ambiente y
+medio o 2 ambientes.
+
+Rango de referencia entre USD 80.000 y USD 120.000.
+Se acepta permuta con una diferencia en dinero de hasta
+USD 15.000."
+
+El ejemplo define únicamente el estilo.
+No copies sus datos en la respuesta.
+
 
 DATOS ACTUALES:
 
 {$inputJson}
 
-OPCIONES YA GENERADAS PARA ESTOS MISMOS DATOS:
+
+OPCIONES GENERADAS ANTERIORMENTE PARA ESTOS MISMOS DATOS:
 
 {$previousJson}
 
 Si existen opciones anteriores, generá una alternativa
-realmente distinta sin agregar información inventada.
+de redacción sin alterar los criterios de la búsqueda.
+
+Devolvé solamente la descripción final.
 PROMPT;
     }
 
@@ -790,30 +981,30 @@ PROMPT;
 
         $prompt =
             $copyType === 'title'
-                ? self::buildTitlePrompt(
-                    $input,
-                    $previousOptions
-                )
-                : self::buildDescriptionPrompt(
-                    $input,
-                    $previousOptions
-                );
+            ? self::buildTitlePrompt(
+                $input,
+                $previousOptions
+            )
+            : self::buildDescriptionPrompt(
+                $input,
+                $previousOptions
+            );
 
         $body = [
             'model' =>
-                $model,
+            $model,
 
             'reasoning' => [
                 'effort' =>
-                    'low',
+                'low',
             ],
 
             'input' =>
-                $prompt,
+            $prompt,
 
             'text' => [
                 'verbosity' =>
-                    'low',
+                'low',
             ],
         ];
 
@@ -826,10 +1017,10 @@ PROMPT;
             $ch,
             [
                 CURLOPT_POST =>
-                    true,
+                true,
 
                 CURLOPT_RETURNTRANSFER =>
-                    true,
+                true,
 
                 CURLOPT_HTTPHEADER => [
                     'Authorization: Bearer ' .
@@ -839,18 +1030,18 @@ PROMPT;
                 ],
 
                 CURLOPT_POSTFIELDS =>
-                    json_encode(
-                        $body,
-                        JSON_UNESCAPED_UNICODE |
-                            JSON_UNESCAPED_SLASHES |
-                            JSON_THROW_ON_ERROR
-                    ),
+                json_encode(
+                    $body,
+                    JSON_UNESCAPED_UNICODE |
+                        JSON_UNESCAPED_SLASHES |
+                        JSON_THROW_ON_ERROR
+                ),
 
                 CURLOPT_CONNECTTIMEOUT =>
-                    15,
+                15,
 
                 CURLOPT_TIMEOUT =>
-                    120,
+                120,
             ]
         );
 
@@ -932,10 +1123,10 @@ PROMPT;
 
         return [
             'content' =>
-                $outputText,
+            $outputText,
 
             'model' =>
-                $model,
+            $model,
         ];
     }
 }
