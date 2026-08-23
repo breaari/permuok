@@ -7,6 +7,7 @@ use App\Services\AI\CompatibilityEngine;
 use App\Services\AI\PublicationQualityService;
 use App\Services\AI\PublicationAIAnalysisService;
 use App\Services\AI\SearchRequestAIAnalysisService;
+use App\Services\AI\DevelopmentAIAnalysisService;
 
 class CompatibilityJobProcessor
 {
@@ -43,6 +44,13 @@ class CompatibilityJobProcessor
             ),
             'search_request_ai_analyze' =>
             SearchRequestAIAnalysisService::processAnalysis(
+                $entityId,
+                (int)($job['reference_id'] ?? 0),
+                (int)($job['attempts'] ?? 1),
+                (int)($job['max_attempts'] ?? 3)
+            ),
+            'development_ai_analyze' =>
+            DevelopmentAIAnalysisService::processAnalysis(
                 $entityId,
                 (int)($job['reference_id'] ?? 0),
                 (int)($job['attempts'] ?? 1),
