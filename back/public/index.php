@@ -495,7 +495,37 @@ if ($method === 'PATCH' && preg_match('#^/developments/(\d+)$#', $uri, $m)) {
     DevelopmentController::update();
     exit;
 }
+if (
+    $method === 'GET' &&
+    preg_match(
+        '#^/developments/(\d+)/quality$#',
+        $uri,
+        $m
+    )
+) {
+    $_GET['id'] =
+        (int)$m[1];
 
+    DevelopmentController::getQuality();
+
+    exit;
+}
+
+if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/developments/(\d+)/ai-analysis$#',
+        $uri,
+        $m
+    )
+) {
+    $_GET['id'] =
+        (int)$m[1];
+
+    DevelopmentController::requestAIAnalysis();
+
+    exit;
+}
 if ($method === 'POST' && preg_match('#^/developments/(\d+)/publish$#', $uri, $m)) {
     $_GET['id'] = (int)$m[1];
     DevelopmentController::publish();

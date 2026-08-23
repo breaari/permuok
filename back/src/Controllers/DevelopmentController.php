@@ -7,6 +7,8 @@ use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
 use App\Services\DevelopmentService;
 use App\Services\MembershipGuard;
+use App\Services\AI\DevelopmentAIAnalysisService;
+use App\Services\AI\DevelopmentQualityScoreService;
 
 class DevelopmentController
 {
@@ -159,6 +161,89 @@ class DevelopmentController
             ResponseHelper::ok($result);
         } catch (Throwable $e) {
             self::fail($e);
+        }
+    }
+
+    public static function requestAIAnalysis(): void
+    {
+        try {
+            $auth =
+                AuthHelper::requireUser();
+
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
+
+            $id =
+                (int)($_GET['id'] ?? 0);
+
+            if ($id <= 0) {
+                throw new \Exception(
+                    'El ID del desarrollo no es válido.'
+                );
+            }
+
+            /*
+         * Verifica que el desarrollo pertenezca
+         * a la inmobiliaria del usuario.
+         */
+            DevelopmentService::getDetail(
+                (int)$auth['id'],
+                $id
+            );
+
+            $result =
+                DevelopmentAIAnalysisService::requestAnalysis(
+                    $id
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
+        } catch (\Throwable $e) {
+            ResponseHelper::error(
+                $e->getMessage(),
+                400
+            );
+        }
+    }
+
+    public static function getQuality(): void
+    {
+        try {
+            $auth =
+                AuthHelper::requireUser();
+
+            $id =
+                (int)($_GET['id'] ?? 0);
+
+            if ($id <= 0) {
+                throw new \Exception(
+                    'El ID del desarrollo no es válido.'
+                );
+            }
+
+            /*
+         * Verifica propiedad del desarrollo.
+         */
+            DevelopmentService::getDetail(
+                (int)$auth['id'],
+                $id
+            );
+
+            $result =
+                DevelopmentQualityScoreService::getScore(
+                    $id
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
+        } catch (\Throwable $e) {
+            ResponseHelper::error(
+                $e->getMessage(),
+                400
+            );
         }
     }
 }
