@@ -10,8 +10,8 @@ class DevelopmentAICopyService
 {
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
-    private const TITLE_PROMPT_VERSION = '1.0';
-    private const DESCRIPTION_PROMPT_VERSION = '1.1';
+    private const TITLE_PROMPT_VERSION = '1.1';
+    private const DESCRIPTION_PROMPT_VERSION = '1.2';
 
     private static function db(
         bool $forceReconnect = false
@@ -93,8 +93,8 @@ class DevelopmentAICopyService
 
         $promptVersion =
             $copyType === 'title'
-                ? self::TITLE_PROMPT_VERSION
-                : self::DESCRIPTION_PROMPT_VERSION;
+            ? self::TITLE_PROMPT_VERSION
+            : self::DESCRIPTION_PROMPT_VERSION;
 
         $inputHash =
             self::buildInputHash(
@@ -147,42 +147,42 @@ class DevelopmentAICopyService
 
         $st->execute([
             'entity_id' =>
-                $developmentId,
+            $developmentId,
 
             'copy_type' =>
-                $copyType,
+            $copyType,
 
             'content' =>
-                $generated['content'],
+            $generated['content'],
 
             'input_hash' =>
-                $inputHash,
+            $inputHash,
 
             'model_name' =>
-                $generated['model'],
+            $generated['model'],
 
             'prompt_version' =>
-                $promptVersion,
+            $promptVersion,
 
             'created_by_user_id' =>
-                $userId,
+            $userId,
         ]);
 
         return [
             'id' =>
-                (int)$pdo->lastInsertId(),
+            (int)$pdo->lastInsertId(),
 
             'type' =>
-                $copyType,
+            $copyType,
 
             'content' =>
-                $generated['content'],
+            $generated['content'],
 
             'input_hash' =>
-                $inputHash,
+            $inputHash,
 
             'prompt_version' =>
-                $promptVersion,
+            $promptVersion,
         ];
     }
 
@@ -195,8 +195,8 @@ class DevelopmentAICopyService
                 $draft['development']
                     ?? null
             )
-                ? $draft['development']
-                : [];
+            ? $draft['development']
+            : [];
 
         if (
             !isset($input['development']) ||
@@ -249,8 +249,8 @@ class DevelopmentAICopyService
                 $draftDevelopment['location']
                     ?? null
             )
-                ? $draftDevelopment['location']
-                : [];
+            ? $draftDevelopment['location']
+            : [];
 
         foreach (
             [
@@ -289,8 +289,8 @@ class DevelopmentAICopyService
                 $draftDevelopment['commercial']
                     ?? null
             )
-                ? $draftDevelopment['commercial']
-                : [];
+            ? $draftDevelopment['commercial']
+            : [];
 
         foreach (
             [
@@ -329,8 +329,8 @@ class DevelopmentAICopyService
                 is_array(
                     $draftDevelopment['unit_types']
                 )
-                    ? $draftDevelopment['unit_types']
-                    : [];
+                ? $draftDevelopment['unit_types']
+                : [];
         }
 
         /*
@@ -346,8 +346,8 @@ class DevelopmentAICopyService
                 is_array(
                     $draftDevelopment['amenities']
                 )
-                    ? $draftDevelopment['amenities']
-                    : [];
+                ? $draftDevelopment['amenities']
+                : [];
         }
 
         return $input;
@@ -362,13 +362,13 @@ class DevelopmentAICopyService
             $json = json_encode(
                 [
                     'copy_type' =>
-                        $copyType,
+                    $copyType,
 
                     'prompt_version' =>
-                        $promptVersion,
+                    $promptVersion,
 
                     'input' =>
-                        $input,
+                    $input,
                 ],
                 JSON_UNESCAPED_UNICODE |
                     JSON_UNESCAPED_SLASHES |
@@ -409,13 +409,13 @@ class DevelopmentAICopyService
 
         $st->execute([
             'entity_id' =>
-                $developmentId,
+            $developmentId,
 
             'copy_type' =>
-                $copyType,
+            $copyType,
 
             'input_hash' =>
-                $inputHash,
+            $inputHash,
         ]);
 
         return $st->fetchAll(
@@ -484,6 +484,37 @@ REGLAS:
 - No agregues datos que no estén presentes.
 - Máximo aproximado: 90 caracteres.
 - Español natural y profesional.
+- No uses Markdown ni ningún formato especial.
+- No encierres el título entre asteriscos, comillas ni símbolos.
+- No uses barras verticales "|" ni estructuras tipo ficha.
+- No uses dos puntos para separar categorías como:
+  "Prelanzamiento:",
+  "En construcción:",
+  "Desarrollo:".
+
+- No antepongas automáticamente el nombre de la desarrolladora
+  o constructora al título.
+
+- La desarrolladora o constructora solamente debe aparecer
+  si forma parte claramente del nombre comercial o identidad
+  reconocible del proyecto.
+
+- No uses una dirección exacta como elemento principal del título.
+  Preferí zona, barrio o ciudad.
+
+- La dirección exacta puede omitirse aunque esté disponible.
+
+- Preferí títulos naturales como:
+  "Departamentos de 3 ambientes en prelanzamiento en Mar del Plata"
+  "Proyecto residencial en construcción en Playa Grande"
+
+- Evitá estructuras como:
+  "Empresa | Etapa: tipo de unidad en dirección"
+  "Desarrolladora - proyecto..."
+
+  - Si no existe un nombre comercial real del proyecto,
+  NO conviertas el nombre de la desarrolladora en el nombre del proyecto.
+
 
 Los datos estructurados tienen prioridad sobre el
 título y las descripciones actuales si existe una
@@ -591,12 +622,59 @@ Cuando la información exista y sea útil, podés incluir:
 - rango de precios;
 - cantidad de unidades;
 - unidades disponibles;
-- amenities relevantes.
+- amenities relevantes.- No conviertas cifras internas en una enumeración mecánica.
+- Mencioná cantidad total y disponibilidad solamente cuando
+  aporten valor comercial al texto.
 
 No es obligatorio mencionar todos los campos.
 
 No conviertas la descripción en una transcripción
 mecánica del formulario.
+
+INFORMACIÓN INTERNA QUE NUNCA DEBE APARECER:
+
+- No mencionar cantidad de imágenes.
+- No mencionar si existe imagen de portada.
+- No mencionar que hay imágenes "registradas", "cargadas",
+  "disponibles" o expresiones similares.
+- No mencionar IDs, registros, campos internos ni estado técnico
+  de los datos.
+- Las imágenes forman parte del sistema y no del texto comercial.
+
+DESARROLLADORA Y CONSTRUCTORA:
+
+- No uses construcciones redundantes como:
+  "Desarrollo de la desarrolladora X".
+- Si resulta relevante mencionarlas, redactá naturalmente.
+
+Preferí:
+"Desarrollado por X y construido por Y."
+
+También puede omitirse esta información si no aporta
+a comprender comercialmente el proyecto.
+
+AMENITIES Y CARACTERÍSTICAS:
+
+- Integralos naturalmente en una oración.
+- No uses expresiones administrativas como:
+  "figuran",
+  "se registran",
+  "se encuentran cargados",
+  "constan",
+  "están informados".
+
+- No uses "amenidades" salvo que sea inevitable.
+  Preferí "amenities", término habitual del mercado inmobiliario argentino.
+
+Preferí:
+"El desarrollo cuenta con balcón, pileta y rooftop."
+
+o:
+"Entre sus principales amenities se encuentran la pileta y el rooftop."
+
+Evitá:
+"Entre sus amenidades figuran..."
+
 
 REDUNDANCIAS Y JERARQUÍA DE INFORMACIÓN:
 
@@ -762,30 +840,30 @@ PROMPT;
 
         $prompt =
             $copyType === 'title'
-                ? self::buildTitlePrompt(
-                    $input,
-                    $previousOptions
-                )
-                : self::buildDescriptionPrompt(
-                    $input,
-                    $previousOptions
-                );
+            ? self::buildTitlePrompt(
+                $input,
+                $previousOptions
+            )
+            : self::buildDescriptionPrompt(
+                $input,
+                $previousOptions
+            );
 
         $body = [
             'model' =>
-                $model,
+            $model,
 
             'reasoning' => [
                 'effort' =>
-                    'low',
+                'low',
             ],
 
             'input' =>
-                $prompt,
+            $prompt,
 
             'text' => [
                 'verbosity' =>
-                    'low',
+                'low',
             ],
         ];
 
@@ -798,10 +876,10 @@ PROMPT;
             $ch,
             [
                 CURLOPT_POST =>
-                    true,
+                true,
 
                 CURLOPT_RETURNTRANSFER =>
-                    true,
+                true,
 
                 CURLOPT_HTTPHEADER => [
                     'Authorization: Bearer ' .
@@ -811,18 +889,18 @@ PROMPT;
                 ],
 
                 CURLOPT_POSTFIELDS =>
-                    json_encode(
-                        $body,
-                        JSON_UNESCAPED_UNICODE |
-                            JSON_UNESCAPED_SLASHES |
-                            JSON_THROW_ON_ERROR
-                    ),
+                json_encode(
+                    $body,
+                    JSON_UNESCAPED_UNICODE |
+                        JSON_UNESCAPED_SLASHES |
+                        JSON_THROW_ON_ERROR
+                ),
 
                 CURLOPT_CONNECTTIMEOUT =>
-                    15,
+                15,
 
                 CURLOPT_TIMEOUT =>
-                    120,
+                120,
             ]
         );
 
@@ -912,10 +990,10 @@ PROMPT;
 
         return [
             'content' =>
-                $outputText,
+            $outputText,
 
             'model' =>
-                $model,
+            $model,
         ];
     }
 }
