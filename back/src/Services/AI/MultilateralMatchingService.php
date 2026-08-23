@@ -56,7 +56,7 @@ class MultilateralMatchingService
         usort(
             $cycles,
             static fn(array $a, array $b): int =>
-                $b['score'] <=> $a['score']
+            $b['score'] <=> $a['score']
         );
 
         return $cycles;
@@ -92,7 +92,7 @@ class MultilateralMatchingService
                 if (
                     count($participants) >= 3 &&
                     count($participants) <=
-                        self::MAX_PARTICIPANTS
+                    self::MAX_PARTICIPANTS
                 ) {
                     $cycleEdges =
                         array_merge(
@@ -159,46 +159,66 @@ class MultilateralMatchingService
         PDO $pdo
     ): array {
         $st = $pdo->prepare("
-            SELECT
-                id,
-                property_id,
-                search_request_id,
+        SELECT
+            c.id,
+            c.property_id,
+            c.search_request_id,
 
-                source_real_estate_id,
-                target_real_estate_id,
+            c.source_real_estate_id,
+            c.target_real_estate_id,
 
-                score,
-                match_level
+            c.score,
+            c.match_level,
 
-            FROM compatibilities
+            seo.id AS exchange_offer_id,
+            seo.property_id AS offered_property_id
 
-            WHERE
-                compatibility_type =
-                    'property_search_request'
+        FROM compatibilities c
 
-                AND deleted_at IS NULL
+        INNER JOIN search_request_exchange_offers seo
+            ON seo.search_request_id =
+                c.search_request_id
 
-                AND status IN (
-                    'detected',
-                    'one_side_interested',
-                    'mutual_interest',
-                    'chat_enabled'
-                )
+            AND seo.deleted_at IS NULL
 
-                AND score >= :min_score
+            AND seo.property_id IS NOT NULL
 
-                AND source_real_estate_id
-                    <> target_real_estate_id
+        INNER JOIN properties offered_property
+            ON offered_property.id =
+                seo.property_id
 
-            ORDER BY
-                source_real_estate_id ASC,
-                score DESC,
-                id ASC
-        ");
+            AND offered_property.real_estate_id =
+                c.source_real_estate_id
+
+            AND offered_property.deleted_at IS NULL
+
+        WHERE
+            c.compatibility_type =
+                'property_search_request'
+
+            AND c.deleted_at IS NULL
+
+            AND c.status IN (
+                'detected',
+                'one_side_interested',
+                'mutual_interest',
+                'chat_enabled'
+            )
+
+            AND c.score >= :min_score
+
+            AND c.source_real_estate_id
+                <> c.target_real_estate_id
+
+        ORDER BY
+            c.source_real_estate_id ASC,
+            c.score DESC,
+            c.id ASC
+    ");
 
         $st->execute([
             'min_score' =>
-                self::MIN_EDGE_SCORE,
+            self::MIN_EDGE_SCORE,
         ]);
 
         return $st->fetchAll(
@@ -212,7 +232,7 @@ class MultilateralMatchingService
     ): array {
         $scores = array_map(
             static fn(array $edge): float =>
-                (float)$edge['score'],
+            (float)$edge['score'],
             $edges
         );
 
@@ -225,48 +245,51 @@ class MultilateralMatchingService
         $score = $scores !== []
             ? round(
                 array_sum($scores) /
-                count($scores),
+                    count($scores),
                 2
             )
             : 0.0;
 
         return [
             'participants_count' =>
-                count($participants),
+            count($participants),
 
             'real_estate_ids' =>
-                array_values($participants),
+            array_values($participants),
 
             'score' =>
-                $score,
+            $score,
 
             'compatibilities' =>
-                array_map(
-                    static fn(array $edge): array => [
-                        'compatibility_id' =>
-                            (int)$edge['id'],
+            array_map(
+                static fn(array $edge): array => [
+                    'compatibility_id' =>
+                    (int)$edge['id'],
 
-                        'property_id' =>
-                            (int)$edge['property_id'],
+                    'property_id' =>
+                    (int)$edge['property_id'],
 
-                        'search_request_id' =>
-                            (int)$edge['search_request_id'],
+                    'search_request_id' =>
+                    (int)$edge['search_request_id'],
 
-                        'source_real_estate_id' =>
-                            (int)$edge[
-                                'source_real_estate_id'
-                            ],
+                    'source_real_estate_id' =>
+                    (int)$edge['source_real_estate_id'],
+                    
+                    'exchange_offer_id' =>
+                    (int)$edge['exchange_offer_id'],
 
-                        'target_real_estate_id' =>
-                            (int)$edge[
-                                'target_real_estate_id'
-                            ],
+                    'offered_property_id' =>
+                    (int)$edge['offered_property_id'],
 
-                        'score' =>
-                            (float)$edge['score'],
-                    ],
-                    $edges
-                ),
+
+                    'target_real_estate_id' =>
+                    (int)$edge['target_real_estate_id'],
+
+                    'score' =>
+                    (float)$edge['score'],
+                ],
+                $edges
+            ),
         ];
     }
 
