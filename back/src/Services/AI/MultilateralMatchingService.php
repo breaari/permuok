@@ -3,6 +3,8 @@
 namespace App\Services\AI;
 
 use PDO;
+use App\Services\CurrencyConversionService;
+use Throwable;
 
 class MultilateralMatchingService
 {
@@ -151,7 +153,39 @@ class MultilateralMatchingService
             );
         }
     }
+    private static function convertAmount(
+        float $amount,
+        string $fromCurrency,
+        string $toCurrency
+    ): ?float {
+        $fromCurrency =
+            strtoupper(trim($fromCurrency));
 
+        $toCurrency =
+            strtoupper(trim($toCurrency));
+
+        if (
+            $amount < 0 ||
+            $fromCurrency === '' ||
+            $toCurrency === ''
+        ) {
+            return null;
+        }
+
+        if ($fromCurrency === $toCurrency) {
+            return round($amount, 2);
+        }
+
+        try {
+            return CurrencyConversionService::convert(
+                $amount,
+                $fromCurrency,
+                $toCurrency
+            );
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
     private static function getEligibleEdges(
         PDO $pdo
     ): array {
@@ -387,12 +421,24 @@ pr.cash_difference_currency
          */
             if (
                 $offeredCurrency === '' ||
-                $targetCurrency === '' ||
-                $offeredCurrency !==
-                $targetCurrency
+                $targetCurrency === ''
             ) {
                 return false;
             }
+
+            $comparableOfferedPrice =
+                self::convertAmount(
+                    $offeredPrice,
+                    $offeredCurrency,
+                    $targetCurrency
+                );
+
+            if ($comparableOfferedPrice === null) {
+                return false;
+            }
+
+            $offeredPrice =
+                $comparableOfferedPrice;
 
             $acceptsTotalSwap =
                 (int)(
@@ -484,24 +530,49 @@ pr.cash_difference_currency
                     )
                 );
 
-            if (
-                $ownerCurrency !== '' &&
-                $ownerCurrency !==
-                $targetCurrency
-            ) {
-                return false;
-            }
-
-            $ownerMin =
+            $ownerMinRaw =
                 self::nullablePositiveFloat(
                     $edge['owner_difference_min'] ?? null
                 );
 
-            $ownerMax =
+            $ownerMaxRaw =
                 self::nullablePositiveFloat(
                     $edge['owner_difference_max'] ?? null
                 );
 
+            $ownerMin = null;
+            $ownerMax = null;
+
+            if ($ownerCurrency === '') {
+                $ownerCurrency =
+                    $targetCurrency;
+            }
+
+            if ($ownerMinRaw !== null) {
+                $ownerMin =
+                    self::convertAmount(
+                        $ownerMinRaw,
+                        $ownerCurrency,
+                        $targetCurrency
+                    );
+
+                if ($ownerMin === null) {
+                    return false;
+                }
+            }
+
+            if ($ownerMaxRaw !== null) {
+                $ownerMax =
+                    self::convertAmount(
+                        $ownerMaxRaw,
+                        $ownerCurrency,
+                        $targetCurrency
+                    );
+
+                if ($ownerMax === null) {
+                    return false;
+                }
+            }
             if (
                 $ownerMin !== null &&
                 $differenceAmount < $ownerMin
@@ -534,11 +605,7 @@ pr.cash_difference_currency
                         $edge['cash_difference_max'] ?? null
                     );
 
-                if (
-                    $availableCash === null ||
-                    $availableCash <
-                    $differenceAmount
-                ) {
+                if ($availableCash === null) {
                     return false;
                 }
 
@@ -551,9 +618,25 @@ pr.cash_difference_currency
                         )
                     );
 
+                if ($availableCurrency === '') {
+                    $availableCurrency =
+                        $targetCurrency;
+                }
+
+                $availableCash =
+                    self::convertAmount(
+                        $availableCash,
+                        $availableCurrency,
+                        $targetCurrency
+                    );
+
+                if ($availableCash === null) {
+                    return false;
+                }
+
                 if (
-                    $availableCurrency !==
-                    $targetCurrency
+                    $availableCash <
+                    $differenceAmount
                 ) {
                     return false;
                 }
@@ -642,7 +725,42 @@ pr.cash_difference_currency
                         (float)(
                             $edge['target_property_price'] ?? 0
                         );
+                    $offeredCurrency =
+                        strtoupper(
+                            trim(
+                                (string)(
+                                    $edge['offered_property_currency'] ?? ''
+                                )
+                            )
+                        );
 
+                    $targetCurrency =
+                        strtoupper(
+                            trim(
+                                (string)(
+                                    $edge['target_property_currency'] ?? ''
+                                )
+                            )
+                        );
+
+                    $comparableOfferedPrice =
+                        self::convertAmount(
+                            $offeredPrice,
+                            $offeredCurrency,
+                            $targetCurrency
+                        );
+
+                    if ($comparableOfferedPrice === null) {
+                        $comparableOfferedPrice =
+                            $offeredPrice;
+                    }
+
+                    $signedDifference =
+                        round(
+                            $targetPrice -
+                                $comparableOfferedPrice,
+                            2
+                        );
                     return [
                         'compatibility_id' =>
                         (int)$edge['id'],
@@ -666,23 +784,34 @@ pr.cash_difference_currency
                         (int)$edge['offered_property_id'],
 
                         'offered_value' =>
+                        $comparableOfferedPrice,
+
+                        'offered_original_value' =>
                         $offeredPrice,
+
+                        'offered_original_currency' =>
+                        $offeredCurrency,
 
                         'target_value' =>
                         $targetPrice,
 
                         'currency' =>
-                        (string)$edge['target_property_currency'],
+                        $targetCurrency,
+
+                        'signed_cash_difference' =>
+                        $signedDifference,
 
                         'cash_difference' =>
-                        round(
-                            max(
-                                0,
-                                $targetPrice -
-                                    $offeredPrice
+                        abs($signedDifference),
+
+                        'cash_difference_direction' =>
+                        $signedDifference > 0
+                            ? 'a_favor'
+                            : (
+                                $signedDifference < 0
+                                ? 'en_contra'
+                                : 'total'
                             ),
-                            2
-                        ),
 
                         'score' =>
                         (float)$edge['score'],
