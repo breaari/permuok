@@ -105,7 +105,12 @@ class MultilateralMatchingService
                             $participants
                         );
 
-                    if (!isset($seen[$key])) {
+                    if (
+                        !isset($seen[$key]) &&
+                        self::isStructurallyContinuous(
+                            $cycleEdges
+                        )
+                    ) {
                         $seen[$key] = true;
 
                         $cycles[] =
@@ -226,6 +231,43 @@ class MultilateralMatchingService
         ) ?: [];
     }
 
+    private static function isStructurallyContinuous(
+        array $edges
+    ): bool {
+        $count = count($edges);
+
+        if ($count < 3) {
+            return false;
+        }
+
+        for ($i = 0; $i < $count; $i++) {
+            $currentEdge = $edges[$i];
+
+            $previousIndex =
+                ($i - 1 + $count) % $count;
+
+            $previousEdge =
+                $edges[$previousIndex];
+
+            $offeredPropertyId =
+                (int)($currentEdge['offered_property_id'] ?? 0);
+
+            $previousTargetPropertyId =
+                (int)($previousEdge['property_id'] ?? 0);
+
+            if (
+                $offeredPropertyId <= 0 ||
+                $previousTargetPropertyId <= 0 ||
+                $offeredPropertyId !==
+                $previousTargetPropertyId
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static function buildCycleResult(
         array $participants,
         array $edges
@@ -274,7 +316,7 @@ class MultilateralMatchingService
 
                     'source_real_estate_id' =>
                     (int)$edge['source_real_estate_id'],
-                    
+
                     'exchange_offer_id' =>
                     (int)$edge['exchange_offer_id'],
 
