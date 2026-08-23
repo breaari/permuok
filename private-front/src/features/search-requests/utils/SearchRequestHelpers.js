@@ -68,6 +68,7 @@ export function emptySearchRequestForm() {
     province: "",
     city: "",
     zone: "",
+    exchange_property_id: "",
     property_condition: "any",
     currency: "USD",
     min_value: "",
@@ -107,6 +108,7 @@ export function mapSearchRequestToForm(detail) {
     currency: request.currency || "USD",
     min_value: request.min_value || "",
     max_value: request.max_value || "",
+    exchange_property_id: detail?.exchange_offer?.property_id || "",
     min_total_area: request.min_total_area || "",
     min_covered_area: request.min_covered_area || "",
     min_bedrooms: request.min_bedrooms || "",
@@ -274,6 +276,9 @@ export function validateSearchRequestForm(form, { requireFull = true } = {}) {
 
   if (form.cash_difference_max !== "" && Number(form.cash_difference_max) < 0) {
     throw new Error("La diferencia máxima en efectivo no puede ser negativa.");
+  }
+  if (form.payment_mode_swap && !form.exchange_property_id) {
+    throw new Error("Seleccioná la propiedad que se ofrece en permuta.");
   }
 }
 

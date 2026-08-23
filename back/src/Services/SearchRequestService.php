@@ -330,6 +330,11 @@ class SearchRequestService
 
         $item['property_types'] = self::getPropertyTypes($pdo, (int)$item['id']);
         $item['amenities'] = self::getAmenities($pdo, (int)$item['id']);
+        $item['exchange_offer'] =
+            self::getExchangeOffer(
+                $pdo,
+                (int)$item['id']
+            );
         $quality =
             SearchRequestQualityService::analyze(
                 $id
@@ -338,6 +343,8 @@ class SearchRequestService
             'search_request' => $item,
             'property_types' => $item['property_types'],
             'amenities' => $item['amenities'],
+            'exchange_offer' =>
+            $item['exchange_offer'],
             'access' => [
                 'can_edit' => in_array($item['status'], ['draft', 'paused', 'archived', 'published'], true),
                 'can_publish' => in_array($item['status'], ['draft', 'paused', 'archived'], true),
@@ -347,6 +354,220 @@ class SearchRequestService
             ],
             'quality' => $quality,
         ];
+    }
+    private static function getExchangeOffer(
+        PDO $pdo,
+        int $searchRequestId
+    ): ?array {
+        $st = $pdo->prepare("
+        SELECT
+            seo.*,
+            p.title AS property_title,
+            p.price AS current_price,
+            p.currency AS current_currency
+
+        FROM search_request_exchange_offers seo
+
+        LEFT JOIN properties p
+            ON p.id = seo.property_id
+            AND p.deleted_at IS NULL
+
+        WHERE seo.search_request_id =
+            :search_request_id
+
+          AND seo.deleted_at IS NULL
+
+        ORDER BY seo.id ASC
+
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'search_request_id' =>
+            $searchRequestId,
+        ]);
+
+        $row =
+            $st->fetch(PDO::FETCH_ASSOC);
+
+        return $row ?: null;
+    }
+
+    private static function syncExchangeOffer(
+        PDO $pdo,
+        int $searchRequestId,
+        int $realEstateId,
+        mixed $propertyId
+    ): void {
+        /*
+     * Eliminamos la oferta anterior.
+     * Actualmente una búsqueda tiene una sola
+     * propiedad real ofrecida.
+     */
+        $stDelete = $pdo->prepare("
+        DELETE FROM search_request_exchange_offers
+        WHERE search_request_id =
+            :search_request_id
+    ");
+
+        $stDelete->execute([
+            'search_request_id' =>
+            $searchRequestId,
+        ]);
+
+        $propertyId =
+            (int)$propertyId;
+
+        if ($propertyId <= 0) {
+            return;
+        }
+
+        /*
+     * La propiedad tiene que pertenecer a
+     * la misma inmobiliaria.
+     */
+        $stProperty = $pdo->prepare("
+        SELECT
+            id,
+            title,
+            property_type,
+            price,
+            currency,
+            country_code,
+            country,
+            province,
+            city,
+            zone,
+            total_area,
+            covered_area,
+            bedrooms,
+            bathrooms,
+            garages,
+            antiquity
+
+        FROM properties
+
+        WHERE id = :id
+          AND real_estate_id =
+              :real_estate_id
+          AND deleted_at IS NULL
+          AND status = 'published'
+          AND is_visible = 1
+
+        LIMIT 1
+    ");
+
+        $stProperty->execute([
+            'id' =>
+            $propertyId,
+
+            'real_estate_id' =>
+            $realEstateId,
+        ]);
+
+        $property =
+            $stProperty->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+        if (!$property) {
+            throw new Exception(
+                'La propiedad ofrecida en permuta no es válida.'
+            );
+        }
+
+        $stInsert = $pdo->prepare("
+        INSERT INTO search_request_exchange_offers (
+            search_request_id,
+            property_id,
+            title,
+            property_type,
+            estimated_price,
+            currency,
+            country_code,
+            country,
+            province,
+            city,
+            zone,
+            total_area,
+            covered_area,
+            bedrooms,
+            bathrooms,
+            garages,
+            antiquity
+        ) VALUES (
+            :search_request_id,
+            :property_id,
+            :title,
+            :property_type,
+            :estimated_price,
+            :currency,
+            :country_code,
+            :country,
+            :province,
+            :city,
+            :zone,
+            :total_area,
+            :covered_area,
+            :bedrooms,
+            :bathrooms,
+            :garages,
+            :antiquity
+        )
+    ");
+
+        $stInsert->execute([
+            'search_request_id' =>
+            $searchRequestId,
+
+            'property_id' =>
+            (int)$property['id'],
+
+            'title' =>
+            $property['title'],
+
+            'property_type' =>
+            $property['property_type'],
+
+            'estimated_price' =>
+            $property['price'],
+
+            'currency' =>
+            $property['currency'],
+
+            'country_code' =>
+            $property['country_code'],
+
+            'country' =>
+            $property['country'],
+
+            'province' =>
+            $property['province'],
+
+            'city' =>
+            $property['city'],
+
+            'zone' =>
+            $property['zone'],
+
+            'total_area' =>
+            $property['total_area'],
+
+            'covered_area' =>
+            $property['covered_area'],
+
+            'bedrooms' =>
+            $property['bedrooms'],
+
+            'bathrooms' =>
+            $property['bathrooms'],
+
+            'garages' =>
+            $property['garages'],
+
+            'antiquity' =>
+            $property['antiquity'],
+        ]);
     }
 
     public static function createDraft(int $userId, array $data): array
@@ -454,7 +675,14 @@ class SearchRequestService
 
             self::syncPropertyTypes($pdo, $id, $data['property_types'] ?? []);
             self::syncAmenities($pdo, $id, $data['amenities'] ?? []);
-
+            self::syncExchangeOffer(
+                $pdo,
+                $id,
+                (int)$user['real_estate_id'],
+                !empty($data['payment_mode_swap'])
+                    ? ($data['exchange_property_id'] ?? null)
+                    : null
+            );
             self::logStatus($pdo, $id, null, 'draft', $userId);
 
             $pdo->commit();
@@ -469,7 +697,11 @@ class SearchRequestService
     public static function updateDraft(int $userId, int $id, array $data): array
     {
         $pdo = self::db();
-        [, $current] = self::getOwnedSearchRequestRow($userId, $id);
+        [$user, $current] =
+            self::getOwnedSearchRequestRow(
+                $userId,
+                $id
+            );
 
         if (!in_array($current['status'], ['draft', 'paused', 'archived', 'published'], true)) {
             throw new Exception("No se puede editar la búsqueda en el estado actual");
@@ -554,7 +786,14 @@ class SearchRequestService
             if (array_key_exists('amenities', $data)) {
                 self::syncAmenities($pdo, $id, $data['amenities'] ?? []);
             }
-
+            self::syncExchangeOffer(
+                $pdo,
+                $id,
+                (int)$user['real_estate_id'],
+                !empty($data['payment_mode_swap'])
+                    ? ($data['exchange_property_id'] ?? null)
+                    : null
+            );
             $pdo->commit();
 
             /*

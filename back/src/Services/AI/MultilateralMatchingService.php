@@ -414,11 +414,6 @@ pr.cash_difference_currency
                     )
                 );
 
-            /*
-         * Regla de producto:
-         * una operación multilateral se calcula
-         * solamente en una misma moneda.
-         */
             if (
                 $offeredCurrency === '' ||
                 $targetCurrency === ''

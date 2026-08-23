@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { SEARCH_REQUEST_CURRENCIES } from "../utils";
 import { Icon } from "../../../ui/icons/Index";
+import { getMyPublishedProperties } from "../../properties/api/properties.api";
 
 function Field({ label, children, hint = "" }) {
   return (
@@ -13,12 +15,7 @@ function Field({ label, children, hint = "" }) {
   );
 }
 
-function ModeCard({
-  checked,
-  title,
-  description,
-  onChange,
-}) {
+function ModeCard({ checked, title, description, onChange }) {
   return (
     <label
       className={`rounded-2xl border p-4 cursor-pointer transition ${
@@ -57,13 +54,43 @@ function SectionBlock({ title, description = "", children }) {
   );
 }
 
-export default function SearchRequestPaymentSection({
-  form,
-  setField,
-}) {
+export default function SearchRequestPaymentSection({ form, setField }) {
   const acceptsCash = !!form.payment_mode_cash;
   const acceptsSwap = !!form.payment_mode_swap;
   const acceptsBoth = acceptsCash && acceptsSwap;
+
+  const [properties, setProperties] = useState([]);
+  const [propertiesLoading, setPropertiesLoading] = useState(false);
+
+  useEffect(() => {
+    if (!acceptsSwap) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadProperties() {
+      try {
+        setPropertiesLoading(true);
+
+        const result = await getMyPublishedProperties();
+
+        if (!cancelled) {
+          setProperties(Array.isArray(result?.items) ? result.items : []);
+        }
+      } finally {
+        if (!cancelled) {
+          setPropertiesLoading(false);
+        }
+      }
+    }
+
+    loadProperties();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [acceptsSwap]);
 
   function handleCashChange(checked) {
     setField("payment_mode_cash", checked);
@@ -74,6 +101,7 @@ export default function SearchRequestPaymentSection({
 
     if (!checked) {
       setField("cash_difference_max", "");
+      setField("exchange_property_id", "");
     }
   }
 
@@ -98,7 +126,8 @@ export default function SearchRequestPaymentSection({
 
             <div>
               <p className="text-sm font-semibold text-emerald-900">
-                El rango de valor funciona como referencia para encontrar mejores coincidencias.
+                El rango de valor funciona como referencia para encontrar
+                mejores coincidencias.
               </p>
               <p className="mt-1 text-xs sm:text-sm text-emerald-800">
                 No representa necesariamente dinero en efectivo. También sirve
@@ -129,7 +158,36 @@ export default function SearchRequestPaymentSection({
             />
           </div>
         </SectionBlock>
+        {acceptsSwap ? (
+          <SectionBlock
+            title="Propiedad ofrecida en permuta"
+            description="Seleccioná una propiedad publicada de tu inmobiliaria que forma parte de la propuesta."
+          >
+            <Field label="Propiedad ofrecida">
+              <select
+                value={form.exchange_property_id || ""}
+                onChange={(e) =>
+                  setField("exchange_property_id", e.target.value)
+                }
+                disabled={propertiesLoading}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+              >
+                <option value="">
+                  {propertiesLoading
+                    ? "Cargando propiedades..."
+                    : "Seleccionar propiedad"}
+                </option>
 
+                {properties.map((property) => (
+                  <option key={property.id} value={property.id}>
+                    {property.title || `Propiedad #${property.id}`} ·{" "}
+                    {property.currency} {property.price}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </SectionBlock>
+        ) : null}
         <SectionBlock
           title="Rango de valor estimado"
           description="Usalo como referencia del valor de la propiedad buscada o del negocio esperado."
@@ -149,10 +207,7 @@ export default function SearchRequestPaymentSection({
               </select>
             </Field>
 
-            <Field
-              label="Valor estimado mínimo"
-              hint="Opcional"
-            >
+            <Field label="Valor estimado mínimo" hint="Opcional">
               <input
                 type="number"
                 min="0"
@@ -163,10 +218,7 @@ export default function SearchRequestPaymentSection({
               />
             </Field>
 
-            <Field
-              label="Valor estimado máximo"
-              hint="Opcional"
-            >
+            <Field label="Valor estimado máximo" hint="Opcional">
               <input
                 type="number"
                 min="0"
@@ -185,10 +237,7 @@ export default function SearchRequestPaymentSection({
             description="Completá esto solo si la búsqueda admite permuta más una diferencia en efectivo."
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field
-                label="Diferencia máxima en dinero"
-                hint="Opcional"
-              >
+              <Field label="Diferencia máxima en dinero" hint="Opcional">
                 <input
                   type="number"
                   min="0"

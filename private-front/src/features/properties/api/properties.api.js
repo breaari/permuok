@@ -91,3 +91,10 @@ export async function generatePropertyAIDescription(id, draft = {}) {
 
   return unwrap(res);
 }
+export async function getMyPublishedProperties() {
+  const res = await http.get(
+    "/properties?status=published&limit=100&page=1",
+  );
+
+  return unwrap(res);
+}

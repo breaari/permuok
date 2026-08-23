@@ -1065,6 +1065,7 @@ class CompatibilityEngine
                 id,
                 search_request_id,
                 title,
+                search_request_id,
                 property_type,
                 estimated_price,
                 currency,
@@ -1249,6 +1250,7 @@ class CompatibilityEngine
             id,
             search_request_id,
             title,
+            property_id,
             property_type,
             estimated_price,
             currency,
@@ -3061,7 +3063,7 @@ class CompatibilityEngine
             $penalties,
         ];
     }
-    
+
     private static function saveCompatibility(
         PDO $pdo,
         array $search,
