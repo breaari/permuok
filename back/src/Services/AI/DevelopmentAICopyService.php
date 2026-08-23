@@ -11,7 +11,7 @@ class DevelopmentAICopyService
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
     private const TITLE_PROMPT_VERSION = '1.0';
-    private const DESCRIPTION_PROMPT_VERSION = '1.0';
+    private const DESCRIPTION_PROMPT_VERSION = '1.1';
 
     private static function db(
         bool $forceReconnect = false
@@ -597,6 +597,44 @@ No es obligatorio mencionar todos los campos.
 
 No conviertas la descripción en una transcripción
 mecánica del formulario.
+
+REDUNDANCIAS Y JERARQUÍA DE INFORMACIÓN:
+
+- No repitas la misma información económica en distintas formas
+  si no aporta una diferencia importante.
+
+- Si existe un rango general del desarrollo y también valores
+  específicos de las tipologías, elegí la información que mejor
+  represente la oferta disponible.
+
+- Podés mencionar ambos solamente cuando aporten información
+  claramente diferente y útil.
+
+- Evitá frases consecutivas como:
+  "Valores de esta tipología entre..."
+  y luego
+  "El rango general de valores es..."
+
+  salvo que esa distinción sea comercialmente relevante.
+
+- Integrá amenities y características naturalmente dentro
+  de la redacción.
+
+- No uses etiquetas como:
+  "Amenities:",
+  "Tipologías:",
+  "Precios:",
+  "Unidades:",
+  "Ubicación:"
+  ni construcciones equivalentes dentro del texto.
+
+- Preferí:
+  "Entre sus amenities se incluyen pileta y gimnasio."
+
+  en lugar de:
+  "Amenities: pileta y gimnasio."
+
+
 
 TIPOLOGÍAS:
 
