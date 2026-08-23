@@ -526,6 +526,38 @@ if (
 
     exit;
 }
+
+if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/developments/(\d+)/ai-copy/title$#',
+        $uri,
+        $m
+    )
+) {
+    $_GET['id'] =
+        (int)$m[1];
+
+    DevelopmentController::generateAITitle();
+
+    exit;
+}
+
+if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/developments/(\d+)/ai-copy/description$#',
+        $uri,
+        $m
+    )
+) {
+    $_GET['id'] =
+        (int)$m[1];
+
+    DevelopmentController::generateAIDescription();
+
+    exit;
+}
 if ($method === 'POST' && preg_match('#^/developments/(\d+)/publish$#', $uri, $m)) {
     $_GET['id'] = (int)$m[1];
     DevelopmentController::publish();

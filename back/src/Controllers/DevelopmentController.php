@@ -9,6 +9,7 @@ use App\Services\DevelopmentService;
 use App\Services\MembershipGuard;
 use App\Services\AI\DevelopmentAIAnalysisService;
 use App\Services\AI\DevelopmentQualityScoreService;
+use App\Services\AI\DevelopmentAICopyService;
 
 class DevelopmentController
 {
@@ -233,6 +234,116 @@ class DevelopmentController
             $result =
                 DevelopmentQualityScoreService::getScore(
                     $id
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
+        } catch (\Throwable $e) {
+            ResponseHelper::error(
+                $e->getMessage(),
+                400
+            );
+        }
+    }
+
+    public static function generateAITitle(): void
+    {
+        try {
+            $auth =
+                AuthHelper::requireUser();
+
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
+
+            $id =
+                (int)($_GET['id'] ?? 0);
+
+            if ($id <= 0) {
+                throw new \Exception(
+                    'El ID del desarrollo no es válido.'
+                );
+            }
+
+            DevelopmentService::assertOwnedDevelopment(
+                (int)$auth['id'],
+                $id
+            );
+
+            $data =
+                json_decode(
+                    file_get_contents('php://input'),
+                    true
+                ) ?? [];
+
+            $draft =
+                is_array(
+                    $data['draft'] ?? null
+                )
+                ? $data['draft']
+                : [];
+
+            $result =
+                DevelopmentAICopyService::generateTitle(
+                    $id,
+                    (int)$auth['id'],
+                    $draft
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
+        } catch (\Throwable $e) {
+            ResponseHelper::error(
+                $e->getMessage(),
+                400
+            );
+        }
+    }
+
+    public static function generateAIDescription(): void
+    {
+        try {
+            $auth =
+                AuthHelper::requireUser();
+
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
+
+            $id =
+                (int)($_GET['id'] ?? 0);
+
+            if ($id <= 0) {
+                throw new \Exception(
+                    'El ID del desarrollo no es válido.'
+                );
+            }
+
+            DevelopmentService::assertOwnedDevelopment(
+                (int)$auth['id'],
+                $id
+            );
+
+            $data =
+                json_decode(
+                    file_get_contents('php://input'),
+                    true
+                ) ?? [];
+
+            $draft =
+                is_array(
+                    $data['draft'] ?? null
+                )
+                ? $data['draft']
+                : [];
+
+            $result =
+                DevelopmentAICopyService::generateDescription(
+                    $id,
+                    (int)$auth['id'],
+                    $draft
                 );
 
             ResponseHelper::ok(
