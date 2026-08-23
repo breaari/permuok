@@ -12,13 +12,15 @@ class CurrencyConversionService
     private const QUOTE_CURRENCY = 'ARS';
 
     private const RATE_TYPE =
-        'official_sell';
+    'official_sell';
 
     private const SOURCE =
-        'dolarhoy';
+    'dolarhoy';
 
     private const SOURCE_URL =
-        'https://dolarhoy.com/cotizacion-dolar-oficial';
+    'https://dolarhoy.com/cotizacion-dolar-oficial';
+
+    private static ?array $cachedRate = null;
 
     private static function db(): PDO
     {
@@ -46,7 +48,7 @@ class CurrencyConversionService
             $current !== null &&
             abs(
                 (float)$current['rate'] -
-                $rate
+                    $rate
             ) < 0.000001
         ) {
             return [
@@ -56,9 +58,9 @@ class CurrencyConversionService
                 'source' => self::SOURCE,
                 'rate_type' => self::RATE_TYPE,
                 'rate_id' =>
-                    (int)$current['id'],
+                (int)$current['id'],
                 'effective_at' =>
-                    $current['effective_at'],
+                $current['effective_at'],
             ];
         }
 
@@ -88,24 +90,28 @@ class CurrencyConversionService
 
         $st->execute([
             'base_currency' =>
-                self::BASE_CURRENCY,
+            self::BASE_CURRENCY,
 
             'quote_currency' =>
-                self::QUOTE_CURRENCY,
+            self::QUOTE_CURRENCY,
 
             'rate' =>
-                $rate,
+            $rate,
 
             'rate_type' =>
-                self::RATE_TYPE,
+            self::RATE_TYPE,
 
             'source' =>
-                self::SOURCE,
+            self::SOURCE,
 
             'source_url' =>
-                self::SOURCE_URL,
-        ]);
+            self::SOURCE_URL,
 
+
+        ]);
+        self::$cachedRate = null;
+        $current =
+            self::getLatestRate(true);
         return [
             'updated' => true,
             'rate' => $rate,
@@ -113,9 +119,10 @@ class CurrencyConversionService
             'source' => self::SOURCE,
             'rate_type' => self::RATE_TYPE,
             'rate_id' =>
-                (int)$pdo->lastInsertId(),
+            (int)$pdo->lastInsertId(),
             'effective_at' =>
-                date('Y-m-d H:i:s'),
+            date('Y-m-d H:i:s'),
+
         ];
     }
 
@@ -221,58 +228,68 @@ class CurrencyConversionService
     /**
      * Devuelve la última cotización válida.
      */
-    public static function getLatestRate(): ?array
-    {
+    public static function getLatestRate(
+        bool $forceRefresh = false
+    ): ?array {
+        if (
+            !$forceRefresh &&
+            self::$cachedRate !== null
+        ) {
+            return self::$cachedRate;
+        }
+
         $pdo = self::db();
 
         $st = $pdo->prepare("
-            SELECT
-                id,
-                base_currency,
-                quote_currency,
-                rate,
-                rate_type,
-                source,
-                source_url,
-                effective_at,
-                fetched_at,
-                created_at
+        SELECT
+            id,
+            base_currency,
+            quote_currency,
+            rate,
+            rate_type,
+            source,
+            source_url,
+            effective_at,
+            fetched_at,
+            created_at
 
-            FROM currency_exchange_rates
+        FROM currency_exchange_rates
 
-            WHERE base_currency =
-                :base_currency
+        WHERE base_currency =
+            :base_currency
 
-              AND quote_currency =
-                :quote_currency
+          AND quote_currency =
+            :quote_currency
 
-              AND rate_type =
-                :rate_type
+          AND rate_type =
+            :rate_type
 
-            ORDER BY
-                effective_at DESC,
-                id DESC
+        ORDER BY
+            effective_at DESC,
+            id DESC
 
-            LIMIT 1
-        ");
+        LIMIT 1
+    ");
 
         $st->execute([
             'base_currency' =>
-                self::BASE_CURRENCY,
+            self::BASE_CURRENCY,
 
             'quote_currency' =>
-                self::QUOTE_CURRENCY,
+            self::QUOTE_CURRENCY,
 
             'rate_type' =>
-                self::RATE_TYPE,
+            self::RATE_TYPE,
         ]);
 
         $row =
             $st->fetch(PDO::FETCH_ASSOC);
 
-        return $row ?: null;
-    }
+        self::$cachedRate =
+            $row ?: null;
 
+        return self::$cachedRate;
+    }
     /**
      * Consulta DolarHoy y obtiene
      * Dólar Oficial - Venta.
@@ -298,7 +315,7 @@ class CurrencyConversionService
             $document->loadHTML(
                 $html,
                 LIBXML_NOERROR |
-                LIBXML_NOWARNING
+                    LIBXML_NOWARNING
             );
 
         libxml_clear_errors();
@@ -336,8 +353,8 @@ class CurrencyConversionService
         $matched =
             preg_match(
                 '/D[oó]lar\s+Oficial.*?' .
-                'Compra\s*\$?\s*([\d\.,]+).*?' .
-                'Venta\s*\$?\s*([\d\.,]+)/isu',
+                    'Compra\s*\$?\s*([\d\.,]+).*?' .
+                    'Venta\s*\$?\s*([\d\.,]+)/isu',
                 $text,
                 $matches
             );
@@ -390,19 +407,19 @@ class CurrencyConversionService
             $ch,
             [
                 CURLOPT_RETURNTRANSFER =>
-                    true,
+                true,
 
                 CURLOPT_FOLLOWLOCATION =>
-                    true,
+                true,
 
                 CURLOPT_CONNECTTIMEOUT =>
-                    8,
+                8,
 
                 CURLOPT_TIMEOUT =>
-                    15,
+                15,
 
                 CURLOPT_USERAGENT =>
-                    'PermuOK/1.0 (+https://permuok.com)',
+                'PermuOK/1.0 (+https://permuok.com)',
 
                 CURLOPT_HTTPHEADER => [
                     'Accept: text/html,application/xhtml+xml',
@@ -428,7 +445,7 @@ class CurrencyConversionService
         if ($response === false) {
             throw new Exception(
                 'No se pudo consultar DolarHoy: ' .
-                $error
+                    $error
             );
         }
 
@@ -438,7 +455,7 @@ class CurrencyConversionService
         ) {
             throw new Exception(
                 'DolarHoy respondió con HTTP ' .
-                $httpCode
+                    $httpCode
             );
         }
 
