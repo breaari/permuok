@@ -30,99 +30,144 @@ class CompatibilityEngine
             $searchRequestId
         );
 
-        $propertyTypes = self::getSearchRequestPropertyTypes(
-            $pdo,
-            $searchRequestId
-        );
-
-        $desiredAmenities = self::getSearchRequestAmenities(
-            $pdo,
-            $searchRequestId
-        );
-        $exchangeOffers = self::getSearchRequestExchangeOffers(
-            $pdo,
-            $searchRequestId
-        );
-        $properties = self::getCandidateProperties(
-            $pdo,
-            (int)$searchRequest['real_estate_id'],
-            $propertyTypes
-        );
-
-        $propertyIds = array_map(
-            static fn(array $property): int =>
-            (int)$property['id'],
-            $properties
-        );
-
-        $amenitiesByProperty =
-            self::getPropertyAmenitiesBatch(
+        $propertyTypes =
+            self::getSearchRequestPropertyTypes(
                 $pdo,
-                $propertyIds
+                $searchRequestId
             );
 
-        $requirementsByProperty =
-            self::getPropertyRequirementsBatch(
+        $desiredAmenities =
+            self::getSearchRequestAmenities(
                 $pdo,
-                $propertyIds
+                $searchRequestId
             );
+
+        $exchangeOffers =
+            self::getSearchRequestExchangeOffers(
+                $pdo,
+                $searchRequestId
+            );
+
+        $results = [];
+        $activePropertyIds = [];
+        $candidatesEvaluated = 0;
+        $lastPropertyId = 0;
 
         $pdo->beginTransaction();
 
         try {
-            $results = [];
-            $activePropertyIds = [];
+            while (true) {
+                $properties =
+                    self::getCandidateProperties(
+                        $pdo,
+                        (int)$searchRequest['real_estate_id'],
+                        $propertyTypes,
+                        $lastPropertyId,
+                        self::BATCH_SIZE
+                    );
 
-            foreach ($properties as $property) {
-                $propertyId = (int)$property['id'];
-
-                $propertyAmenities =
-                    $amenitiesByProperty[$propertyId] ?? [];
-
-                $propertyRequirements =
-                    $requirementsByProperty[$propertyId] ?? null;
-                $evaluation = self::evaluatePropertyAgainstSearch(
-                    $searchRequest,
-                    $propertyTypes,
-                    $desiredAmenities,
-                    $exchangeOffers,
-                    $property,
-                    $propertyAmenities,
-                    $propertyRequirements
-                );
-
-                if (
-                    $evaluation['discarded'] ||
-                    $evaluation['score'] < self::MIN_SCORE_TO_SAVE
-                ) {
-                    continue;
+                if ($properties === []) {
+                    break;
                 }
 
-                $compatibilityId = self::saveCompatibility(
-                    $pdo,
-                    $searchRequest,
-                    $property,
-                    $evaluation
+                $propertyIds = array_map(
+                    static fn(array $property): int =>
+                    (int)$property['id'],
+                    $properties
                 );
 
-                $activePropertyIds[] = $propertyId;
+                $amenitiesByProperty =
+                    self::getPropertyAmenitiesBatch(
+                        $pdo,
+                        $propertyIds
+                    );
 
-                $results[] = [
-                    'compatibility_id' => $compatibilityId,
-                    'property_id' => $propertyId,
-                    'search_request_id' => $searchRequestId,
-                    'score' => $evaluation['score'],
-                    'match_level' => $evaluation['match_level'],
-                    'reasons' => $evaluation['reasons'],
-                    'penalties' => $evaluation['penalties'],
-                ];
+                $requirementsByProperty =
+                    self::getPropertyRequirementsBatch(
+                        $pdo,
+                        $propertyIds
+                    );
+
+                foreach ($properties as $property) {
+                    $propertyId =
+                        (int)$property['id'];
+
+                    $lastPropertyId =
+                        max(
+                            $lastPropertyId,
+                            $propertyId
+                        );
+
+                    $candidatesEvaluated++;
+
+                    $evaluation =
+                        self::evaluatePropertyAgainstSearch(
+                            $searchRequest,
+                            $propertyTypes,
+                            $desiredAmenities,
+                            $exchangeOffers,
+                            $property,
+                            $amenitiesByProperty[$propertyId] ?? [],
+                            $requirementsByProperty[$propertyId] ?? null
+                        );
+
+                    if (
+                        $evaluation['discarded'] ||
+                        $evaluation['score'] <
+                        self::MIN_SCORE_TO_SAVE
+                    ) {
+                        continue;
+                    }
+
+                    $compatibilityId =
+                        self::saveCompatibility(
+                            $pdo,
+                            $searchRequest,
+                            $property,
+                            $evaluation
+                        );
+
+                    $activePropertyIds[] =
+                        $propertyId;
+
+                    $results[] = [
+                        'compatibility_id' =>
+                        $compatibilityId,
+
+                        'property_id' =>
+                        $propertyId,
+
+                        'search_request_id' =>
+                        $searchRequestId,
+
+                        'score' =>
+                        $evaluation['score'],
+
+                        'match_level' =>
+                        $evaluation['match_level'],
+
+                        'reasons' =>
+                        $evaluation['reasons'],
+
+                        'penalties' =>
+                        $evaluation['penalties'],
+                    ];
+                }
+
+                if (
+                    count($properties) <
+                    self::BATCH_SIZE
+                ) {
+                    break;
+                }
             }
 
-            $archivedCount = self::archiveStaleCompatibilities(
-                $pdo,
-                $searchRequestId,
-                $activePropertyIds
-            );
+            $archivedCount =
+                self::archiveStaleCompatibilities(
+                    $pdo,
+                    $searchRequestId,
+                    $activePropertyIds
+                );
 
             $pdo->commit();
 
@@ -133,11 +178,20 @@ class CompatibilityEngine
             );
 
             return [
-                'search_request_id' => $searchRequestId,
-                'candidates_evaluated' => count($properties),
-                'compatibilities_saved' => count($results),
-                'compatibilities_archived' => $archivedCount,
-                'results' => $results,
+                'search_request_id' =>
+                $searchRequestId,
+
+                'candidates_evaluated' =>
+                $candidatesEvaluated,
+
+                'compatibilities_saved' =>
+                count($results),
+
+                'compatibilities_archived' =>
+                $archivedCount,
+
+                'results' =>
+                $results,
             ];
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
@@ -147,6 +201,7 @@ class CompatibilityEngine
             throw $e;
         }
     }
+
     private static function getPropertyAmenitiesBatch(
         PDO $pdo,
         array $propertyIds
@@ -1032,7 +1087,9 @@ class CompatibilityEngine
     private static function getCandidateProperties(
         PDO $pdo,
         int $sourceRealEstateId,
-        array $propertyTypes
+        array $propertyTypes,
+        int $afterId = 0,
+        int $limit = self::BATCH_SIZE
     ): array {
         $sql = "
         SELECT p.*
@@ -1041,11 +1098,15 @@ class CompatibilityEngine
           AND p.status = 'published'
           AND p.is_visible = 1
           AND p.deleted_at IS NULL
+          
     ";
-
+        $sql .= "
+    AND p.id > :after_id
+";
         $params = [
             'source_real_estate_id' =>
             $sourceRealEstateId,
+            'after_id' => $afterId,
         ];
 
         /*
@@ -1093,9 +1154,15 @@ class CompatibilityEngine
         ";
         }
 
+        $limit = max(
+            1,
+            min(self::BATCH_SIZE, $limit)
+        );
+
         $sql .= "
-        ORDER BY p.id DESC
-    ";
+    ORDER BY p.id ASC
+    LIMIT {$limit}
+";
 
         $st = $pdo->prepare($sql);
 
