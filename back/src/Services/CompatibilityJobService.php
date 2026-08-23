@@ -29,6 +29,9 @@ class CompatibilityJobService
     private const TYPE_SEARCH_REQUEST_AI_ANALYZE =
     'search_request_ai_analyze';
 
+    private const TYPE_DEVELOPMENT_AI_ANALYZE =
+    'development_ai_analyze';
+
     private const STALE_LOCK_MINUTES = 10;
 
     private static function db(
@@ -47,6 +50,19 @@ class CompatibilityJobService
         return self::enqueue(
             self::TYPE_SEARCH_REQUEST_AI_ANALYZE,
             $searchRequestId,
+            $priority,
+            $analysisId
+        );
+    }
+
+    public static function enqueueDevelopmentAIAnalysis(
+        int $developmentId,
+        int $analysisId,
+        int $priority = 7
+    ): array {
+        return self::enqueue(
+            self::TYPE_DEVELOPMENT_AI_ANALYZE,
+            $developmentId,
             $priority,
             $analysisId
         );
@@ -140,6 +156,7 @@ class CompatibilityJobService
             self::TYPE_PROPERTY_QUALITY_RECALCULATE,
             self::TYPE_PROPERTY_AI_ANALYZE,
             self::TYPE_SEARCH_REQUEST_AI_ANALYZE,
+            self::TYPE_DEVELOPMENT_AI_ANALYZE,
         ];
 
         if (!in_array($jobType, $validTypes, true)) {
@@ -161,6 +178,7 @@ class CompatibilityJobService
                 [
                     self::TYPE_PROPERTY_AI_ANALYZE,
                     self::TYPE_SEARCH_REQUEST_AI_ANALYZE,
+                    self::TYPE_DEVELOPMENT_AI_ANALYZE,
                 ],
                 true
             ) &&
