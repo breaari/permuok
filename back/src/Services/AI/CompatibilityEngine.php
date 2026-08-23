@@ -11,6 +11,7 @@ class CompatibilityEngine
 {
     private const MIN_SCORE_TO_SAVE = 25.0;
     private const BATCH_SIZE = 500;
+    private const MIN_SCORE_TO_NOTIFY = 75.0;
     /**
      * Recalcula las compatibilidades de una búsqueda
      * contra propiedades publicadas de otras inmobiliarias.
@@ -212,6 +213,44 @@ class CompatibilityEngine
             'results' =>
             $results,
         ];
+    }
+
+    private static function createMatchEvent(
+        PDO $pdo,
+        string $eventType,
+        int $compatibilityId,
+        array $payload = []
+    ): void {
+        $st = $pdo->prepare("
+        INSERT INTO match_events (
+            event_type,
+            entity_type,
+            entity_id,
+            payload_json,
+            occurred_at
+        ) VALUES (
+            :event_type,
+            'compatibility',
+            :entity_id,
+            :payload_json,
+            NOW()
+        )
+    ");
+
+        $st->execute([
+            'event_type' =>
+            $eventType,
+
+            'entity_id' =>
+            $compatibilityId,
+
+            'payload_json' =>
+            json_encode(
+                $payload,
+                JSON_UNESCAPED_UNICODE |
+                    JSON_UNESCAPED_SLASHES
+            ),
+        ]);
     }
 
     private static function getPropertyAmenitiesBatch(
@@ -3145,8 +3184,11 @@ class CompatibilityEngine
         );
 
         $stExisting = $pdo->prepare("
-            SELECT id
-            FROM compatibilities
+            SELECT
+    id,
+    score,
+    status
+FROM compatibilities
             WHERE property_id = :property_id
               AND search_request_id = :search_request_id
             LIMIT 1
@@ -3157,9 +3199,13 @@ class CompatibilityEngine
             'search_request_id' => (int)$search['id'],
         ]);
 
-        $existingId = (int)(
-            $stExisting->fetchColumn() ?: 0
-        );
+        $existing =
+            $stExisting->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+        $existingId =
+            (int)($existing['id'] ?? 0);
 
         if ($existingId > 0) {
             $stUpdate = $pdo->prepare("
@@ -3211,7 +3257,67 @@ updated_at = CURRENT_TIMESTAMP
                 'reasons_json' => $reasonsJson,
                 'id' => $existingId,
             ]);
+            $previousScore =
+                (float)($existing['score'] ?? 0);
 
+            $newScore =
+                (float)$evaluation['score'];
+
+            $wasMatch =
+                $previousScore >=
+                self::MIN_SCORE_TO_NOTIFY
+                &&
+                ($existing['status'] ?? '') !==
+                'archived';
+
+            $isMatch =
+                $newScore >=
+                self::MIN_SCORE_TO_NOTIFY;
+
+            if (!$wasMatch && $isMatch) {
+                self::createMatchEvent(
+                    $pdo,
+                    'direct_new',
+                    $existingId,
+                    [
+                        'score' => $newScore,
+                        'previous_score' =>
+                        $previousScore,
+                    ]
+                );
+            } elseif (
+                $wasMatch &&
+                $isMatch &&
+                abs(
+                    $newScore -
+                        $previousScore
+                ) >= 5
+            ) {
+                self::createMatchEvent(
+                    $pdo,
+                    'direct_changed',
+                    $existingId,
+                    [
+                        'score' => $newScore,
+                        'previous_score' =>
+                        $previousScore,
+                    ]
+                );
+            } elseif (
+                $wasMatch &&
+                !$isMatch
+            ) {
+                self::createMatchEvent(
+                    $pdo,
+                    'direct_lost',
+                    $existingId,
+                    [
+                        'score' => $newScore,
+                        'previous_score' =>
+                        $previousScore,
+                    ]
+                );
+            }
             return $existingId;
         }
 
@@ -3273,7 +3379,25 @@ updated_at = CURRENT_TIMESTAMP
             'match_reason' => $matchReason,
             'reasons_json' => $reasonsJson,
         ]);
+        $compatibilityId =
+            (int)$pdo->lastInsertId();
 
+        if (
+            (float)$evaluation['score'] >=
+            self::MIN_SCORE_TO_NOTIFY
+        ) {
+            self::createMatchEvent(
+                $pdo,
+                'direct_new',
+                $compatibilityId,
+                [
+                    'score' =>
+                    (float)$evaluation['score'],
+                ]
+            );
+        }
+
+        return $compatibilityId;
         return (int)$pdo->lastInsertId();
     }
     private static function archiveStaleCompatibilities(

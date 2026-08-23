@@ -40,6 +40,9 @@ class CompatibilityJobService
     private const TYPE_MULTILATERAL_RECALCULATE =
     'multilateral_recalculate';
 
+    private const TYPE_MATCH_DAILY_DIGEST =
+    'match_daily_digest';
+
     private static function db(
         bool $forceReconnect = false
     ): PDO {
@@ -67,6 +70,16 @@ class CompatibilityJobService
             $priority
         );
     }
+
+    public static function enqueueMatchDailyDigest(
+    int $priority = 2
+): array {
+    return self::enqueue(
+        self::TYPE_MATCH_DAILY_DIGEST,
+        1,
+        $priority
+    );
+}
 
     public static function enqueueAllPublishedSearchRequestRecalculations(
         int $priority = 4
@@ -261,6 +274,7 @@ class CompatibilityJobService
             self::TYPE_DEVELOPMENT_AI_ANALYZE,
             self::TYPE_CURRENCY_RATE_UPDATE,
             self::TYPE_MULTILATERAL_RECALCULATE,
+            self::TYPE_MATCH_DAILY_DIGEST,
         ];
 
         if (!in_array($jobType, $validTypes, true)) {

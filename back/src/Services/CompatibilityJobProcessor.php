@@ -10,6 +10,7 @@ use App\Services\AI\SearchRequestAIAnalysisService;
 use App\Services\AI\DevelopmentAIAnalysisService;
 use App\Services\CurrencyConversionService;
 use App\Services\AI\MultilateralOperationService;
+use App\Services\MatchDigestService;
 
 class CompatibilityJobProcessor
 {
@@ -48,6 +49,8 @@ class CompatibilityJobProcessor
             MultilateralOperationService::recalculate(),
             'currency_rate_update' =>
             self::processCurrencyRateUpdate(),
+            'match_daily_digest' =>
+            MatchDigestService::process(),
             'search_request_ai_analyze' =>
             SearchRequestAIAnalysisService::processAnalysis(
                 $entityId,
