@@ -755,77 +755,91 @@ class CompatibilityEngine
         int $searchRequestId
     ): int {
         /*
-     * No alteramos compatibilidades que ya
-     * avanzaron comercialmente.
+     * Solamente archivamos oportunidades
+     * que todavía no avanzaron comercialmente.
      */
-        $protectedStatuses = [
-            'one_side_interested',
-            'mutual_interest',
-            'chat_enabled',
-        ];
+        $stLost = $pdo->prepare("
+        SELECT id
+        FROM compatibilities
+        WHERE compatibility_type =
+            'property_search_request'
+          AND property_id =
+            :property_id
+          AND search_request_id =
+            :search_request_id
+          AND deleted_at IS NULL
+          AND status IN (
+              'detected',
+              'dismissed'
+          )
+          AND score >= :min_score
+        LIMIT 1
+    ");
 
-        $params = [
+        $stLost->execute([
             'property_id' =>
             $propertyId,
 
             'search_request_id' =>
             $searchRequestId,
-        ];
 
-        $placeholders = [];
+            'min_score' =>
+            self::MIN_SCORE_TO_NOTIFY,
+        ]);
 
-        foreach (
-            $protectedStatuses
-            as $index => $status
-        ) {
-            $key =
-                'protected_status_' . $index;
+        $lostId =
+            (int)(
+                $stLost->fetchColumn()
+                ?: 0
+            );
 
-            $placeholders[] =
-                ':' . $key;
-
-            $params[$key] =
-                $status;
-        }
-
-        $sql = "
+        $st = $pdo->prepare("
         UPDATE compatibilities
 
         SET
             status = 'archived',
-
             archived_at = NOW(),
+            updated_at = CURRENT_TIMESTAMP
 
-            updated_at =
-                CURRENT_TIMESTAMP
+        WHERE compatibility_type =
+            'property_search_request'
 
-        WHERE
-            compatibility_type =
-                'property_search_request'
+          AND property_id =
+            :property_id
 
-            AND property_id =
-                :property_id
+          AND search_request_id =
+            :search_request_id
 
-            AND search_request_id =
-                :search_request_id
+          AND deleted_at IS NULL
 
-            AND deleted_at IS NULL
+          AND status IN (
+              'detected',
+              'dismissed'
+          )
+    ");
 
-            AND status NOT IN (
-                " .
-            implode(
-                ', ',
-                $placeholders
-            ) .
-            "
-            )
-    ";
+        $st->execute([
+            'property_id' =>
+            $propertyId,
 
-        $st = $pdo->prepare($sql);
+            'search_request_id' =>
+            $searchRequestId,
+        ]);
 
-        $st->execute($params);
+        $archivedCount =
+            $st->rowCount();
 
-        return $st->rowCount();
+        if (
+            $archivedCount > 0 &&
+            $lostId > 0
+        ) {
+            self::createDirectLostEvents(
+                $pdo,
+                [$lostId]
+            );
+        }
+
+        return $archivedCount;
     }
 
     public static function archiveForProperty(
@@ -3468,72 +3482,141 @@ updated_at = CURRENT_TIMESTAMP
         int $searchRequestId,
         array $activePropertyIds
     ): int {
-        /*
-     * No archivamos compatibilidades que ya hayan avanzado
-     * comercialmente.
-     */
-        $protectedStatuses = [
-            'one_side_interested',
-            'mutual_interest',
-            'chat_enabled',
-        ];
-
         $params = [
-            'search_request_id' => $searchRequestId,
+            'search_request_id' =>
+            $searchRequestId,
+
+            'min_score' =>
+            self::MIN_SCORE_TO_NOTIFY,
         ];
 
-        $protectedPlaceholders = [];
-
-        foreach ($protectedStatuses as $index => $status) {
-            $key = 'protected_status_' . $index;
-
-            $protectedPlaceholders[] = ':' . $key;
-            $params[$key] = $status;
-        }
-
-        $sql = "
-        UPDATE compatibilities
-        SET
-            status = 'archived',
-            archived_at = NOW(),
-            updated_at = CURRENT_TIMESTAMP
-        WHERE compatibility_type =
+        /*
+     * Construimos una única condición para
+     * identificar las compatibilidades que
+     * dejaron de ser válidas.
+     */
+        $baseWhere = "
+        compatibility_type =
             'property_search_request'
-          AND search_request_id = :search_request_id
-          AND deleted_at IS NULL
-          AND status NOT IN (
-              " . implode(', ', $protectedPlaceholders) . "
-          )
+
+        AND search_request_id =
+            :search_request_id
+
+        AND deleted_at IS NULL
+
+        AND status IN (
+            'detected',
+            'dismissed'
+        )
     ";
 
-        /*
-     * Si siguen existiendo compatibilidades válidas,
-     * las excluimos del archivado.
-     */
         if ($activePropertyIds !== []) {
             $propertyPlaceholders = [];
 
             foreach (
-                array_values(array_unique($activePropertyIds))
-                as $index => $propertyId
+                array_values(
+                    array_unique(
+                        array_map(
+                            'intval',
+                            $activePropertyIds
+                        )
+                    )
+                ) as $index => $propertyId
             ) {
-                $key = 'active_property_' . $index;
+                if ($propertyId <= 0) {
+                    continue;
+                }
 
-                $propertyPlaceholders[] = ':' . $key;
-                $params[$key] = (int)$propertyId;
+                $key =
+                    'active_property_' .
+                    $index;
+
+                $propertyPlaceholders[] =
+                    ':' . $key;
+
+                $params[$key] =
+                    $propertyId;
             }
 
-            $sql .= "
-          AND property_id NOT IN (
-              " . implode(', ', $propertyPlaceholders) . "
-          )
-        ";
+            if ($propertyPlaceholders !== []) {
+                $baseWhere .= "
+                AND property_id NOT IN (
+                    " .
+                    implode(
+                        ', ',
+                        $propertyPlaceholders
+                    ) .
+                    "
+                )
+            ";
+            }
         }
 
-        $st = $pdo->prepare($sql);
-        $st->execute($params);
+        /*
+     * Antes de archivar guardamos solamente
+     * las oportunidades que eran matches
+     * notificables.
+     */
+        $stLost = $pdo->prepare("
+        SELECT id
+        FROM compatibilities
 
-        return $st->rowCount();
+        WHERE
+            {$baseWhere}
+
+          AND score >= :min_score
+    ");
+
+        $stLost->execute($params);
+
+        $lostIds =
+            $stLost->fetchAll(
+                PDO::FETCH_COLUMN
+            ) ?: [];
+
+        /*
+     * min_score es únicamente para el SELECT.
+     * El UPDATE debe archivar también las
+     * compatibilidades inferiores a 75.
+     */
+        $updateParams =
+            $params;
+
+        unset(
+            $updateParams['min_score']
+        );
+
+        $st = $pdo->prepare("
+        UPDATE compatibilities
+
+        SET
+            status = 'archived',
+            archived_at = NOW(),
+            updated_at =
+                CURRENT_TIMESTAMP
+
+        WHERE
+            {$baseWhere}
+    ");
+
+        $st->execute(
+            $updateParams
+        );
+
+        $archivedCount =
+            $st->rowCount();
+
+        if (
+            $archivedCount > 0 &&
+            $lostIds !== []
+        ) {
+            self::createDirectLostEvents(
+                $pdo,
+                $lostIds
+            );
+        }
+
+        return $archivedCount;
     }
     private static function buildMatchReason(
         array $evaluation
