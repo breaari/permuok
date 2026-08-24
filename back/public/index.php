@@ -201,7 +201,8 @@ $routes = [
     // Compatibilities / recomendaciones
     'GET /compatibilities/recommendations' =>
     [CompatibilityController::class, 'recommendations'],
-
+    'GET /compatibilities/multilateral' =>
+    [CompatibilityController::class, 'multilateral'],
 ];
 
 $key = $method . ' ' . $uri;
@@ -745,6 +746,20 @@ if (
     AiEnrichmentController::searchRequestAnalysis(
         (int)$matches[1]
     );
+    exit;
+}
+if (
+    $method === 'GET' &&
+    preg_match(
+        '#^/compatibilities/multilateral/(\d+)$#',
+        $uri,
+        $m
+    )
+) {
+    CompatibilityController::multilateralDetail(
+            (int)$m[1]
+        );
+
     exit;
 }
 if (

@@ -6,6 +6,7 @@ use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
 use App\Services\CompatibilityService;
 use Throwable;
+use App\Services\MultilateralOperationReadService;
 
 class CompatibilityController
 {
@@ -111,6 +112,45 @@ class CompatibilityController
             self::error($e);
         }
     }
+
+    public static function multilateral(): void
+    {
+        try {
+            $user =
+                AuthHelper::requireUser();
+
+            $result =
+                MultilateralOperationReadService::listForUser(
+                    (int)$user['id'],
+                    $_GET
+                );
+
+            ResponseHelper::ok($result);
+        } catch (Throwable $e) {
+            self::error($e);
+        }
+    }
+
+    public static function multilateralDetail(
+        int $operationId
+    ): void {
+        try {
+            $user =
+                AuthHelper::requireUser();
+
+            $result =
+                MultilateralOperationReadService::detailForUser(
+                    (int)$user['id'],
+                    $operationId
+                );
+
+            ResponseHelper::ok($result);
+        } catch (Throwable $e) {
+            self::error($e);
+        }
+    }
+
+
     private static function error(
         Throwable $e
     ): void {
