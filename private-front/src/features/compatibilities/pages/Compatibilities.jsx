@@ -380,6 +380,24 @@ export default function Compatibilities() {
         </div>
       </div>
 
+      {/* Tipo de compatibilidad */}
+      <div className="mb-7 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+        <button
+          type="button"
+          className="rounded-lg bg-white px-4 py-2 text-sm font-bold text-primary shadow-sm"
+        >
+          Directas
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate("/compatibilities/multilateral")}
+          className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 transition hover:text-slate-900"
+        >
+          Multilaterales
+        </button>
+      </div>
+
       {/* =====================================================
           RESUMEN
       ====================================================== */}
@@ -466,7 +484,6 @@ export default function Compatibilities() {
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 sm:w-auto"
               >
                 Revisar nuevas
-
                 <ArrowRightIcon />
               </button>
             </div>
@@ -490,7 +507,6 @@ export default function Compatibilities() {
             }`}
           >
             Activas
-
             {view === "active" && (
               <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />
             )}
@@ -506,7 +522,6 @@ export default function Compatibilities() {
             }`}
           >
             Historial
-
             {view === "history" && (
               <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />
             )}

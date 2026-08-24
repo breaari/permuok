@@ -45,6 +45,8 @@ import AdminDashboard from "./features/admin/pages/AdminDashboard";
 import Compatibilities from "./features/compatibilities/pages/Compatibilities";
 import CompatibilityDetail from "./features/compatibilities/pages/CompatibilityDetail";
 
+import MultilateralCompatibilities from "./features/compatibilities/pages/MultilateralCompatibilities";
+
 export default function App() {
   return (
     <Routes>
@@ -150,6 +152,10 @@ export default function App() {
           }
         />
         <Route path="compatibilities" element={<Compatibilities />} />
+        <Route
+          path="compatibilities/multilateral"
+          element={<MultilateralCompatibilities />}
+        />
         <Route path="compatibilities/:id" element={<CompatibilityDetail />} />
 
         <Route path="conversations" element={<Inbox />} />

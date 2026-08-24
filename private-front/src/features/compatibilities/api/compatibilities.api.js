@@ -40,3 +40,22 @@ export async function saveCompatibilityFeedback(id, payload) {
 
   return unwrap(res);
 }
+export async function getMultilateralCompatibilities(filters = {}) {
+  const params = {
+    page: filters.page || 1,
+    limit: filters.limit || 12,
+    view: filters.view || "active",
+  };
+
+  const res = await http.get("/compatibilities/multilateral", {
+    params,
+  });
+
+  return unwrap(res);
+}
+
+export async function getMultilateralCompatibilityDetail(id) {
+  const res = await http.get(`/compatibilities/multilateral/${id}`);
+
+  return unwrap(res);
+}
