@@ -839,36 +839,87 @@ class CompatibilityEngine
 
         $pdo = self::db();
 
-        /*
-     * Conservamos las compatibilidades que ya avanzaron
-     * comercialmente.
-     */
-        $st = $pdo->prepare("
-        UPDATE compatibilities
-        SET
-            status = 'archived',
-            archived_at = NOW(),
-            updated_at = CURRENT_TIMESTAMP
-        WHERE compatibility_type =
-            'property_search_request'
-          AND property_id = :property_id
-          AND deleted_at IS NULL
-          AND status IN (
-              'detected',
-              'dismissed'
-          )
-    ");
+        $pdo->beginTransaction();
 
-        $st->execute([
-            'property_id' => $propertyId,
-        ]);
+        try {
+            /*
+         * Guardamos qué matches notificables
+         * estaban activos antes de archivarlos.
+         */
+            $stIds = $pdo->prepare("
+            SELECT id
+            FROM compatibilities
+            WHERE compatibility_type =
+                'property_search_request'
+              AND property_id = :property_id
+              AND deleted_at IS NULL
+              AND status IN (
+                  'detected',
+                  'dismissed'
+              )
+              AND score >= :min_score
+        ");
 
-        return [
-            'property_id' => $propertyId,
-            'compatibilities_archived' =>
-            $st->rowCount(),
-        ];
+            $stIds->execute([
+                'property_id' =>
+                $propertyId,
+
+                'min_score' =>
+                self::MIN_SCORE_TO_NOTIFY,
+            ]);
+
+            $lostIds =
+                $stIds->fetchAll(
+                    PDO::FETCH_COLUMN
+                ) ?: [];
+
+            $st = $pdo->prepare("
+            UPDATE compatibilities
+            SET
+                status = 'archived',
+                archived_at = NOW(),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE compatibility_type =
+                'property_search_request'
+              AND property_id = :property_id
+              AND deleted_at IS NULL
+              AND status IN (
+                  'detected',
+                  'dismissed'
+              )
+        ");
+
+            $st->execute([
+                'property_id' =>
+                $propertyId,
+            ]);
+
+            self::createDirectLostEvents(
+                $pdo,
+                $lostIds
+            );
+
+            $archivedCount =
+                $st->rowCount();
+
+            $pdo->commit();
+
+            return [
+                'property_id' =>
+                $propertyId,
+
+                'compatibilities_archived' =>
+                $archivedCount,
+            ];
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $e;
+        }
     }
+
     public static function archiveForSearchRequest(
         int $searchRequestId
     ): array {
@@ -880,33 +931,84 @@ class CompatibilityEngine
 
         $pdo = self::db();
 
-        $st = $pdo->prepare("
-        UPDATE compatibilities
-        SET
-            status = 'archived',
-            archived_at = NOW(),
-            updated_at = CURRENT_TIMESTAMP
-        WHERE compatibility_type =
-            'property_search_request'
-          AND search_request_id = :search_request_id
-          AND deleted_at IS NULL
-          AND status IN (
-              'detected',
-              'dismissed',
-              'archived'
-          )
-    ");
+        $pdo->beginTransaction();
 
-        $st->execute([
-            'search_request_id' => $searchRequestId,
-        ]);
+        try {
+            $stIds = $pdo->prepare("
+            SELECT id
+            FROM compatibilities
+            WHERE compatibility_type =
+                'property_search_request'
+              AND search_request_id =
+                :search_request_id
+              AND deleted_at IS NULL
+              AND status IN (
+                  'detected',
+                  'dismissed'
+              )
+              AND score >= :min_score
+        ");
 
-        return [
-            'search_request_id' => $searchRequestId,
-            'compatibilities_archived' => $st->rowCount(),
-        ];
+            $stIds->execute([
+                'search_request_id' =>
+                $searchRequestId,
+
+                'min_score' =>
+                self::MIN_SCORE_TO_NOTIFY,
+            ]);
+
+            $lostIds =
+                $stIds->fetchAll(
+                    PDO::FETCH_COLUMN
+                ) ?: [];
+
+            $st = $pdo->prepare("
+            UPDATE compatibilities
+            SET
+                status = 'archived',
+                archived_at = NOW(),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE compatibility_type =
+                'property_search_request'
+              AND search_request_id =
+                :search_request_id
+              AND deleted_at IS NULL
+              AND status IN (
+                  'detected',
+                  'dismissed'
+              )
+        ");
+
+            $st->execute([
+                'search_request_id' =>
+                $searchRequestId,
+            ]);
+
+            self::createDirectLostEvents(
+                $pdo,
+                $lostIds
+            );
+
+            $archivedCount =
+                $st->rowCount();
+
+            $pdo->commit();
+
+            return [
+                'search_request_id' =>
+                $searchRequestId,
+
+                'compatibilities_archived' =>
+                $archivedCount,
+            ];
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $e;
+        }
     }
-
 
     private static function getSearchRequest(
         PDO $pdo,
@@ -3582,6 +3684,32 @@ updated_at = CURRENT_TIMESTAMP
             'placeholders' => $placeholders,
             'params' => $params,
         ];
+    }
+
+    private static function createDirectLostEvents(
+        PDO $pdo,
+        array $compatibilityIds
+    ): void {
+        foreach (
+            array_values(
+                array_unique(
+                    array_map(
+                        'intval',
+                        $compatibilityIds
+                    )
+                )
+            ) as $compatibilityId
+        ) {
+            if ($compatibilityId <= 0) {
+                continue;
+            }
+
+            self::createMatchEvent(
+                $pdo,
+                'direct_lost',
+                $compatibilityId
+            );
+        }
     }
 
     private static function createMatchEvent(
