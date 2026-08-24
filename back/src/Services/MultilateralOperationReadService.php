@@ -78,10 +78,10 @@ class MultilateralOperationReadService
 
         $params = [
             'real_estate_id_1' =>
-                $realEstateId,
+            $realEstateId,
 
             'real_estate_id_2' =>
-                $realEstateId,
+            $realEstateId,
         ];
 
         if ($view === 'active') {
@@ -146,8 +146,8 @@ class MultilateralOperationReadService
                 own_leg.cash_difference
                     AS own_cash_difference,
 
-                own_leg.direction
-                    AS own_direction,
+               own_leg.cash_difference_direction
+    AS own_direction,
 
                 own_leg.comparison_currency
                     AS own_comparison_currency,
@@ -220,9 +220,7 @@ class MultilateralOperationReadService
         $listParams =
             $params;
 
-        $listParams[
-            'own_real_estate_id'
-        ] = $realEstateId;
+        $listParams['own_real_estate_id'] = $realEstateId;
 
         $st->execute($listParams);
 
@@ -248,12 +246,12 @@ class MultilateralOperationReadService
                 'total' => $total,
 
                 'pages' =>
-                    max(
-                        1,
-                        (int)ceil(
-                            $total / $limit
-                        )
-                    ),
+                max(
+                    1,
+                    (int)ceil(
+                        $total / $limit
+                    )
+                ),
             ],
         ];
     }
@@ -313,13 +311,13 @@ class MultilateralOperationReadService
 
         $st->execute([
             'operation_id' =>
-                $operationId,
+            $operationId,
 
             'real_estate_id_1' =>
-                $realEstateId,
+            $realEstateId,
 
             'real_estate_id_2' =>
-                $realEstateId,
+            $realEstateId,
         ]);
 
         $operation =
@@ -420,8 +418,9 @@ class MultilateralOperationReadService
                 ml.comparison_currency,
 
                 ml.signed_cash_difference,
-                ml.cash_difference,
-                ml.direction
+ml.cash_difference,
+ml.cash_difference_direction
+    AS direction
 
             FROM multilateral_operation_legs ml
 
@@ -460,7 +459,7 @@ class MultilateralOperationReadService
 
         $stLegs->execute([
             'operation_id' =>
-                $operationId,
+            $operationId,
         ]);
 
         $legs =
@@ -470,9 +469,7 @@ class MultilateralOperationReadService
 
         foreach ($legs as &$leg) {
             $leg['is_my_leg'] =
-                (int)$leg[
-                    'source_real_estate_id'
-                ] === $realEstateId;
+                (int)$leg['source_real_estate_id'] === $realEstateId;
 
             $leg['score'] =
                 (float)$leg['score'];
@@ -484,9 +481,7 @@ class MultilateralOperationReadService
 
             $leg['offered_original_value'] =
                 self::nullableFloat(
-                    $leg[
-                        'offered_original_value'
-                    ]
+                    $leg['offered_original_value']
                 );
 
             $leg['target_value'] =
@@ -496,16 +491,12 @@ class MultilateralOperationReadService
 
             $leg['signed_cash_difference'] =
                 self::nullableFloat(
-                    $leg[
-                        'signed_cash_difference'
-                    ]
+                    $leg['signed_cash_difference']
                 );
 
             $leg['cash_difference'] =
                 self::nullableFloat(
-                    $leg[
-                        'cash_difference'
-                    ]
+                    $leg['cash_difference']
                 );
 
             $leg['property_price'] =
@@ -515,42 +506,30 @@ class MultilateralOperationReadService
 
             $leg['offered_property_price'] =
                 self::nullableFloat(
-                    $leg[
-                        'offered_property_price'
-                    ]
+                    $leg['offered_property_price']
                 );
 
             $leg['property_cover_image_id'] =
-                $leg[
-                    'property_cover_image_id'
-                ] !== null
-                    ? (int)$leg[
-                        'property_cover_image_id'
-                    ]
-                    : null;
+                $leg['property_cover_image_id'] !== null
+                ? (int)$leg['property_cover_image_id']
+                : null;
 
-            $leg[
-                'offered_property_cover_image_id'
-            ] =
-                $leg[
-                    'offered_property_cover_image_id'
-                ] !== null
-                    ? (int)$leg[
-                        'offered_property_cover_image_id'
-                    ]
-                    : null;
+            $leg['offered_property_cover_image_id'] =
+                $leg['offered_property_cover_image_id'] !== null
+                ? (int)$leg['offered_property_cover_image_id']
+                : null;
         }
         unset($leg);
 
         return [
             'operation' =>
-                $operation,
+            $operation,
 
             'legs' =>
-                $legs,
+            $legs,
 
             'my_real_estate_id' =>
-                $realEstateId,
+            $realEstateId,
         ];
     }
 
@@ -607,22 +586,16 @@ class MultilateralOperationReadService
             (int)$operation['id'];
 
         $operation['participants_count'] =
-            (int)$operation[
-                'participants_count'
-            ];
+            (int)$operation['participants_count'];
 
         $operation['score'] =
             (float)$operation['score'];
 
         $operation['minimum_edge_score'] =
-            (float)$operation[
-                'minimum_edge_score'
-            ];
+            (float)$operation['minimum_edge_score'];
 
         $operation['average_edge_score'] =
-            (float)$operation[
-                'average_edge_score'
-            ];
+            (float)$operation['average_edge_score'];
 
         if (
             array_key_exists(
@@ -631,43 +604,29 @@ class MultilateralOperationReadService
             )
         ) {
             $operation['own_position'] =
-                (int)$operation[
-                    'own_position'
-                ];
+                (int)$operation['own_position'];
 
             $operation['own_leg_score'] =
-                (float)$operation[
-                    'own_leg_score'
-                ];
+                (float)$operation['own_leg_score'];
 
-            $operation[
-                'own_signed_cash_difference'
-            ] =
+            $operation['own_signed_cash_difference'] =
                 self::nullableFloat(
-                    $operation[
-                        'own_signed_cash_difference'
-                    ]
+                    $operation['own_signed_cash_difference']
                 );
 
             $operation['own_cash_difference'] =
                 self::nullableFloat(
-                    $operation[
-                        'own_cash_difference'
-                    ]
+                    $operation['own_cash_difference']
                 );
 
             $operation['target_property_price'] =
                 self::nullableFloat(
-                    $operation[
-                        'target_property_price'
-                    ]
+                    $operation['target_property_price']
                 );
 
             $operation['offered_property_price'] =
                 self::nullableFloat(
-                    $operation[
-                        'offered_property_price'
-                    ]
+                    $operation['offered_property_price']
                 );
         }
     }

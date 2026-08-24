@@ -46,6 +46,7 @@ import Compatibilities from "./features/compatibilities/pages/Compatibilities";
 import CompatibilityDetail from "./features/compatibilities/pages/CompatibilityDetail";
 
 import MultilateralCompatibilities from "./features/compatibilities/pages/MultilateralCompatibilities";
+import MultilateralCompatibilityDetail from "./features/compatibilities/pages/MultilateralCompatibilityDetail";
 
 export default function App() {
   return (
@@ -152,10 +153,17 @@ export default function App() {
           }
         />
         <Route path="compatibilities" element={<Compatibilities />} />
+
         <Route
           path="compatibilities/multilateral"
           element={<MultilateralCompatibilities />}
         />
+
+        <Route
+          path="compatibilities/multilateral/:id"
+          element={<MultilateralCompatibilityDetail />}
+        />
+
         <Route path="compatibilities/:id" element={<CompatibilityDetail />} />
 
         <Route path="conversations" element={<Inbox />} />
