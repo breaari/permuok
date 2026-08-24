@@ -71,12 +71,12 @@ class CompatibilityJobProcessor
             ),
 
             'property_archive' =>
-            CompatibilityEngine::archiveForProperty(
+            self::processPropertyArchive(
                 $entityId
             ),
 
             'search_request_archive' =>
-            CompatibilityEngine::archiveForSearchRequest(
+            self::processSearchRequestArchive(
                 $entityId
             ),
 
@@ -138,6 +138,36 @@ class CompatibilityJobProcessor
         CompatibilityJobService::enqueueMultilateralRecalculation(
             3
         );
+
+        return $result;
+    }
+
+    private static function processPropertyArchive(
+        int $propertyId
+    ): array {
+        $result =
+            CompatibilityEngine::archiveForProperty(
+                $propertyId
+            );
+
+        CompatibilityJobService::enqueueMultilateralRecalculation(
+                3
+            );
+
+        return $result;
+    }
+
+    private static function processSearchRequestArchive(
+        int $searchRequestId
+    ): array {
+        $result =
+            CompatibilityEngine::archiveForSearchRequest(
+                $searchRequestId
+            );
+
+        CompatibilityJobService::enqueueMultilateralRecalculation(
+                3
+            );
 
         return $result;
     }
