@@ -30,7 +30,11 @@ function formatDate(value) {
     return "—";
   }
 
-  const date = new Date(String(value).replace(" ", "T"));
+  const normalized = String(value).replace(" ", "T");
+
+  const date = new Date(
+    /Z$|[+-]\d{2}:\d{2}$/.test(normalized) ? normalized : `${normalized}Z`,
+  );
 
   if (Number.isNaN(date.getTime())) {
     return "—";
@@ -277,9 +281,7 @@ function OperationLeg({ leg, index, total, navigate }) {
               onOpen={
                 leg?.offered_property_id
                   ? () =>
-                      navigate(
-                        `/explore/properties/${leg.offered_property_id}`,
-                      )
+                      navigate(`/explore/properties/${leg.offered_property_id}`)
                   : null
               }
             />
@@ -301,8 +303,7 @@ function OperationLeg({ leg, index, total, navigate }) {
               city={leg?.property_city}
               onOpen={
                 leg?.property_id
-                  ? () =>
-                      navigate(`/explore/properties/${leg.property_id}`)
+                  ? () => navigate(`/explore/properties/${leg.property_id}`)
                   : null
               }
             />
@@ -525,9 +526,7 @@ export default function MultilateralCompatibilityDetail() {
           </div>
 
           <div className="bg-white p-4">
-            <div className="text-xs font-bold text-slate-400">
-              Detectada
-            </div>
+            <div className="text-xs font-bold text-slate-400">Detectada</div>
 
             <div className="mt-1 text-sm font-bold text-slate-900">
               {formatDate(operation.detected_at)}

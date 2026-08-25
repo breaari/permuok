@@ -30,7 +30,11 @@ function formatDate(value) {
     return "—";
   }
 
-  const date = new Date(String(value).replace(" ", "T"));
+  const normalized = String(value).replace(" ", "T");
+
+  const date = new Date(
+    /Z$|[+-]\d{2}:\d{2}$/.test(normalized) ? normalized : `${normalized}Z`,
+  );
 
   if (Number.isNaN(date.getTime())) {
     return "—";
@@ -67,8 +71,7 @@ function resolveDifferenceLabel(item) {
   if (item?.own_direction === "en_contra") {
     return {
       label: `Recibís ${formatMoney(difference, currency)}`,
-      description:
-        "Tu propiedad tiene un valor superior dentro de este tramo.",
+      description: "Tu propiedad tiene un valor superior dentro de este tramo.",
       tone: "blue",
     };
   }
@@ -486,9 +489,7 @@ export default function MultilateralCompatibilities() {
           <button
             type="button"
             disabled={page >= pages}
-            onClick={() =>
-              setPage((current) => Math.min(pages, current + 1))
-            }
+            onClick={() => setPage((current) => Math.min(pages, current + 1))}
             className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Siguiente
