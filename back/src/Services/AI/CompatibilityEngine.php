@@ -1836,7 +1836,7 @@ class CompatibilityEngine
             return [
                 'score' => 25.0,
                 'reason' => [
-                    'code' => 'exact_zone_match', 
+                    'code' => 'exact_zone_match',
                     'label' => 'Coincidencia exacta de zona',
                     'weight' => 25,
                     'matched' => true,
@@ -2798,18 +2798,18 @@ class CompatibilityEngine
             ($priceMaxRaw === null ||
                 $priceMax !== null);
 
- $hasOfferValueConstraint =
-    (
-        $priceMinRaw !== null &&
-        $priceMinRaw > 0
-    )
-    ||
-    (
-        $priceMaxRaw !== null &&
-        $priceMaxRaw > 0
-    );
+        $hasOfferValueConstraint =
+            (
+                $priceMinRaw !== null &&
+                $priceMinRaw > 0
+            )
+            ||
+            (
+                $priceMaxRaw !== null &&
+                $priceMaxRaw > 0
+            );
 
-/*
+        /*
  * Si el propietario no definió un rango
  * para el inmueble que recibiría, no decimos
  * que el valor sea "compatible".
@@ -2817,116 +2817,116 @@ class CompatibilityEngine
  * Lo correcto es indicar que está abierto
  * a evaluar propuestas sin un rango previo.
  */
-if (!$hasOfferValueConstraint) {
-    $score += 5;
+        if (!$hasOfferValueConstraint) {
+            $score += 5;
 
-    $reasons[] = [
-        'code' =>
-            'exchange_offer_value_unrestricted',
+            $reasons[] = [
+                'code' =>
+                'exchange_offer_value_unrestricted',
 
-        'label' =>
-            'El propietario no definió un rango de valor para el inmueble ofrecido',
+                'label' =>
+                'El propietario no definió un rango de valor para el inmueble ofrecido',
 
-        'weight' =>
-            5,
+                'weight' =>
+                5,
 
-        'matched' =>
-            true,
+                'matched' =>
+                true,
 
-        'offered_value' =>
-            $offerPrice,
-
-        'accepted_min' =>
-            null,
-
-        'accepted_max' =>
-            null,
-
-        'currency' =>
-            $propertyCurrency,
-
-        'original_offered_value' =>
-            $selectedOfferOriginalPrice,
-
-        'original_offered_currency' =>
-            $selectedOfferOriginalCurrency,
-
-        'currency_conversion_applied' =>
-            $selectedOfferConversionApplied,
-    ];
-} else {
-    $withinAcceptedOfferRange =
-        $offerRangeConversionAvailable &&
-        (
-            $priceMin === null ||
-            $priceMin <= 0 ||
-            $offerPrice >= $priceMin
-        ) &&
-        (
-            $priceMax === null ||
-            $priceMax <= 0 ||
-            $offerPrice <= $priceMax
-        );
-
-    if ($withinAcceptedOfferRange) {
-        $score += 5;
-    } else {
-        $penalties[] = [
-            'code' =>
-                'exchange_offer_value_out_of_range',
-
-            'label' =>
-                'El valor del inmueble ofrecido no está dentro del rango aceptado',
-
-            'offered_value' =>
+                'offered_value' =>
                 $offerPrice,
 
-            'accepted_min' =>
+                'accepted_min' =>
+                null,
+
+                'accepted_max' =>
+                null,
+
+                'currency' =>
+                $propertyCurrency,
+
+                'original_offered_value' =>
+                $selectedOfferOriginalPrice,
+
+                'original_offered_currency' =>
+                $selectedOfferOriginalCurrency,
+
+                'currency_conversion_applied' =>
+                $selectedOfferConversionApplied,
+            ];
+        } else {
+            $withinAcceptedOfferRange =
+                $offerRangeConversionAvailable &&
+                (
+                    $priceMin === null ||
+                    $priceMin <= 0 ||
+                    $offerPrice >= $priceMin
+                ) &&
+                (
+                    $priceMax === null ||
+                    $priceMax <= 0 ||
+                    $offerPrice <= $priceMax
+                );
+
+            if ($withinAcceptedOfferRange) {
+                $score += 5;
+            } else {
+                $penalties[] = [
+                    'code' =>
+                    'exchange_offer_value_out_of_range',
+
+                    'label' =>
+                    'El valor del inmueble ofrecido no está dentro del rango aceptado',
+
+                    'offered_value' =>
+                    $offerPrice,
+
+                    'accepted_min' =>
+                    $priceMin,
+
+                    'accepted_max' =>
+                    $priceMax,
+
+                    'currency' =>
+                    $propertyCurrency,
+                ];
+            }
+
+            $reasons[] = [
+                'code' =>
+                'exchange_offer_value_match',
+
+                'label' =>
+                'El valor del inmueble ofrecido está dentro del rango aceptado',
+
+                'weight' =>
+                5,
+
+                'matched' =>
+                $withinAcceptedOfferRange,
+
+                'offered_value' =>
+                $offerPrice,
+
+                'accepted_min' =>
                 $priceMin,
 
-            'accepted_max' =>
+                'accepted_max' =>
                 $priceMax,
 
-            'currency' =>
+                'currency' =>
                 $propertyCurrency,
-        ];
-    }
 
-    $reasons[] = [
-        'code' =>
-            'exchange_offer_value_match',
+                'original_offered_value' =>
+                $selectedOfferOriginalPrice,
 
-        'label' =>
-            'El valor del inmueble ofrecido está dentro del rango aceptado',
+                'original_offered_currency' =>
+                $selectedOfferOriginalCurrency,
 
-        'weight' =>
-            5,
-
-        'matched' =>
-            $withinAcceptedOfferRange,
-
-        'offered_value' =>
-            $offerPrice,
-
-        'accepted_min' =>
-            $priceMin,
-
-        'accepted_max' =>
-            $priceMax,
-
-        'currency' =>
-            $propertyCurrency,
-
-        'original_offered_value' =>
-            $selectedOfferOriginalPrice,
-
-        'original_offered_currency' =>
-            $selectedOfferOriginalCurrency,
-
-        'currency_conversion_applied' =>
-            $selectedOfferConversionApplied,
-    ];
-}
+                'currency_conversion_applied' =>
+                $selectedOfferConversionApplied,
+            ];
+        }
 
         /*
      * --------------------------------------------------
@@ -3320,108 +3320,206 @@ if (!$hasOfferValueConstraint) {
         );
 
         $stExisting = $pdo->prepare("
-            SELECT
-    id,
-    score,
-    status
-FROM compatibilities
-            WHERE property_id = :property_id
-              AND search_request_id = :search_request_id
-            LIMIT 1
-        ");
+        SELECT
+            id,
+            score,
+            status
+        FROM compatibilities
+        WHERE property_id = :property_id
+          AND search_request_id = :search_request_id
+        LIMIT 1
+    ");
 
         $stExisting->execute([
-            'property_id' => (int)$property['id'],
-            'search_request_id' => (int)$search['id'],
+            'property_id' =>
+            (int)$property['id'],
+
+            'search_request_id' =>
+            (int)$search['id'],
         ]);
 
-        $existing =
-            $stExisting->fetch(
-                PDO::FETCH_ASSOC
-            );
+        $existing = $stExisting->fetch(
+            PDO::FETCH_ASSOC
+        );
 
         $existingId =
             (int)($existing['id'] ?? 0);
 
+        /*
+    |--------------------------------------------------------------------------
+    | Compatibilidad existente
+    |--------------------------------------------------------------------------
+    */
         if ($existingId > 0) {
-            $stUpdate = $pdo->prepare("
-                UPDATE compatibilities
-                SET
-                    compatibility_type =
-                        'property_search_request',
-                    source_type = 'search_request',
-                    source_id = :source_id,
-                    target_type = 'property',
-                    target_id = :target_id,
-                    source_real_estate_id =
-                        :source_real_estate_id,
-                    target_real_estate_id =
-                        :target_real_estate_id,
-                    detected_from = 'system',
-                    score = :score,
-                    match_level = :match_level,
-                    match_reason = :match_reason,
-                    reasons_json = :reasons_json,
-                    calculated_at = NOW(),
-status = CASE
-    WHEN status = 'archived'
-        THEN 'detected'
-    ELSE status
-END,
-archived_at = CASE
-    WHEN status = 'archived'
-        THEN NULL
-    ELSE archived_at
-END,
-deleted_at = NULL,
-updated_at = CURRENT_TIMESTAMP
-                WHERE id = :id
-                LIMIT 1
-            ");
-
-            $stUpdate->execute([
-                'source_id' => (int)$search['id'],
-                'target_id' => (int)$property['id'],
-                'source_real_estate_id' =>
-                (int)$search['real_estate_id'],
-                'target_real_estate_id' =>
-                (int)$property['real_estate_id'],
-                'score' => $evaluation['score'],
-                'match_level' =>
-                $evaluation['match_level'],
-                'match_reason' => $matchReason,
-                'reasons_json' => $reasonsJson,
-                'id' => $existingId,
-            ]);
             $previousScore =
                 (float)($existing['score'] ?? 0);
+
+            $previousStatus =
+                (string)($existing['status'] ?? '');
 
             $newScore =
                 (float)$evaluation['score'];
 
+            $wasArchived =
+                $previousStatus === 'archived';
+
+            /*
+         * Si estaba archivada y vuelve a ser válida,
+         * la reactivamos explícitamente.
+         *
+         * No usamos un CASE que dependa del mismo campo
+         * status dentro del UPDATE porque MySQL puede
+         * evaluar las asignaciones de izquierda a derecha.
+         */
+            $newStatus =
+                $wasArchived
+                ? 'detected'
+                : $previousStatus;
+
+            $archivedAtSql =
+                $wasArchived
+                ? 'NULL'
+                : 'archived_at';
+
+            $stUpdate = $pdo->prepare("
+            UPDATE compatibilities
+            SET
+                compatibility_type =
+                    'property_search_request',
+
+                source_type =
+                    'search_request',
+
+                source_id =
+                    :source_id,
+
+                target_type =
+                    'property',
+
+                target_id =
+                    :target_id,
+
+                source_real_estate_id =
+                    :source_real_estate_id,
+
+                target_real_estate_id =
+                    :target_real_estate_id,
+
+                detected_from =
+                    'system',
+
+                score =
+                    :score,
+
+                match_level =
+                    :match_level,
+
+                match_reason =
+                    :match_reason,
+
+                reasons_json =
+                    :reasons_json,
+
+                calculated_at =
+                    NOW(),
+
+                status =
+                    :status,
+
+                archived_at =
+                    {$archivedAtSql},
+
+                deleted_at =
+                    NULL,
+
+                updated_at =
+                    CURRENT_TIMESTAMP
+
+            WHERE id = :id
+            LIMIT 1
+        ");
+
+            $stUpdate->execute([
+                'source_id' =>
+                (int)$search['id'],
+
+                'target_id' =>
+                (int)$property['id'],
+
+                'source_real_estate_id' =>
+                (int)$search['real_estate_id'],
+
+                'target_real_estate_id' =>
+                (int)$property['real_estate_id'],
+
+                'score' =>
+                $newScore,
+
+                'match_level' =>
+                $evaluation['match_level'],
+
+                'match_reason' =>
+                $matchReason,
+
+                'reasons_json' =>
+                $reasonsJson,
+
+                'status' =>
+                $newStatus,
+
+                'id' =>
+                $existingId,
+            ]);
+
+            /*
+         * Un match notificable es uno que alcanza
+         * MIN_SCORE_TO_NOTIFY y que antes estaba activo.
+         */
             $wasMatch =
                 $previousScore >=
                 self::MIN_SCORE_TO_NOTIFY
                 &&
-                ($existing['status'] ?? '') !==
-                'archived';
+                !$wasArchived;
 
             $isMatch =
                 $newScore >=
                 self::MIN_SCORE_TO_NOTIFY;
 
-            if (!$wasMatch && $isMatch) {
+            /*
+         * Caso 1:
+         * no era match notificable y ahora sí.
+         *
+         * Incluye:
+         * - score que subió hasta el umbral;
+         * - compatibilidad archivada que volvió a aparecer
+         *   y ahora tiene score notificable.
+         */
+            if (
+                !$wasMatch &&
+                $isMatch
+            ) {
                 self::createMatchEvent(
                     $pdo,
                     'direct_new',
                     $existingId,
                     [
-                        'score' => $newScore,
+                        'score' =>
+                        $newScore,
+
                         'previous_score' =>
                         $previousScore,
                     ]
                 );
-            } elseif (
+
+                return $existingId;
+            }
+
+            /*
+         * Caso 2:
+         * seguía siendo match pero cambió
+         * significativamente el puntaje.
+         */
+            if (
                 $wasMatch &&
                 $isMatch &&
                 abs(
@@ -3434,12 +3532,23 @@ updated_at = CURRENT_TIMESTAMP
                     'direct_changed',
                     $existingId,
                     [
-                        'score' => $newScore,
+                        'score' =>
+                        $newScore,
+
                         'previous_score' =>
                         $previousScore,
                     ]
                 );
-            } elseif (
+
+                return $existingId;
+            }
+
+            /*
+         * Caso 3:
+         * antes era notificable y ahora
+         * dejó de alcanzar el umbral.
+         */
+            if (
                 $wasMatch &&
                 !$isMatch
             ) {
@@ -3448,76 +3557,106 @@ updated_at = CURRENT_TIMESTAMP
                     'direct_lost',
                     $existingId,
                     [
-                        'score' => $newScore,
+                        'score' =>
+                        $newScore,
+
                         'previous_score' =>
                         $previousScore,
                     ]
                 );
             }
+
             return $existingId;
         }
 
+        /*
+    |--------------------------------------------------------------------------
+    | Nueva compatibilidad
+    |--------------------------------------------------------------------------
+    */
         $stInsert = $pdo->prepare("
-            INSERT INTO compatibilities (
-                compatibility_type,
-                source_type,
-                source_id,
-                target_type,
-                target_id,
-                property_id,
-                related_property_id,
-                search_request_id,
-                source_real_estate_id,
-                target_real_estate_id,
-                detected_from,
-                score,
-                match_level,
-                match_reason,
-                reasons_json,
-                calculated_at,
-                source_response,
-                target_response,
-                status
-            ) VALUES (
-                'property_search_request',
-                'search_request',
-                :source_id,
-                'property',
-                :target_id,
-                :property_id,
-                NULL,
-                :search_request_id,
-                :source_real_estate_id,
-                :target_real_estate_id,
-                'system',
-                :score,
-                :match_level,
-                :match_reason,
-                :reasons_json,
-                NOW(),
-                'pending',
-                'pending',
-                'detected'
-            )
-        ");
+        INSERT INTO compatibilities (
+            compatibility_type,
+            source_type,
+            source_id,
+            target_type,
+            target_id,
+            property_id,
+            related_property_id,
+            search_request_id,
+            source_real_estate_id,
+            target_real_estate_id,
+            detected_from,
+            score,
+            match_level,
+            match_reason,
+            reasons_json,
+            calculated_at,
+            source_response,
+            target_response,
+            status
+        ) VALUES (
+            'property_search_request',
+            'search_request',
+            :source_id,
+            'property',
+            :target_id,
+            :property_id,
+            NULL,
+            :search_request_id,
+            :source_real_estate_id,
+            :target_real_estate_id,
+            'system',
+            :score,
+            :match_level,
+            :match_reason,
+            :reasons_json,
+            NOW(),
+            'pending',
+            'pending',
+            'detected'
+        )
+    ");
 
         $stInsert->execute([
-            'source_id' => (int)$search['id'],
-            'target_id' => (int)$property['id'],
-            'property_id' => (int)$property['id'],
-            'search_request_id' => (int)$search['id'],
+            'source_id' =>
+            (int)$search['id'],
+
+            'target_id' =>
+            (int)$property['id'],
+
+            'property_id' =>
+            (int)$property['id'],
+
+            'search_request_id' =>
+            (int)$search['id'],
+
             'source_real_estate_id' =>
             (int)$search['real_estate_id'],
+
             'target_real_estate_id' =>
             (int)$property['real_estate_id'],
-            'score' => $evaluation['score'],
-            'match_level' => $evaluation['match_level'],
-            'match_reason' => $matchReason,
-            'reasons_json' => $reasonsJson,
+
+            'score' =>
+            (float)$evaluation['score'],
+
+            'match_level' =>
+            $evaluation['match_level'],
+
+            'match_reason' =>
+            $matchReason,
+
+            'reasons_json' =>
+            $reasonsJson,
         ]);
+
         $compatibilityId =
             (int)$pdo->lastInsertId();
 
+        /*
+     * Solo generamos evento de match nuevo
+     * si supera el umbral notificable.
+     */
         if (
             (float)$evaluation['score'] >=
             self::MIN_SCORE_TO_NOTIFY
