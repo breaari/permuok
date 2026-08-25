@@ -597,7 +597,7 @@ export default function Compatibilities() {
 
                 {/* Cards */}
 
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="space-y-4">
                   {group.items.map(
                     (item) => (
                       <CompatibilityCard

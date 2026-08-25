@@ -32,7 +32,6 @@ function formatDetectedDate(value) {
   }
 
   const normalized = String(value).replace(" ", "T");
-
   const date = new Date(normalized);
 
   if (Number.isNaN(date.getTime())) {
@@ -360,11 +359,11 @@ export default function CompatibilityCard({
           HEADER
       ====================================================== */}
 
-      <div className="border-b border-slate-100 p-5">
-        <div className="flex items-start justify-between gap-4">
+      <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
+        <div className="flex items-center justify-between gap-5">
           <div className="flex min-w-0 items-center gap-3">
             <div
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${matchMeta.icon}`}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${matchMeta.icon}`}
             >
               <DirectMatchIcon />
             </div>
@@ -384,7 +383,7 @@ export default function CompatibilityCard({
                 </span>
               </div>
 
-              <h2 className="mt-1 truncate text-lg font-black tracking-tight text-slate-900">
+              <h2 className="mt-0.5 truncate text-base font-black tracking-tight text-slate-900">
                 {matchMeta.label}
               </h2>
             </div>
@@ -403,14 +402,14 @@ export default function CompatibilityCard({
       </div>
 
       {/* =====================================================
-          BODY
+          BODY HORIZONTAL
       ====================================================== */}
 
-      <div className="p-5">
-        {/* Comparación */}
-
-        <div className="grid gap-3 md:grid-cols-2">
-          {/* Búsqueda */}
+      <div className="p-5 sm:p-6">
+        <div className="grid gap-4 xl:grid-cols-[1fr_1fr_auto] xl:items-stretch">
+          {/* =================================================
+              SEARCH
+          ================================================== */}
 
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="mb-2 flex items-center gap-2">
@@ -423,24 +422,30 @@ export default function CompatibilityCard({
               </span>
             </div>
 
-            <div className="line-clamp-2 min-h-[40px] font-bold leading-snug text-slate-900">
+            <div className="font-bold leading-snug text-slate-900">
               {search?.title || "Búsqueda sin título"}
             </div>
 
-            {searchBudgetMax !== null && searchBudgetMax !== undefined && (
-              <div className="mt-1 text-sm text-slate-500">
-                Hasta {formatMoney(searchBudgetMax, search?.budget?.currency)}
-              </div>
-            )}
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+              {searchLocation && (
+                <span className="flex items-center gap-1.5">
+                  <Icon name="mapPin" size={14} className="text-slate-400" />
 
-            {searchLocation && (
-              <div className="mt-1 truncate text-xs text-slate-400">
-                {searchLocation}
-              </div>
-            )}
+                  {searchLocation}
+                </span>
+              )}
+
+              {searchBudgetMax !== null && searchBudgetMax !== undefined && (
+                <span className="font-semibold text-slate-600">
+                  Hasta {formatMoney(searchBudgetMax, search?.budget?.currency)}
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Propiedad */}
+          {/* =================================================
+              PROPERTY
+          ================================================== */}
 
           <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
             <div className="mb-2 flex items-center gap-2">
@@ -453,27 +458,80 @@ export default function CompatibilityCard({
               </span>
             </div>
 
-            <div className="line-clamp-2 min-h-[40px] font-bold leading-snug text-slate-900">
-              {property?.title || "Propiedad sin título"}
-            </div>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="font-bold leading-snug text-slate-900">
+                  {property?.title || "Propiedad sin título"}
+                </div>
 
-            <div className="mt-1 text-sm font-medium text-slate-500">
-              {formatMoney(property?.price, property?.currency)}
-            </div>
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                  {propertyLocation && (
+                    <span className="flex items-center gap-1.5">
+                      <Icon
+                        name="mapPin"
+                        size={14}
+                        className="text-slate-400"
+                      />
 
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-              {propertyLocation && (
-                <span className="truncate">{propertyLocation}</span>
-              )}
+                      {propertyLocation}
+                    </span>
+                  )}
 
-              {propertyArea !== null && propertyArea !== undefined && (
-                <span>{Number(propertyArea)} m²</span>
-              )}
+                  {propertyArea !== null && propertyArea !== undefined && (
+                    <span className="flex items-center gap-1.5">
+                      <Icon name="ruler" size={14} className="text-slate-400" />
+                      {Number(propertyArea)} m²
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="shrink-0 text-base font-black text-slate-900">
+                {formatMoney(property?.price, property?.currency)}
+              </div>
             </div>
+          </div>
+
+          {/* =================================================
+              CTA DESKTOP
+          ================================================== */}
+
+          <div className="hidden min-w-[160px] xl:flex xl:flex-col xl:justify-center xl:gap-2">
+            <button
+              type="button"
+              onClick={handleOpenDetail}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white transition hover:opacity-90"
+            >
+              Ver detalle
+              <Icon name="arrowRight" size={16} />
+            </button>
+
+            {hasConversation && (
+              <button
+                type="button"
+                onClick={handleOpenConversation}
+                className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                Conversación
+              </button>
+            )}
+
+            {isHistory && canReactivate && (
+              <button
+                type="button"
+                disabled={reactivating}
+                onClick={() => onReactivate?.(item)}
+                className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {reactivating ? "Reactivando..." : "Reactivar"}
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Razones */}
+        {/* =====================================================
+            REASONS
+        ====================================================== */}
 
         {reasons.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
@@ -483,57 +541,63 @@ export default function CompatibilityCard({
           </div>
         )}
 
-        {/* Estado */}
+        {/* =====================================================
+            STATUS + FOOTER
+        ====================================================== */}
 
-        <div className={`mt-4 rounded-xl border px-4 py-3 ${status.boxClass}`}>
-          <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-            Estado de la oportunidad
+        <div className="mt-4 grid gap-3 xl:grid-cols-[1fr_auto] xl:items-center">
+          <div className={`rounded-xl border px-4 py-3 ${status.boxClass}`}>
+            <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+              Estado de la oportunidad
+            </div>
+
+            <div className="mt-1 text-sm font-bold text-slate-800">
+              {status.description}
+            </div>
           </div>
 
-          <div className="mt-1 text-sm font-bold text-slate-800">
-            {status.description}
-          </div>
-        </div>
+          {/* Mobile / tablet actions */}
 
-        {/* Footer */}
-
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <div className="text-xs text-slate-400">
-            Detectada {detectedLabel}
-            {item?.id ? ` · #${item.id}` : ""}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {isHistory && canReactivate && (
-              <button
-                type="button"
-                disabled={reactivating}
-                onClick={() => onReactivate?.(item)}
-                className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {reactivating ? "Reactivando..." : "Reactivar"}
-              </button>
-            )}
+          <div className="flex flex-wrap gap-2 xl:hidden">
+            <button
+              type="button"
+              onClick={handleOpenDetail}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-90"
+            >
+              Ver detalle
+              <Icon name="arrowRight" size={16} />
+            </button>
 
             {hasConversation && (
               <button
                 type="button"
                 onClick={handleOpenConversation}
-                className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700"
               >
                 Conversación
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={handleOpenDetail}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-90"
-            >
-              Ver detalle
-              <Icon name="arrowRight" size={16} />
-            </button>
+            {isHistory && canReactivate && (
+              <button
+                type="button"
+                disabled={reactivating}
+                onClick={() => onReactivate?.(item)}
+                className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {reactivating ? "Reactivando..." : "Reactivar"}
+              </button>
+            )}
           </div>
+        </div>
+
+        {/* =====================================================
+            DATE
+        ====================================================== */}
+
+        <div className="mt-3 text-xs text-slate-400">
+          Detectada {detectedLabel}
+          {item?.id ? ` · #${item.id}` : ""}
         </div>
       </div>
     </article>
