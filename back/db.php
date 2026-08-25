@@ -55,6 +55,6 @@ function pdo(bool $forceReconnect = false): PDO
             10,
         ]
     );
-
+    $pdo->exec("SET time_zone = '-03:00'");
     return $pdo;
 }
