@@ -542,18 +542,74 @@ ml.cash_difference_direction
         $myResponse =
             $stMyResponse->fetchColumn()
             ?: null;
+
+        $contacts = [];
+
+        if (
+            ($operation['commercial_status'] ?? null)
+            === 'confirmed'
+        ) {
+            $stContacts = $pdo->prepare("
+        SELECT DISTINCT
+            mor.real_estate_id,
+            re.name AS real_estate_name,
+
+            u.id AS user_id,
+            u.first_name,
+            u.last_name,
+            u.email,
+            u.phone
+
+        FROM multilateral_operation_responses mor
+
+        INNER JOIN users u
+            ON u.id = mor.responded_by_user_id
+           AND u.deleted_at IS NULL
+           AND u.is_active = 1
+
+        INNER JOIN real_estates re
+            ON re.id = mor.real_estate_id
+           AND re.deleted_at IS NULL
+
+        WHERE mor.operation_id = :operation_id
+          AND mor.response = 'interested'
+
+        ORDER BY
+            re.name ASC,
+            u.first_name ASC,
+            u.last_name ASC
+    ");
+
+            $stContacts->execute([
+                'operation_id' => $operationId,
+            ]);
+
+            $contacts =
+                $stContacts->fetchAll(
+                    PDO::FETCH_ASSOC
+                ) ?: [];
+
+            foreach ($contacts as &$contact) {
+                $contact['real_estate_id'] =
+                    (int)$contact['real_estate_id'];
+
+                $contact['user_id'] =
+                    (int)$contact['user_id'];
+
+                $contact['is_me'] =
+                    $contact['real_estate_id']
+                    === $realEstateId;
+            }
+
+            unset($contact);
+        }
+
         return [
-            'operation' =>
-            $operation,
-
-            'legs' =>
-            $legs,
-
-            'my_real_estate_id' =>
-            $realEstateId,
-
-
+            'operation' => $operation,
+            'legs' => $legs,
+            'my_real_estate_id' => $realEstateId,
             'my_response' => $myResponse,
+            'contacts' => $contacts,
         ];
     }
 

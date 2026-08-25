@@ -402,6 +402,11 @@ export default function MultilateralCompatibilityDetail() {
     () => legs.find((leg) => leg?.is_my_leg) || null,
     [legs],
   );
+
+  const contacts = useMemo(
+    () => (data?.contacts || []).filter((contact) => !contact?.is_me),
+    [data],
+  );
   async function handleResponse(response) {
     try {
       setResponding(true);
@@ -654,9 +659,48 @@ export default function MultilateralCompatibilityDetail() {
               </h2>
 
               <p className="mt-2 text-sm text-slate-600">
-                La oportunidad está lista para iniciar la coordinación entre las
-                inmobiliarias participantes.
+                Ya podés contactar a las demás inmobiliarias para coordinar la
+                operación.
               </p>
+
+              {contacts.length > 0 && (
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                  {contacts.map((contact) => (
+                    <div
+                      key={`${contact.real_estate_id}-${contact.user_id}`}
+                      className="rounded-xl border border-emerald-200 bg-white p-4"
+                    >
+                      <div className="text-xs font-extrabold uppercase tracking-wide text-emerald-700">
+                        {contact.real_estate_name}
+                      </div>
+
+                      <div className="mt-1 font-black text-slate-900">
+                        {[contact.first_name, contact.last_name]
+                          .filter(Boolean)
+                          .join(" ") || "Contacto responsable"}
+                      </div>
+
+                      {contact.phone && (
+                        <a
+                          href={`tel:${contact.phone}`}
+                          className="mt-3 block text-sm font-bold text-primary hover:underline"
+                        >
+                          {contact.phone}
+                        </a>
+                      )}
+
+                      {contact.email && (
+                        <a
+                          href={`mailto:${contact.email}`}
+                          className="mt-1 block break-all text-sm font-medium text-slate-600 hover:text-primary"
+                        >
+                          {contact.email}
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
