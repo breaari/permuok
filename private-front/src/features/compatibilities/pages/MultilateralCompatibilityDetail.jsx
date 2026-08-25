@@ -93,57 +93,7 @@ function getDifferenceMeta(leg) {
     className: "border-slate-200 bg-slate-50 text-slate-700",
   };
 }
-<div className="mt-6 border-t border-slate-200 pt-6">
-  <div className="mb-4">
-    <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-400">
-      Publicaciones involucradas
-    </div>
 
-    <h3 className="mt-1 text-lg font-black text-slate-900">
-      Información completa del tramo
-    </h3>
-  </div>
-
-  <div className="space-y-4">
-    <div>
-      <div className="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-500">
-        Búsqueda
-      </div>
-
-      <SearchRequestCard
-        item={leg.search_request}
-        variant="dashboard"
-        onView={() =>
-          navigate(`/explore/search-requests/${leg.search_request_id}`)
-        }
-      />
-    </div>
-
-    <div>
-      <div className="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-500">
-        Propiedad que entrega
-      </div>
-
-      <PropertyCard
-        item={leg.offered_property}
-        variant="dashboard"
-        detailHref={`/explore/properties/${leg.offered_property_id}`}
-      />
-    </div>
-
-    <div>
-      <div className="mb-2 text-xs font-extrabold uppercase tracking-wide text-violet-600">
-        Propiedad que busca recibir
-      </div>
-
-      <PropertyCard
-        item={leg.target_property}
-        variant="dashboard"
-        detailHref={`/explore/properties/${leg.property_id}`}
-      />
-    </div>
-  </div>
-</div>;
 /* =========================================================
    ICONOS
 ========================================================= */
@@ -362,7 +312,6 @@ function OperationLeg({ leg, index, total, navigate }) {
               }
             />
           </div>
-
           <div
             className={`mt-4 rounded-xl border px-4 py-3 ${difference.className}`}
           >
@@ -372,7 +321,6 @@ function OperationLeg({ leg, index, total, navigate }) {
               {difference.description}
             </div>
           </div>
-
           {leg?.search_title && (
             <div className="mt-4 border-t border-slate-100 pt-4">
               <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">
@@ -384,6 +332,60 @@ function OperationLeg({ leg, index, total, navigate }) {
               </div>
             </div>
           )}
+          <div className="mt-6 border-t border-slate-200 pt-6">
+            <div className="mb-4">
+              <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-400">
+                Publicaciones involucradas
+              </div>
+
+              <h3 className="mt-1 text-lg font-black text-slate-900">
+                Información completa del tramo
+              </h3>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <div className="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                  Búsqueda
+                </div>
+
+                <SearchRequestCard
+                  item={leg.search_request}
+                  variant="dashboard"
+                  onView={() =>
+                    navigate(
+                      `/explore/search-requests/${leg.search_request_id}`,
+                    )
+                  }
+                />
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                  Propiedad que entrega
+                </div>
+
+                <PropertyCard
+                  item={leg.offered_property}
+                  variant="dashboard"
+                  detailHref={`/explore/properties/${leg.offered_property_id}`}
+                />
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs font-extrabold uppercase tracking-wide text-violet-600">
+                  Propiedad que busca recibir
+                </div>
+
+                <PropertyCard
+                  item={leg.target_property}
+                  variant="dashboard"
+                  detailHref={`/explore/properties/${leg.property_id}`}
+                />
+              </div>
+            </div>
+          </div>
+          
         </div>
       </article>
 
