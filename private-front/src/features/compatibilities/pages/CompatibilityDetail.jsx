@@ -7,7 +7,15 @@ import {
   respondToCompatibility,
   saveCompatibilityFeedback,
 } from "../api/compatibilities.api";
+
 import { Icon } from "../../../ui/icons/Index";
+
+import PropertyCard from "../../properties/components/PropertyCard";
+import SearchRequestCard from "../../search-requests/components/SearchRequestCard";
+
+/* =========================================================
+   HELPERS
+========================================================= */
 
 function formatMoney(value, currency = "USD") {
   const amount = Number(value);
@@ -21,12 +29,6 @@ function formatMoney(value, currency = "USD") {
     currency,
     maximumFractionDigits: 0,
   }).format(amount);
-}
-
-function buildLocation(location = {}) {
-  return [location?.zone, location?.city, location?.province]
-    .filter(Boolean)
-    .join(", ");
 }
 
 function getReasonLabel(reason) {
@@ -59,6 +61,10 @@ function isMatchedReason(reason) {
   return false;
 }
 
+/* =========================================================
+   SCORE
+========================================================= */
+
 function ScoreCircle({ score }) {
   const value = Math.round(Number(score || 0));
 
@@ -75,10 +81,17 @@ function ScoreCircle({ score }) {
   );
 }
 
+/* =========================================================
+   FEEDBACK MODAL
+========================================================= */
+
 function FeedbackModal({ open, onClose, onSubmit, submitting }) {
   const [useful, setUseful] = useState(null);
+
   const [rating, setRating] = useState(null);
+
   const [comment, setComment] = useState("");
+
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -256,21 +269,37 @@ function FeedbackModal({ open, onClose, onSubmit, submitting }) {
   );
 }
 
+/* =========================================================
+   PAGE
+========================================================= */
+
 export default function CompatibilityDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [item, setItem] = useState(null);
+
   const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState("");
 
   const [actionLoading, setActionLoading] = useState(false);
+
   const [actionError, setActionError] = useState("");
+
   const [actionSuccess, setActionSuccess] = useState("");
 
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+
+  const [publicationsTab, setPublicationsTab] = useState("property");
+
+  /* =========================================================
+     LOAD
+  ========================================================= */
 
   useEffect(() => {
     async function loadDetail() {
@@ -282,10 +311,6 @@ export default function CompatibilityDetail() {
 
         setItem(data || null);
 
-        /*
-         * Marcamos la compatibilidad como vista
-         * solamente después de haber podido cargarla.
-         */
         try {
           const updated = await markCompatibilityAsSeen(id);
 
@@ -293,10 +318,6 @@ export default function CompatibilityDetail() {
             setItem(updated);
           }
         } catch (seenError) {
-          /*
-           * No bloqueamos la pantalla si falla
-           * solamente el marcado de lectura.
-           */
           console.error(
             "No se pudo marcar la compatibilidad como vista:",
             seenError,
@@ -322,6 +343,10 @@ export default function CompatibilityDetail() {
     () => (item?.reasons || []).filter(isMatchedReason),
     [item],
   );
+
+  /* =========================================================
+     LOADING / ERROR
+  ========================================================= */
 
   if (loading) {
     return (
@@ -354,15 +379,17 @@ export default function CompatibilityDetail() {
     );
   }
 
+  /* =========================================================
+     DATA
+  ========================================================= */
+
   const property = item.property || {};
+
   const search = item.search_request || {};
+
   const swap = item.swap || {};
 
   const isSearchSide = item.my_side === "search_request";
-
-  const propertyLocation = buildLocation(property.location);
-
-  const searchLocation = buildLocation(search.location);
 
   const myResponse = item.my_response || "pending";
 
@@ -379,17 +406,105 @@ export default function CompatibilityDetail() {
 
   const hasConversation = Number(item?.conversation_id) > 0;
 
-  const isMutualInterest =
-    item?.status === "mutual_interest" || item?.status === "chat_enabled";
-
   const canReactivate = Boolean(
     item?.actions?.can_reactivate ||
     (isDismissed && item?.status === "dismissed"),
   );
 
+  /*
+   * Adaptamos los objetos del endpoint de
+   * compatibilidades al contrato de las cards
+   * oficiales de propiedades y búsquedas.
+   */
+
+  const propertyCardItem = {
+    id: property.id,
+
+    title: property.title,
+
+    description: property.description,
+
+    property_type: property.property_type || property.type,
+
+    price: property.price,
+
+    currency: property.currency,
+
+    country: property.country || property.location?.country,
+
+    province: property.province || property.location?.province,
+
+    city: property.city || property.location?.city,
+
+    zone: property.zone || property.location?.zone,
+
+    total_area: property.total_area ?? property.features?.total_area,
+
+    covered_area: property.covered_area ?? property.features?.covered_area,
+
+    bedrooms: property.bedrooms ?? property.features?.bedrooms,
+
+    bathrooms: property.bathrooms ?? property.features?.bathrooms,
+
+    garages: property.garages ?? property.features?.garages,
+
+    antiquity: property.antiquity ?? property.features?.antiquity,
+
+    status: property.status || "published",
+
+    cover_image_url: property.cover_image_url || property.image_url,
+
+    images: property.images || [],
+  };
+
+  const searchCardItem = {
+    id: search.id,
+
+    title: search.title,
+
+    description: search.description,
+
+    country: search.country || search.location?.country,
+
+    province: search.province || search.location?.province,
+
+    city: search.city || search.location?.city,
+
+    zone: search.zone || search.location?.zone,
+
+    currency: search.currency || search.budget?.currency,
+
+    min_value: search.min_value ?? search.budget?.min,
+
+    max_value: search.max_value ?? search.budget?.max,
+
+    min_total_area: search.min_total_area,
+
+    min_covered_area: search.min_covered_area,
+
+    min_bedrooms: search.min_bedrooms,
+
+    min_bathrooms: search.min_bathrooms,
+
+    min_garages: search.min_garages,
+
+    payment_mode_cash: search.payment_mode_cash,
+
+    payment_mode_swap: search.payment_mode_swap,
+
+    property_types: search.property_types,
+
+    status: search.status || "published",
+  };
+
+  /* =========================================================
+     NAVIGATION
+  ========================================================= */
+
   function openSearchRequest() {
     if (isSearchSide) {
       navigate(`/search-requests/${search.id}`);
+
       return;
     }
 
@@ -399,11 +514,16 @@ export default function CompatibilityDetail() {
   function openProperty() {
     if (!isSearchSide) {
       navigate(`/properties/${property.id}`);
+
       return;
     }
 
     navigate(`/explore/properties/${property.id}`);
   }
+
+  /* =========================================================
+     ACTIONS
+  ========================================================= */
 
   async function handleDecision(response, { openFeedback = true } = {}) {
     if (actionLoading) {
@@ -472,10 +592,17 @@ export default function CompatibilityDetail() {
     }
   }
 
+  /* =========================================================
+     RENDER
+  ========================================================= */
+
   return (
     <>
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* Header */}
+        {/* =====================================================
+            HEADER
+        ====================================================== */}
+
         <div className="mb-6">
           <button
             type="button"
@@ -499,6 +626,10 @@ export default function CompatibilityDetail() {
             oportunidades comercialmente viables.
           </p>
         </div>
+
+        {/* =====================================================
+            MESSAGES
+        ====================================================== */}
 
         {actionSuccess && (
           <div className="mb-5 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
@@ -534,10 +665,18 @@ export default function CompatibilityDetail() {
           </div>
         )}
 
+        {/* =====================================================
+            MAIN GRID
+        ====================================================== */}
+
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
-          {/* Columna principal */}
+          {/* ===================================================
+              MAIN COLUMN
+          ==================================================== */}
+
           <div className="space-y-6">
-            {/* Score */}
+            {/* SCORE */}
+
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                 <ScoreCircle score={item.score} />
@@ -564,154 +703,78 @@ export default function CompatibilityDetail() {
               </div>
             </section>
 
-            {/* Comparación */}
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              {/* Búsqueda */}
-              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                <div className="mb-5 flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
-                    <Icon name="search" size={18} />
-                  </div>
+            {/* =================================================
+                PUBLICACIONES REALES
+            ================================================== */}
 
-                  <div>
-                    <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">
-                      {isSearchSide ? "Tu búsqueda" : "Búsqueda compatible"}
-                    </span>
+            <section>
+              <div className="mb-4">
+                <span className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-400">
+                  Publicaciones involucradas
+                </span>
 
-                    <h3 className="text-base font-extrabold text-slate-900">
-                      Búsqueda
-                    </h3>
-                  </div>
-                </div>
+                <h2 className="mt-1 text-xl font-black text-slate-900">
+                  Revisá el match completo
+                </h2>
 
-                <h4 className="text-lg font-black text-slate-900">
-                  {search.title || "Búsqueda sin título"}
-                </h4>
+                <p className="mt-1 text-sm text-slate-500">
+                  Consultá la propiedad y la búsqueda que dieron origen a esta
+                  compatibilidad.
+                </p>
+              </div>
 
-                <div className="mt-2 flex items-start gap-2 text-sm text-slate-500">
-                  <Icon
-                    name="mapPin"
-                    size={16}
-                    className="mt-0.5 shrink-0 text-slate-400"
-                  />
-
-                  {searchLocation || "Ubicación no informada"}
-                </div>
-
-                <div className="mt-5 border-t border-slate-100 pt-4">
-                  <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">
-                    Presupuesto
-                  </span>
-
-                  <p className="mt-1 text-xl font-black text-slate-900">
-                    {formatMoney(search?.budget?.min, search?.budget?.currency)}
-                    {" — "}
-                    {formatMoney(search?.budget?.max, search?.budget?.currency)}
-                  </p>
-                </div>
+              <div className="mb-5 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => setPublicationsTab("property")}
+                  className={`rounded-lg px-4 py-2 text-sm font-bold transition ${
+                    publicationsTab === "property"
+                      ? "bg-white text-primary shadow-sm"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  {isSearchSide ? "Propiedad encontrada" : "Tu propiedad"}
+                </button>
 
                 <button
                   type="button"
-                  onClick={openSearchRequest}
-                  className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-primary transition hover:opacity-80"
+                  onClick={() => setPublicationsTab("search")}
+                  className={`rounded-lg px-4 py-2 text-sm font-bold transition ${
+                    publicationsTab === "search"
+                      ? "bg-white text-primary shadow-sm"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
                 >
-                  Ver publicación
-                  <Icon name="arrowRight" size={16} />
+                  {isSearchSide ? "Tu búsqueda" : "Búsqueda compatible"}
                 </button>
-              </section>
+              </div>
 
-              {/* Propiedad */}
-              <section className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm sm:p-6">
-                <div className="mb-5 flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                    <Icon name="home" size={18} />
-                  </div>
+              {publicationsTab === "property" && (
+                <PropertyCard
+                  item={propertyCardItem}
+                  variant="dashboard"
+                  detailHref={
+                    isSearchSide
+                      ? `/explore/properties/${property.id}`
+                      : `/properties/${property.id}`
+                  }
+                />
+              )}
 
-                  <div>
-                    <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700">
-                      {isSearchSide ? "Propiedad encontrada" : "Tu propiedad"}
-                    </span>
+              {publicationsTab === "search" && (
+                <SearchRequestCard
+                  item={searchCardItem}
+                  variant="dashboard"
+                  compact
+                  onView={openSearchRequest}
+                />
+              )}
+            </section>
 
-                    <h3 className="text-base font-extrabold text-slate-900">
-                      Propiedad
-                    </h3>
-                  </div>
-                </div>
+            {/* =================================================
+                SWAP ANALYSIS
+            ================================================== */}
 
-                <h4 className="text-lg font-black text-slate-900">
-                  {property.title || "Propiedad sin título"}
-                </h4>
-
-                <div className="mt-2 flex items-start gap-2 text-sm text-slate-500">
-                  <Icon
-                    name="mapPin"
-                    size={16}
-                    className="mt-0.5 shrink-0 text-slate-400"
-                  />
-
-                  {propertyLocation || "Ubicación no informada"}
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-4 text-sm font-semibold text-slate-600">
-                  {property.total_area !== null &&
-                    property.total_area !== undefined && (
-                      <span className="flex items-center gap-1.5">
-                        <Icon
-                          name="ruler"
-                          size={15}
-                          className="text-slate-400"
-                        />
-                        {property.total_area} m²
-                      </span>
-                    )}
-
-                  {property.bedrooms !== null &&
-                    property.bedrooms !== undefined && (
-                      <span className="flex items-center gap-1.5">
-                        <Icon name="bed" size={15} className="text-slate-400" />
-
-                        {Number(property.bedrooms) === 0
-                          ? "Monoamb."
-                          : `${property.bedrooms} dorm.`}
-                      </span>
-                    )}
-
-                  {property.bathrooms !== null &&
-                    property.bathrooms !== undefined && (
-                      <span className="flex items-center gap-1.5">
-                        <Icon
-                          name="bath"
-                          size={15}
-                          className="text-slate-400"
-                        />
-
-                        {property.bathrooms}
-                      </span>
-                    )}
-                </div>
-
-                <div className="mt-5 border-t border-slate-100 pt-4">
-                  <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">
-                    Valor publicado
-                  </span>
-
-                  <p className="mt-1 text-xl font-black text-slate-900">
-                    {formatMoney(property.price, property.currency)}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={openProperty}
-                  className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-primary transition hover:opacity-80"
-                >
-                  Ver publicación
-                  <Icon name="arrowRight" size={16} />
-                </button>
-              </section>
-            </div>
-
-            {/* Operación */}
             {swap.evaluated && (
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                 <h3 className="text-lg font-black text-slate-900">
@@ -789,38 +852,61 @@ export default function CompatibilityDetail() {
             )}
           </div>
 
-          {/* Sidebar */}
+          {/* ===================================================
+              SIDEBAR
+          ==================================================== */}
+
           <aside className="space-y-6">
-            {/* Razones */}
+            {/* ===============================================
+                REASONS
+            ================================================ */}
+
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <h3 className="text-base font-black text-slate-900">
                 ¿Por qué es un match?
               </h3>
 
-              <div className="mt-4 space-y-3">
-                {matchedReasons.map((reason) => (
-                  <div key={reason.code} className="flex items-start gap-3">
-                    <Icon
-                      name="checkCircle"
-                      size={18}
-                      className="mt-0.5 shrink-0 text-emerald-600"
-                    />
+              {matchedReasons.length > 0 ? (
+                <div className="mt-4 space-y-3">
+                  {matchedReasons.map((reason) => (
+                    <div key={reason.code} className="flex items-start gap-3">
+                      <Icon
+                        name="checkCircle"
+                        size={18}
+                        className="mt-0.5 shrink-0 text-emerald-600"
+                      />
 
-                    <span className="text-sm leading-relaxed text-slate-600">
-                      {getReasonLabel(reason)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+                      <span className="text-sm leading-relaxed text-slate-600">
+                        {getReasonLabel(reason)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-700">
+                    No hay un desglose de criterios disponible para este match.
+                  </p>
+
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    Este registro fue generado sin el detalle de evaluación del
+                    motor.
+                  </p>
+                </div>
+              )}
             </section>
 
-            {/* Decisión */}
+            {/* ===============================================
+                DECISION
+            ================================================ */}
+
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">
                 Tu decisión
               </span>
 
-              {/* Conversación habilitada */}
+              {/* INTERÉS MUTUO / CHAT */}
+
               {hasConversation && (
                 <>
                   <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
@@ -857,7 +943,8 @@ export default function CompatibilityDetail() {
                 </>
               )}
 
-              {/* La otra parte ya está interesada */}
+              {/* OTRA PARTE YA INTERESADA */}
+
               {!hasConversation && counterpartInterested && (
                 <>
                   <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
@@ -908,7 +995,8 @@ export default function CompatibilityDetail() {
                 </>
               )}
 
-              {/* Nadie respondió todavía */}
+              {/* SIN RESPUESTAS */}
+
               {!hasConversation &&
                 !counterpartInterested &&
                 myResponse === "pending" &&
@@ -946,7 +1034,8 @@ export default function CompatibilityDetail() {
                   </>
                 )}
 
-              {/* Yo mostré interés */}
+              {/* YO INTERESADA */}
+
               {!hasConversation && isInterested && !counterpartDismissed && (
                 <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                   <div className="flex items-start gap-3">
@@ -970,7 +1059,8 @@ export default function CompatibilityDetail() {
                 </div>
               )}
 
-              {/* Yo descarté */}
+              {/* YO DESCARTÉ */}
+
               {isDismissed && (
                 <>
                   <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -1002,7 +1092,8 @@ export default function CompatibilityDetail() {
                 </>
               )}
 
-              {/* La otra parte descartó */}
+              {/* OTRA PARTE DESCARTÓ */}
+
               {!hasConversation && counterpartDismissed && !isDismissed && (
                 <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-sm font-bold text-slate-700">
@@ -1016,11 +1107,15 @@ export default function CompatibilityDetail() {
                 </div>
               )}
 
+              {/* ERRORS */}
+
               {actionError && (
                 <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                   {actionError}
                 </div>
               )}
+
+              {/* FEEDBACK */}
 
               <div className="mt-5 border-t border-slate-100 pt-4">
                 <p className="text-xs leading-relaxed text-slate-500">

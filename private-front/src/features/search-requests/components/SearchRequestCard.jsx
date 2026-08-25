@@ -130,6 +130,7 @@ export default function SearchRequestCard({
   onDelete,
   onView,
   variant = "owned",
+  compact = false,
 }) {
   const status = getStatusMeta(item?.status);
   const location = formatLocation(item);
@@ -142,14 +143,22 @@ export default function SearchRequestCard({
   return (
     <article className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
       <div className="p-5 sm:p-6">
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(290px,1.3fr)_minmax(190px,0.9fr)_minmax(180px,0.75fr)_minmax(220px,0.9fr)] gap-6 items-start">
+        <div
+          className={`grid grid-cols-1 gap-6 items-start ${
+            compact
+              ? "lg:grid-cols-2"
+              : "xl:grid-cols-[minmax(290px,1.3fr)_minmax(190px,0.9fr)_minmax(180px,0.75fr)_minmax(220px,0.9fr)]"
+          }`}
+        >
           <div className="min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
               {!isDashboard && (
                 <span
                   className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-bold tracking-wide ${status.className}`}
                 >
-                  <span className={`w-2 h-2 rounded-full ${status.dotClassName}`} />
+                  <span
+                    className={`w-2 h-2 rounded-full ${status.dotClassName}`}
+                  />
                   {status.label}
                 </span>
               )}
@@ -199,18 +208,10 @@ export default function SearchRequestCard({
           </div>
 
           <div className="min-w-0 xl:border-l xl:border-slate-200 xl:pl-6">
-            <InfoBlock
-              label="Tipo buscado"
-              value={propertyTypes}
-              clamp={2}
-            />
+            <InfoBlock label="Tipo buscado" value={propertyTypes} clamp={2} />
 
             <div className="mt-4">
-              <InfoBlock
-                label="Modalidad"
-                value={payment}
-                clamp={2}
-              />
+              <InfoBlock label="Modalidad" value={payment} clamp={2} />
             </div>
           </div>
 
@@ -236,7 +237,6 @@ export default function SearchRequestCard({
                 </button>
               ) : (
                 <>
-
                   <button
                     type="button"
                     onClick={onEdit}
@@ -271,7 +271,9 @@ function InfoBlock({ label, value, clamp = 1 }) {
       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
         {label}
       </p>
-      <p className={`text-sm font-semibold text-slate-800 min-w-0 ${clampClass}`}>
+      <p
+        className={`text-sm font-semibold text-slate-800 min-w-0 ${clampClass}`}
+      >
         {value}
       </p>
     </div>
