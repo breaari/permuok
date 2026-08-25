@@ -3376,10 +3376,7 @@ class CompatibilityEngine
                 ? 'detected'
                 : $previousStatus;
 
-            $archivedAtSql =
-                $wasArchived
-                ? 'NULL'
-                : 'archived_at';
+
 
             $stUpdate = $pdo->prepare("
             UPDATE compatibilities
@@ -3426,8 +3423,7 @@ class CompatibilityEngine
                 status =
                     :status,
 
-                archived_at =
-                    {$archivedAtSql},
+               archived_at = NULL,
 
                 deleted_at =
                     NULL,
