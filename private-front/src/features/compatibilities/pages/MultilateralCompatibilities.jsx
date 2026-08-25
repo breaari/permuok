@@ -24,7 +24,45 @@ function formatMoney(value, currency) {
     maximumFractionDigits: 0,
   }).format(amount);
 }
+function resolveCommercialStatus(item) {
+  if (item?.status === "archived") {
+    return {
+      label: "Archivada",
+      description: "La oportunidad dejó de estar disponible.",
+      className: "bg-slate-100 text-slate-700",
+    };
+  }
 
+  if (item?.commercial_status === "declined") {
+    return {
+      label: "No disponible",
+      description: "La cadena no continuará.",
+      className: "bg-slate-100 text-slate-700",
+    };
+  }
+
+  if (item?.commercial_status === "confirmed") {
+    return {
+      label: "Confirmada",
+      description: "Todas las partes aceptaron. Contactos habilitados.",
+      className: "bg-emerald-100 text-emerald-800",
+    };
+  }
+
+  if (item?.my_response === "interested") {
+    return {
+      label: "Interés registrado",
+      description: "Esperando la decisión de las demás inmobiliarias.",
+      className: "bg-blue-100 text-blue-800",
+    };
+  }
+
+  return {
+    label: "Pendiente de respuesta",
+    description: "Todavía tenés que indicar si querés avanzar.",
+    className: "bg-amber-100 text-amber-800",
+  };
+}
 function formatDate(value) {
   if (!value) {
     return "—";
@@ -113,7 +151,7 @@ function CycleIcon({ className = "h-5 w-5" }) {
 
 function MultilateralCard({ item, onOpen }) {
   const difference = resolveDifferenceLabel(item);
-
+  const commercial = resolveCommercialStatus(item);
   const differenceStyles = {
     emerald: "bg-emerald-50 text-emerald-700 border-emerald-100",
     amber: "bg-amber-50 text-amber-700 border-amber-100",
@@ -137,15 +175,10 @@ function MultilateralCard({ item, onOpen }) {
                 <span className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-violet-700">
                   Operación multilateral
                 </span>
-
                 <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                    isArchived
-                      ? "bg-slate-100 text-slate-600"
-                      : "bg-emerald-50 text-emerald-700"
-                  }`}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${commercial.className}`}
                 >
-                  {isArchived ? "Archivada" : "Activa"}
+                  {commercial.label}
                 </span>
               </div>
 
@@ -223,7 +256,15 @@ function MultilateralCard({ item, onOpen }) {
             {difference.description}
           </div>
         </div>
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+            Estado de la operación
+          </div>
 
+          <div className="mt-1 text-sm font-bold text-slate-800">
+            {commercial.description}
+          </div>
+        </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
           <div className="text-xs text-slate-400">
             Detectada {formatDate(item?.detected_at)}

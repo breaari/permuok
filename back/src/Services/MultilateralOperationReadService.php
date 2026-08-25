@@ -85,15 +85,23 @@ class MultilateralOperationReadService
         ];
 
         if ($view === 'active') {
-            $where[] =
-                "mo.status = 'detected'";
+            $where[] = "
+        mo.status = 'detected'
+        AND mo.commercial_status IN (
+            'open',
+            'confirmed'
+        )
+    ";
         }
 
         if ($view === 'history') {
-            $where[] =
-                "mo.status = 'archived'";
+            $where[] = "
+        (
+            mo.status = 'archived'
+            OR mo.commercial_status = 'declined'
+        )
+    ";
         }
-
         $whereSql =
             implode(
                 ' AND ',
@@ -119,6 +127,17 @@ class MultilateralOperationReadService
                 mo.minimum_edge_score,
                 mo.average_edge_score,
                 mo.status,
+                mo.commercial_status,
+mo.confirmed_at,
+mo.declined_at,
+
+(
+    SELECT mor.response
+    FROM multilateral_operation_responses mor
+    WHERE mor.operation_id = mo.id
+      AND mor.real_estate_id = :response_real_estate_id
+    LIMIT 1
+) AS my_response,
                 mo.detected_at,
                 mo.last_seen_at,
                 mo.archived_at,
@@ -221,7 +240,8 @@ class MultilateralOperationReadService
             $params;
 
         $listParams['own_real_estate_id'] = $realEstateId;
-
+        $listParams['response_real_estate_id'] =
+            $realEstateId;
         $st->execute($listParams);
 
         $items =
@@ -419,7 +439,88 @@ mo.declined_at,
 
                 ml.target_value,
                 ml.comparison_currency,
+target_property.description
+    AS property_description,
+target_property.country
+    AS property_country,
+target_property.province
+    AS property_province,
+target_property.total_area
+    AS property_total_area,
+target_property.covered_area
+    AS property_covered_area,
+target_property.bedrooms
+    AS property_bedrooms,
+target_property.bathrooms
+    AS property_bathrooms,
+target_property.garages
+    AS property_garages,
+target_property.antiquity
+    AS property_antiquity,
+target_property.status
+    AS property_status,
+    offered_property.description
+    AS offered_property_description,
+offered_property.country
+    AS offered_property_country,
+offered_property.province
+    AS offered_property_province,
+offered_property.total_area
+    AS offered_property_total_area,
+offered_property.covered_area
+    AS offered_property_covered_area,
+offered_property.bedrooms
+    AS offered_property_bedrooms,
+offered_property.bathrooms
+    AS offered_property_bathrooms,
+offered_property.garages
+    AS offered_property_garages,
+offered_property.antiquity
+    AS offered_property_antiquity,
+offered_property.status
+    AS offered_property_status,
+    sr.description
+    AS search_description,
+sr.country
+    AS search_country,
+sr.province
+    AS search_province,
+sr.city
+    AS search_city,
+sr.zone
+    AS search_zone,
+sr.currency
+    AS search_currency,
+sr.min_value
+    AS search_min_value,
+sr.max_value
+    AS search_max_value,
+sr.min_total_area
+    AS search_min_total_area,
+sr.min_covered_area
+    AS search_min_covered_area,
+sr.min_bedrooms
+    AS search_min_bedrooms,
+sr.min_bathrooms
+    AS search_min_bathrooms,
+sr.min_garages
+    AS search_min_garages,
+sr.payment_mode_cash
+    AS search_payment_mode_cash,
+sr.payment_mode_swap
+    AS search_payment_mode_swap,
+sr.status
+    AS search_status,
 
+(
+    SELECT GROUP_CONCAT(
+        DISTINCT srpt.property_type
+        ORDER BY srpt.property_type
+        SEPARATOR ','
+    )
+    FROM search_request_property_types srpt
+    WHERE srpt.search_request_id = sr.id
+) AS search_property_types,
                 ml.signed_cash_difference,
 ml.cash_difference,
 ml.cash_difference_direction
@@ -486,7 +587,84 @@ ml.cash_difference_direction
                 self::nullableFloat(
                     $leg['offered_original_value']
                 );
+            $leg['offered_property'] = [
+                'id' => (int)$leg['offered_property_id'],
+                'title' => $leg['offered_property_title'],
+                'description' => $leg['offered_property_description'],
+                'property_type' => $leg['offered_property_type'],
+                'price' => $leg['offered_property_price'],
+                'currency' => $leg['offered_property_currency'],
+                'country' => $leg['offered_property_country'],
+                'province' => $leg['offered_property_province'],
+                'city' => $leg['offered_property_city'],
+                'zone' => $leg['offered_property_zone'],
+                'total_area' => $leg['offered_property_total_area'],
+                'covered_area' => $leg['offered_property_covered_area'],
+                'bedrooms' => $leg['offered_property_bedrooms'],
+                'bathrooms' => $leg['offered_property_bathrooms'],
+                'garages' => $leg['offered_property_garages'],
+                'antiquity' => $leg['offered_property_antiquity'],
+                'status' => $leg['offered_property_status'],
 
+                'cover_image_url' =>
+                $leg['offered_property_cover_image_id']
+                    ? '/property-images/' .
+                    $leg['offered_property_cover_image_id'] .
+                    '/view'
+                    : null,
+            ];
+
+            $leg['target_property'] = [
+                'id' => (int)$leg['property_id'],
+                'title' => $leg['property_title'],
+                'description' => $leg['property_description'],
+                'property_type' => $leg['property_type'],
+                'price' => $leg['property_price'],
+                'currency' => $leg['property_currency'],
+                'country' => $leg['property_country'],
+                'province' => $leg['property_province'],
+                'city' => $leg['property_city'],
+                'zone' => $leg['property_zone'],
+                'total_area' => $leg['property_total_area'],
+                'covered_area' => $leg['property_covered_area'],
+                'bedrooms' => $leg['property_bedrooms'],
+                'bathrooms' => $leg['property_bathrooms'],
+                'garages' => $leg['property_garages'],
+                'antiquity' => $leg['property_antiquity'],
+                'status' => $leg['property_status'],
+
+                'cover_image_url' =>
+                $leg['property_cover_image_id']
+                    ? '/property-images/' .
+                    $leg['property_cover_image_id'] .
+                    '/view'
+                    : null,
+            ];
+
+            $leg['search_request'] = [
+                'id' => (int)$leg['search_request_id'],
+                'title' => $leg['search_title'],
+                'description' => $leg['search_description'],
+                'country' => $leg['search_country'],
+                'province' => $leg['search_province'],
+                'city' => $leg['search_city'],
+                'zone' => $leg['search_zone'],
+                'currency' => $leg['search_currency'],
+                'min_value' => $leg['search_min_value'],
+                'max_value' => $leg['search_max_value'],
+                'min_total_area' => $leg['search_min_total_area'],
+                'min_covered_area' => $leg['search_min_covered_area'],
+                'min_bedrooms' => $leg['search_min_bedrooms'],
+                'min_bathrooms' => $leg['search_min_bathrooms'],
+                'min_garages' => $leg['search_min_garages'],
+                'payment_mode_cash' =>
+                (int)$leg['search_payment_mode_cash'],
+                'payment_mode_swap' =>
+                (int)$leg['search_payment_mode_swap'],
+                'property_types' =>
+                $leg['search_property_types'],
+                'status' => $leg['search_status'],
+            ];
             $leg['target_value'] =
                 self::nullableFloat(
                     $leg['target_value']

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
+import PropertyCard from "../../properties/components/PropertyCard";
+import SearchRequestCard from "../../search-requests/components/SearchRequestCard";
 import {
   getMultilateralCompatibilityDetail,
   respondToMultilateralCompatibility,
@@ -92,7 +93,57 @@ function getDifferenceMeta(leg) {
     className: "border-slate-200 bg-slate-50 text-slate-700",
   };
 }
+<div className="mt-6 border-t border-slate-200 pt-6">
+  <div className="mb-4">
+    <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-400">
+      Publicaciones involucradas
+    </div>
 
+    <h3 className="mt-1 text-lg font-black text-slate-900">
+      Información completa del tramo
+    </h3>
+  </div>
+
+  <div className="space-y-4">
+    <div>
+      <div className="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+        Búsqueda
+      </div>
+
+      <SearchRequestCard
+        item={leg.search_request}
+        variant="dashboard"
+        onView={() =>
+          navigate(`/explore/search-requests/${leg.search_request_id}`)
+        }
+      />
+    </div>
+
+    <div>
+      <div className="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+        Propiedad que entrega
+      </div>
+
+      <PropertyCard
+        item={leg.offered_property}
+        variant="dashboard"
+        detailHref={`/explore/properties/${leg.offered_property_id}`}
+      />
+    </div>
+
+    <div>
+      <div className="mb-2 text-xs font-extrabold uppercase tracking-wide text-violet-600">
+        Propiedad que busca recibir
+      </div>
+
+      <PropertyCard
+        item={leg.target_property}
+        variant="dashboard"
+        detailHref={`/explore/properties/${leg.property_id}`}
+      />
+    </div>
+  </div>
+</div>;
 /* =========================================================
    ICONOS
 ========================================================= */
