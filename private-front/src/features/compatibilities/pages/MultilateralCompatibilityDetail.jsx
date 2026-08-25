@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { getMultilateralCompatibilityDetail } from "../api/compatibilities.api";
+import {
+  getMultilateralCompatibilityDetail,
+  respondToMultilateralCompatibility,
+} from "../api/compatibilities.api";
 
 /* =========================================================
    HELPERS
@@ -353,7 +356,8 @@ export default function MultilateralCompatibilityDetail() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
+  const [responding, setResponding] = useState(false);
+  const [responseError, setResponseError] = useState("");
   useEffect(() => {
     let active = true;
 
@@ -398,7 +402,28 @@ export default function MultilateralCompatibilityDetail() {
     () => legs.find((leg) => leg?.is_my_leg) || null,
     [legs],
   );
+  async function handleResponse(response) {
+    try {
+      setResponding(true);
+      setResponseError("");
 
+      await respondToMultilateralCompatibility(id, response);
+
+      const refreshed = await getMultilateralCompatibilityDetail(id);
+
+      setData(refreshed);
+    } catch (err) {
+      console.error("Error respondiendo operación multilateral:", err);
+
+      setResponseError(
+        err?.response?.data?.error ||
+          err?.message ||
+          "No se pudo registrar tu respuesta.",
+      );
+    } finally {
+      setResponding(false);
+    }
+  }
   if (loading) {
     return (
       <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
@@ -553,7 +578,101 @@ export default function MultilateralCompatibilityDetail() {
           </p>
         </div>
       )}
+      {/* DECISIÓN COMERCIAL */}
+      {operation.status === "detected" && (
+        <section className="mt-6">
+          {operation.commercial_status === "open" && !data?.my_response && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-400">
+                ¿Querés avanzar?
+              </div>
 
+              <h2 className="mt-1 text-lg font-black text-slate-900">
+                Indicá si esta oportunidad te interesa
+              </h2>
+
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
+                Tu respuesta es privada. Los datos de contacto sólo se
+                habilitarán si todas las inmobiliarias de la cadena manifiestan
+                interés.
+              </p>
+
+              {responseError && (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                  {responseError}
+                </div>
+              )}
+
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  disabled={responding}
+                  onClick={() => handleResponse("interested")}
+                  className="rounded-xl bg-primary px-5 py-3 text-sm font-extrabold text-white transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {responding ? "Guardando..." : "Me interesa avanzar"}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={responding}
+                  onClick={() => handleResponse("declined")}
+                  className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  No me interesa
+                </button>
+              </div>
+            </div>
+          )}
+
+          {operation.commercial_status === "open" &&
+            data?.my_response === "interested" && (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+                <div className="text-xs font-extrabold uppercase tracking-[0.14em] text-emerald-700">
+                  Respuesta registrada
+                </div>
+
+                <h2 className="mt-1 text-lg font-black text-slate-900">
+                  Te interesa avanzar
+                </h2>
+
+                <p className="mt-2 text-sm text-slate-600">
+                  Estamos esperando la decisión de las demás inmobiliarias. Sus
+                  respuestas permanecen privadas.
+                </p>
+              </div>
+            )}
+
+          {operation.commercial_status === "confirmed" && (
+            <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-5">
+              <div className="text-xs font-extrabold uppercase tracking-[0.14em] text-emerald-700">
+                Cadena confirmada
+              </div>
+
+              <h2 className="mt-1 text-xl font-black text-slate-900">
+                Todas las partes manifestaron interés
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-600">
+                La oportunidad está lista para iniciar la coordinación entre las
+                inmobiliarias participantes.
+              </p>
+            </div>
+          )}
+
+          {operation.commercial_status === "declined" && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <h2 className="text-lg font-black text-slate-900">
+                Esta oportunidad ya no se encuentra disponible
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                La cadena no continuará por el momento.
+              </p>
+            </div>
+          )}
+        </section>
+      )}
       {/* CIRCUITO */}
       <section className="mt-8">
         <div className="mb-5">
