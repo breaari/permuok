@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -35,58 +35,26 @@ function formatMoney(value, currency = "USD") {
   }).format(amount);
 }
 
-function getReasonLabel(reason) {
-  const labels = {
-    property_type_match: "Es el tipo de propiedad buscado",
+function DirectMatchIcon({ className = "h-5 w-5" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M7 7h11" />
+      <path d="m15 4 3 3-3 3" />
 
-    exact_zone_match: "Está ubicada exactamente en la zona buscada",
-
-    city_match: "Está ubicada en la ciudad buscada",
-
-    province_match: "Está ubicada en la provincia buscada",
-
-    country_match: "Está ubicada en el país buscado",
-
-    price_in_range: "El valor está dentro del rango buscado",
-
-    price_below_range: "El valor está por debajo del presupuesto previsto",
-
-    amenities_match: "Cumple con los amenities solicitados",
-
-    swap_mode_accepted: "La propiedad acepta operaciones con permuta",
-
-    exchange_offer_value_match:
-      "La propiedad ofrecida está dentro del rango de valor aceptado",
-
-    exchange_offer_value_unrestricted:
-      "El propietario está abierto a evaluar inmuebles sin un rango de valor predeterminado",
-
-    cash_difference_capacity:
-      Number(reason?.required_difference || 0) === 0
-        ? "No requiere diferencia de dinero"
-        : "La diferencia económica puede ser cubierta",
-
-    owner_difference_conditions:
-      Number(reason?.difference || 0) === 0
-        ? "Los valores permiten una permuta total"
-        : "La diferencia está dentro de las condiciones aceptadas",
-  };
-
-  return labels[reason?.code] || reason?.label || "Criterio compatible";
+      <path d="M17 17H6" />
+      <path d="m9 14-3 3 3 3" />
+    </svg>
+  );
 }
-
-function isMatchedReason(reason) {
-  if (reason?.matched === true) {
-    return true;
-  }
-
-  if (Array.isArray(reason?.matched) && reason.matched.length > 0) {
-    return true;
-  }
-
-  return false;
-}
-
 
 /* =========================================================
    FEEDBACK MODAL
@@ -282,6 +250,7 @@ function FeedbackModal({ open, onClose, onSubmit, submitting }) {
 
 export default function CompatibilityDetail() {
   const { id } = useParams();
+
   const navigate = useNavigate();
 
   const [item, setItem] = useState(null);
@@ -302,8 +271,6 @@ export default function CompatibilityDetail() {
 
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
-  const [publicationsTab, setPublicationsTab] = useState("property");
-
   /* =========================================================
      LOAD
   ========================================================= */
@@ -312,6 +279,7 @@ export default function CompatibilityDetail() {
     async function loadDetail() {
       try {
         setLoading(true);
+
         setError("");
 
         const data = await getCompatibilityDetail(id);
@@ -346,30 +314,29 @@ export default function CompatibilityDetail() {
     loadDetail();
   }, [id]);
 
-  const matchedReasons = useMemo(
-    () =>
-      (item?.reasons || []).filter(
-        (reason) =>
-          isMatchedReason(reason) && reason?.code !== "currency_reference",
-      ),
-    [item],
-  );
-
   /* =========================================================
-     LOADING / ERROR
+     LOADING
   ========================================================= */
 
   if (loading) {
     return (
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <p className="text-sm font-medium text-slate-500">
-            Cargando detalle del match...
-          </p>
+        <div className="space-y-5">
+          <div className="h-6 w-44 animate-pulse rounded bg-slate-200" />
+
+          <div className="h-40 animate-pulse rounded-2xl border border-slate-200 bg-white" />
+
+          <div className="h-56 animate-pulse rounded-2xl border border-slate-200 bg-white" />
+
+          <div className="h-64 animate-pulse rounded-2xl border border-slate-200 bg-white" />
         </div>
       </div>
     );
   }
+
+  /* =========================================================
+     ERROR
+  ========================================================= */
 
   if (error || !item) {
     return (
@@ -422,11 +389,40 @@ export default function CompatibilityDetail() {
     (isDismissed && item?.status === "dismissed"),
   );
 
-  /*
-   * Adaptamos los objetos del endpoint de
-   * compatibilidades al contrato de las cards
-   * oficiales de propiedades y búsquedas.
-   */
+  const matchLabel =
+    item?.match_level === "total"
+      ? "Match total"
+      : item?.match_level === "high"
+        ? "Match alto"
+        : item?.match_level === "medium"
+          ? "Match medio"
+          : "Oportunidad compatible";
+
+  const statusLabel = hasConversation
+    ? "En curso"
+    : counterpartInterested
+      ? "Requiere tu atención"
+      : isInterested
+        ? "Interés registrado"
+        : isDismissed
+          ? "Descartada"
+          : counterpartDismissed
+            ? "No disponible"
+            : "Pendiente de respuesta";
+
+  const statusClass = hasConversation
+    ? "bg-blue-100 text-blue-800"
+    : counterpartInterested
+      ? "bg-amber-100 text-amber-800"
+      : isInterested
+        ? "bg-sky-100 text-sky-800"
+        : isDismissed || counterpartDismissed
+          ? "bg-slate-100 text-slate-700"
+          : "bg-amber-100 text-amber-800";
+
+  /* =========================================================
+     CARD ADAPTERS
+  ========================================================= */
 
   const propertyCardItem = {
     id: property.id,
@@ -522,16 +518,6 @@ export default function CompatibilityDetail() {
     navigate(`/explore/search-requests/${search.id}`);
   }
 
-  function openProperty() {
-    if (!isSearchSide) {
-      navigate(`/properties/${property.id}`);
-
-      return;
-    }
-
-    navigate(`/explore/properties/${property.id}`);
-  }
-
   /* =========================================================
      ACTIONS
   ========================================================= */
@@ -543,7 +529,9 @@ export default function CompatibilityDetail() {
 
     try {
       setActionLoading(true);
+
       setActionError("");
+
       setActionSuccess("");
 
       const updated = await respondToCompatibility(item.id, response);
@@ -589,6 +577,7 @@ export default function CompatibilityDetail() {
       await saveCompatibilityFeedback(item.id, payload);
 
       setFeedbackOpen(false);
+
       setFeedbackSuccess(true);
 
       setTimeout(() => {
@@ -625,16 +614,16 @@ export default function CompatibilityDetail() {
           </button>
 
           <span className="block text-xs font-bold uppercase tracking-[0.18em] text-primary">
-  Match inteligente
-</span>
+            Match inteligente
+          </span>
 
           <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
             Detalle de compatibilidad
           </h1>
 
-          <p className="mt-2 max-w-2xl text-sm text-slate-500">
-            Analizamos las condiciones de ambas publicaciones para detectar
-            oportunidades comercialmente viables.
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
+            Revisá las publicaciones involucradas y decidí si querés avanzar con
+            esta oportunidad.
           </p>
         </div>
 
@@ -677,157 +666,204 @@ export default function CompatibilityDetail() {
         )}
 
         {/* =====================================================
-            MAIN GRID
+            MATCH SUMMARY
         ====================================================== */}
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
-          {/* ===================================================
-              MAIN COLUMN
-          ==================================================== */}
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="px-5 py-5 sm:px-6">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                  <DirectMatchIcon />
+                </div>
 
-          <div className="space-y-6">
-         {/* RESUMEN DEL MATCH */}
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-emerald-700">
+                      Compatibilidad directa
+                    </span>
 
-<section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-  <div className="p-5 sm:p-6">
-    <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-      <div className="flex min-w-0 gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-5 w-5"
-            aria-hidden="true"
-          >
-            <path d="M7 7h11" />
-            <path d="m15 4 3 3-3 3" />
-            <path d="M17 17H6" />
-            <path d="m9 14-3 3 3 3" />
-          </svg>
-        </div>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${statusClass}`}
+                    >
+                      {statusLabel}
+                    </span>
 
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-emerald-700">
-              Compatibilidad directa
+                    <span className="text-xs font-medium text-slate-400">
+                      #{item.id}
+                    </span>
+                  </div>
+
+                  <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900">
+                    {matchLabel}
+                  </h2>
+
+                  <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500">
+                    {item.match_reason ||
+                      "PermuOK encontró una coincidencia relevante entre la búsqueda y la propiedad."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="shrink-0 sm:text-right">
+                <div className="text-4xl font-black tracking-tight text-slate-900">
+                  {Math.round(Number(item.score || 0))}%
+                </div>
+
+                <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                  compatibilidad
+                </div>
+              </div>
+            </div>
+
+            {swap?.evaluated && (
+              <div
+                className={`mt-5 flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
+                  swap?.accepted
+                    ? "border-emerald-100 bg-emerald-50"
+                    : "border-amber-100 bg-amber-50"
+                }`}
+              >
+                <div>
+                  <span
+                    className={`text-[10px] font-extrabold uppercase tracking-[0.14em] ${
+                      swap?.accepted ? "text-emerald-700" : "text-amber-700"
+                    }`}
+                  >
+                    Resultado de la operación
+                  </span>
+
+                  <div className="mt-0.5 text-sm font-bold text-slate-900">
+                    {Number(swap?.required_difference || 0) === 0
+                      ? "Permuta total · Sin diferencia de dinero"
+                      : `Diferencia estimada: ${formatMoney(
+                          swap?.required_difference,
+                          swap?.currency,
+                        )}`}
+                  </div>
+                </div>
+
+                <span
+                  className={`w-fit rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                    swap?.accepted
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-amber-100 text-amber-800"
+                  }`}
+                >
+                  {swap?.accepted ? "Operación posible" : "Revisar diferencia"}
+                </span>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* =====================================================
+            PUBLICATIONS
+        ====================================================== */}
+
+        <section className="mt-8">
+          <div className="mb-5">
+            <span className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-400">
+              Publicaciones involucradas
             </span>
 
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-              #{item.id}
-            </span>
+            <h2 className="mt-1 text-xl font-black text-slate-900">
+              Compará las dos partes del match
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Estas son las publicaciones reales que dieron origen a la
+              compatibilidad.
+            </p>
           </div>
 
-          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900">
-            {item.match_level === "total"
-              ? "Match total"
-              : item.match_level === "high"
-                ? "Match alto"
-                : item.match_level === "medium"
-                  ? "Match medio"
-                  : "Oportunidad compatible"}
-          </h2>
+          {/* SEARCH */}
 
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
-            {item.match_reason ||
-              "La propiedad cumple varios de los criterios definidos en la búsqueda."}
-          </p>
-        </div>
-      </div>
-
-      <div className="shrink-0 sm:text-right">
-        <div className="text-4xl font-black tracking-tight text-slate-900">
-          {Math.round(Number(item.score || 0))}%
-        </div>
-
-        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-          compatibilidad
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-            {/* =================================================
-                PUBLICACIONES REALES
-            ================================================== */}
-
-            <section>
-              <div className="mb-4">
-                <span className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-400">
-                  Publicaciones involucradas
-                </span>
-
-                <h2 className="mt-1 text-xl font-black text-slate-900">
-                  Revisá el match completo
-                </h2>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  Consultá la propiedad y la búsqueda que dieron origen a esta
-                  compatibilidad.
-                </p>
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                <Icon name="search" size={14} />
               </div>
 
-              <div className="mb-5 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
-                <button
-                  type="button"
-                  onClick={() => setPublicationsTab("property")}
-                  className={`rounded-lg px-4 py-2 text-sm font-bold transition ${
-                    publicationsTab === "property"
-                      ? "bg-white text-primary shadow-sm"
-                      : "text-slate-500 hover:text-slate-900"
-                  }`}
-                >
-                  {isSearchSide ? "Propiedad encontrada" : "Tu propiedad"}
-                </button>
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500">
+                {isSearchSide ? "Tu búsqueda" : "Búsqueda compatible"}
+              </span>
+            </div>
 
-                <button
-                  type="button"
-                  onClick={() => setPublicationsTab("search")}
-                  className={`rounded-lg px-4 py-2 text-sm font-bold transition ${
-                    publicationsTab === "search"
-                      ? "bg-white text-primary shadow-sm"
-                      : "text-slate-500 hover:text-slate-900"
-                  }`}
-                >
-                  {isSearchSide ? "Tu búsqueda" : "Búsqueda compatible"}
-                </button>
+            <SearchRequestCard
+              item={searchCardItem}
+              variant="dashboard"
+              onView={openSearchRequest}
+            />
+          </div>
+
+          {/* CONNECTION */}
+
+          <div className="flex items-center justify-center py-4">
+            <div className="flex items-center gap-3 text-emerald-600">
+              <div className="h-px w-12 bg-emerald-200" />
+
+              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50">
+                <DirectMatchIcon className="h-4 w-4" />
               </div>
 
-              {publicationsTab === "property" && (
-                <PropertyCard
-                  item={propertyCardItem}
-                  variant="dashboard"
-                  detailHref={
-                    isSearchSide
-                      ? `/explore/properties/${property.id}`
-                      : `/properties/${property.id}`
-                  }
-                />
-              )}
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.14em]">
+                Compatible con
+              </span>
 
-              {publicationsTab === "search" && (
-                <SearchRequestCard
-                  item={searchCardItem}
-                  variant="dashboard"
-                  compact
-                  onView={openSearchRequest}
-                />
-              )}
-            </section>
+              <div className="h-px w-12 bg-emerald-200" />
+            </div>
+          </div>
 
-            {/* =================================================
-                SWAP ANALYSIS
-            ================================================== */}
+          {/* PROPERTY */}
 
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                <Icon name="home" size={14} />
+              </div>
+
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700">
+                {isSearchSide ? "Propiedad encontrada" : "Tu propiedad"}
+              </span>
+            </div>
+
+            <PropertyCard
+              item={propertyCardItem}
+              variant="dashboard"
+              detailHref={
+                isSearchSide
+                  ? `/explore/properties/${property.id}`
+                  : `/properties/${property.id}`
+              }
+            />
+          </div>
+        </section>
+
+        {/* =====================================================
+            ANALYSIS + DECISION
+        ====================================================== */}
+
+        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,0.9fr)]">
+          {/* ===================================================
+              ANALYSIS
+          ==================================================== */}
+
+          <div>
             {swap.evaluated && (
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                <h3 className="text-lg font-black text-slate-900">
-                  Análisis de la operación
+                <span className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-400">
+                  Análisis económico
+                </span>
+
+                <h3 className="mt-1 text-lg font-black text-slate-900">
+                  Detalle de la operación
                 </h3>
+
+                <p className="mt-1 text-sm leading-relaxed text-slate-500">
+                  Comparación de valores y diferencia económica necesaria para
+                  completar la operación.
+                </p>
 
                 {swap.accepted && (
                   <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
@@ -849,6 +885,7 @@ export default function CompatibilityDetail() {
                     </div>
                   </div>
                 )}
+
                 {swap.accepted === false && (
                   <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
                     <Icon
@@ -863,13 +900,14 @@ export default function CompatibilityDetail() {
                       </p>
 
                       <p className="mt-1 text-sm leading-relaxed text-amber-800/80">
-                        La propiedad admite una operación con permuta, pero con
-                        las condiciones actualmente cargadas no puede
-                        confirmarse la viabilidad económica.
+                        La propiedad admite una operación con permuta, pero las
+                        condiciones actuales no alcanzan para confirmar la
+                        viabilidad económica.
                       </p>
                     </div>
                   </div>
                 )}
+
                 <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="rounded-xl bg-slate-50 p-4">
                     <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400">
@@ -893,7 +931,7 @@ export default function CompatibilityDetail() {
 
                   <div className="rounded-xl bg-slate-50 p-4">
                     <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400">
-                      Capacidad de efectivo declarada
+                      Capacidad de efectivo
                     </span>
 
                     <p className="mt-2 text-lg font-black text-slate-900">
@@ -921,59 +959,16 @@ export default function CompatibilityDetail() {
           </div>
 
           {/* ===================================================
-              SIDEBAR
+              DECISION
           ==================================================== */}
 
-          <aside className="space-y-6">
-            {/* ===============================================
-                REASONS
-            ================================================ */}
-
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <h3 className="text-base font-black text-slate-900">
-                ¿Por qué es un match?
-              </h3>
-
-              {matchedReasons.length > 0 ? (
-                <div className="mt-4 space-y-3">
-                  {matchedReasons.map((reason) => (
-                    <div key={reason.code} className="flex items-start gap-3">
-                      <Icon
-                        name="checkCircle"
-                        size={18}
-                        className="mt-0.5 shrink-0 text-emerald-600"
-                      />
-
-                      <span className="text-sm leading-relaxed text-slate-600">
-                        {getReasonLabel(reason)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-700">
-                    No hay un desglose de criterios disponible para este match.
-                  </p>
-
-                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                    Este registro fue generado sin el detalle de evaluación del
-                    motor.
-                  </p>
-                </div>
-              )}
-            </section>
-
-            {/* ===============================================
-                DECISION
-            ================================================ */}
-
+          <aside>
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">
                 Tu decisión
               </span>
 
-              {/* INTERÉS MUTUO / CHAT */}
+              {/* INTERÉS MUTUO */}
 
               {hasConversation && (
                 <>
@@ -1011,26 +1006,25 @@ export default function CompatibilityDetail() {
                 </>
               )}
 
-              {/* OTRA PARTE YA INTERESADA */}
+              {/* COUNTERPART INTERESTED */}
 
               {!hasConversation && counterpartInterested && (
                 <>
-                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
                     <div className="flex items-start gap-3">
                       <Icon
-                        name="checkCircle"
+                        name="info"
                         size={20}
-                        className="mt-0.5 shrink-0 text-emerald-700"
+                        className="mt-0.5 shrink-0 text-amber-700"
                       />
 
                       <div>
-                        <p className="text-sm font-black text-emerald-900">
-                          Hay interés en esta oportunidad
+                        <p className="text-sm font-black text-amber-900">
+                          La otra inmobiliaria quiere avanzar
                         </p>
 
-                        <p className="mt-1 text-xs leading-relaxed text-emerald-800/80">
-                          La otra inmobiliaria ya indicó que quiere avanzar con
-                          este match.
+                        <p className="mt-1 text-xs leading-relaxed text-amber-800/80">
+                          Ya indicó que esta oportunidad le interesa.
                         </p>
                       </div>
                     </div>
@@ -1063,7 +1057,7 @@ export default function CompatibilityDetail() {
                 </>
               )}
 
-              {/* SIN RESPUESTAS */}
+              {/* PENDING */}
 
               {!hasConversation &&
                 !counterpartInterested &&
@@ -1102,23 +1096,23 @@ export default function CompatibilityDetail() {
                   </>
                 )}
 
-              {/* YO INTERESADA */}
+              {/* MY INTEREST */}
 
               {!hasConversation && isInterested && !counterpartDismissed && (
-                <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4">
                   <div className="flex items-start gap-3">
                     <Icon
                       name="checkCircle"
                       size={19}
-                      className="mt-0.5 shrink-0 text-emerald-700"
+                      className="mt-0.5 shrink-0 text-sky-700"
                     />
 
                     <div>
-                      <p className="text-sm font-bold text-emerald-900">
+                      <p className="text-sm font-bold text-sky-900">
                         Marcaste que te interesa
                       </p>
 
-                      <p className="mt-1 text-xs leading-relaxed text-emerald-800/80">
+                      <p className="mt-1 text-xs leading-relaxed text-sky-800/80">
                         Le avisamos a la otra inmobiliaria. Si también muestra
                         interés, habilitaremos una conversación automáticamente.
                       </p>
@@ -1127,7 +1121,7 @@ export default function CompatibilityDetail() {
                 </div>
               )}
 
-              {/* YO DESCARTÉ */}
+              {/* DISMISSED */}
 
               {isDismissed && (
                 <>
@@ -1160,7 +1154,7 @@ export default function CompatibilityDetail() {
                 </>
               )}
 
-              {/* OTRA PARTE DESCARTÓ */}
+              {/* OTHER SIDE DISMISSED */}
 
               {!hasConversation && counterpartDismissed && !isDismissed && (
                 <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -1175,7 +1169,7 @@ export default function CompatibilityDetail() {
                 </div>
               )}
 
-              {/* ERRORS */}
+              {/* ERROR */}
 
               {actionError && (
                 <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
