@@ -86,25 +86,7 @@ function isMatchedReason(reason) {
 
   return false;
 }
-/* =========================================================
-   SCORE
-========================================================= */
 
-function ScoreCircle({ score }) {
-  const value = Math.round(Number(score || 0));
-
-  return (
-    <div className="flex h-24 w-24 shrink-0 flex-col items-center justify-center rounded-full border-[5px] border-emerald-500 bg-white">
-      <span className="text-2xl font-black tracking-tight text-emerald-700">
-        {value}%
-      </span>
-
-      <span className="mt-0.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-emerald-600">
-        Match
-      </span>
-    </div>
-  );
-}
 
 /* =========================================================
    FEEDBACK MODAL
@@ -642,9 +624,9 @@ export default function CompatibilityDetail() {
             Volver a compatibilidades
           </button>
 
-          <span className="block text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">
-            Match inteligente
-          </span>
+          <span className="block text-xs font-bold uppercase tracking-[0.18em] text-primary">
+  Match inteligente
+</span>
 
           <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
             Detalle de compatibilidad
@@ -704,33 +686,70 @@ export default function CompatibilityDetail() {
           ==================================================== */}
 
           <div className="space-y-6">
-            {/* SCORE */}
+         {/* RESUMEN DEL MATCH */}
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-                <ScoreCircle score={item.score} />
+<section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <div className="p-5 sm:p-6">
+    <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-5 w-5"
+            aria-hidden="true"
+          >
+            <path d="M7 7h11" />
+            <path d="m15 4 3 3-3 3" />
+            <path d="M17 17H6" />
+            <path d="m9 14-3 3 3 3" />
+          </svg>
+        </div>
 
-                <div>
-                  <span className="text-xs font-extrabold uppercase tracking-[0.16em] text-emerald-700">
-                    #{item.id}{" "}
-                    {item.match_level === "total"
-                      ? "Compatibilidad total"
-                      : "Compatibilidad detectada"}
-                  </span>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-emerald-700">
+              Compatibilidad directa
+            </span>
 
-                  <h2 className="mt-1 text-xl font-black text-slate-900">
-                    {item.match_level === "total"
-                      ? "Encontramos una coincidencia muy fuerte"
-                      : "Encontramos una oportunidad compatible"}
-                  </h2>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+              #{item.id}
+            </span>
+          </div>
 
-                  <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
-                    {item.match_reason ||
-                      "La propiedad cumple varios de los criterios definidos."}
-                  </p>
-                </div>
-              </div>
-            </section>
+          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900">
+            {item.match_level === "total"
+              ? "Match total"
+              : item.match_level === "high"
+                ? "Match alto"
+                : item.match_level === "medium"
+                  ? "Match medio"
+                  : "Oportunidad compatible"}
+          </h2>
+
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
+            {item.match_reason ||
+              "La propiedad cumple varios de los criterios definidos en la búsqueda."}
+          </p>
+        </div>
+      </div>
+
+      <div className="shrink-0 sm:text-right">
+        <div className="text-4xl font-black tracking-tight text-slate-900">
+          {Math.round(Number(item.score || 0))}%
+        </div>
+
+        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+          compatibilidad
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
             {/* =================================================
                 PUBLICACIONES REALES

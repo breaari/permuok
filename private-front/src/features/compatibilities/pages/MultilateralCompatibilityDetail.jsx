@@ -585,7 +585,7 @@ export default function MultilateralCompatibilityDetail() {
 
   if (loading) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="h-5 w-44 animate-pulse rounded bg-slate-200" />
 
         <div className="mt-6 h-52 animate-pulse rounded-2xl border border-slate-200 bg-white" />
@@ -599,7 +599,7 @@ export default function MultilateralCompatibilityDetail() {
 
   if (error) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <button
           type="button"
           onClick={() => navigate("/compatibilities/multilateral")}
@@ -623,19 +623,19 @@ export default function MultilateralCompatibilityDetail() {
   const archived = operation.status === "archived";
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
       {/* =====================================================
           VOLVER
       ====================================================== */}
 
-      <button
-        type="button"
-        onClick={() => navigate("/compatibilities/multilateral")}
-        className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition hover:text-slate-900"
-      >
-        <ArrowLeftIcon />
-        Volver a multilaterales
-      </button>
+     <button
+  type="button"
+  onClick={() => navigate("/compatibilities")}
+  className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition hover:text-slate-900"
+>
+  <ArrowLeftIcon />
+  Volver a compatibilidades
+</button>
 
       {/* =====================================================
           HEADER
