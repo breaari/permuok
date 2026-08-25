@@ -72,14 +72,14 @@ class CompatibilityJobService
     }
 
     public static function enqueueMatchDailyDigest(
-    int $priority = 2
-): array {
-    return self::enqueue(
-        self::TYPE_MATCH_DAILY_DIGEST,
-        1,
-        $priority
-    );
-}
+        int $priority = 2
+    ): array {
+        return self::enqueue(
+            self::TYPE_MATCH_DAILY_DIGEST,
+            1,
+            $priority
+        );
+    }
 
     public static function enqueueAllPublishedSearchRequestRecalculations(
         int $priority = 4
@@ -363,7 +363,11 @@ class CompatibilityJobService
                     )
                     ELSE available_at
                 END,
-
+rerun_requested = CASE
+    WHEN status = 'processing'
+    THEN 1
+    ELSE rerun_requested
+END,
                 updated_at = CURRENT_TIMESTAMP
         ");
 
@@ -475,15 +479,16 @@ class CompatibilityJobService
 
             $stUpdate = $pdo->prepare("
                 UPDATE compatibility_jobs
-                SET
-                    status = 'processing',
-                    attempts = attempts + 1,
-                    started_at = NOW(),
-                    locked_at = NOW(),
-                    locked_by = :locked_by,
-                    error_message = NULL
-                WHERE id = :id
-                LIMIT 1
+SET
+    status = 'processing',
+    attempts = attempts + 1,
+    started_at = NOW(),
+    locked_at = NOW(),
+    locked_by = :locked_by,
+    error_message = NULL,
+    rerun_requested = 0
+WHERE id = :id
+LIMIT 1
             ");
 
             $stUpdate->execute([
@@ -524,28 +529,58 @@ class CompatibilityJobService
 
         $pdo = self::db();
 
+
         $st = $pdo->prepare("
-            UPDATE compatibility_jobs
-            SET
-                status = 'completed',
-                completed_at = NOW(),
+    UPDATE compatibility_jobs
+    SET
+        status = CASE
+            WHEN rerun_requested = 1
+            THEN 'pending'
+            ELSE 'completed'
+        END,
 
-                locked_at = NULL,
-                locked_by = NULL,
+        attempts = CASE
+            WHEN rerun_requested = 1
+            THEN 0
+            ELSE attempts
+        END,
 
-                /*
-                 * Liberamos la clave para que en el
-                 * futuro pueda encolarse nuevamente.
-                 */
-                active_key = NULL,
+        available_at = CASE
+            WHEN rerun_requested = 1
+            THEN NOW()
+            ELSE available_at
+        END,
 
-                error_message = NULL
+        started_at = CASE
+            WHEN rerun_requested = 1
+            THEN NULL
+            ELSE started_at
+        END,
 
-            WHERE id = :id
-              AND status = 'processing'
+        completed_at = CASE
+            WHEN rerun_requested = 1
+            THEN NULL
+            ELSE NOW()
+        END,
 
-            LIMIT 1
-        ");
+        locked_at = NULL,
+        locked_by = NULL,
+
+        active_key = CASE
+            WHEN rerun_requested = 1
+            THEN active_key
+            ELSE NULL
+        END,
+
+        error_message = NULL,
+
+        rerun_requested = 0
+
+    WHERE id = :id
+      AND status = 'processing'
+
+    LIMIT 1
+");
 
         $st->execute([
             'id' => $jobId,
