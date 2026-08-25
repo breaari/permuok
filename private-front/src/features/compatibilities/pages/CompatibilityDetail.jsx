@@ -18,11 +18,7 @@ import SearchRequestCard from "../../search-requests/components/SearchRequestCar
 ========================================================= */
 
 function formatMoney(value, currency = "USD") {
-  if (
-    value === null ||
-    value === undefined ||
-    value === ""
-  ) {
+  if (value === null || value === undefined || value === "") {
     return "—";
   }
 
@@ -31,6 +27,14 @@ function formatMoney(value, currency = "USD") {
   if (!Number.isFinite(amount)) {
     return "—";
   }
+
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: currency || "USD",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
 function getReasonLabel(reason) {
   const labels = {
     property_type_match: "Es el tipo de propiedad buscado",
@@ -41,18 +45,22 @@ function getReasonLabel(reason) {
 
     province_match: "Está ubicada en la provincia buscada",
 
+    country_match: "Está ubicada en el país buscado",
+
     price_in_range: "El valor está dentro del rango buscado",
 
-    price_below_range: "El valor está por debajo del presupuesto máximo",
+    price_below_range: "El valor está por debajo del presupuesto previsto",
 
     amenities_match: "Cumple con los amenities solicitados",
 
     swap_mode_accepted: "La propiedad acepta operaciones con permuta",
 
     exchange_offer_value_match:
-      "La propiedad ofrecida tiene un valor compatible",
+      "La propiedad ofrecida está dentro del rango de valor aceptado",
+
     exchange_offer_value_unrestricted:
       "El propietario está abierto a evaluar inmuebles sin un rango de valor predeterminado",
+
     cash_difference_capacity:
       Number(reason?.required_difference || 0) === 0
         ? "No requiere diferencia de dinero"
@@ -78,7 +86,6 @@ function isMatchedReason(reason) {
 
   return false;
 }
-
 /* =========================================================
    SCORE
 ========================================================= */
