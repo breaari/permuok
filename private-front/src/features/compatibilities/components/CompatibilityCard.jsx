@@ -2,117 +2,85 @@ import { useNavigate } from "react-router-dom";
 
 import { Icon } from "../../../ui/icons/Index";
 
-function formatMoney(
-  value,
-  currency = "USD",
-) {
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function formatMoney(value, currency = "USD") {
   const amount = Number(value);
 
   if (!Number.isFinite(amount)) {
     return "—";
   }
 
-  return new Intl.NumberFormat(
-    "es-AR",
-    {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 0,
-    },
-  ).format(amount);
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: currency || "USD",
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
-function buildLocation(
-  location = {},
-) {
-  return [
-    location?.zone,
-    location?.city,
-    location?.province,
-  ]
+function buildLocation(location = {}) {
+  return [location?.zone, location?.city, location?.province]
     .filter(Boolean)
     .join(", ");
 }
 
 function formatDetectedDate(value) {
   if (!value) {
-    return null;
+    return "—";
   }
 
-  const normalized =
-    String(value).replace(" ", "T");
+  const normalized = String(value).replace(" ", "T");
 
   const date = new Date(normalized);
 
   if (Number.isNaN(date.getTime())) {
-    return null;
+    return "—";
   }
 
-  return new Intl.DateTimeFormat(
-    "es-AR",
-    {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    },
-  ).format(date);
+  return new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
 }
 
-function getMatchMeta(
-  level,
-  score,
-) {
-  const numericScore =
-    Number(score || 0);
+function getMatchMeta(level, score) {
+  const numericScore = Number(score || 0);
 
-  if (
-    level === "total" ||
-    numericScore >= 95
-  ) {
+  if (level === "total" || numericScore >= 95) {
     return {
       label: "Match total",
       text: "text-emerald-700",
-      border:
-        "border-emerald-500",
-      badge:
-        "bg-emerald-100 text-emerald-800",
+      badge: "bg-emerald-100 text-emerald-800",
+      icon: "bg-emerald-50 text-emerald-700",
     };
   }
 
-  if (
-    level === "high" ||
-    numericScore >= 80
-  ) {
+  if (level === "high" || numericScore >= 80) {
     return {
       label: "Match alto",
       text: "text-sky-700",
-      border: "border-sky-500",
-      badge:
-        "bg-sky-100 text-sky-800",
+      badge: "bg-sky-100 text-sky-800",
+      icon: "bg-sky-50 text-sky-700",
     };
   }
 
-  if (
-    level === "medium" ||
-    numericScore >= 60
-  ) {
+  if (level === "medium" || numericScore >= 60) {
     return {
       label: "Match medio",
       text: "text-amber-700",
-      border:
-        "border-amber-500",
-      badge:
-        "bg-amber-100 text-amber-800",
+      badge: "bg-amber-100 text-amber-800",
+      icon: "bg-amber-50 text-amber-700",
     };
   }
 
   return {
     label: "Match",
     text: "text-slate-600",
-    border: "border-slate-400",
-    badge:
-      "bg-slate-100 text-slate-700",
+    badge: "bg-slate-100 text-slate-700",
+    icon: "bg-slate-100 text-slate-600",
   };
 }
 
@@ -144,8 +112,7 @@ function getReasonMeta(reason) {
     },
 
     amenities_match: {
-      label:
-        "Amenities compatibles",
+      label: "Amenities compatibles",
       priority: 4,
     },
 
@@ -160,45 +127,32 @@ function getReasonMeta(reason) {
     },
 
     cash_difference_capacity: {
-      label:
-        "Diferencia cubierta",
+      label: "Diferencia cubierta",
       priority: 7,
     },
 
     owner_difference_conditions: {
-      label:
-        "Diferencia aceptada",
+      label: "Diferencia aceptada",
       priority: 8,
     },
   };
 
   return (
     map[reason?.code] || {
-      label:
-        reason?.label ||
-        "Coincidencia",
+      label: reason?.label || "Coincidencia",
       priority: 99,
     }
   );
 }
 
-function getVisibleReasons(
-  reasons = [],
-) {
+function getVisibleReasons(reasons = []) {
   return reasons
     .filter((reason) => {
-      if (
-        reason?.matched === true
-      ) {
+      if (reason?.matched === true) {
         return true;
       }
 
-      if (
-        Array.isArray(
-          reason?.matched,
-        ) &&
-        reason.matched.length > 0
-      ) {
+      if (Array.isArray(reason?.matched) && reason.matched.length > 0) {
         return true;
       }
 
@@ -208,172 +162,147 @@ function getVisibleReasons(
       ...reason,
       ...getReasonMeta(reason),
     }))
-    .sort(
-      (a, b) =>
-        a.priority - b.priority,
-    )
+    .sort((a, b) => a.priority - b.priority)
     .slice(0, 4);
 }
 
-function MatchScore({
-  score,
-  meta,
-}) {
-  const numericScore =
-    Math.round(
-      Number(score || 0),
-    );
+/* =========================================================
+   ICON
+========================================================= */
 
+function DirectMatchIcon({ className = "h-5 w-5" }) {
   return (
-    <div
-      className={`flex h-24 w-24 shrink-0 flex-col items-center justify-center rounded-full border-[4px] bg-white ${meta.border}`}
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
     >
-      <span
-        className={`text-2xl font-black tracking-tight ${meta.text}`}
-      >
-        {numericScore}%
-      </span>
+      <path d="M7 7h11" />
+      <path d="m15 4 3 3-3 3" />
 
-      <span
-        className={`mt-0.5 text-[10px] font-extrabold uppercase tracking-[0.12em] ${meta.text}`}
-      >
-        Match
-      </span>
-    </div>
+      <path d="M17 17H6" />
+      <path d="m9 14-3 3 3 3" />
+    </svg>
   );
 }
 
-function ReasonChip({
-  reason,
-}) {
+/* =========================================================
+   STATUS
+========================================================= */
+
+function resolveStatus(item, isHistory) {
+  const hasConversation =
+    item?.status === "chat_enabled" && item?.conversation_id;
+
+  const counterpartInterested =
+    item?.my_response === "pending" &&
+    item?.counterpart_response === "interested";
+
+  const waitingResponse =
+    item?.my_response === "interested" &&
+    item?.counterpart_response === "pending";
+
+  if (item?.status === "archived") {
+    return {
+      label: "Archivada",
+      description:
+        "La compatibilidad dejó de estar disponible por cambios en alguna publicación.",
+      className: "bg-slate-100 text-slate-700",
+      boxClass: "border-slate-200 bg-slate-50",
+    };
+  }
+
+  if (item?.my_response === "dismissed") {
+    return {
+      label: "Descartada",
+      description:
+        "Descartaste este match. Podés reactivarlo si querés reconsiderarlo.",
+      className: "bg-slate-100 text-slate-700",
+      boxClass: "border-slate-200 bg-slate-50",
+    };
+  }
+
+  if (item?.counterpart_response === "dismissed") {
+    return {
+      label: "No disponible",
+      description:
+        "La otra inmobiliaria decidió no avanzar con esta oportunidad.",
+      className: "bg-slate-100 text-slate-700",
+      boxClass: "border-slate-200 bg-slate-50",
+    };
+  }
+
+  if (hasConversation) {
+    return {
+      label: "En curso",
+      description:
+        "Ambas partes mostraron interés y la conversación ya está habilitada.",
+      className: "bg-blue-100 text-blue-800",
+      boxClass: "border-blue-100 bg-blue-50",
+    };
+  }
+
+  if (counterpartInterested) {
+    return {
+      label: "Requiere tu atención",
+      description:
+        "La otra inmobiliaria quiere avanzar. Revisá el match y decidí si también te interesa.",
+      className: "bg-amber-100 text-amber-800",
+      boxClass: "border-amber-200 bg-amber-50",
+    };
+  }
+
+  if (waitingResponse) {
+    return {
+      label: "Interés registrado",
+      description:
+        "Ya indicaste que te interesa. Estamos esperando la decisión de la otra inmobiliaria.",
+      className: "bg-sky-100 text-sky-800",
+      boxClass: "border-sky-100 bg-sky-50",
+    };
+  }
+
+  if (item?.is_new && !isHistory) {
+    return {
+      label: "Nueva",
+      description:
+        "Esta oportunidad todavía no fue revisada. Podés abrirla para evaluar el match.",
+      className: "bg-emerald-100 text-emerald-800",
+      boxClass: "border-emerald-100 bg-emerald-50",
+    };
+  }
+
+  return {
+    label: "Pendiente de respuesta",
+    description:
+      "Todavía tenés que indicar si querés avanzar con esta oportunidad.",
+    className: "bg-amber-100 text-amber-800",
+    boxClass: "border-slate-200 bg-slate-50",
+  };
+}
+
+/* =========================================================
+   REASON CHIP
+========================================================= */
+
+function ReasonChip({ reason }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-      <Icon
-        name="check"
-        size={12}
-        className="text-emerald-600"
-      />
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+      <Icon name="check" size={12} className="text-emerald-600" />
 
       {reason.label}
     </span>
   );
 }
 
-function StatusBadge({ item }) {
-  const hasConversation =
-    item?.status === "chat_enabled" &&
-    item?.conversation_id;
-
-  const counterpartInterested =
-    item?.my_response ===
-      "pending" &&
-    item?.counterpart_response ===
-      "interested";
-
-  const waitingResponse =
-    item?.my_response ===
-      "interested" &&
-    item?.counterpart_response ===
-      "pending";
-
-  if (hasConversation) {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-blue-700">
-        <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-        En curso
-      </span>
-    );
-  }
-
-  if (counterpartInterested) {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-amber-800">
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-        Requiere tu atención
-      </span>
-    );
-  }
-
-  if (waitingResponse) {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-sky-700">
-        Interés enviado
-      </span>
-    );
-  }
-
-  if (item?.is_new) {
-    return (
-      <span className="inline-flex items-center rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white">
-        Nueva
-      </span>
-    );
-  }
-
-  return null;
-}
-
-function HistoryStatus({
-  item,
-}) {
-  if (
-    item?.status === "archived"
-  ) {
-    return (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <p className="text-sm font-bold text-slate-700">
-          Compatibilidad archivada
-        </p>
-
-        <p className="mt-1 text-xs text-slate-500">
-          Este match dejó de estar
-          disponible por cambios en
-          alguna de las publicaciones.
-        </p>
-      </div>
-    );
-  }
-
-  if (
-    item?.my_response ===
-    "dismissed"
-  ) {
-    return (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <p className="text-sm font-bold text-slate-700">
-          Descartaste este match
-        </p>
-
-        <p className="mt-1 text-xs text-slate-500">
-          Podés volver a activarlo si
-          querés reconsiderar la
-          oportunidad.
-        </p>
-      </div>
-    );
-  }
-
-  if (
-    item?.counterpart_response ===
-    "dismissed"
-  ) {
-    return (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <p className="text-sm font-bold text-slate-700">
-          La otra parte no avanzó con
-          este match
-        </p>
-
-        <p className="mt-1 text-xs text-slate-500">
-          Conservamos el registro en tu
-          historial.
-        </p>
-      </div>
-    );
-  }
-
-  return null;
-}
+/* =========================================================
+   CARD
+========================================================= */
 
 export default function CompatibilityCard({
   item,
@@ -383,79 +312,38 @@ export default function CompatibilityCard({
 }) {
   const navigate = useNavigate();
 
-  const property =
-    item?.property || {};
+  const property = item?.property || {};
+  const search = item?.search_request || {};
 
-  const search =
-    item?.search_request || {};
+  const isSearchSide = item?.my_side === "search_request";
+  const isHistory = view === "history";
 
-  const isSearchSide =
-    item?.my_side ===
-    "search_request";
+  const matchMeta = getMatchMeta(item?.match_level, item?.score);
 
-  const isHistory =
-    view === "history";
+  const status = resolveStatus(item, isHistory);
 
-  const matchMeta =
-    getMatchMeta(
-      item?.match_level,
-      item?.score,
-    );
+  const reasons = getVisibleReasons(item?.reasons || []);
 
-  const reasons =
-    getVisibleReasons(
-      item?.reasons || [],
-    );
+  const searchLocation = buildLocation(search?.location);
 
-  const searchLocation =
-    buildLocation(
-      search?.location,
-    );
+  const propertyLocation = buildLocation(property?.location);
 
-  const propertyLocation =
-    buildLocation(
-      property?.location,
-    );
+  const searchBudgetMax = search?.budget?.max ?? null;
 
-  const searchBudgetMax =
-    search?.budget?.max ?? null;
+  const propertyArea = property?.total_area ?? property?.covered_area ?? null;
 
-  const propertyArea =
-    property?.total_area ??
-    property?.covered_area ??
-    null;
+  const canReactivate = Boolean(item?.actions?.can_reactivate);
 
-  const canReactivate =
-    Boolean(
-      item?.actions
-        ?.can_reactivate,
-    );
+  const hasConversation = Boolean(
+    item?.actions?.can_open_conversation && item?.conversation_id,
+  );
 
-  const hasConversation =
-    Boolean(
-      item?.actions
-        ?.can_open_conversation &&
-        item?.conversation_id,
-    );
-
-  const detectedLabel =
-    formatDetectedDate(
-      item?.detected_at ||
-        item?.calculated_at,
-    );
-
-  const isInProgress =
-    hasConversation;
-
-  const needsAttention =
-    item?.my_response === "pending" &&
-    item?.counterpart_response ===
-      "interested";
+  const detectedLabel = formatDetectedDate(
+    item?.detected_at || item?.calculated_at,
+  );
 
   function handleOpenDetail() {
-    navigate(
-      `/compatibilities/${item.id}`,
-    );
+    navigate(`/compatibilities/${item.id}`);
   }
 
   function handleOpenConversation() {
@@ -463,300 +351,189 @@ export default function CompatibilityCard({
       return;
     }
 
-    navigate(
-      `/conversations/${item.conversation_id}`,
-    );
+    navigate(`/conversations/${item.conversation_id}`);
   }
 
   return (
-    <article
-      className={`relative overflow-hidden rounded-2xl border bg-white p-5 shadow-sm transition-all duration-300 hover:shadow-md sm:p-6 ${
-        isInProgress
-          ? "border-blue-200"
-          : needsAttention
-            ? "border-amber-300"
-            : isHistory
-              ? "border-slate-200"
-              : "border-slate-200 hover:border-slate-300"
-      }`}
-    >
-      {isInProgress && (
-        <div className="absolute inset-x-0 top-0 h-1 bg-blue-500" />
-      )}
+    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      {/* =====================================================
+          HEADER
+      ====================================================== */}
 
-      {needsAttention && (
-        <div className="absolute inset-x-0 top-0 h-1 bg-amber-400" />
-      )}
+      <div className="border-b border-slate-100 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${matchMeta.icon}`}
+            >
+              <DirectMatchIcon />
+            </div>
 
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-center">
-        {/* Score */}
-        <div className="flex shrink-0 items-center gap-4 xl:block">
-          <MatchScore
-            score={item?.score}
-            meta={matchMeta}
-          />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`text-[10px] font-extrabold uppercase tracking-[0.16em] ${matchMeta.text}`}
+                >
+                  Compatibilidad directa
+                </span>
 
-          <div className="xl:hidden">
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${matchMeta.badge}`}
-              >
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${status.className}`}
+                >
+                  {status.label}
+                </span>
+              </div>
+
+              <h2 className="mt-1 truncate text-lg font-black tracking-tight text-slate-900">
                 {matchMeta.label}
-              </span>
+              </h2>
+            </div>
+          </div>
 
-              <StatusBadge item={item} />
+          <div className="shrink-0 text-right">
+            <div className="text-2xl font-black tracking-tight text-slate-900">
+              {Math.round(Number(item?.score || 0))}%
+            </div>
+
+            <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              compatibilidad
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Contenido */}
-        <div className="min-w-0 flex-1">
-          <div className="mb-3 hidden flex-wrap items-center gap-2 xl:flex">
-            <span
-              className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${matchMeta.badge}`}
-            >
-              {matchMeta.label}
-            </span>
+      {/* =====================================================
+          BODY
+      ====================================================== */}
 
-            <StatusBadge item={item} />
+      <div className="p-5">
+        {/* Comparación */}
 
-            <span className="text-xs font-medium text-slate-400">
-              #{item.id}
-            </span>
+        <div className="grid gap-3 md:grid-cols-2">
+          {/* Búsqueda */}
 
-            {detectedLabel && (
-              <span className="text-xs text-slate-400">
-                Detectada{" "}
-                {detectedLabel}
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200">
+                <Icon name="search" size={15} />
+              </div>
+
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">
+                {isSearchSide ? "Tu búsqueda" : "Búsqueda compatible"}
               </span>
+            </div>
+
+            <div className="line-clamp-2 min-h-[40px] font-bold leading-snug text-slate-900">
+              {search?.title || "Búsqueda sin título"}
+            </div>
+
+            {searchBudgetMax !== null && searchBudgetMax !== undefined && (
+              <div className="mt-1 text-sm text-slate-500">
+                Hasta {formatMoney(searchBudgetMax, search?.budget?.currency)}
+              </div>
             )}
 
-            {isHistory && (
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                Historial
-              </span>
+            {searchLocation && (
+              <div className="mt-1 truncate text-xs text-slate-400">
+                {searchLocation}
+              </div>
             )}
           </div>
 
-          {isInProgress && (
-            <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
-              <p className="text-sm font-bold text-blue-900">
-                Esta oportunidad está en
-                curso
-              </p>
+          {/* Propiedad */}
 
-              <p className="mt-0.5 text-xs text-blue-700">
-                Ambas partes mostraron
-                interés y la conversación
-                ya está habilitada.
-              </p>
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100">
+                <Icon name="home" size={15} />
+              </div>
+
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700">
+                {isSearchSide ? "Propiedad encontrada" : "Tu propiedad"}
+              </span>
             </div>
-          )}
 
-          {needsAttention && (
-            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <p className="text-sm font-bold text-amber-900">
-                La otra inmobiliaria
-                quiere avanzar
-              </p>
-
-              <p className="mt-0.5 text-xs text-amber-800">
-                Revisá el match y decidí
-                si también te interesa.
-              </p>
+            <div className="line-clamp-2 min-h-[40px] font-bold leading-snug text-slate-900">
+              {property?.title || "Propiedad sin título"}
             </div>
-          )}
 
-          {reasons.length > 0 && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              {reasons.map(
-                (reason) => (
-                  <ReasonChip
-                    key={reason.code}
-                    reason={reason}
-                  />
-                ),
+            <div className="mt-1 text-sm font-medium text-slate-500">
+              {formatMoney(property?.price, property?.currency)}
+            </div>
+
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+              {propertyLocation && (
+                <span className="truncate">{propertyLocation}</span>
+              )}
+
+              {propertyArea !== null && propertyArea !== undefined && (
+                <span>{Number(propertyArea)} m²</span>
               )}
             </div>
-          )}
-
-          {/* Comparación */}
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200">
-                  <Icon
-                    name="search"
-                    size={15}
-                  />
-                </div>
-
-                <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">
-                  {isSearchSide
-                    ? "Tu búsqueda"
-                    : "Búsqueda compatible"}
-                </span>
-              </div>
-
-              <h3 className="line-clamp-1 text-base font-extrabold text-slate-900">
-                {search?.title ||
-                  "Búsqueda sin título"}
-              </h3>
-
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-                {searchLocation && (
-                  <span className="flex items-center gap-1.5">
-                    <Icon
-                      name="mapPin"
-                      size={14}
-                      className="text-slate-400"
-                    />
-
-                    {searchLocation}
-                  </span>
-                )}
-
-                {searchBudgetMax !==
-                  null &&
-                  searchBudgetMax !==
-                    undefined && (
-                    <span className="font-semibold text-slate-600">
-                      Hasta{" "}
-                      {formatMoney(
-                        searchBudgetMax,
-                        search?.budget
-                          ?.currency,
-                      )}
-                    </span>
-                  )}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100">
-                  <Icon
-                    name="home"
-                    size={15}
-                  />
-                </div>
-
-                <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700">
-                  {isSearchSide
-                    ? "Propiedad encontrada"
-                    : "Tu propiedad"}
-                </span>
-              </div>
-
-              <div className="flex items-start justify-between gap-3">
-                <h3 className="line-clamp-1 min-w-0 text-base font-extrabold text-slate-900">
-                  {property?.title ||
-                    "Propiedad sin título"}
-                </h3>
-
-                <span className="shrink-0 text-base font-black text-slate-900">
-                  {formatMoney(
-                    property?.price,
-                    property?.currency,
-                  )}
-                </span>
-              </div>
-
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-                {propertyLocation && (
-                  <span className="flex items-center gap-1.5">
-                    <Icon
-                      name="mapPin"
-                      size={14}
-                      className="text-slate-400"
-                    />
-
-                    {propertyLocation}
-                  </span>
-                )}
-
-                {propertyArea !== null &&
-                  propertyArea !==
-                    undefined && (
-                    <span className="flex items-center gap-1.5">
-                      <Icon
-                        name="ruler"
-                        size={14}
-                        className="text-slate-400"
-                      />
-
-                      {Number(
-                        propertyArea,
-                      )}{" "}
-                      m²
-                    </span>
-                  )}
-              </div>
-            </div>
           </div>
-
-          {isHistory && (
-            <div className="mt-4">
-              <HistoryStatus
-                item={item}
-              />
-            </div>
-          )}
         </div>
 
-        {/* Acciones */}
-        <div className="flex w-full shrink-0 flex-col gap-2 xl:w-auto xl:min-w-[190px]">
-          <button
-            type="button"
-            onClick={handleOpenDetail}
-            className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition ${
-              hasConversation
-                ? "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                : "bg-primary text-white shadow-sm hover:opacity-90"
-            }`}
-          >
-            Ver detalle
+        {/* Razones */}
 
-            {!hasConversation && (
-              <Icon
-                name="arrowRight"
-                size={17}
-              />
-            )}
-          </button>
+        {reasons.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {reasons.map((reason) => (
+              <ReasonChip key={reason.code} reason={reason} />
+            ))}
+          </div>
+        )}
 
-          {hasConversation && (
-            <button
-              type="button"
-              onClick={
-                handleOpenConversation
-              }
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
-            >
-              Abrir conversación
+        {/* Estado */}
 
-              <Icon
-                name="arrowRight"
-                size={17}
-              />
-            </button>
-          )}
+        <div className={`mt-4 rounded-xl border px-4 py-3 ${status.boxClass}`}>
+          <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+            Estado de la oportunidad
+          </div>
 
-          {isHistory &&
-            canReactivate && (
+          <div className="mt-1 text-sm font-bold text-slate-800">
+            {status.description}
+          </div>
+        </div>
+
+        {/* Footer */}
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+          <div className="text-xs text-slate-400">
+            Detectada {detectedLabel}
+            {item?.id ? ` · #${item.id}` : ""}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {isHistory && canReactivate && (
               <button
                 type="button"
                 disabled={reactivating}
-                onClick={() =>
-                  onReactivate?.(item)
-                }
-                className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => onReactivate?.(item)}
+                className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {reactivating
-                  ? "Reactivando..."
-                  : "Reactivar"}
+                {reactivating ? "Reactivando..." : "Reactivar"}
               </button>
             )}
+
+            {hasConversation && (
+              <button
+                type="button"
+                onClick={handleOpenConversation}
+                className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                Conversación
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleOpenDetail}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-90"
+            >
+              Ver detalle
+              <Icon name="arrowRight" size={16} />
+            </button>
+          </div>
         </div>
       </div>
     </article>
