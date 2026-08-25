@@ -283,6 +283,9 @@ class MultilateralOperationReadService
                 mo.minimum_edge_score,
                 mo.average_edge_score,
                 mo.status,
+                mo.commercial_status,
+mo.confirmed_at,
+mo.declined_at,
                 mo.detected_at,
                 mo.last_seen_at,
                 mo.archived_at,
@@ -520,7 +523,25 @@ ml.cash_difference_direction
                 : null;
         }
         unset($leg);
+        $stMyResponse = $pdo->prepare("
+    SELECT response
+    FROM multilateral_operation_responses
+    WHERE operation_id = :operation_id
+      AND real_estate_id = :real_estate_id
+    LIMIT 1
+");
 
+        $stMyResponse->execute([
+            'operation_id' =>
+            $operationId,
+
+            'real_estate_id' =>
+            $realEstateId,
+        ]);
+
+        $myResponse =
+            $stMyResponse->fetchColumn()
+            ?: null;
         return [
             'operation' =>
             $operation,
@@ -530,6 +551,9 @@ ml.cash_difference_direction
 
             'my_real_estate_id' =>
             $realEstateId,
+
+
+            'my_response' => $myResponse,
         ];
     }
 

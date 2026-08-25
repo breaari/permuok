@@ -59,3 +59,11 @@ export async function getMultilateralCompatibilityDetail(id) {
 
   return unwrap(res);
 }
+export async function respondToMultilateralCompatibility(id, response) {
+  const res = await http.post(
+    `/compatibilities/multilateral/${id}/respond`,
+    { response },
+  );
+
+  return unwrap(res);
+}

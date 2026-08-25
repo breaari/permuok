@@ -749,6 +749,20 @@ if (
     exit;
 }
 if (
+    $method === 'POST' &&
+    preg_match(
+        '#^/compatibilities/multilateral/(\d+)/respond$#',
+        $uri,
+        $m
+    )
+) {
+    CompatibilityController::multilateralRespond(
+        (int)$m[1]
+    );
+
+    exit;
+}
+if (
     $method === 'GET' &&
     preg_match(
         '#^/compatibilities/multilateral/(\d+)$#',
@@ -757,8 +771,8 @@ if (
     )
 ) {
     CompatibilityController::multilateralDetail(
-            (int)$m[1]
-        );
+        (int)$m[1]
+    );
 
     exit;
 }

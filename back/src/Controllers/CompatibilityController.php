@@ -7,6 +7,7 @@ use App\Helpers\ResponseHelper;
 use App\Services\CompatibilityService;
 use Throwable;
 use App\Services\MultilateralOperationReadService;
+use App\Services\MultilateralOperationResponseService;
 
 class CompatibilityController
 {
@@ -150,7 +151,37 @@ class CompatibilityController
         }
     }
 
+    public static function multilateralRespond(
+        int $operationId
+    ): void {
+        try {
+            $user =
+                AuthHelper::requireUser();
 
+            $body =
+                json_decode(
+                    file_get_contents('php://input'),
+                    true
+                ) ?: [];
+
+            $response =
+                trim(
+                    (string)($body['response'] ?? '')
+                );
+
+            $result =
+                MultilateralOperationResponseService::respond(
+                    (int)$user['id'],
+                    $operationId,
+                    $response
+                );
+
+            ResponseHelper::ok($result);
+        } catch (Throwable $e) {
+            self::error($e);
+        }
+    }
+    
     private static function error(
         Throwable $e
     ): void {
