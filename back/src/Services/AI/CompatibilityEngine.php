@@ -1836,7 +1836,7 @@ class CompatibilityEngine
             return [
                 'score' => 25.0,
                 'reason' => [
-                    'code' => 'exact_zone_match',
+                    'code' => 'exact_zone_match', 
                     'label' => 'Coincidencia exacta de zona',
                     'weight' => 25,
                     'matched' => true,
@@ -2798,77 +2798,135 @@ class CompatibilityEngine
             ($priceMaxRaw === null ||
                 $priceMax !== null);
 
-        $withinAcceptedOfferRange =
-            $offerRangeConversionAvailable &&
-            (
-                $priceMin === null ||
-                $priceMin <= 0 ||
-                $offerPrice >= $priceMin
-            ) &&
-            (
-                $priceMax === null ||
-                $priceMax <= 0 ||
-                $offerPrice <= $priceMax
-            );
+ $hasOfferValueConstraint =
+    (
+        $priceMinRaw !== null &&
+        $priceMinRaw > 0
+    )
+    ||
+    (
+        $priceMaxRaw !== null &&
+        $priceMaxRaw > 0
+    );
 
-        if ($withinAcceptedOfferRange) {
-            $score += 5;
-        } else {
-            $penalties[] = [
-                'code' =>
-                'exchange_offer_value_out_of_range',
+/*
+ * Si el propietario no definió un rango
+ * para el inmueble que recibiría, no decimos
+ * que el valor sea "compatible".
+ *
+ * Lo correcto es indicar que está abierto
+ * a evaluar propuestas sin un rango previo.
+ */
+if (!$hasOfferValueConstraint) {
+    $score += 5;
 
-                'label' =>
-                'El valor del inmueble ofrecido no está dentro del rango aceptado',
+    $reasons[] = [
+        'code' =>
+            'exchange_offer_value_unrestricted',
 
-                'offered_value' =>
-                $offerPrice,
+        'label' =>
+            'El propietario no definió un rango de valor para el inmueble ofrecido',
 
-                'accepted_min' =>
-                $priceMin,
-
-                'accepted_max' =>
-                $priceMax,
-
-                'currency' =>
-                $propertyCurrency,
-            ];
-        }
-
-        $reasons[] = [
-            'code' =>
-            'exchange_offer_value_match',
-
-            'label' =>
-            'Valor del inmueble ofrecido compatible',
-
-            'weight' =>
+        'weight' =>
             5,
 
-            'matched' =>
-            $withinAcceptedOfferRange,
+        'matched' =>
+            true,
 
-            'offered_value' =>
+        'offered_value' =>
             $offerPrice,
 
-            'accepted_min' =>
-            $priceMin,
+        'accepted_min' =>
+            null,
 
-            'accepted_max' =>
-            $priceMax,
+        'accepted_max' =>
+            null,
 
-            'currency' =>
+        'currency' =>
             $propertyCurrency,
 
-            'original_offered_value' =>
+        'original_offered_value' =>
             $selectedOfferOriginalPrice,
 
-            'original_offered_currency' =>
+        'original_offered_currency' =>
             $selectedOfferOriginalCurrency,
 
-            'currency_conversion_applied' =>
+        'currency_conversion_applied' =>
             $selectedOfferConversionApplied,
+    ];
+} else {
+    $withinAcceptedOfferRange =
+        $offerRangeConversionAvailable &&
+        (
+            $priceMin === null ||
+            $priceMin <= 0 ||
+            $offerPrice >= $priceMin
+        ) &&
+        (
+            $priceMax === null ||
+            $priceMax <= 0 ||
+            $offerPrice <= $priceMax
+        );
+
+    if ($withinAcceptedOfferRange) {
+        $score += 5;
+    } else {
+        $penalties[] = [
+            'code' =>
+                'exchange_offer_value_out_of_range',
+
+            'label' =>
+                'El valor del inmueble ofrecido no está dentro del rango aceptado',
+
+            'offered_value' =>
+                $offerPrice,
+
+            'accepted_min' =>
+                $priceMin,
+
+            'accepted_max' =>
+                $priceMax,
+
+            'currency' =>
+                $propertyCurrency,
         ];
+    }
+
+    $reasons[] = [
+        'code' =>
+            'exchange_offer_value_match',
+
+        'label' =>
+            'El valor del inmueble ofrecido está dentro del rango aceptado',
+
+        'weight' =>
+            5,
+
+        'matched' =>
+            $withinAcceptedOfferRange,
+
+        'offered_value' =>
+            $offerPrice,
+
+        'accepted_min' =>
+            $priceMin,
+
+        'accepted_max' =>
+            $priceMax,
+
+        'currency' =>
+            $propertyCurrency,
+
+        'original_offered_value' =>
+            $selectedOfferOriginalPrice,
+
+        'original_offered_currency' =>
+            $selectedOfferOriginalCurrency,
+
+        'currency_conversion_applied' =>
+            $selectedOfferConversionApplied,
+    ];
+}
 
         /*
      * --------------------------------------------------

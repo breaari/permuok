@@ -1812,6 +1812,18 @@ c.target_seen_at,
             'currency' => null,
         ];
 
+        /*
+     * Cada parte importante de la permuta
+     * debe ser compatible para considerar
+     * viable la operación.
+     */
+        $checks = [
+            'mode' => null,
+            'offer_value' => null,
+            'cash_capacity' => null,
+            'owner_conditions' => null,
+        ];
+
         foreach (
             $reasonsData['reasons'] ?? []
             as $reason
@@ -1820,21 +1832,38 @@ c.target_seen_at,
                 continue;
             }
 
-            $code = $reason['code'] ?? null;
+            $code =
+                $reason['code'] ?? null;
 
             switch ($code) {
                 case 'swap_mode_accepted':
                     $summary['evaluated'] = true;
-                    $summary['accepted'] = true;
+                    $checks['mode'] = true;
                     break;
 
                 case 'swap_mode_rejected':
+                case 'swap_not_confirmed':
+                case 'exchange_offer_missing':
                     $summary['evaluated'] = true;
-                    $summary['accepted'] = false;
+                    $checks['mode'] = false;
                     break;
 
-                case 'exchange_offer_value_match':
+                case 'target_property_value_missing':
+                case 'swap_values_not_comparable':
                     $summary['evaluated'] = true;
+                    $checks['offer_value'] = false;
+                    break;
+
+                case 'exchange_offer_value_unrestricted':
+                    $summary['evaluated'] = true;
+
+                    /*
+                 * No existe una restricción declarada
+                 * sobre el valor del inmueble recibido.
+                 * Esto no significa igualdad económica,
+                 * pero tampoco invalida esta condición.
+                 */
+                    $checks['offer_value'] = true;
 
                     $summary['offered_value'] =
                         self::nullableFloat(
@@ -1844,10 +1873,33 @@ c.target_seen_at,
                     $summary['currency'] =
                         $reason['currency']
                         ?? $summary['currency'];
+
+                    break;
+
+                case 'exchange_offer_value_match':
+                    $summary['evaluated'] = true;
+
+                    $checks['offer_value'] =
+                        ($reason['matched'] ?? false)
+                        === true;
+
+                    $summary['offered_value'] =
+                        self::nullableFloat(
+                            $reason['offered_value'] ?? null
+                        );
+
+                    $summary['currency'] =
+                        $reason['currency']
+                        ?? $summary['currency'];
+
                     break;
 
                 case 'cash_difference_capacity':
                     $summary['evaluated'] = true;
+
+                    $checks['cash_capacity'] =
+                        ($reason['matched'] ?? false)
+                        === true;
 
                     $summary['required_difference'] =
                         self::nullableFloat(
@@ -1864,10 +1916,15 @@ c.target_seen_at,
                     $summary['currency'] =
                         $reason['currency']
                         ?? $summary['currency'];
+
                     break;
 
                 case 'owner_difference_conditions':
                     $summary['evaluated'] = true;
+
+                    $checks['owner_conditions'] =
+                        ($reason['matched'] ?? false)
+                        === true;
 
                     $summary['accepted_difference_min'] =
                         self::nullableFloat(
@@ -1881,13 +1938,39 @@ c.target_seen_at,
                                 ?? null
                         );
 
+                    /*
+                 * El motor guarda actual_direction.
+                 */
                     $summary['direction'] =
-                        $reason['direction'] ?? null;
+                        $reason['actual_direction']
+                        ?? null;
 
                     $summary['currency'] =
                         $reason['currency']
                         ?? $summary['currency'];
+
                     break;
+            }
+        }
+
+        if ($summary['evaluated']) {
+            /*
+         * Una sola condición económica fallida
+         * alcanza para que la operación NO pueda
+         * presentarse como viable.
+         */
+            if (
+                in_array(
+                    false,
+                    $checks,
+                    true
+                )
+            ) {
+                $summary['accepted'] = false;
+            } elseif (
+                $checks['mode'] === true
+            ) {
+                $summary['accepted'] = true;
             }
         }
 

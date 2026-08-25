@@ -18,32 +18,50 @@ import SearchRequestCard from "../../search-requests/components/SearchRequestCar
 ========================================================= */
 
 function formatMoney(value, currency = "USD") {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return "—";
+  }
+
   const amount = Number(value);
 
   if (!Number.isFinite(amount)) {
     return "—";
   }
-
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
 function getReasonLabel(reason) {
   const labels = {
     property_type_match: "Es el tipo de propiedad buscado",
-    exact_zone_match: "Coincide exactamente con la zona",
-    city_match: "Coincide con la ciudad buscada",
-    province_match: "Coincide con la provincia",
-    price_in_range: "Está dentro del presupuesto",
-    amenities_match: "Cumple los amenities solicitados",
-    swap_mode_accepted: "La propiedad acepta permuta",
+
+    exact_zone_match: "Está ubicada exactamente en la zona buscada",
+
+    city_match: "Está ubicada en la ciudad buscada",
+
+    province_match: "Está ubicada en la provincia buscada",
+
+    price_in_range: "El valor está dentro del rango buscado",
+
+    price_below_range: "El valor está por debajo del presupuesto máximo",
+
+    amenities_match: "Cumple con los amenities solicitados",
+
+    swap_mode_accepted: "La propiedad acepta operaciones con permuta",
+
     exchange_offer_value_match:
-      "El inmueble ofrecido tiene un valor compatible",
-    cash_difference_capacity: "La diferencia puede ser cubierta",
-    owner_difference_conditions: "La diferencia está dentro de lo aceptado",
+      "La propiedad ofrecida tiene un valor compatible",
+    exchange_offer_value_unrestricted:
+      "El propietario está abierto a evaluar inmuebles sin un rango de valor predeterminado",
+    cash_difference_capacity:
+      Number(reason?.required_difference || 0) === 0
+        ? "No requiere diferencia de dinero"
+        : "La diferencia económica puede ser cubierta",
+
+    owner_difference_conditions:
+      Number(reason?.difference || 0) === 0
+        ? "Los valores permiten una permuta total"
+        : "La diferencia está dentro de las condiciones aceptadas",
   };
 
   return labels[reason?.code] || reason?.label || "Criterio compatible";
@@ -340,7 +358,11 @@ export default function CompatibilityDetail() {
   }, [id]);
 
   const matchedReasons = useMemo(
-    () => (item?.reasons || []).filter(isMatchedReason),
+    () =>
+      (item?.reasons || []).filter(
+        (reason) =>
+          isMatchedReason(reason) && reason?.code !== "currency_reference",
+      ),
     [item],
   );
 
@@ -801,7 +823,27 @@ export default function CompatibilityDetail() {
                     </div>
                   </div>
                 )}
+                {swap.accepted === false && (
+                  <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <Icon
+                      name="info"
+                      size={20}
+                      className="mt-0.5 shrink-0 text-amber-700"
+                    />
 
+                    <div>
+                      <p className="font-bold text-amber-900">
+                        Diferencia económica no cubierta
+                      </p>
+
+                      <p className="mt-1 text-sm leading-relaxed text-amber-800/80">
+                        La propiedad admite una operación con permuta, pero con
+                        las condiciones actualmente cargadas no puede
+                        confirmarse la viabilidad económica.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="rounded-xl bg-slate-50 p-4">
                     <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400">
@@ -825,7 +867,7 @@ export default function CompatibilityDetail() {
 
                   <div className="rounded-xl bg-slate-50 p-4">
                     <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400">
-                      Podés aportar hasta
+                      Capacidad de efectivo declarada
                     </span>
 
                     <p className="mt-2 text-lg font-black text-slate-900">
