@@ -153,248 +153,111 @@ function CycleIcon() {
   );
 }
 
-/* =========================================================
-   PROPERTY BOX
-========================================================= */
-
-function PropertyBox({
-  title,
-  propertyType,
-  price,
-  currency,
-  zone,
-  city,
-  label,
-  accent = false,
-  onOpen,
-}) {
+function CompactCircuit({ legs, navigate }) {
   return (
-    <div
-      className={`flex-1 rounded-xl border p-4 ${
-        accent
-          ? "border-violet-200 bg-violet-50/70"
-          : "border-slate-200 bg-slate-50"
-      }`}
-    >
-      <div
-        className={`text-[10px] font-extrabold uppercase tracking-[0.14em] ${
-          accent ? "text-violet-700" : "text-slate-400"
-        }`}
-      >
-        {label}
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="grid gap-3 lg:grid-cols-3">
+        {legs.map((leg, index) => {
+          const difference = getDifferenceMeta(leg);
+
+          return (
+            <div
+              key={leg.id || `${leg.position}-${index}`}
+              className={`relative rounded-2xl border p-4 ${
+                leg?.is_my_leg
+                  ? "border-violet-300 bg-violet-50/50 ring-2 ring-violet-100"
+                  : "border-slate-200 bg-slate-50"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">
+                      Inmobiliaria {index + 1}
+                    </span>
+
+                    {leg?.is_my_leg && (
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-extrabold uppercase text-violet-700">
+                        Tu inmobiliaria
+                      </span>
+                    )}
+                  </div>
+
+                  <h3 className="mt-1 text-lg font-black text-slate-900">
+                    {leg?.source_real_estate_name || "Inmobiliaria"}
+                  </h3>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-xl font-black text-slate-900">
+                    {Math.round(Number(leg?.score || 0))}%
+                  </div>
+
+                  <div className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
+                    match
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(`/explore/properties/${leg.offered_property_id}`)
+                  }
+                  className="block w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-slate-300"
+                >
+                  <div className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400">
+                    Entrega
+                  </div>
+
+                  <div className="mt-1 line-clamp-2 text-sm font-bold text-slate-900">
+                    {leg?.offered_property_title || "Propiedad"}
+                  </div>
+                </button>
+
+                <div className="flex justify-center text-violet-500">
+                  <ArrowDownIcon />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(`/explore/properties/${leg.property_id}`)
+                  }
+                  className="block w-full rounded-xl border border-violet-200 bg-violet-50 p-3 text-left transition hover:border-violet-300"
+                >
+                  <div className="text-[9px] font-extrabold uppercase tracking-wider text-violet-600">
+                    Recibe
+                  </div>
+
+                  <div className="mt-1 line-clamp-2 text-sm font-bold text-slate-900">
+                    {leg?.property_title || "Propiedad"}
+                  </div>
+
+                  <div className="mt-1 text-[11px] text-slate-500">
+                    de {leg?.target_real_estate_name || "otra inmobiliaria"}
+                  </div>
+                </button>
+              </div>
+
+              <div
+                className={`mt-4 rounded-xl border px-3 py-2 ${difference.className}`}
+              >
+                <div className="text-xs font-extrabold">{difference.label}</div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      <div className="mt-1 text-base font-black leading-snug text-slate-900">
-        {title || "Propiedad"}
-      </div>
-
-      {propertyType && (
-        <div className="mt-1 text-xs font-semibold capitalize text-slate-500">
-          {propertyType}
+      {legs.length > 1 && (
+        <div className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-dashed border-violet-200 bg-violet-50/40 px-4 py-3 text-xs font-bold text-violet-700">
+          <CycleIcon />
+          El último intercambio vuelve al primero y completa el circuito
         </div>
-      )}
-
-      <div className="mt-3 text-lg font-black text-slate-900">
-        {formatMoney(price, currency)}
-      </div>
-
-      {buildLocation(zone, city) && (
-        <div className="mt-1 text-xs text-slate-500">
-          {buildLocation(zone, city)}
-        </div>
-      )}
-
-      {onOpen && (
-        <button
-          type="button"
-          onClick={onOpen}
-          className="mt-3 text-xs font-bold text-primary hover:underline"
-        >
-          Ver publicación
-        </button>
       )}
     </div>
-  );
-}
-
-/* =========================================================
-   LEG / TRAMO
-========================================================= */
-
-function OperationLeg({ leg, index, total, navigate }) {
-  const difference = getDifferenceMeta(leg);
-
-  return (
-    <>
-      <article
-        className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${
-          leg?.is_my_leg
-            ? "border-violet-300 ring-2 ring-violet-100"
-            : "border-slate-200"
-        }`}
-      >
-        <div className="border-b border-slate-100 px-5 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">
-                  Tramo {index + 1}
-                </span>
-
-                {leg?.is_my_leg && (
-                  <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-violet-700">
-                    Tu inmobiliaria
-                  </span>
-                )}
-              </div>
-
-              <h2 className="mt-1 text-lg font-black text-slate-900">
-                {leg?.source_real_estate_name || "Inmobiliaria"}
-              </h2>
-
-              <p className="mt-0.5 text-xs text-slate-500">
-                Busca una propiedad de{" "}
-                <span className="font-bold text-slate-700">
-                  {leg?.target_real_estate_name || "otra inmobiliaria"}
-                </span>
-              </p>
-            </div>
-
-            <div className="text-right">
-              <div className="text-2xl font-black text-slate-900">
-                {Math.round(Number(leg?.score || 0))}%
-              </div>
-
-              <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                compatibilidad
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-5">
-          <div className="grid items-stretch gap-3 md:grid-cols-[1fr_auto_1fr]">
-            <PropertyBox
-              label="Entrega"
-              title={leg?.offered_property_title}
-              propertyType={leg?.offered_property_type}
-              price={leg?.offered_property_price}
-              currency={leg?.offered_property_currency}
-              zone={leg?.offered_property_zone}
-              city={leg?.offered_property_city}
-              onOpen={
-                leg?.offered_property_id
-                  ? () =>
-                      navigate(`/explore/properties/${leg.offered_property_id}`)
-                  : null
-              }
-            />
-
-            <div className="flex items-center justify-center py-1 text-violet-500 md:px-1">
-              <div className="rotate-0 md:-rotate-90">
-                <ArrowDownIcon />
-              </div>
-            </div>
-
-            <PropertyBox
-              label="Recibe"
-              accent
-              title={leg?.property_title}
-              propertyType={leg?.property_type}
-              price={leg?.property_price}
-              currency={leg?.property_currency}
-              zone={leg?.property_zone}
-              city={leg?.property_city}
-              onOpen={
-                leg?.property_id
-                  ? () => navigate(`/explore/properties/${leg.property_id}`)
-                  : null
-              }
-            />
-          </div>
-          <div
-            className={`mt-4 rounded-xl border px-4 py-3 ${difference.className}`}
-          >
-            <div className="text-sm font-extrabold">{difference.label}</div>
-
-            <div className="mt-0.5 text-xs opacity-80">
-              {difference.description}
-            </div>
-          </div>
-          {leg?.search_title && (
-            <div className="mt-4 border-t border-slate-100 pt-4">
-              <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">
-                Búsqueda asociada
-              </div>
-
-              <div className="mt-1 text-sm font-bold text-slate-800">
-                {leg.search_title}
-              </div>
-            </div>
-          )}
-          <div className="mt-6 border-t border-slate-200 pt-6">
-            <div className="mb-4">
-              <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-400">
-                Publicaciones involucradas
-              </div>
-
-              <h3 className="mt-1 text-lg font-black text-slate-900">
-                Información completa del tramo
-              </h3>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <div className="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-500">
-                  Búsqueda
-                </div>
-
-                <SearchRequestCard
-                  item={leg.search_request}
-                  variant="dashboard"
-                  onView={() =>
-                    navigate(
-                      `/explore/search-requests/${leg.search_request_id}`,
-                    )
-                  }
-                />
-              </div>
-
-              <div>
-                <div className="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-500">
-                  Propiedad que entrega
-                </div>
-
-                <PropertyCard
-                  item={leg.offered_property}
-                  variant="dashboard"
-                  detailHref={`/explore/properties/${leg.offered_property_id}`}
-                />
-              </div>
-
-              <div>
-                <div className="mb-2 text-xs font-extrabold uppercase tracking-wide text-violet-600">
-                  Propiedad que busca recibir
-                </div>
-
-                <PropertyCard
-                  item={leg.target_property}
-                  variant="dashboard"
-                  detailHref={`/explore/properties/${leg.property_id}`}
-                />
-              </div>
-            </div>
-          </div>
-          
-        </div>
-      </article>
-
-      {index < total - 1 && (
-        <div className="flex justify-center py-3 text-violet-400">
-          <ArrowDownIcon />
-        </div>
-      )}
-    </>
   );
 }
 
@@ -411,6 +274,8 @@ export default function MultilateralCompatibilityDetail() {
   const [error, setError] = useState("");
   const [responding, setResponding] = useState(false);
   const [responseError, setResponseError] = useState("");
+  const [publicationsTab, setPublicationsTab] = useState("properties");
+
   useEffect(() => {
     let active = true;
 
@@ -459,6 +324,38 @@ export default function MultilateralCompatibilityDetail() {
   const contacts = useMemo(
     () => (data?.contacts || []).filter((contact) => !contact?.is_me),
     [data],
+  );
+
+  const properties = useMemo(() => {
+    const map = new Map();
+
+    legs.forEach((leg) => {
+      const property = leg?.offered_property;
+
+      if (!property?.id || map.has(property.id)) {
+        return;
+      }
+
+      map.set(property.id, {
+        property,
+        realEstateName: leg?.source_real_estate_name,
+        isMine: !!leg?.is_my_leg,
+      });
+    });
+
+    return [...map.values()];
+  }, [legs]);
+
+  const searches = useMemo(
+    () =>
+      legs
+        .filter((leg) => leg?.search_request?.id)
+        .map((leg) => ({
+          search: leg.search_request,
+          realEstateName: leg?.source_real_estate_name,
+          isMine: !!leg?.is_my_leg,
+        })),
+    [legs],
   );
   async function handleResponse(response) {
     try {
@@ -788,17 +685,120 @@ export default function MultilateralCompatibilityDetail() {
         </div>
 
         <div>
-          {legs.map((leg, index) => (
-            <OperationLeg
-              key={leg.id || `${leg.position}-${index}`}
-              leg={leg}
-              index={index}
-              total={legs.length}
-              navigate={navigate}
-            />
-          ))}
-        </div>
+          <section className="mt-8">
+            <div className="mb-5">
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+                Circuito de la operación
+              </span>
 
+              <h2 className="mt-1 text-xl font-black text-slate-900">
+                Cómo se conecta la cadena
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Cada inmobiliaria entrega una propiedad y recibe la propiedad
+                que necesita de la siguiente parte.
+              </p>
+            </div>
+
+            <CompactCircuit legs={legs} navigate={navigate} />
+          </section>
+        </div>
+        <section className="mt-8">
+          <div className="mb-5">
+            <span className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+              Publicaciones involucradas
+            </span>
+
+            <h2 className="mt-1 text-xl font-black text-slate-900">
+              Revisá la información completa
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Cada propiedad y búsqueda aparece una sola vez.
+            </p>
+          </div>
+
+          <div className="mb-5 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+            <button
+              type="button"
+              onClick={() => setPublicationsTab("properties")}
+              className={`rounded-lg px-4 py-2 text-sm font-bold transition ${
+                publicationsTab === "properties"
+                  ? "bg-white text-primary shadow-sm"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Propiedades ({properties.length})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPublicationsTab("searches")}
+              className={`rounded-lg px-4 py-2 text-sm font-bold transition ${
+                publicationsTab === "searches"
+                  ? "bg-white text-primary shadow-sm"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Búsquedas ({searches.length})
+            </button>
+          </div>
+
+          {publicationsTab === "properties" && (
+            <div className="space-y-4">
+              {properties.map(({ property, realEstateName, isMine }) => (
+                <div key={property.id}>
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">
+                      {realEstateName}
+                    </span>
+
+                    {isMine && (
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[9px] font-extrabold uppercase text-violet-700">
+                        Tu propiedad
+                      </span>
+                    )}
+                  </div>
+
+                  <PropertyCard
+                    item={property}
+                    variant="dashboard"
+                    detailHref={`/explore/properties/${property.id}`}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {publicationsTab === "searches" && (
+            <div className="space-y-4">
+              {searches.map(({ search, realEstateName, isMine }) => (
+                <div key={search.id}>
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">
+                      {realEstateName}
+                    </span>
+
+                    {isMine && (
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[9px] font-extrabold uppercase text-violet-700">
+                        Tu búsqueda
+                      </span>
+                    )}
+                  </div>
+
+                  <SearchRequestCard
+                    item={search}
+                    variant="dashboard"
+                    onView={() =>
+                      navigate(`/explore/search-requests/${search.id}`)
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
         {legs.length > 1 && (
           <div className="mt-3 rounded-2xl border border-dashed border-violet-300 bg-violet-50/40 px-5 py-4 text-center">
             <div className="flex items-center justify-center gap-2 text-sm font-extrabold text-violet-700">
