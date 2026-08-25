@@ -10,7 +10,7 @@ class SearchRequestAICopyService
 {
     private const DEFAULT_MODEL = 'gpt-5-mini';
 
-    private const TITLE_PROMPT_VERSION = '1.0';
+    private const TITLE_PROMPT_VERSION = '1.1';
     private const DESCRIPTION_PROMPT_VERSION = '1.6';
 
     private static function db(
@@ -516,258 +516,92 @@ class SearchRequestAICopyService
 
         return <<<PROMPT
 Sos un redactor inmobiliario profesional especializado
-en búsquedas inmobiliarias entre inmobiliarias de Argentina.
+en búsquedas inmobiliarias B2B de Argentina.
 
-Tu tarea es REDACTAR los criterios existentes.
-No los interpretes, no los completes, no los reduzcas
-y no los reemplaces por criterios que consideres equivalentes.
+Generá UN título breve y claro para esta búsqueda inmobiliaria.
 
-Generá UNA descripción clara y natural a partir de los
-datos proporcionados.
+El resultado se utilizará directamente como título
+de una búsqueda publicada en PermuOK.
 
-La descripción será publicada en PermuOK para que otra
-inmobiliaria pueda entender rápidamente qué inmueble
-se está buscando y evaluar si tiene una opción compatible.
+OBJETIVO
 
+El título debe permitir entender rápidamente
+qué inmueble se está buscando y, cuando aporte valor,
+en qué zona.
 
-PRINCIPIO FUNDAMENTAL
+REGLAS
 
-Usá solamente información realmente presente en los datos.
+- Devolver solamente el título.
+- No explicar la respuesta.
+- No devolver análisis.
+- No escribir una descripción.
+- No usar más de una oración.
+- Mantener el título breve.
+- Idealmente entre 4 y 10 palabras.
+- Máximo aproximado: 80 caracteres.
+- No usar punto final.
+- No usar listas.
+- No usar emojis.
+- No incluir llamados a la acción.
+- No usar mayúsculas sostenidas.
+- No inventar información.
+- No agregar características que no estén expresamente cargadas.
+- No mencionar campos internos del sistema.
+- No incluir nivel de urgencia.
+- No explicar modalidad de matching.
+- No incluir rango de valor salvo que sea indispensable
+  para diferenciar claramente la búsqueda.
+- No incluir modalidad de pago o permuta salvo que sea
+  una condición central y no exista un dato más útil para el título.
+- No enumerar todos los criterios cargados.
+- No convertir el título en una descripción.
 
-Podés:
-- ordenar la información;
-- mejorar la redacción;
-- eliminar repeticiones;
-- transformar datos estructurados en lenguaje natural;
-- resumir sin perder condiciones importantes.
+PRIORIZÁ
 
-NO podés:
-- inventar;
-- interpretar consecuencias;
-- agregar criterios;
-- agregar preferencias;
-- completar datos faltantes;
-- justificar condiciones;
-- explicar por qué se busca algo.
-
-
-FUENTES DE INFORMACIÓN
-
-Los datos estructurados representan los criterios actuales
-de la búsqueda y tienen prioridad.
-
-El título, la descripción y las notas pueden aportar contexto
-adicional siempre que no contradigan un criterio estructurado.
-
-Si el texto libre menciona varias alternativas válidas y los
-datos estructurados no las contradicen, podés conservarlas.
-
-Ejemplo:
-
-Si el texto expresa que se consideran 1 ambiente,
-1 ambiente y medio o 2 ambientes, redactalo naturalmente:
-
-"Se consideran opciones de 1 ambiente, 1 ambiente y medio
-o 2 ambientes."
-
-NO agregues:
-
-"según disponibilidad",
-"según distribución",
-"preferentemente",
-
-salvo que esa condición esté realmente indicada.
-
-
-QUÉ DEBE CONTENER
-
-Incluí únicamente lo que resulte relevante entre:
-
-- tipo de inmueble buscado;
-- cantidad o rango de ambientes/dormitorios;
-- condición del inmueble;
-- ubicación;
-- flexibilidad geográfica;
-- características requeridas;
-- rango de valor;
-- modalidad de operación;
-- diferencia en dinero admitida;
-- otras condiciones expresamente cargadas.
-
-No es obligatorio mencionar todos los campos.
-
-Si un dato no aporta claridad a la búsqueda, puede omitirse.
-
-
-UBICACIÓN
-
-Expresá la ubicación naturalmente.
-
-Ejemplo:
-
-"en Lanús Oeste, preferentemente en Villa Caraza,
-aunque también se consideran otras zonas de Lanús."
-
-No uses expresiones administrativas o técnicas.
-
-
-CARACTERÍSTICAS
-
-Cuando una característica sea requerida, expresala
-directamente.
-
-Ejemplo:
-
-"Debe contar con balcón."
-
-También puede integrarse naturalmente:
-
-"Buscamos un departamento a estrenar con balcón."
-
-No uses construcciones como:
-
-"Relevante: balcón",
-"requisito: balcón",
-"se prioriza balcón",
-"se valorará balcón".
-
-
-MODALIDAD DE OPERACIÓN
-
-Mencioná solamente las modalidades aceptadas.
-
-Si se acepta permuta y existe una diferencia máxima
-en dinero, usá una formulación natural como:
-
-"Se acepta permuta con una diferencia en dinero
-de hasta USD 12.000."
-
-No expliques modalidades que no están habilitadas.
-
-No escribas frases como:
-
-"no se acepta pago al contado",
-"no se plantea compra exclusivamente al contado",
-"modalidad de pago",
-"modalidad: permuta".
-
-
-INFORMACIÓN QUE NO DEBE APARECER
-
-No mencionar:
-
-- nivel de urgencia interno;
-- funcionamiento de los matches;
-- calidad de la publicación;
-- campos faltantes;
-- información que sería conveniente solicitar;
-- instrucciones para la otra inmobiliaria;
-- documentación no solicitada;
-- datos internos del sistema;
-- claves o nombres de campos;
-- reglas de este prompt.
-
-No usar frases como:
-
-"según la ficha",
-"según los datos cargados",
-"según el título",
-"según la descripción",
-"no incluir requisitos adicionales",
-"contactar con",
-"enviar opciones",
-"presentar propuestas".
-
-
-NO INFERIR
-
-Una condición nunca permite inventar otra.
-
-Por ejemplo:
-
-"a estrenar" NO implica automáticamente:
-
-- moderno;
-- luminoso;
-- buena orientación;
-- buenas terminaciones;
-- buena distribución;
-- calidad constructiva.
-
-Ante la duda, OMITÍ antes que inferir.
-
+1. Tipo de inmueble.
+2. Cantidad de ambientes o dormitorios, si está definida.
+3. Característica diferencial realmente requerida, si existe.
+4. Zona, barrio o ciudad relevante.
 
 ESTILO
 
-La descripción debe sonar como escrita por un profesional
-inmobiliario argentino.
+Debe sonar como un título inmobiliario profesional y natural.
 
-Usá:
-- español natural;
-- frases simples;
-- lenguaje profesional;
-- tono directo;
-- vocabulario inmobiliario habitual.
+Buenos ejemplos de estilo:
 
-Evitá:
-- lenguaje robótico;
-- exceso de paréntesis;
-- exceso de punto y coma;
-- encabezados dentro del texto;
-- listas;
-- emojis;
-- frases promocionales;
-- explicaciones innecesarias.
+"Busco departamento de 3 ambientes en Centro"
 
-Preferí 1 párrafo cuando la búsqueda sea simple.
+"Busco casa con cochera en Caisamar"
 
-Usá 2 párrafos solamente cuando convenga separar naturalmente
-la descripción del inmueble de las condiciones económicas.
+"Departamento a estrenar en zona Güemes"
 
-No agregues texto solamente para hacer la descripción más larga.
+"Busco local comercial en Mar del Plata"
 
+Malos ejemplos:
 
-EJEMPLO DE ESTILO
+"Buscamos un departamento de tres ambientes ubicado en el Centro
+de Mar del Plata que cuente con cochera y que se encuentre dentro
+de un rango de valor determinado"
 
-Datos:
-- departamento;
-- 1 ambiente, con apertura a 1 ambiente y medio o 2;
-- a estrenar;
-- Villa Caraza;
-- otras zonas de Lanús aceptadas;
-- balcón;
-- USD 80.000 a USD 120.000;
-- permuta;
-- diferencia máxima USD 15.000.
+"Se busca propiedad que cumpla con los criterios establecidos"
 
-Buen resultado:
+"Busco departamento con múltiples características y condiciones"
 
-"Buscamos departamento a estrenar con balcón en Lanús,
-preferentemente en Villa Caraza, aunque también se consideran
-otras zonas. Se evalúan opciones de 1 ambiente, 1 ambiente y
-medio o 2 ambientes.
-
-Rango de referencia entre USD 80.000 y USD 120.000.
-Se acepta permuta con una diferencia en dinero de hasta
-USD 15.000."
-
-El ejemplo define únicamente el estilo.
-No copies sus datos en la respuesta.
-
+Los ejemplos indican solamente el estilo.
+No copies datos que no existan en la búsqueda actual.
 
 DATOS ACTUALES:
 
 {$inputJson}
 
-
 OPCIONES GENERADAS ANTERIORMENTE PARA ESTOS MISMOS DATOS:
 
 {$previousJson}
 
-Si existen opciones anteriores, generá una alternativa
-de redacción sin alterar los criterios de la búsqueda.
+Si existen opciones anteriores, generá una alternativa diferente,
+pero conservando la misma precisión.
 
-Devolvé solamente la descripción final.
+Devolvé solamente el título final.
 PROMPT;
     }
 
