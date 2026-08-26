@@ -330,8 +330,8 @@ class SearchRequestService
 
         $item['property_types'] = self::getPropertyTypes($pdo, (int)$item['id']);
         $item['amenities'] = self::getAmenities($pdo, (int)$item['id']);
-        $item['exchange_offer'] =
-            self::getExchangeOffer(
+        $item['exchange_offers'] =
+            self::getExchangeOffers(
                 $pdo,
                 (int)$item['id']
             );
@@ -343,8 +343,8 @@ class SearchRequestService
             'search_request' => $item,
             'property_types' => $item['property_types'],
             'amenities' => $item['amenities'],
-            'exchange_offer' =>
-            $item['exchange_offer'],
+            'exchange_offers' =>
+            $item['exchange_offers'],
             'access' => [
                 'can_edit' => in_array($item['status'], ['draft', 'paused', 'archived', 'published'], true),
                 'can_publish' => in_array($item['status'], ['draft', 'paused', 'archived'], true),
@@ -355,10 +355,10 @@ class SearchRequestService
             'quality' => $quality,
         ];
     }
-    private static function getExchangeOffer(
+    private static function getExchangeOffers(
         PDO $pdo,
         int $searchRequestId
-    ): ?array {
+    ): array {
         $st = $pdo->prepare("
         SELECT
             seo.*,
@@ -372,202 +372,370 @@ class SearchRequestService
             ON p.id = seo.property_id
             AND p.deleted_at IS NULL
 
-        WHERE seo.search_request_id =
-            :search_request_id
-
+        WHERE seo.search_request_id = :search_request_id
           AND seo.deleted_at IS NULL
 
         ORDER BY seo.id ASC
-
-        LIMIT 1
     ");
 
         $st->execute([
-            'search_request_id' =>
-            $searchRequestId,
+            'search_request_id' => $searchRequestId,
         ]);
 
-        $row =
-            $st->fetch(PDO::FETCH_ASSOC);
-
-        return $row ?: null;
+        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
-    private static function syncExchangeOffer(
+    private static function syncExchangeOffers(
         PDO $pdo,
         int $searchRequestId,
         int $realEstateId,
-        mixed $propertyId
+        array $offers
     ): void {
-        /*
-     * Eliminamos la oferta anterior.
-     * Actualmente una búsqueda tiene una sola
-     * propiedad real ofrecida.
-     */
         $stDelete = $pdo->prepare("
         DELETE FROM search_request_exchange_offers
-        WHERE search_request_id =
-            :search_request_id
+        WHERE search_request_id = :search_request_id
     ");
 
         $stDelete->execute([
-            'search_request_id' =>
-            $searchRequestId,
+            'search_request_id' => $searchRequestId,
         ]);
 
-        $propertyId =
-            (int)$propertyId;
+        foreach ($offers as $offer) {
+            if (!is_array($offer)) {
+                continue;
+            }
 
-        if ($propertyId <= 0) {
-            return;
-        }
-
-        /*
-     * La propiedad tiene que pertenecer a
-     * la misma inmobiliaria.
-     */
-        $stProperty = $pdo->prepare("
-        SELECT
-            id,
-            title,
-            property_type,
-            price,
-            currency,
-            country_code,
-            country,
-            province,
-            city,
-            zone,
-            total_area,
-            covered_area,
-            bedrooms,
-            bathrooms,
-            garages,
-            antiquity
-
-        FROM properties
-
-        WHERE id = :id
-          AND real_estate_id =
-              :real_estate_id
-          AND deleted_at IS NULL
-          AND status = 'published'
-          AND is_visible = 1
-
-        LIMIT 1
-    ");
-
-        $stProperty->execute([
-            'id' =>
-            $propertyId,
-
-            'real_estate_id' =>
-            $realEstateId,
-        ]);
-
-        $property =
-            $stProperty->fetch(
-                PDO::FETCH_ASSOC
+            $offerType = trim(
+                (string)($offer['offer_type'] ?? '')
             );
 
-        if (!$property) {
-            throw new Exception(
-                'La propiedad ofrecida en permuta no es válida.'
-            );
+            if (!in_array(
+                $offerType,
+                ['property', 'vehicle', 'cash', 'other'],
+                true
+            )) {
+                throw new Exception(
+                    'El tipo de bien ofrecido no es válido.'
+                );
+            }
+
+            $propertyId = null;
+            $property = null;
+
+            /*
+         * Una propiedad puede estar vinculada a una
+         * publicación existente, pero ya no es obligatorio.
+         */
+            if (
+                $offerType === 'property' &&
+                !empty($offer['property_id'])
+            ) {
+                $propertyId = (int)$offer['property_id'];
+
+                $stProperty = $pdo->prepare("
+                SELECT
+                    id,
+                    title,
+                    description,
+                    property_type,
+                    price,
+                    currency,
+                    country_code,
+                    country,
+                    province,
+                    city,
+                    zone,
+                    total_area,
+                    covered_area,
+                    bedrooms,
+                    bathrooms,
+                    garages,
+                    antiquity
+
+                FROM properties
+
+                WHERE id = :id
+                  AND real_estate_id = :real_estate_id
+                  AND deleted_at IS NULL
+                  AND status = 'published'
+                  AND is_visible = 1
+
+                LIMIT 1
+            ");
+
+                $stProperty->execute([
+                    'id' => $propertyId,
+                    'real_estate_id' => $realEstateId,
+                ]);
+
+                $property =
+                    $stProperty->fetch(PDO::FETCH_ASSOC);
+
+                if (!$property) {
+                    throw new Exception(
+                        'La propiedad ofrecida en permuta no es válida.'
+                    );
+                }
+            }
+
+            $title =
+                $property['title']
+                ?? self::nullableString(
+                    $offer['title'] ?? null
+                );
+
+            $description =
+                $property['description']
+                ?? self::nullableString(
+                    $offer['description'] ?? null
+                );
+
+            $propertyType =
+                $property['property_type']
+                ?? self::nullableString(
+                    $offer['property_type'] ?? null
+                );
+
+            $estimatedPrice =
+                $property['price']
+                ?? self::nullableNumber(
+                    $offer['estimated_price'] ?? null
+                );
+
+            $currency =
+                $property['currency']
+                ?? ($offer['currency'] ?? 'USD');
+
+            $vehicleType =
+                $offerType === 'vehicle'
+                ? self::nullableString(
+                    $offer['vehicle_type'] ?? null
+                )
+                : null;
+
+            if (
+                $offerType === 'vehicle' &&
+                !in_array(
+                    $vehicleType,
+                    ['car', 'motorcycle', 'other'],
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'El tipo de vehículo no es válido.'
+                );
+            }
+
+            $vehicleYear =
+                self::nullableInt(
+                    $offer['vehicle_year'] ?? null
+                );
+
+            if (
+                $vehicleYear !== null &&
+                ($vehicleYear < 1900 ||
+                    $vehicleYear > ((int)date('Y') + 1))
+            ) {
+                throw new Exception(
+                    'El año del vehículo no es válido.'
+                );
+            }
+
+            /*
+         * Validaciones mínimas según el tipo.
+         */
+            if (
+                in_array(
+                    $offerType,
+                    ['cash', 'vehicle', 'other'],
+                    true
+                ) &&
+                (
+                    $estimatedPrice === null ||
+                    (float)$estimatedPrice <= 0
+                )
+            ) {
+                throw new Exception(
+                    'Indicá un valor estimado válido para la oferta.'
+                );
+            }
+
+            if (
+                $offerType === 'property' &&
+                $propertyId === null &&
+                !$title
+            ) {
+                throw new Exception(
+                    'Indicá al menos una descripción para la propiedad ofrecida.'
+                );
+            }
+
+            $stInsert = $pdo->prepare("
+            INSERT INTO search_request_exchange_offers (
+                search_request_id,
+                offer_type,
+                property_id,
+                title,
+                description,
+                property_type,
+                vehicle_type,
+                vehicle_brand,
+                vehicle_model,
+                vehicle_year,
+                estimated_price,
+                currency,
+                country_code,
+                country,
+                province,
+                city,
+                zone,
+                total_area,
+                covered_area,
+                bedrooms,
+                bathrooms,
+                garages,
+                antiquity
+            ) VALUES (
+                :search_request_id,
+                :offer_type,
+                :property_id,
+                :title,
+                :description,
+                :property_type,
+                :vehicle_type,
+                :vehicle_brand,
+                :vehicle_model,
+                :vehicle_year,
+                :estimated_price,
+                :currency,
+                :country_code,
+                :country,
+                :province,
+                :city,
+                :zone,
+                :total_area,
+                :covered_area,
+                :bedrooms,
+                :bathrooms,
+                :garages,
+                :antiquity
+            )
+        ");
+
+            $stInsert->execute([
+                'search_request_id' =>
+                $searchRequestId,
+
+                'offer_type' =>
+                $offerType,
+
+                'property_id' =>
+                $propertyId,
+
+                'title' =>
+                $title,
+
+                'description' =>
+                $description,
+
+                'property_type' =>
+                $propertyType,
+
+                'vehicle_type' =>
+                $vehicleType,
+
+                'vehicle_brand' =>
+                $offerType === 'vehicle'
+                    ? self::nullableString(
+                        $offer['vehicle_brand'] ?? null
+                    )
+                    : null,
+
+                'vehicle_model' =>
+                $offerType === 'vehicle'
+                    ? self::nullableString(
+                        $offer['vehicle_model'] ?? null
+                    )
+                    : null,
+
+                'vehicle_year' =>
+                $offerType === 'vehicle'
+                    ? $vehicleYear
+                    : null,
+
+                'estimated_price' =>
+                $estimatedPrice,
+
+                'currency' =>
+                $currency,
+
+                'country_code' =>
+                $property['country_code']
+                    ?? self::nullableString(
+                        $offer['country_code'] ?? null
+                    ),
+
+                'country' =>
+                $property['country']
+                    ?? self::nullableString(
+                        $offer['country'] ?? null
+                    ),
+
+                'province' =>
+                $property['province']
+                    ?? self::nullableString(
+                        $offer['province'] ?? null
+                    ),
+
+                'city' =>
+                $property['city']
+                    ?? self::nullableString(
+                        $offer['city'] ?? null
+                    ),
+
+                'zone' =>
+                $property['zone']
+                    ?? self::nullableString(
+                        $offer['zone'] ?? null
+                    ),
+
+                'total_area' =>
+                $property['total_area']
+                    ?? self::nullableNumber(
+                        $offer['total_area'] ?? null
+                    ),
+
+                'covered_area' =>
+                $property['covered_area']
+                    ?? self::nullableNumber(
+                        $offer['covered_area'] ?? null
+                    ),
+
+                'bedrooms' =>
+                $property['bedrooms']
+                    ?? self::nullableInt(
+                        $offer['bedrooms'] ?? null
+                    ),
+
+                'bathrooms' =>
+                $property['bathrooms']
+                    ?? self::nullableInt(
+                        $offer['bathrooms'] ?? null
+                    ),
+
+                'garages' =>
+                $property['garages']
+                    ?? self::nullableInt(
+                        $offer['garages'] ?? null
+                    ),
+
+                'antiquity' =>
+                $property['antiquity']
+                    ?? self::nullableInt(
+                        $offer['antiquity'] ?? null
+                    ),
+            ]);
         }
-
-        $stInsert = $pdo->prepare("
-        INSERT INTO search_request_exchange_offers (
-            search_request_id,
-            property_id,
-            title,
-            property_type,
-            estimated_price,
-            currency,
-            country_code,
-            country,
-            province,
-            city,
-            zone,
-            total_area,
-            covered_area,
-            bedrooms,
-            bathrooms,
-            garages,
-            antiquity
-        ) VALUES (
-            :search_request_id,
-            :property_id,
-            :title,
-            :property_type,
-            :estimated_price,
-            :currency,
-            :country_code,
-            :country,
-            :province,
-            :city,
-            :zone,
-            :total_area,
-            :covered_area,
-            :bedrooms,
-            :bathrooms,
-            :garages,
-            :antiquity
-        )
-    ");
-
-        $stInsert->execute([
-            'search_request_id' =>
-            $searchRequestId,
-
-            'property_id' =>
-            (int)$property['id'],
-
-            'title' =>
-            $property['title'],
-
-            'property_type' =>
-            $property['property_type'],
-
-            'estimated_price' =>
-            $property['price'],
-
-            'currency' =>
-            $property['currency'],
-
-            'country_code' =>
-            $property['country_code'],
-
-            'country' =>
-            $property['country'],
-
-            'province' =>
-            $property['province'],
-
-            'city' =>
-            $property['city'],
-
-            'zone' =>
-            $property['zone'],
-
-            'total_area' =>
-            $property['total_area'],
-
-            'covered_area' =>
-            $property['covered_area'],
-
-            'bedrooms' =>
-            $property['bedrooms'],
-
-            'bathrooms' =>
-            $property['bathrooms'],
-
-            'garages' =>
-            $property['garages'],
-
-            'antiquity' =>
-            $property['antiquity'],
-        ]);
     }
 
     public static function createDraft(int $userId, array $data): array
@@ -675,13 +843,13 @@ class SearchRequestService
 
             self::syncPropertyTypes($pdo, $id, $data['property_types'] ?? []);
             self::syncAmenities($pdo, $id, $data['amenities'] ?? []);
-            self::syncExchangeOffer(
+            self::syncExchangeOffers(
                 $pdo,
                 $id,
                 (int)$user['real_estate_id'],
                 !empty($data['payment_mode_swap'])
-                    ? ($data['exchange_property_id'] ?? null)
-                    : null
+                    ? ($data['exchange_offers'] ?? [])
+                    : []
             );
             self::logStatus($pdo, $id, null, 'draft', $userId);
 
@@ -786,13 +954,13 @@ class SearchRequestService
             if (array_key_exists('amenities', $data)) {
                 self::syncAmenities($pdo, $id, $data['amenities'] ?? []);
             }
-            self::syncExchangeOffer(
+            self::syncExchangeOffers(
                 $pdo,
                 $id,
                 (int)$user['real_estate_id'],
                 !empty($data['payment_mode_swap'])
-                    ? ($data['exchange_property_id'] ?? null)
-                    : null
+                    ? ($data['exchange_offers'] ?? [])
+                    : []
             );
             $pdo->commit();
 
