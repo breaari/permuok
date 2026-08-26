@@ -562,12 +562,28 @@ class SearchRequestService
 
             if (
                 $offerType === 'property' &&
-                $propertyId === null &&
-                !$title
+                $propertyId === null
             ) {
-                throw new Exception(
-                    'Indicá al menos una descripción para la propiedad ofrecida.'
-                );
+                if (!$propertyType) {
+                    throw new Exception(
+                        'Indicá el tipo de propiedad ofrecida.'
+                    );
+                }
+
+                if (!$description) {
+                    throw new Exception(
+                        'Indicá una descripción para la propiedad ofrecida.'
+                    );
+                }
+
+                if (
+                    $estimatedPrice === null ||
+                    (float)$estimatedPrice <= 0
+                ) {
+                    throw new Exception(
+                        'Indicá un valor estimado válido para la propiedad ofrecida.'
+                    );
+                }
             }
 
             $stInsert = $pdo->prepare("
