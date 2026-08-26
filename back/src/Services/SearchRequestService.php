@@ -970,14 +970,26 @@ class SearchRequestService
             if (array_key_exists('amenities', $data)) {
                 self::syncAmenities($pdo, $id, $data['amenities'] ?? []);
             }
-            self::syncExchangeOffers(
-                $pdo,
-                $id,
-                (int)$user['real_estate_id'],
-                !empty($data['payment_mode_swap'])
-                    ? ($data['exchange_offers'] ?? [])
-                    : []
-            );
+            $effectivePaymentModeSwap =
+                isset($data['payment_mode_swap'])
+                ? (!empty($data['payment_mode_swap']) ? 1 : 0)
+                : (int)$current['payment_mode_swap'];
+
+            if ($effectivePaymentModeSwap === 0) {
+                self::syncExchangeOffers(
+                    $pdo,
+                    $id,
+                    (int)$user['real_estate_id'],
+                    []
+                );
+            } elseif (array_key_exists('exchange_offers', $data)) {
+                self::syncExchangeOffers(
+                    $pdo,
+                    $id,
+                    (int)$user['real_estate_id'],
+                    $data['exchange_offers'] ?? []
+                );
+            }
             $pdo->commit();
 
             /*
@@ -1193,7 +1205,7 @@ class SearchRequestService
                 throw new Exception("Debe elegir al menos una forma de pago");
             }
         }
-    
+
         if ($strict) {
             $types = $data['property_types'] ?? [];
             if (!is_array($types) || count($types) === 0) {
