@@ -41,7 +41,6 @@ function ModeCard({ checked, title, description, onChange }) {
 
         <div>
           <p className="text-sm font-bold text-slate-900">{title}</p>
-
           <p className="text-xs text-slate-500 mt-1">{description}</p>
         </div>
       </div>
@@ -68,32 +67,13 @@ function SectionBlock({ title, description = "", children }) {
 function emptyOffer(type = "property") {
   return {
     offer_type: type,
-
     property_id: "",
     title: "",
     description: "",
     property_type: "",
-
     vehicle_type: "",
-    vehicle_brand: "",
-    vehicle_model: "",
-    vehicle_year: "",
-
     estimated_price: "",
     currency: "USD",
-
-    country_code: "",
-    country: "",
-    province: "",
-    city: "",
-    zone: "",
-
-    total_area: "",
-    covered_area: "",
-    bedrooms: "",
-    bathrooms: "",
-    garages: "",
-    antiquity: "",
   };
 }
 
@@ -103,30 +83,27 @@ function getOfferTitle(offer) {
       return offer.property_title || offer.title || "Propiedad publicada";
     }
 
-    return offer.title || "Propiedad";
+    const propertyLabel =
+      SEARCH_REQUEST_PROPERTY_TYPES.find(
+        (item) => item.value === offer.property_type,
+      )?.label || "Propiedad";
+
+    return offer.description || propertyLabel;
   }
 
   if (offer.offer_type === "vehicle") {
-    const vehicleType =
+    const vehicleLabel =
       offer.vehicle_type === "car"
         ? "Auto"
         : offer.vehicle_type === "motorcycle"
           ? "Moto"
           : "Vehículo";
 
-    const detail = [
-      offer.vehicle_brand,
-      offer.vehicle_model,
-      offer.vehicle_year,
-    ]
-      .filter(Boolean)
-      .join(" ");
-
-    return detail ? `${vehicleType} · ${detail}` : vehicleType;
+    return offer.description || vehicleLabel;
   }
 
   if (offer.offer_type === "other") {
-    return offer.title || "Otro bien";
+    return offer.description || offer.title || "Otro bien";
   }
 
   return "Oferta";
@@ -134,7 +111,7 @@ function getOfferTitle(offer) {
 
 function getOfferTypeLabel(offer) {
   if (offer.offer_type === "property") {
-    return offer.property_id ? "Propiedad publicada" : "Propiedad no publicada";
+    return offer.property_id ? "Propiedad publicada" : "Propiedad";
   }
 
   if (offer.offer_type === "vehicle") {
@@ -169,10 +146,6 @@ function OfferCard({ offer, onEdit, onRemove }) {
           ) : (
             <p className="mt-1 text-xs text-slate-500">Valor sin informar</p>
           )}
-
-          {offer.description ? (
-            <p className="mt-2 text-sm text-slate-600">{offer.description}</p>
-          ) : null}
         </div>
 
         <div className="flex shrink-0 gap-2">
@@ -211,9 +184,7 @@ export default function SearchRequestPaymentSection({ form, setField }) {
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
-
   const [draftOffer, setDraftOffer] = useState(emptyOffer());
-
   const [propertySource, setPropertySource] = useState("published");
 
   useEffect(() => {
@@ -232,7 +203,7 @@ export default function SearchRequestPaymentSection({ form, setField }) {
         if (!cancelled) {
           setProperties(Array.isArray(result?.items) ? result.items : []);
         }
-      } catch (error) {
+      } catch {
         if (!cancelled) {
           setProperties([]);
         }
@@ -345,8 +316,18 @@ export default function SearchRequestPaymentSection({ form, setField }) {
         throw new Error("Seleccioná una propiedad publicada.");
       }
 
-      if (propertySource === "manual" && !String(offer.title || "").trim()) {
-        throw new Error("Ingresá una referencia para la propiedad ofrecida.");
+      if (propertySource === "manual") {
+        if (!offer.property_type) {
+          throw new Error("Seleccioná el tipo de propiedad.");
+        }
+
+        if (!String(offer.description || "").trim()) {
+          throw new Error("Describí brevemente la propiedad ofrecida.");
+        }
+
+        if (!offer.estimated_price || Number(offer.estimated_price) <= 0) {
+          throw new Error("Ingresá el valor estimado de la propiedad.");
+        }
       }
 
       return;
@@ -357,12 +338,8 @@ export default function SearchRequestPaymentSection({ form, setField }) {
         throw new Error("Seleccioná el tipo de vehículo.");
       }
 
-      if (!String(offer.vehicle_brand || "").trim()) {
-        throw new Error("Ingresá la marca del vehículo.");
-      }
-
-      if (!String(offer.vehicle_model || "").trim()) {
-        throw new Error("Ingresá el modelo del vehículo.");
+      if (!String(offer.description || "").trim()) {
+        throw new Error("Describí brevemente el vehículo.");
       }
 
       if (!offer.estimated_price || Number(offer.estimated_price) <= 0) {
@@ -373,8 +350,8 @@ export default function SearchRequestPaymentSection({ form, setField }) {
     }
 
     if (offer.offer_type === "other") {
-      if (!String(offer.title || "").trim()) {
-        throw new Error("Indicá qué bien se ofrece.");
+      if (!String(offer.description || "").trim()) {
+        throw new Error("Describí brevemente el bien ofrecido.");
       }
 
       if (!offer.estimated_price || Number(offer.estimated_price) <= 0) {
@@ -395,39 +372,15 @@ export default function SearchRequestPaymentSection({ form, setField }) {
 
           if (property) {
             nextOffer.property_id = property.id;
-
             nextOffer.title = property.title || "";
-
             nextOffer.property_type = property.property_type || "";
-
+            nextOffer.description = property.title || "";
             nextOffer.estimated_price = property.price || "";
-
             nextOffer.currency = property.currency || "USD";
-
-            nextOffer.country_code = property.country_code || "";
-
-            nextOffer.country = property.country || "";
-
-            nextOffer.province = property.province || "";
-
-            nextOffer.city = property.city || "";
-
-            nextOffer.zone = property.zone || "";
-
-            nextOffer.total_area = property.total_area || "";
-
-            nextOffer.covered_area = property.covered_area || "";
-
-            nextOffer.bedrooms = property.bedrooms || "";
-
-            nextOffer.bathrooms = property.bathrooms || "";
-
-            nextOffer.garages = property.garages || "";
-
-            nextOffer.antiquity = property.antiquity || "";
           }
         } else {
           nextOffer.property_id = "";
+          nextOffer.title = "";
         }
       }
 
@@ -445,7 +398,7 @@ export default function SearchRequestPaymentSection({ form, setField }) {
 
       cancelOfferEditor();
     } catch (error) {
-      window.alert(error?.message || "Revisá los datos de la oferta.");
+      window.alert(error?.message || "Revisá los datos del bien ofrecido.");
     }
   }
 
@@ -457,8 +410,8 @@ export default function SearchRequestPaymentSection({ form, setField }) {
         </h2>
 
         <p className="text-sm text-slate-500 mt-1 max-w-2xl">
-          Definí cómo puede resolverse la operación y, si existe una permuta,
-          qué bienes puede ofrecer el cliente.
+          Definí cómo puede resolverse la operación y qué puede ofrecer el
+          cliente como parte de pago.
         </p>
       </div>
 
@@ -471,13 +424,13 @@ export default function SearchRequestPaymentSection({ form, setField }) {
 
             <div>
               <p className="text-sm font-semibold text-emerald-900">
-                La búsqueda y los bienes ofrecidos son cosas diferentes.
+                El rango de valor corresponde a la propiedad buscada.
               </p>
 
               <p className="mt-1 text-xs sm:text-sm text-emerald-800">
-                El rango de valor describe la propiedad buscada. Si el cliente
-                ofrece una propiedad, vehículo u otro bien como parte de pago,
-                podés cargarlo aparte.
+                Los bienes que el cliente puede ofrecer en permuta se cargan
+                aparte y se usan para evaluar la viabilidad económica de la
+                operación.
               </p>
             </div>
           </div>
@@ -485,20 +438,20 @@ export default function SearchRequestPaymentSection({ form, setField }) {
 
         <SectionBlock
           title="Cómo puede resolverse la operación"
-          description="Podés seleccionar dinero, permuta o combinar ambas alternativas."
+          description="Podés seleccionar dinero, bienes en permuta o ambas alternativas."
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <ModeCard
               checked={acceptsCash}
               title="Pago con dinero"
-              description="El cliente dispone de dinero para resolver total o parcialmente la operación."
+              description="El cliente puede aportar dinero para resolver total o parcialmente la operación."
               onChange={(event) => handleCashChange(event.target.checked)}
             />
 
             <ModeCard
               checked={acceptsSwap}
               title="Ofrece bienes en permuta"
-              description="El cliente puede ofrecer una propiedad, vehículo u otro bien como parte de la operación."
+              description="El cliente puede entregar una propiedad, vehículo u otro bien."
               onChange={(event) => handleSwapChange(event.target.checked)}
             />
           </div>
@@ -507,7 +460,7 @@ export default function SearchRequestPaymentSection({ form, setField }) {
         {acceptsSwap ? (
           <SectionBlock
             title="Bienes ofrecidos"
-            description="No es obligatorio que el bien esté publicado en PermuOK. Podés cargar uno o varios."
+            description="Podés cargar uno o varios bienes. Solo necesitamos una descripción y un valor estimado."
           >
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <button
@@ -542,7 +495,7 @@ export default function SearchRequestPaymentSection({ form, setField }) {
                 <p className="text-sm font-bold text-slate-900">+ Otro bien</p>
 
                 <p className="mt-1 text-xs text-slate-500">
-                  Embarcación, maquinaria u otro activo.
+                  Cualquier otro activo ofrecido.
                 </p>
               </button>
             </div>
@@ -580,7 +533,8 @@ export default function SearchRequestPaymentSection({ form, setField }) {
                     </h4>
 
                     <p className="mt-1 text-xs text-slate-500">
-                      Completá únicamente los datos que conozcas.
+                      Cargá solamente la información necesaria para identificar
+                      y valuar el bien.
                     </p>
                   </div>
 
@@ -609,8 +563,7 @@ export default function SearchRequestPaymentSection({ form, setField }) {
                             checked={propertySource === "published"}
                             onChange={() => {
                               setPropertySource("published");
-
-                              updateDraftOffer("property_id", "");
+                              setDraftOffer(emptyOffer("property"));
                             }}
                           />
 
@@ -620,7 +573,7 @@ export default function SearchRequestPaymentSection({ form, setField }) {
                             </p>
 
                             <p className="text-xs text-slate-500">
-                              Seleccionarla de PermuOK.
+                              Seleccionarla desde PermuOK.
                             </p>
                           </div>
                         </div>
@@ -639,8 +592,7 @@ export default function SearchRequestPaymentSection({ form, setField }) {
                             checked={propertySource === "manual"}
                             onChange={() => {
                               setPropertySource("manual");
-
-                              updateDraftOffer("property_id", "");
+                              setDraftOffer(emptyOffer("property"));
                             }}
                           />
 
@@ -650,7 +602,7 @@ export default function SearchRequestPaymentSection({ form, setField }) {
                             </p>
 
                             <p className="text-xs text-slate-500">
-                              Cargar datos básicos.
+                              Cargarla brevemente.
                             </p>
                           </div>
                         </div>
@@ -683,107 +635,28 @@ export default function SearchRequestPaymentSection({ form, setField }) {
                       </Field>
                     ) : (
                       <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <Field label="Referencia de la propiedad">
-                            <input
-                              value={draftOffer.title || ""}
-                              onChange={(event) =>
-                                updateDraftOffer("title", event.target.value)
-                              }
-                              placeholder="Ej. Departamento en Centro"
-                              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                            />
-                          </Field>
+                        <Field label="Tipo de propiedad">
+                          <select
+                            value={draftOffer.property_type || ""}
+                            onChange={(event) =>
+                              updateDraftOffer(
+                                "property_type",
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-500"
+                          >
+                            <option value="">Seleccionar</option>
 
-                          <Field label="Tipo">
-                            <select
-                              value={draftOffer.property_type || ""}
-                              onChange={(event) =>
-                                updateDraftOffer(
-                                  "property_type",
-                                  event.target.value,
-                                )
-                              }
-                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-500"
-                            >
-                              <option value="">Sin especificar</option>
+                            {SEARCH_REQUEST_PROPERTY_TYPES.map((item) => (
+                              <option key={item.value} value={item.value}>
+                                {item.label}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
 
-                              {SEARCH_REQUEST_PROPERTY_TYPES.map((item) => (
-                                <option key={item.value} value={item.value}>
-                                  {item.label}
-                                </option>
-                              ))}
-                            </select>
-                          </Field>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <Field label="Valor estimado">
-                            <input
-                              type="number"
-                              min="0"
-                              value={draftOffer.estimated_price || ""}
-                              onChange={(event) =>
-                                updateDraftOffer(
-                                  "estimated_price",
-                                  event.target.value,
-                                )
-                              }
-                              placeholder="Ej. 80000"
-                              className="w-full no-spinner rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500"
-                            />
-                          </Field>
-
-                          <Field label="Moneda">
-                            <select
-                              value={draftOffer.currency || "USD"}
-                              onChange={(event) =>
-                                updateDraftOffer("currency", event.target.value)
-                              }
-                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-500"
-                            >
-                              {SEARCH_REQUEST_CURRENCIES.map((item) => (
-                                <option key={item.value} value={item.value}>
-                                  {item.label}
-                                </option>
-                              ))}
-                            </select>
-                          </Field>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <Field label="Provincia">
-                            <input
-                              value={draftOffer.province || ""}
-                              onChange={(event) =>
-                                updateDraftOffer("province", event.target.value)
-                              }
-                              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                            />
-                          </Field>
-
-                          <Field label="Ciudad">
-                            <input
-                              value={draftOffer.city || ""}
-                              onChange={(event) =>
-                                updateDraftOffer("city", event.target.value)
-                              }
-                              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                            />
-                          </Field>
-
-                          <Field label="Zona">
-                            <input
-                              value={draftOffer.zone || ""}
-                              onChange={(event) =>
-                                updateDraftOffer("zone", event.target.value)
-                              }
-                              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                            />
-                          </Field>
-                        </div>
-
-                        <Field label="Descripción" hint="Opcional">
+                        <Field label="Descripción">
                           <textarea
                             rows={3}
                             value={draftOffer.description || ""}
@@ -793,10 +666,15 @@ export default function SearchRequestPaymentSection({ form, setField }) {
                                 event.target.value,
                               )
                             }
-                            placeholder="Datos adicionales de la propiedad ofrecida..."
+                            placeholder="Ej. Departamento de 2 ambientes en Mar del Plata"
                             className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm resize-none outline-none focus:border-emerald-500"
                           />
                         </Field>
+
+                        <ValueFields
+                          offer={draftOffer}
+                          updateDraftOffer={updateDraftOffer}
+                        />
                       </>
                     )}
                   </>
@@ -804,160 +682,20 @@ export default function SearchRequestPaymentSection({ form, setField }) {
 
                 {draftOffer.offer_type === "vehicle" ? (
                   <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Field label="Tipo de vehículo">
-                        <select
-                          value={draftOffer.vehicle_type || ""}
-                          onChange={(event) =>
-                            updateDraftOffer("vehicle_type", event.target.value)
-                          }
-                          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm"
-                        >
-                          <option value="">Seleccionar</option>
-                          <option value="car">Auto</option>
-                          <option value="motorcycle">Moto</option>
-                          <option value="other">Otro</option>
-                        </select>
-                      </Field>
-
-                      <Field label="Año">
-                        <input
-                          type="number"
-                          min="1900"
-                          max={new Date().getFullYear() + 1}
-                          value={draftOffer.vehicle_year || ""}
-                          onChange={(event) =>
-                            updateDraftOffer("vehicle_year", event.target.value)
-                          }
-                          placeholder="Ej. 2022"
-                          className="w-full no-spinner rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                        />
-                      </Field>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Field label="Marca">
-                        <input
-                          value={draftOffer.vehicle_brand || ""}
-                          onChange={(event) =>
-                            updateDraftOffer(
-                              "vehicle_brand",
-                              event.target.value,
-                            )
-                          }
-                          placeholder="Ej. Toyota"
-                          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                        />
-                      </Field>
-
-                      <Field label="Modelo">
-                        <input
-                          value={draftOffer.vehicle_model || ""}
-                          onChange={(event) =>
-                            updateDraftOffer(
-                              "vehicle_model",
-                              event.target.value,
-                            )
-                          }
-                          placeholder="Ej. Corolla"
-                          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                        />
-                      </Field>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Field label="Valor estimado">
-                        <input
-                          type="number"
-                          min="0"
-                          value={draftOffer.estimated_price || ""}
-                          onChange={(event) =>
-                            updateDraftOffer(
-                              "estimated_price",
-                              event.target.value,
-                            )
-                          }
-                          placeholder="Ej. 25000"
-                          className="w-full no-spinner rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                        />
-                      </Field>
-
-                      <Field label="Moneda">
-                        <select
-                          value={draftOffer.currency || "USD"}
-                          onChange={(event) =>
-                            updateDraftOffer("currency", event.target.value)
-                          }
-                          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm"
-                        >
-                          {SEARCH_REQUEST_CURRENCIES.map((item) => (
-                            <option key={item.value} value={item.value}>
-                              {item.label}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                    </div>
-
-                    <Field label="Descripción" hint="Opcional">
-                      <textarea
-                        rows={3}
-                        value={draftOffer.description || ""}
+                    <Field label="Tipo de vehículo">
+                      <select
+                        value={draftOffer.vehicle_type || ""}
                         onChange={(event) =>
-                          updateDraftOffer("description", event.target.value)
+                          updateDraftOffer("vehicle_type", event.target.value)
                         }
-                        placeholder="Ej. Único dueño, buen estado..."
-                        className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm resize-none"
-                      />
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm"
+                      >
+                        <option value="">Seleccionar</option>
+                        <option value="car">Auto</option>
+                        <option value="motorcycle">Moto</option>
+                        <option value="other">Otro vehículo</option>
+                      </select>
                     </Field>
-                  </>
-                ) : null}
-
-                {draftOffer.offer_type === "other" ? (
-                  <>
-                    <Field label="¿Qué bien ofrece?">
-                      <input
-                        value={draftOffer.title || ""}
-                        onChange={(event) =>
-                          updateDraftOffer("title", event.target.value)
-                        }
-                        placeholder="Ej. Embarcación, maquinaria, lote..."
-                        className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                      />
-                    </Field>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Field label="Valor estimado">
-                        <input
-                          type="number"
-                          min="0"
-                          value={draftOffer.estimated_price || ""}
-                          onChange={(event) =>
-                            updateDraftOffer(
-                              "estimated_price",
-                              event.target.value,
-                            )
-                          }
-                          className="w-full no-spinner rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                        />
-                      </Field>
-
-                      <Field label="Moneda">
-                        <select
-                          value={draftOffer.currency || "USD"}
-                          onChange={(event) =>
-                            updateDraftOffer("currency", event.target.value)
-                          }
-                          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm"
-                        >
-                          {SEARCH_REQUEST_CURRENCIES.map((item) => (
-                            <option key={item.value} value={item.value}>
-                              {item.label}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                    </div>
 
                     <Field label="Descripción">
                       <textarea
@@ -966,10 +704,36 @@ export default function SearchRequestPaymentSection({ form, setField }) {
                         onChange={(event) =>
                           updateDraftOffer("description", event.target.value)
                         }
-                        placeholder="Describí brevemente el bien..."
+                        placeholder="Ej. Toyota Corolla 2020 en buen estado"
                         className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm resize-none"
                       />
                     </Field>
+
+                    <ValueFields
+                      offer={draftOffer}
+                      updateDraftOffer={updateDraftOffer}
+                    />
+                  </>
+                ) : null}
+
+                {draftOffer.offer_type === "other" ? (
+                  <>
+                    <Field label="Descripción del bien">
+                      <textarea
+                        rows={3}
+                        value={draftOffer.description || ""}
+                        onChange={(event) =>
+                          updateDraftOffer("description", event.target.value)
+                        }
+                        placeholder="Ej. Embarcación Quicksilver 2019"
+                        className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm resize-none"
+                      />
+                    </Field>
+
+                    <ValueFields
+                      offer={draftOffer}
+                      updateDraftOffer={updateDraftOffer}
+                    />
                   </>
                 ) : null}
 
@@ -1085,12 +849,45 @@ export default function SearchRequestPaymentSection({ form, setField }) {
               rows={4}
               value={form.notes}
               onChange={(event) => setField("notes", event.target.value)}
-              placeholder="Ej. El cliente podría evaluar otras alternativas y dispone de margen para negociar una diferencia."
+              placeholder="Ej. El cliente está abierto a negociar la diferencia."
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition resize-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
             />
           </Field>
         </SectionBlock>
       </div>
     </section>
+  );
+}
+
+function ValueFields({ offer, updateDraftOffer }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Field label="Valor estimado">
+        <input
+          type="number"
+          min="0"
+          value={offer.estimated_price || ""}
+          onChange={(event) =>
+            updateDraftOffer("estimated_price", event.target.value)
+          }
+          placeholder="Ej. 25000"
+          className="w-full no-spinner rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500"
+        />
+      </Field>
+
+      <Field label="Moneda">
+        <select
+          value={offer.currency || "USD"}
+          onChange={(event) => updateDraftOffer("currency", event.target.value)}
+          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-500"
+        >
+          {SEARCH_REQUEST_CURRENCIES.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+    </div>
   );
 }
