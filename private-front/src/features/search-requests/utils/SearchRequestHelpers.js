@@ -68,7 +68,7 @@ export function emptySearchRequestForm() {
     province: "",
     city: "",
     zone: "",
-    exchange_property_id: "",
+    exchange_offers: [],
     property_condition: "any",
     currency: "USD",
     min_value: "",
@@ -108,7 +108,32 @@ export function mapSearchRequestToForm(detail) {
     currency: request.currency || "USD",
     min_value: request.min_value || "",
     max_value: request.max_value || "",
-    exchange_property_id: detail?.exchange_offer?.property_id || "",
+    exchange_offers: Array.isArray(detail?.exchange_offers)
+      ? detail.exchange_offers.map((offer) => ({
+          offer_type: offer.offer_type || "property",
+          property_id: offer.property_id || "",
+          title: offer.title || "",
+          description: offer.description || "",
+          property_type: offer.property_type || "",
+          vehicle_type: offer.vehicle_type || "",
+          vehicle_brand: offer.vehicle_brand || "",
+          vehicle_model: offer.vehicle_model || "",
+          vehicle_year: offer.vehicle_year || "",
+          estimated_price: offer.estimated_price || "",
+          currency: offer.currency || "USD",
+          country_code: offer.country_code || "",
+          country: offer.country || "",
+          province: offer.province || "",
+          city: offer.city || "",
+          zone: offer.zone || "",
+          total_area: offer.total_area || "",
+          covered_area: offer.covered_area || "",
+          bedrooms: offer.bedrooms || "",
+          bathrooms: offer.bathrooms || "",
+          garages: offer.garages || "",
+          antiquity: offer.antiquity || "",
+        }))
+      : [],
     min_total_area: request.min_total_area || "",
     min_covered_area: request.min_covered_area || "",
     min_bedrooms: request.min_bedrooms || "",
@@ -161,10 +186,23 @@ export function buildSearchRequestPayload(form) {
     urgency: form.urgency || "medium",
     payment_mode_cash: !!form.payment_mode_cash,
     payment_mode_swap: !!form.payment_mode_swap,
-    exchange_property_id:
-      form.payment_mode_swap && form.exchange_property_id
-        ? Number(form.exchange_property_id)
-        : null,
+    exchange_offers:
+      form.payment_mode_swap && Array.isArray(form.exchange_offers)
+        ? form.exchange_offers.map((offer) => ({
+            ...offer,
+            property_id: offer.property_id ? Number(offer.property_id) : null,
+            vehicle_year: offer.vehicle_year
+              ? Number(offer.vehicle_year)
+              : null,
+            estimated_price: offer.estimated_price || null,
+            total_area: offer.total_area || null,
+            covered_area: offer.covered_area || null,
+            bedrooms: offer.bedrooms || null,
+            bathrooms: offer.bathrooms || null,
+            garages: offer.garages || null,
+            antiquity: offer.antiquity || null,
+          }))
+        : [],
     cash_difference_max: form.cash_difference_max || null,
     cash_difference_currency: form.cash_difference_currency || "USD",
     open_to_other_zones: !!form.open_to_other_zones,
@@ -280,9 +318,6 @@ export function validateSearchRequestForm(form, { requireFull = true } = {}) {
 
   if (form.cash_difference_max !== "" && Number(form.cash_difference_max) < 0) {
     throw new Error("La diferencia máxima en efectivo no puede ser negativa.");
-  }
-  if (form.payment_mode_swap && !form.exchange_property_id) {
-    throw new Error("Seleccioná la propiedad que se ofrece en permuta.");
   }
 }
 
