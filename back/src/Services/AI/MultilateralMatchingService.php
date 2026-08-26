@@ -251,12 +251,14 @@ pr.cash_difference_currency
                 AND sr.is_visible = 1
 
             INNER JOIN search_request_exchange_offers seo
-                ON seo.search_request_id =
-                    c.search_request_id
+    ON seo.search_request_id =
+        c.search_request_id
 
-                AND seo.deleted_at IS NULL
+    AND seo.deleted_at IS NULL
 
-                AND seo.property_id IS NOT NULL
+    AND seo.offer_type = 'property'
+
+    AND seo.property_id IS NOT NULL
 
             INNER JOIN properties offered_property
                 ON offered_property.id =
