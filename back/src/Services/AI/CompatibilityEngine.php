@@ -2412,38 +2412,6 @@ class CompatibilityEngine
      * --------------------------------------------------
      */
 
-        if ($exchangeOffers === []) {
-            return [
-                'score' => 0.0,
-
-                'reasons' => [
-                    [
-                        'code' =>
-                        'exchange_offer_missing',
-
-                        'label' =>
-                        'No hay bienes ofrecidos para evaluar la permuta',
-
-                        'weight' =>
-                        20,
-
-                        'matched' =>
-                        false,
-                    ],
-                ],
-
-                'penalties' => [
-                    [
-                        'code' =>
-                        'exchange_offer_missing',
-
-                        'label' =>
-                        'La búsqueda contempla permuta, pero todavía no tiene bienes cargados',
-                    ],
-                ],
-            ];
-        }
-
         if (!$requirements) {
             return [
                 'score' => 0.0,
@@ -2505,6 +2473,75 @@ class CompatibilityEngine
                 $requirements['accepts_open_proposals']
                 ?? 0
             ) === 1;
+
+        if ($exchangeOffers === []) {
+            if ($acceptsOpenProposals) {
+                return [
+                    'score' => 5.0,
+
+                    'reasons' => [
+                        [
+                            'code' =>
+                            'open_swap_proposal_accepted',
+
+                            'label' =>
+                            'El propietario acepta propuestas abiertas de permuta',
+
+                            'weight' =>
+                            5,
+
+                            'matched' =>
+                            true,
+                        ],
+                        [
+                            'code' =>
+                            'exchange_assets_not_specified',
+
+                            'label' =>
+                            'La búsqueda todavía no especificó los bienes ofrecidos',
+
+                            'weight' =>
+                            15,
+
+                            'matched' =>
+                            false,
+                        ],
+                    ],
+
+                    'penalties' => [],
+                ];
+            }
+
+            return [
+                'score' => 0.0,
+
+                'reasons' => [
+                    [
+                        'code' =>
+                        'exchange_assets_not_specified',
+
+                        'label' =>
+                        'No hay bienes ofrecidos y la propiedad no acepta propuestas abiertas',
+
+                        'weight' =>
+                        20,
+
+                        'matched' =>
+                        false,
+                    ],
+                ],
+
+                'penalties' => [
+                    [
+                        'code' =>
+                        'open_swap_proposal_not_accepted',
+
+                        'label' =>
+                        'La propiedad requiere una propuesta de permuta más definida',
+                    ],
+                ],
+            ];
+        }
 
         $acceptsAnySwap =
             $acceptsTotalSwap ||
