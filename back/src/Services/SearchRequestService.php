@@ -1193,14 +1193,7 @@ class SearchRequestService
                 throw new Exception("Debe elegir al menos una forma de pago");
             }
         }
-        if (
-            !empty($data['payment_mode_swap']) &&
-            empty($data['exchange_property_id'])
-        ) {
-            throw new Exception(
-                "Debés seleccionar la propiedad ofrecida en permuta"
-            );
-        }
+    
         if ($strict) {
             $types = $data['property_types'] ?? [];
             if (!is_array($types) || count($types) === 0) {
