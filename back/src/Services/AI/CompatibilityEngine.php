@@ -1178,12 +1178,15 @@ class CompatibilityEngine
                 );
 
             $st = $pdo->prepare("
-            SELECT
-                seo.id,
-                seo.search_request_id,
-                seo.property_id,
-                seo.title,
-                seo.property_type,
+           SELECT
+    seo.id,
+    seo.search_request_id,
+    seo.offer_type,
+    seo.property_id,
+    seo.title,
+    seo.description,
+    seo.property_type,
+    seo.vehicle_type,
 
                 CASE
                     WHEN seo.property_id IS NOT NULL
@@ -1389,12 +1392,15 @@ class CompatibilityEngine
         int $searchRequestId
     ): array {
         $st = $pdo->prepare("
-        SELECT
-            seo.id,
-            seo.search_request_id,
-            seo.property_id,
-            seo.title,
-            seo.property_type,
+      SELECT
+    seo.id,
+    seo.search_request_id,
+    seo.offer_type,
+    seo.property_id,
+    seo.title,
+    seo.description,
+    seo.property_type,
+    seo.vehicle_type,
 
             CASE
                 WHEN seo.property_id IS NOT NULL
@@ -2416,7 +2422,7 @@ class CompatibilityEngine
                         'exchange_offer_missing',
 
                         'label' =>
-                        'No hay un inmueble ofrecido para la permuta',
+                        'No hay bienes ofrecidos para evaluar la permuta',
 
                         'weight' =>
                         20,
@@ -2432,7 +2438,7 @@ class CompatibilityEngine
                         'exchange_offer_missing',
 
                         'label' =>
-                        'La búsqueda indica permuta, pero no tiene una oferta cargada',
+                        'La búsqueda contempla permuta, pero todavía no tiene bienes cargados',
                     ],
                 ],
             ];
@@ -2478,22 +2484,26 @@ class CompatibilityEngine
 
         $acceptsTotalSwap =
             (int)(
-                $requirements['accepts_total_swap'] ?? 0
+                $requirements['accepts_total_swap']
+                ?? 0
             ) === 1;
 
         $acceptsSwapPlusCash =
             (int)(
-                $requirements['accepts_swap_plus_cash'] ?? 0
+                $requirements['accepts_swap_plus_cash']
+                ?? 0
             ) === 1;
 
         $acceptsMultipleSwap =
             (int)(
-                $requirements['accepts_multiple_swap'] ?? 0
+                $requirements['accepts_multiple_swap']
+                ?? 0
             ) === 1;
 
         $acceptsOpenProposals =
             (int)(
-                $requirements['accepts_open_proposals'] ?? 0
+                $requirements['accepts_open_proposals']
+                ?? 0
             ) === 1;
 
         $acceptsAnySwap =
@@ -2501,10 +2511,6 @@ class CompatibilityEngine
             $acceptsSwapPlusCash ||
             $acceptsMultipleSwap ||
             $acceptsOpenProposals;
-
-        /*
-     * 1. Modalidad aceptada: 5 puntos.
-     */
 
         if (!$acceptsAnySwap) {
             return [
@@ -2516,7 +2522,7 @@ class CompatibilityEngine
                         'swap_mode_rejected',
 
                         'label' =>
-                        'La propiedad no tiene habilitada una modalidad de permuta',
+                        'La propiedad no acepta operaciones con permuta',
 
                         'weight' =>
                         5,
@@ -2538,6 +2544,129 @@ class CompatibilityEngine
             ];
         }
 
+        /*
+     * --------------------------------------------------
+     * Analizamos qué tipo de bienes ofrece el buscador.
+     *
+     * Propiedades:
+     * pueden intervenir en las modalidades normales
+     * de permuta.
+     *
+     * Vehículos / otros:
+     * por ahora solo se consideran compatibles cuando
+     * el propietario acepta propuestas abiertas.
+     * --------------------------------------------------
+     */
+
+        $propertyOfferCount = 0;
+        $nonPropertyOfferCount = 0;
+
+        foreach ($exchangeOffers as $offer) {
+            $offerType = strtolower(
+                trim(
+                    (string)(
+                        $offer['offer_type']
+                        ?? 'property'
+                    )
+                )
+            );
+
+            if ($offerType === 'property') {
+                $propertyOfferCount++;
+            } else {
+                $nonPropertyOfferCount++;
+            }
+        }
+
+        $hasMultipleProperties =
+            $propertyOfferCount > 1;
+
+        $hasNonPropertyAssets =
+            $nonPropertyOfferCount > 0;
+
+        /*
+     * Si ofrece más de una propiedad,
+     * necesitamos que el propietario admita
+     * múltiples permutas o propuestas abiertas.
+     */
+        if (
+            $hasMultipleProperties &&
+            !$acceptsMultipleSwap &&
+            !$acceptsOpenProposals
+        ) {
+            return [
+                'score' => 0.0,
+
+                'reasons' => [
+                    [
+                        'code' =>
+                        'multiple_swap_not_accepted',
+
+                        'label' =>
+                        'La propuesta incluye varias propiedades y el propietario no indicó que acepte múltiples bienes',
+
+                        'weight' =>
+                        20,
+
+                        'matched' =>
+                        false,
+                    ],
+                ],
+
+                'penalties' => [
+                    [
+                        'code' =>
+                        'multiple_swap_not_accepted',
+
+                        'label' =>
+                        'La propiedad no acepta múltiples bienes en permuta',
+                    ],
+                ],
+            ];
+        }
+
+        /*
+     * Autos, motos y otros activos requieren,
+     * por ahora, propuestas abiertas.
+     */
+        if (
+            $hasNonPropertyAssets &&
+            !$acceptsOpenProposals
+        ) {
+            return [
+                'score' => 0.0,
+
+                'reasons' => [
+                    [
+                        'code' =>
+                        'non_property_assets_not_accepted',
+
+                        'label' =>
+                        'La propuesta incluye bienes no inmobiliarios y el propietario no indicó que acepte propuestas abiertas',
+
+                        'weight' =>
+                        20,
+
+                        'matched' =>
+                        false,
+                    ],
+                ],
+
+                'penalties' => [
+                    [
+                        'code' =>
+                        'non_property_assets_not_accepted',
+
+                        'label' =>
+                        'El propietario no indicó que acepte vehículos u otros bienes',
+                    ],
+                ],
+            ];
+        }
+
+        /*
+     * Modalidad aceptada: 5 puntos.
+     */
         $score += 5;
 
         $reasons[] = [
@@ -2545,18 +2674,24 @@ class CompatibilityEngine
             'swap_mode_accepted',
 
             'label' =>
-            'La propiedad acepta operaciones con permuta',
+            'La modalidad de permuta propuesta es aceptada por el propietario',
 
             'weight' =>
             5,
 
             'matched' =>
             true,
+
+            'property_offers_count' =>
+            $propertyOfferCount,
+
+            'other_assets_count' =>
+            $nonPropertyOfferCount,
         ];
 
         /*
      * --------------------------------------------------
-     * Precio de propiedad objetivo
+     * Precio de la propiedad objetivo
      * --------------------------------------------------
      */
 
@@ -2618,23 +2753,23 @@ class CompatibilityEngine
 
         /*
      * --------------------------------------------------
-     * Elegimos la mejor propiedad ofrecida.
+     * Sumamos TODOS los bienes ofrecidos.
      *
-     * Todas las ofertas se convierten a la moneda
-     * de la propiedad objetivo antes de compararlas.
+     * Cada valor se convierte primero a la moneda
+     * de la propiedad objetivo.
      * --------------------------------------------------
      */
 
-        $selectedOffer = null;
-        $selectedOfferComparablePrice = null;
-        $selectedOfferOriginalPrice = null;
-        $selectedOfferOriginalCurrency = null;
-        $selectedOfferConversionApplied = false;
+        $totalOfferedValue = 0.0;
+        $validOffersCount = 0;
+        $invalidOffersCount = 0;
+        $offerSummary = [];
 
         foreach ($exchangeOffers as $offer) {
             $offerPrice =
                 self::toNullableFloat(
-                    $offer['estimated_price'] ?? null
+                    $offer['estimated_price']
+                        ?? null
                 );
 
             $offerCurrency =
@@ -2647,11 +2782,23 @@ class CompatibilityEngine
                     )
                 );
 
+            $offerType =
+                strtolower(
+                    trim(
+                        (string)(
+                            $offer['offer_type']
+                            ?? 'property'
+                        )
+                    )
+                );
+
             if (
                 $offerPrice === null ||
                 $offerPrice <= 0 ||
                 $offerCurrency === ''
             ) {
+                $invalidOffersCount++;
+
                 continue;
             }
 
@@ -2663,43 +2810,62 @@ class CompatibilityEngine
                 );
 
             if ($comparablePrice === null) {
+                $invalidOffersCount++;
+
                 continue;
             }
 
-            if (
-                $selectedOffer === null ||
-                $selectedOfferComparablePrice === null ||
-                $comparablePrice >
-                $selectedOfferComparablePrice
-            ) {
-                $selectedOffer =
-                    $offer;
+            $totalOfferedValue +=
+                $comparablePrice;
 
-                $selectedOfferComparablePrice =
-                    $comparablePrice;
+            $validOffersCount++;
 
-                $selectedOfferOriginalPrice =
-                    $offerPrice;
+            $offerSummary[] = [
+                'offer_type' =>
+                $offerType,
 
-                $selectedOfferOriginalCurrency =
-                    $offerCurrency;
+                'description' =>
+                $offer['description']
+                    ?? $offer['title']
+                    ?? null,
 
-                $selectedOfferConversionApplied =
-                    $offerCurrency !==
-                    $propertyCurrency;
-            }
+                'original_value' =>
+                $offerPrice,
+
+                'original_currency' =>
+                $offerCurrency,
+
+                'comparable_value' =>
+                round(
+                    $comparablePrice,
+                    2
+                ),
+
+                'currency' =>
+                $propertyCurrency,
+
+                'currency_conversion_applied' =>
+                $offerCurrency !==
+                    $propertyCurrency,
+            ];
         }
 
+        $totalOfferedValue =
+            round(
+                $totalOfferedValue,
+                2
+            );
+
         if (
-            $selectedOffer === null ||
-            $selectedOfferComparablePrice === null
+            $validOffersCount === 0 ||
+            $totalOfferedValue <= 0
         ) {
             $reasons[] = [
                 'code' =>
                 'swap_values_not_comparable',
 
                 'label' =>
-                'No se pueden comparar los valores de la permuta',
+                'No se pueden comparar los valores de los bienes ofrecidos',
 
                 'weight' =>
                 15,
@@ -2713,7 +2879,7 @@ class CompatibilityEngine
                 'swap_currency_conversion_unavailable',
 
                 'label' =>
-                'No hay precios válidos o una cotización disponible para comparar la permuta',
+                'No hay valores válidos o una cotización disponible para comparar la permuta',
             ];
 
             return [
@@ -2728,16 +2894,26 @@ class CompatibilityEngine
             ];
         }
 
-        $offerPrice =
-            $selectedOfferComparablePrice;
+        if ($invalidOffersCount > 0) {
+            $penalties[] = [
+                'code' =>
+                'some_exchange_offers_not_comparable',
+
+                'label' =>
+                'Algunos bienes ofrecidos no pudieron incluirse en el cálculo por falta de valor o cotización',
+
+                'invalid_offers_count' =>
+                $invalidOffersCount,
+            ];
+        }
 
         /*
      * --------------------------------------------------
-     * 2. Valor del inmueble ofrecido:
-     * 5 puntos.
+     * 2. Valor agregado de los bienes: 5 puntos.
      *
-     * price_min / price_max pueden estar expresados
-     * en otra moneda.
+     * price_min / price_max del propietario siguen
+     * funcionando como referencia económica para
+     * aquello que recibe en la operación.
      * --------------------------------------------------
      */
 
@@ -2758,12 +2934,14 @@ class CompatibilityEngine
 
         $priceMinRaw =
             self::toNullableFloat(
-                $requirements['price_min'] ?? null
+                $requirements['price_min']
+                    ?? null
             );
 
         $priceMaxRaw =
             self::toNullableFloat(
-                $requirements['price_max'] ?? null
+                $requirements['price_max']
+                    ?? null
             );
 
         $priceMin = null;
@@ -2787,16 +2965,16 @@ class CompatibilityEngine
                 );
         }
 
-        /*
-     * Si había un límite informado pero no
-     * pudimos convertirlo, no lo consideramos match.
-     */
         $offerRangeConversionAvailable =
-            ($priceMinRaw === null ||
-                $priceMin !== null)
+            (
+                $priceMinRaw === null ||
+                $priceMin !== null
+            )
             &&
-            ($priceMaxRaw === null ||
-                $priceMax !== null);
+            (
+                $priceMaxRaw === null ||
+                $priceMax !== null
+            );
 
         $hasOfferValueConstraint =
             (
@@ -2809,14 +2987,6 @@ class CompatibilityEngine
                 $priceMaxRaw > 0
             );
 
-        /*
- * Si el propietario no definió un rango
- * para el inmueble que recibiría, no decimos
- * que el valor sea "compatible".
- *
- * Lo correcto es indicar que está abierto
- * a evaluar propuestas sin un rango previo.
- */
         if (!$hasOfferValueConstraint) {
             $score += 5;
 
@@ -2825,7 +2995,7 @@ class CompatibilityEngine
                 'exchange_offer_value_unrestricted',
 
                 'label' =>
-                'El propietario no definió un rango de valor para el inmueble ofrecido',
+                'El propietario no definió un rango de valor para los bienes recibidos',
 
                 'weight' =>
                 5,
@@ -2834,25 +3004,16 @@ class CompatibilityEngine
                 true,
 
                 'offered_value' =>
-                $offerPrice,
-
-                'accepted_min' =>
-                null,
-
-                'accepted_max' =>
-                null,
+                $totalOfferedValue,
 
                 'currency' =>
                 $propertyCurrency,
 
-                'original_offered_value' =>
-                $selectedOfferOriginalPrice,
+                'offers_count' =>
+                $validOffersCount,
 
-                'original_offered_currency' =>
-                $selectedOfferOriginalCurrency,
-
-                'currency_conversion_applied' =>
-                $selectedOfferConversionApplied,
+                'offers' =>
+                $offerSummary,
             ];
         } else {
             $withinAcceptedOfferRange =
@@ -2860,12 +3021,14 @@ class CompatibilityEngine
                 (
                     $priceMin === null ||
                     $priceMin <= 0 ||
-                    $offerPrice >= $priceMin
+                    $totalOfferedValue >=
+                    $priceMin
                 ) &&
                 (
                     $priceMax === null ||
                     $priceMax <= 0 ||
-                    $offerPrice <= $priceMax
+                    $totalOfferedValue <=
+                    $priceMax
                 );
 
             if ($withinAcceptedOfferRange) {
@@ -2876,10 +3039,10 @@ class CompatibilityEngine
                     'exchange_offer_value_out_of_range',
 
                     'label' =>
-                    'El valor del inmueble ofrecido no está dentro del rango aceptado',
+                    'El valor conjunto de los bienes ofrecidos no está dentro del rango aceptado',
 
                     'offered_value' =>
-                    $offerPrice,
+                    $totalOfferedValue,
 
                     'accepted_min' =>
                     $priceMin,
@@ -2897,7 +3060,7 @@ class CompatibilityEngine
                 'exchange_offer_value_match',
 
                 'label' =>
-                'El valor del inmueble ofrecido está dentro del rango aceptado',
+                'El valor conjunto de los bienes ofrecidos está dentro del rango aceptado',
 
                 'weight' =>
                 5,
@@ -2906,7 +3069,7 @@ class CompatibilityEngine
                 $withinAcceptedOfferRange,
 
                 'offered_value' =>
-                $offerPrice,
+                $totalOfferedValue,
 
                 'accepted_min' =>
                 $priceMin,
@@ -2917,14 +3080,11 @@ class CompatibilityEngine
                 'currency' =>
                 $propertyCurrency,
 
-                'original_offered_value' =>
-                $selectedOfferOriginalPrice,
+                'offers_count' =>
+                $validOffersCount,
 
-                'original_offered_currency' =>
-                $selectedOfferOriginalCurrency,
-
-                'currency_conversion_applied' =>
-                $selectedOfferConversionApplied,
+                'offers' =>
+                $offerSummary,
             ];
         }
 
@@ -2932,25 +3092,14 @@ class CompatibilityEngine
      * --------------------------------------------------
      * Diferencia económica real.
      *
-     * POSITIVA:
-     * propiedad buscada vale más.
-     * El buscador debe agregar dinero.
-     * Para el propietario objetivo es "a_favor".
-     *
-     * NEGATIVA:
-     * propiedad ofrecida vale más.
-     * El propietario objetivo debería agregar dinero.
-     * Para él es "en_contra".
-     *
-     * CERO:
-     * permuta total.
+     * Ahora usamos la SUMA de los bienes.
      * --------------------------------------------------
      */
 
         $signedDifference =
             round(
                 $propertyPrice -
-                    $offerPrice,
+                    $totalOfferedValue,
                 2
             );
 
@@ -2973,24 +3122,23 @@ class CompatibilityEngine
 
         /*
      * --------------------------------------------------
-     * 3. Capacidad económica del buscador:
-     * 5 puntos.
-     *
-     * Sólo necesita aportar efectivo cuando
-     * signedDifference > 0.
+     * 3. Capacidad del buscador para cubrir
+     * la diferencia: 5 puntos.
      * --------------------------------------------------
      */
 
         $availableDifferenceRaw =
             self::toNullableFloat(
-                $search['cash_difference_max'] ?? null
+                $search['cash_difference_max']
+                    ?? null
             );
 
         $availableDifferenceCurrency =
             strtoupper(
                 trim(
                     (string)(
-                        $search['cash_difference_currency'] ?? ''
+                        $search['cash_difference_currency']
+                        ?? ''
                     )
                 )
             );
@@ -3016,17 +3164,13 @@ class CompatibilityEngine
                 );
         }
 
-        /*
-     * Sin diferencia o diferencia a favor
-     * del buscador: no necesita aportar efectivo.
-     */
         if ($signedDifference <= 0) {
-            $canCoverDifference =
-                true;
+            $canCoverDifference = true;
         } else {
             $searchAcceptsCash =
                 (int)(
-                    $search['payment_mode_cash'] ?? 0
+                    $search['payment_mode_cash']
+                    ?? 0
                 ) === 1;
 
             $canCoverDifference =
@@ -3070,6 +3214,12 @@ class CompatibilityEngine
             'matched' =>
             $canCoverDifference,
 
+            'offered_assets_value' =>
+            $totalOfferedValue,
+
+            'target_property_value' =>
+            $propertyPrice,
+
             'required_difference' =>
             $signedDifference > 0
                 ? $absoluteDifference
@@ -3093,7 +3243,8 @@ class CompatibilityEngine
             strtoupper(
                 trim(
                     (string)(
-                        $requirements['cash_difference_currency'] ?? ''
+                        $requirements['cash_difference_currency']
+                        ?? ''
                     )
                 )
             );
@@ -3105,12 +3256,14 @@ class CompatibilityEngine
 
         $differenceMinRaw =
             self::toNullableFloat(
-                $requirements['cash_difference_min'] ?? null
+                $requirements['cash_difference_min']
+                    ?? null
             );
 
         $differenceMaxRaw =
             self::toNullableFloat(
-                $requirements['cash_difference_max'] ?? null
+                $requirements['cash_difference_max']
+                    ?? null
             );
 
         $differenceMin = null;
@@ -3135,28 +3288,42 @@ class CompatibilityEngine
         }
 
         $differenceRangeConversionAvailable =
-            ($differenceMinRaw === null ||
-                $differenceMin !== null)
+            (
+                $differenceMinRaw === null ||
+                $differenceMin !== null
+            )
             &&
-            ($differenceMaxRaw === null ||
-                $differenceMax !== null);
+            (
+                $differenceMaxRaw === null ||
+                $differenceMax !== null
+            );
 
         $differenceDirection =
             strtolower(
                 trim(
                     (string)(
-                        $requirements['cash_difference_direction'] ?? ''
+                        $requirements['cash_difference_direction']
+                        ?? ''
                     )
                 )
             );
 
-        /*
-     * Validamos primero la modalidad económica.
-     */
         if ($actualDirection === 'total') {
             $modeCompatible =
                 $acceptsTotalSwap ||
                 $acceptsOpenProposals;
+
+            /*
+         * Si hay varias propiedades,
+         * también puede resolverse mediante
+         * accepts_multiple_swap.
+         */
+            if (
+                $hasMultipleProperties &&
+                $acceptsMultipleSwap
+            ) {
+                $modeCompatible = true;
+            }
 
             $directionCompatible =
                 $modeCompatible;
@@ -3165,15 +3332,33 @@ class CompatibilityEngine
                 $acceptsSwapPlusCash ||
                 $acceptsOpenProposals;
 
+            /*
+         * Para múltiples propiedades más
+         * diferencia también aceptamos
+         * multiple_swap si el propietario
+         * admite diferencia.
+         */
+            if (
+                $hasMultipleProperties &&
+                $acceptsMultipleSwap &&
+                $acceptsSwapPlusCash
+            ) {
+                $modeCompatible = true;
+            }
+
             $directionCompatible =
                 $modeCompatible &&
                 (
                     $differenceDirection ===
-                    'indistinto' ||
+                    'indistinto'
+                    ||
                     $differenceDirection ===
-                    $actualDirection ||
+                    $actualDirection
+                    ||
                     (
-                        $differenceDirection === '' &&
+                        $differenceDirection ===
+                        ''
+                        &&
                         $acceptsOpenProposals
                     )
                 );
@@ -3244,6 +3429,12 @@ class CompatibilityEngine
             'signed_difference' =>
             $signedDifference,
 
+            'offered_assets_value' =>
+            $totalOfferedValue,
+
+            'target_property_value' =>
+            $propertyPrice,
+
             'accepted_min' =>
             $differenceMin,
 
@@ -3261,10 +3452,7 @@ class CompatibilityEngine
         ];
 
         /*
-     * Metadatos de la cotización usada.
-     *
-     * Como CurrencyConversionService tiene cache,
-     * esto no genera consultas repetidas.
+     * Cotización utilizada.
      */
         $rateInfo =
             CurrencyConversionService::getCurrentRateInfo();
