@@ -1,4 +1,5 @@
 import { Icon } from "../../../ui/icons/Index";
+import { getApiBaseUrl } from "../../../api/http";
 
 const CONVERSATION_STATUSES = [
   { value: "open", label: "Abierta" },
@@ -42,10 +43,7 @@ function getImageUrl(conversation) {
 
   if (/^https?:\/\//i.test(url)) return url;
 
-  const apiBase =
-    import.meta.env.VITE_API_BASE_URL || "http://localhost/permuok/public";
-
-  const cleanBase = apiBase.replace(/\/$/, "");
+  const cleanBase = getApiBaseUrl();
   const cleanUrl = url.startsWith("/") ? url : `/${url}`;
 
   return `${cleanBase}${cleanUrl}`;

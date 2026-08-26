@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../../../ui/icons/Index";
 import { useToast } from "../../../ui/toast/ToastProvider";
+import { getApiBaseUrl } from "../../../api/http";
 
 function hasSensitiveData(text) {
   const value = String(text || "");
@@ -21,10 +22,7 @@ function getImageUrl(imageUrl) {
 
   if (/^https?:\/\//i.test(imageUrl)) return imageUrl;
 
-  const apiBase =
-    import.meta.env.VITE_API_BASE_URL || "http://localhost/permuok/public";
-
-  const cleanBase = apiBase.replace(/\/$/, "");
+  const cleanBase = getApiBaseUrl();
   const cleanUrl = imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`;
 
   return `${cleanBase}${cleanUrl}`;
