@@ -729,6 +729,449 @@ LEFT JOIN search_requests sr
         );
     }
 
+    private static function getInboxMatches(
+        PDO $pdo,
+        int $userId,
+        string $status,
+        string $search,
+        bool $showArchived,
+        int $page,
+        int $limit,
+        int $offset
+    ): array {
+        $where = [
+            'cp.user_id = :user_id',
+            'cp.deleted_at IS NULL',
+            'c.deleted_at IS NULL',
+            'c.compatibility_id IS NOT NULL',
+        ];
+
+        $params = [
+            ':user_id' => $userId,
+        ];
+
+        $where[] = $showArchived
+            ? 'cp.archived_at IS NOT NULL'
+            : 'cp.archived_at IS NULL';
+
+        if ($status !== 'all') {
+            $where[] = 'c.status = :status';
+            $params[':status'] = $status;
+        }
+
+        if ($search !== '') {
+            $where[] = "(
+            c.subject LIKE :search
+            OR lm.body LIKE :search
+            OR lm.sanitized_body LIKE :search
+            OR p.title LIKE :search
+            OR sr.title LIKE :search
+            OR CAST(comp.property_id AS CHAR) LIKE :search
+            OR CAST(comp.search_request_id AS CHAR) LIKE :search
+        )";
+
+            $params[':search'] = '%' . $search . '%';
+        }
+
+        $whereSql = implode(
+            "\n AND ",
+            $where
+        );
+
+        /*
+     * Total real para paginación.
+     */
+        $countStmt = $pdo->prepare("
+        SELECT COUNT(*)
+
+        FROM conversation_participants cp
+
+        INNER JOIN conversations c
+            ON c.id = cp.conversation_id
+
+        LEFT JOIN compatibilities comp
+            ON comp.id = c.compatibility_id
+           AND comp.deleted_at IS NULL
+
+        LEFT JOIN properties p
+            ON p.id = comp.property_id
+           AND p.deleted_at IS NULL
+
+        LEFT JOIN search_requests sr
+            ON sr.id = comp.search_request_id
+           AND sr.deleted_at IS NULL
+
+        LEFT JOIN messages lm
+            ON lm.id = c.last_message_id
+
+        WHERE {$whereSql}
+    ");
+
+        $countStmt->execute($params);
+
+        $total = (int)$countStmt->fetchColumn();
+
+        /*
+     * Página actual.
+     */
+        $listParams = $params;
+
+        /*
+     * Usamos otro nombre para user_id en
+     * la subconsulta de no leídos.
+     */
+        $listParams[':user_id_unread'] = $userId;
+
+        $stmt = $pdo->prepare("
+        SELECT
+            c.*,
+
+            comp.score
+                AS compatibility_score,
+
+            comp.match_level
+                AS compatibility_match_level,
+
+            comp.property_id
+                AS compatibility_property_id,
+
+            comp.search_request_id
+                AS compatibility_search_request_id,
+
+            p.title
+                AS compatibility_property_title,
+
+            sr.title
+                AS compatibility_search_title,
+
+            CASE
+                WHEN cp.role = 'owner'
+                    THEN 'received'
+
+                WHEN cp.role = 'initiator'
+                    THEN 'sent'
+
+                ELSE 'participant'
+            END AS direction,
+
+            cp.role
+                AS participant_role,
+
+            cp.last_read_message_id,
+            cp.last_read_at,
+            cp.archived_at,
+
+            lm.body
+                AS last_message_body,
+
+            lm.sanitized_body
+                AS last_message_sanitized_body,
+
+            lm.sender_user_id
+                AS last_message_sender_user_id,
+
+            lm.created_at
+                AS last_message_created_at,
+
+            (
+                SELECT COUNT(*)
+
+                FROM messages um
+
+                WHERE
+                    um.conversation_id = c.id
+
+                    AND um.deleted_at IS NULL
+
+                    AND um.sender_user_id
+                        <> :user_id_unread
+
+                    AND (
+                        cp.last_read_message_id IS NULL
+
+                        OR um.id
+                            > cp.last_read_message_id
+                    )
+            ) AS unread_count
+
+        FROM conversation_participants cp
+
+        INNER JOIN conversations c
+            ON c.id = cp.conversation_id
+
+        LEFT JOIN compatibilities comp
+            ON comp.id = c.compatibility_id
+           AND comp.deleted_at IS NULL
+
+        LEFT JOIN properties p
+            ON p.id = comp.property_id
+           AND p.deleted_at IS NULL
+
+        LEFT JOIN search_requests sr
+            ON sr.id = comp.search_request_id
+           AND sr.deleted_at IS NULL
+
+        LEFT JOIN messages lm
+            ON lm.id = c.last_message_id
+
+        WHERE {$whereSql}
+
+        ORDER BY
+            COALESCE(
+                c.last_message_at,
+                c.created_at
+            ) DESC,
+            c.id DESC
+
+        LIMIT {$limit}
+        OFFSET {$offset}
+    ");
+
+        $stmt->execute($listParams);
+
+        $items =
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        $totalPages =
+            $total > 0
+            ? (int)ceil($total / $limit)
+            : 0;
+
+        return [
+            'type' => 'conversations',
+            'tab' => 'matches',
+            'items' => $items,
+
+            'pagination' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'total_pages' => $totalPages,
+                'has_more' => $page < $totalPages,
+            ],
+        ];
+    }
+
+    private static function getInboxGrouped(
+        PDO $pdo,
+        int $userId,
+        string $tab,
+        string $status,
+        string $search,
+        bool $showArchived,
+        int $page,
+        int $limit,
+        int $offset
+    ): array {
+        $where = [
+            'cp.user_id = :user_id',
+            'cp.deleted_at IS NULL',
+            'c.deleted_at IS NULL',
+            'c.compatibility_id IS NULL',
+            'c.opportunity_type IS NOT NULL',
+            'c.opportunity_id IS NOT NULL',
+        ];
+
+        $params = [
+            ':user_id' => $userId,
+        ];
+
+        $where[] = $showArchived
+            ? 'cp.archived_at IS NOT NULL'
+            : 'cp.archived_at IS NULL';
+
+        /*
+     * Las conversaciones normales ya guardan
+     * correctamente owner / initiator en
+     * conversation_participants.
+     */
+        if ($tab === 'own') {
+            $where[] = "cp.role = 'owner'";
+        } else {
+            $where[] = "cp.role = 'initiator'";
+        }
+
+        if ($status !== 'all') {
+            $where[] = 'c.status = :status';
+            $params[':status'] = $status;
+        }
+
+        if ($search !== '') {
+            $where[] = "(
+            c.subject LIKE :search
+            OR lm.body LIKE :search
+            OR lm.sanitized_body LIKE :search
+        )";
+
+            $params[':search'] =
+                '%' . $search . '%';
+        }
+
+        $whereSql = implode(
+            "\n AND ",
+            $where
+        );
+
+        /*
+     * Cantidad REAL de publicaciones/grupos,
+     * no cantidad de conversaciones.
+     */
+        $countStmt = $pdo->prepare("
+        SELECT COUNT(*)
+
+        FROM (
+            SELECT
+                c.opportunity_type,
+                c.opportunity_id
+
+            FROM conversation_participants cp
+
+            INNER JOIN conversations c
+                ON c.id = cp.conversation_id
+
+            LEFT JOIN messages lm
+                ON lm.id = c.last_message_id
+
+            WHERE {$whereSql}
+
+            GROUP BY
+                c.opportunity_type,
+                c.opportunity_id
+        ) grouped_conversations
+    ");
+
+        $countStmt->execute($params);
+
+        $total =
+            (int)$countStmt->fetchColumn();
+
+        /*
+     * Página de publicaciones.
+     *
+     * conversation_count cuenta las
+     * conversaciones que cumplen el filtro.
+     *
+     * unread_count se calcula para todas las
+     * conversaciones incluidas en ese grupo.
+     */
+        $listParams = $params;
+        $listParams[':user_id_unread'] = $userId;
+
+        $stmt = $pdo->prepare("
+        SELECT
+            c.opportunity_type,
+            c.opportunity_id,
+
+            MAX(c.subject)
+                AS subject,
+
+            COUNT(DISTINCT c.id)
+                AS conversation_count,
+
+            MAX(
+                COALESCE(
+                    c.last_message_at,
+                    c.created_at
+                )
+            ) AS last_activity_at,
+
+            SUM(
+                (
+                    SELECT COUNT(*)
+
+                    FROM messages um
+
+                    WHERE
+                        um.conversation_id = c.id
+
+                        AND um.deleted_at IS NULL
+
+                        AND um.sender_user_id
+                            <> :user_id_unread
+
+                        AND (
+                            cp.last_read_message_id
+                                IS NULL
+
+                            OR um.id
+                                > cp.last_read_message_id
+                        )
+                )
+            ) AS unread_count
+
+        FROM conversation_participants cp
+
+        INNER JOIN conversations c
+            ON c.id = cp.conversation_id
+
+        LEFT JOIN messages lm
+            ON lm.id = c.last_message_id
+
+        WHERE {$whereSql}
+
+        GROUP BY
+            c.opportunity_type,
+            c.opportunity_id
+
+        ORDER BY
+            last_activity_at DESC,
+            c.opportunity_id DESC
+
+        LIMIT {$limit}
+        OFFSET {$offset}
+    ");
+
+        $stmt->execute($listParams);
+
+        $items =
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        /*
+     * Normalizamos tipos porque PDO puede
+     * devolver COUNT/SUM como string.
+     */
+        foreach ($items as &$item) {
+            $item['opportunity_id'] =
+                (int)$item['opportunity_id'];
+
+            $item['conversation_count'] =
+                (int)$item['conversation_count'];
+
+            $item['unread_count'] =
+                (int)$item['unread_count'];
+
+            $item['key'] =
+                $item['opportunity_type']
+                . ':'
+                . $item['opportunity_id'];
+        }
+
+        unset($item);
+
+        $totalPages =
+            $total > 0
+            ? (int)ceil($total / $limit)
+            : 0;
+
+        return [
+            'type' => 'groups',
+            'tab' => $tab,
+            'items' => $items,
+
+            'pagination' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'total_pages' => $totalPages,
+                'has_more' => $page < $totalPages,
+            ],
+        ];
+    }
+
     public static function getConversationDetail(int $userId, int $conversationId): array
     {
         self::assertParticipant($userId, $conversationId);
