@@ -761,16 +761,24 @@ LEFT JOIN search_requests sr
 
         if ($search !== '') {
             $where[] = "(
-            c.subject LIKE :search
-            OR lm.body LIKE :search
-            OR lm.sanitized_body LIKE :search
-            OR p.title LIKE :search
-            OR sr.title LIKE :search
-            OR CAST(comp.property_id AS CHAR) LIKE :search
-            OR CAST(comp.search_request_id AS CHAR) LIKE :search
-        )";
+        c.subject LIKE :search_subject
+        OR lm.body LIKE :search_body
+        OR lm.sanitized_body LIKE :search_sanitized
+        OR p.title LIKE :search_property_title
+        OR sr.title LIKE :search_request_title
+        OR CAST(comp.property_id AS CHAR) LIKE :search_property_id
+        OR CAST(comp.search_request_id AS CHAR) LIKE :search_request_id
+    )";
 
-            $params[':search'] = '%' . $search . '%';
+            $searchValue = '%' . $search . '%';
+
+            $params[':search_subject'] = $searchValue;
+            $params[':search_body'] = $searchValue;
+            $params[':search_sanitized'] = $searchValue;
+            $params[':search_property_title'] = $searchValue;
+            $params[':search_request_title'] = $searchValue;
+            $params[':search_property_id'] = $searchValue;
+            $params[':search_request_id'] = $searchValue;
         }
 
         $whereSql = implode(
@@ -1000,13 +1008,16 @@ LEFT JOIN search_requests sr
 
         if ($search !== '') {
             $where[] = "(
-            c.subject LIKE :search
-            OR lm.body LIKE :search
-            OR lm.sanitized_body LIKE :search
-        )";
+        c.subject LIKE :search_subject
+        OR lm.body LIKE :search_body
+        OR lm.sanitized_body LIKE :search_sanitized
+    )";
 
-            $params[':search'] =
-                '%' . $search . '%';
+            $searchValue = '%' . $search . '%';
+
+            $params[':search_subject'] = $searchValue;
+            $params[':search_body'] = $searchValue;
+            $params[':search_sanitized'] = $searchValue;
         }
 
         $whereSql = implode(
