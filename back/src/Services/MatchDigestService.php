@@ -27,6 +27,7 @@ class MatchDigestService
             return [
                 'events_processed' => 0,
                 'notifications_created' => 0,
+                'emails_queued' => 0,
                 'real_estates_notified' => 0,
             ];
         }
@@ -46,14 +47,10 @@ class MatchDigestService
             ) {
                 if (
                     !isset(
-                        $byRealEstate[
-                            $realEstateId
-                        ]
+                        $byRealEstate[$realEstateId]
                     )
                 ) {
-                    $byRealEstate[
-                        $realEstateId
-                    ] = [
+                    $byRealEstate[$realEstateId] = [
                         'direct_new' => 0,
                         'direct_changed' => 0,
                         'direct_lost' => 0,
@@ -64,27 +61,21 @@ class MatchDigestService
                 }
 
                 $type =
-                    (string)$event[
-                        'event_type'
-                    ];
+                    (string)$event['event_type'];
 
                 if (
                     array_key_exists(
                         $type,
-                        $byRealEstate[
-                            $realEstateId
-                        ]
+                        $byRealEstate[$realEstateId]
                     )
                 ) {
-                    $byRealEstate[
-                        $realEstateId
-                    ][$type]++;
+                    $byRealEstate[$realEstateId][$type]++;
                 }
             }
         }
 
         $notificationsCreated = 0;
-
+        $emailsQueued = 0;
         $pdo->beginTransaction();
 
         try {
@@ -102,25 +93,15 @@ class MatchDigestService
                     $counts['direct_new'];
 
                 $newMultilateral =
-                    $counts[
-                        'multilateral_new'
-                    ];
+                    $counts['multilateral_new'];
 
                 $changed =
-                    $counts[
-                        'direct_changed'
-                    ] +
-                    $counts[
-                        'multilateral_changed'
-                    ];
+                    $counts['direct_changed'] +
+                    $counts['multilateral_changed'];
 
                 $lost =
-                    $counts[
-                        'direct_lost'
-                    ] +
-                    $counts[
-                        'multilateral_lost'
-                    ];
+                    $counts['direct_lost'] +
+                    $counts['multilateral_lost'];
 
                 if (
                     $newDirect === 0 &&
@@ -130,13 +111,13 @@ class MatchDigestService
                     continue;
                 }
 
-                $userIds =
-                    self::getRecipientUserIds(
+                $users =
+                    self::getRecipientUsers(
                         $pdo,
                         (int)$realEstateId
                     );
 
-                if ($userIds === []) {
+                if ($users === []) {
                     continue;
                 }
 
@@ -191,15 +172,84 @@ class MatchDigestService
                         $parts
                     );
 
-                foreach ($userIds as $userId) {
+                foreach ($users as $user) {
+                    $userId =
+                        (int)$user['id'];
+
                     self::insertNotification(
                         $pdo,
-                        (int)$userId,
+                        $userId,
                         $title,
                         $body
                     );
 
                     $notificationsCreated++;
+
+                    $email = trim(
+                        (string)(
+                            $user['email']
+                            ?? ''
+                        )
+                    );
+
+                    if (
+                        $email === '' ||
+                        !filter_var(
+                            $email,
+                            FILTER_VALIDATE_EMAIL
+                        )
+                    ) {
+                        continue;
+                    }
+
+                    $name = trim(
+                        (string)(
+                            $user['first_name']
+                            ?? ''
+                        ) .
+                            ' ' .
+                            (string)(
+                                $user['last_name']
+                                ?? ''
+                            )
+                    );
+
+                    $appUrl = rtrim(
+                        (string)(
+                            $_ENV['APP_URL']
+                            ?? 'https://permuok.com'
+                        ),
+                        '/'
+                    );
+
+                    $htmlBody =
+                        self::buildEmail(
+                            $title,
+                            $body,
+                            $appUrl
+                        );
+
+                    $textBody =
+                        $title .
+                        "\n\n" .
+                        $body .
+                        "\n\n" .
+                        $appUrl;
+
+                    EmailJobService::enqueue(
+                        $email,
+                        'match_daily_digest',
+                        $title,
+                        $htmlBody,
+                        $textBody,
+                        $userId,
+                        $name,
+                        null,
+                        null,
+                        5
+                    );
+
+                    $emailsQueued++;
                 }
             }
 
@@ -226,13 +276,16 @@ class MatchDigestService
 
         return [
             'events_processed' =>
-                count($events),
+            count($events),
 
             'notifications_created' =>
-                $notificationsCreated,
+            $notificationsCreated,
+
+            'emails_queued' =>
+            $emailsQueued,
 
             'real_estates_notified' =>
-                count($byRealEstate),
+            count($byRealEstate),
         ];
     }
 
@@ -266,14 +319,10 @@ class MatchDigestService
         array $event
     ): array {
         $entityType =
-            (string)$event[
-                'entity_type'
-            ];
+            (string)$event['entity_type'];
 
         $entityId =
-            (int)$event[
-                'entity_id'
-            ];
+            (int)$event['entity_id'];
 
         if ($entityType === 'compatibility') {
             $st = $pdo->prepare("
@@ -302,13 +351,9 @@ class MatchDigestService
             }
 
             return self::cleanIds([
-                $row[
-                    'source_real_estate_id'
-                ] ?? null,
+                $row['source_real_estate_id'] ?? null,
 
-                $row[
-                    'target_real_estate_id'
-                ] ?? null,
+                $row['target_real_estate_id'] ?? null,
             ]);
         }
 
@@ -328,7 +373,7 @@ class MatchDigestService
 
             $st->execute([
                 'operation_id' =>
-                    $entityId,
+                $entityId,
             ]);
 
             return self::cleanIds(
@@ -341,38 +386,39 @@ class MatchDigestService
         return [];
     }
 
-    private static function getRecipientUserIds(
+    private static function getRecipientUsers(
         PDO $pdo,
         int $realEstateId
     ): array {
         $st = $pdo->prepare("
-            SELECT id
+        SELECT
+            id,
+            first_name,
+            last_name,
+            email
 
-            FROM users
+        FROM users
 
-            WHERE real_estate_id =
-                :real_estate_id
+        WHERE real_estate_id =
+            :real_estate_id
 
-              AND is_active = 1
+          AND is_active = 1
 
-              AND deleted_at IS NULL
+          AND deleted_at IS NULL
 
-              AND role IN (2, 3)
+          AND role IN (2, 3)
 
-            ORDER BY id ASC
-        ");
+        ORDER BY id ASC
+    ");
 
         $st->execute([
             'real_estate_id' =>
-                $realEstateId,
+            $realEstateId,
         ]);
 
-        return array_map(
-            'intval',
-            $st->fetchAll(
-                PDO::FETCH_COLUMN
-            ) ?: []
-        );
+        return $st->fetchAll(
+            PDO::FETCH_ASSOC
+        ) ?: [];
     }
 
     private static function insertNotification(
@@ -439,11 +485,11 @@ class MatchDigestService
 
             WHERE id IN (
                 " .
-                implode(
-                    ', ',
-                    $placeholders
-                ) .
-                "
+            implode(
+                ', ',
+                $placeholders
+            ) .
+            "
             )
 
               AND digest_processed_at
@@ -451,6 +497,137 @@ class MatchDigestService
         ");
 
         $st->execute($params);
+    }
+
+    private static function buildEmail(
+        string $title,
+        string $body,
+        string $url
+    ): string {
+        $safeTitle =
+            htmlspecialchars(
+                $title,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        $safeBody =
+            htmlspecialchars(
+                $body,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        $safeUrl =
+            htmlspecialchars(
+                $url,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        return <<<HTML
+<!doctype html>
+<html lang="es">
+<body style="
+    margin:0;
+    padding:0;
+    background:#f8fafc;
+    font-family:Arial,Helvetica,sans-serif;
+    color:#0f172a;
+">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td align="center" style="padding:32px 16px;">
+
+<table
+    width="100%"
+    cellpadding="0"
+    cellspacing="0"
+    style="
+        max-width:600px;
+        background:#ffffff;
+        border:1px solid #e2e8f0;
+        border-radius:18px;
+        overflow:hidden;
+    "
+>
+<tr>
+<td style="
+    background:#0f172a;
+    padding:24px 28px;
+    color:#ffffff;
+    font-size:22px;
+    font-weight:700;
+">
+    Permuok
+</td>
+</tr>
+
+<tr>
+<td style="padding:32px 28px;">
+
+<p style="
+    margin:0 0 8px;
+    color:#64748b;
+    font-size:13px;
+    font-weight:700;
+    text-transform:uppercase;
+">
+    Resumen de oportunidades
+</p>
+
+<h1 style="
+    margin:0 0 18px;
+    font-size:25px;
+">
+    {$safeTitle}
+</h1>
+
+<p style="
+    margin:0 0 26px;
+    color:#475569;
+    font-size:16px;
+    line-height:1.7;
+">
+    {$safeBody}
+</p>
+
+<a
+    href="{$safeUrl}"
+    style="
+        display:inline-block;
+        background:#0f172a;
+        color:#ffffff;
+        text-decoration:none;
+        padding:13px 20px;
+        border-radius:10px;
+        font-weight:700;
+    "
+>
+    Ver oportunidades
+</a>
+
+</td>
+</tr>
+
+<tr>
+<td style="
+    border-top:1px solid #e2e8f0;
+    padding:20px 28px;
+    color:#94a3b8;
+    font-size:12px;
+">
+    Resumen diario de actividad de Permuok.
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+</table>
+</body>
+</html>
+HTML;
     }
 
     private static function cleanIds(
