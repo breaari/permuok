@@ -426,7 +426,8 @@ class NotificationService
     }
     public static function notifyCompatibilityInterest(
         int $userId,
-        int $compatibilityId
+        int $compatibilityId,
+        ?PDO $pdo = null
     ): void {
         if ($userId <= 0 || $compatibilityId <= 0) {
             return;
@@ -438,14 +439,16 @@ class NotificationService
             'Hay interés en una compatibilidad',
             'La otra inmobiliaria indicó que le interesa avanzar con una oportunidad compatible.',
             'compatibility',
-            $compatibilityId
+            $compatibilityId,
+            $pdo
         );
     }
 
     public static function notifyCompatibilityInterestForRealEstate(
         int $realEstateId,
         int $compatibilityId,
-        ?int $excludeUserId = null
+        ?int $excludeUserId = null,
+        ?PDO $pdo = null
     ): int {
         if (
             $realEstateId <= 0 ||
@@ -454,7 +457,7 @@ class NotificationService
             return 0;
         }
 
-        $pdo = self::db();
+        $pdo ??= self::db();
 
         $sql = "
         SELECT id
@@ -498,7 +501,8 @@ class NotificationService
         foreach ($userIds as $recipientUserId) {
             self::notifyCompatibilityInterest(
                 (int)$recipientUserId,
-                $compatibilityId
+                $compatibilityId,
+                $pdo
             );
 
             $created++;

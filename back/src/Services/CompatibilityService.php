@@ -1140,7 +1140,18 @@ c.target_seen_at,
                 'id' =>
                 $compatibilityId,
             ]);
-
+            if (
+                $status === 'one_side_interested' &&
+                $response === 'interested' &&
+                $previousMyResponse !== 'interested' &&
+                $counterpartRealEstateId > 0
+            ) {
+                NotificationService::notifyCompatibilityInterestForRealEstate(
+                    $counterpartRealEstateId,
+                    $compatibilityId,
+                    $userId
+                );
+            }
             $pdo->commit();
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
@@ -1155,18 +1166,7 @@ c.target_seen_at,
      * notificamos a la otra parte,
      * pero todavía NO creamos conversación.
      */
-        if (
-            $status === 'one_side_interested' &&
-            $response === 'interested' &&
-            $previousMyResponse !== 'interested' &&
-            $counterpartRealEstateId > 0
-        ) {
-            NotificationService::notifyCompatibilityInterestForRealEstate(
-                    $counterpartRealEstateId,
-                    $compatibilityId,
-                    $userId
-                );
-        }
+
 
         /*
      * Interés mutuo:
