@@ -31,6 +31,67 @@ function countUnread(items) {
   return items.reduce((acc, item) => acc + Number(item?.unread_count || 0), 0);
 }
 
+function groupConversationsByOpportunity(items) {
+  const groups = new Map();
+
+  items.forEach((item) => {
+    const type = String(item?.opportunity_type || "");
+    const id = Number(item?.opportunity_id || 0);
+
+    if (!type || !id) {
+      return;
+    }
+
+    const key = `${type}:${id}`;
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        opportunity_type: type,
+        opportunity_id: id,
+        subject: item?.subject || "Publicación",
+        conversations: [],
+        conversation_count: 0,
+        unread_count: 0,
+        last_activity_at: null,
+      });
+    }
+
+    const group = groups.get(key);
+
+    group.conversations.push(item);
+    group.conversation_count += 1;
+    group.unread_count += Number(item?.unread_count || 0);
+
+    const itemDate =
+      item?.last_message_created_at ||
+      item?.last_message_at ||
+      item?.updated_at ||
+      item?.created_at ||
+      null;
+
+    if (
+      itemDate &&
+      (!group.last_activity_at ||
+        new Date(itemDate).getTime() >
+          new Date(group.last_activity_at).getTime())
+    ) {
+      group.last_activity_at = itemDate;
+    }
+  });
+
+  return Array.from(groups.values()).sort(
+    (a, b) =>
+      new Date(b.last_activity_at || 0).getTime() -
+      new Date(a.last_activity_at || 0).getTime(),
+  );
+}
+
+const ownGroups = useMemo(
+  () => groupConversationsByOpportunity(ownItems),
+  [ownItems],
+);
+
 export default function useInboxConversations() {
   const toast = useToast();
   const initializedRef = useRef(false);
@@ -234,5 +295,6 @@ export default function useInboxConversations() {
     handleUnarchive,
     matchItems,
     matchUnread,
+    ownGroups,
   };
 }
