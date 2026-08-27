@@ -37,10 +37,13 @@ export default function Inbox() {
     ownGroups,
   } = useInboxConversations();
 
-  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [selectedGroupKey, setSelectedGroupKey] = useState(null);
+
+  const selectedGroup =
+    ownGroups.find((group) => group.key === selectedGroupKey) || null;
 
   function handleTabChange(tab) {
-    setSelectedGroup(null);
+    setSelectedGroupKey(null);
     setActiveTab(tab);
   }
 
@@ -127,7 +130,7 @@ export default function Inbox() {
                 <div className="mb-5">
                   <button
                     type="button"
-                    onClick={() => setSelectedGroup(null)}
+                    onClick={() => setSelectedGroupKey(null)}
                     className="text-sm font-black text-slate-600 transition hover:text-slate-900"
                   >
                     ← Volver a mis publicaciones
@@ -168,7 +171,7 @@ export default function Inbox() {
                 <ConversationGroupCard
                   key={group.key}
                   group={group}
-                  onOpen={() => setSelectedGroup(group)}
+                  onOpen={() => setSelectedGroupKey(group.key)}
                 />
               ))
             )
