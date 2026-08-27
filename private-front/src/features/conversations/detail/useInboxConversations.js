@@ -44,17 +44,35 @@ export default function useInboxConversations() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
 
+  const matchItems = useMemo(
+    () => items.filter((item) => Number(item?.compatibility_id || 0) > 0),
+    [items],
+  );
+
   const ownItems = useMemo(
-    () => items.filter((item) => item?.direction === "received"),
+    () =>
+      items.filter(
+        (item) => !item?.compatibility_id && item?.direction === "received",
+      ),
     [items],
   );
 
   const externalItems = useMemo(
-    () => items.filter((item) => item?.direction === "sent"),
+    () =>
+      items.filter(
+        (item) => !item?.compatibility_id && item?.direction === "sent",
+      ),
     [items],
   );
 
-  const baseItems = activeTab === "own" ? ownItems : externalItems;
+  const baseItems =
+    activeTab === "own"
+      ? ownItems
+      : activeTab === "external"
+        ? externalItems
+        : matchItems;
+
+  const matchUnread = countUnread(matchItems);
 
   const statusCounts = useMemo(() => {
     const counts = {
@@ -214,5 +232,7 @@ export default function useInboxConversations() {
     externalUnread,
     handleArchive,
     handleUnarchive,
+    matchItems,
+    matchUnread,
   };
 }
