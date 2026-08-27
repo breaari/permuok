@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Services\CompatibilityJobProcessor;
 use App\Services\CompatibilityJobService;
+use App\Services\HighMatchNotificationService;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -136,7 +137,22 @@ try {
                 $jobId
             );
 
+            $highMatchResult =
+                HighMatchNotificationService::process();
 
+            if (
+                ($highMatchResult['notifications_created'] ?? 0) > 0
+            ) {
+                echo
+                "  Alertas match alto: " .
+                    $highMatchResult['notifications_created'] .
+                    "\n";
+
+                echo
+                "  Emails encolados: " .
+                    $highMatchResult['emails_queued'] .
+                    "\n";
+            }
 
             if (
                 !empty($result['skipped'])

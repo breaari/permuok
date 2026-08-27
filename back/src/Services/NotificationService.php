@@ -209,11 +209,81 @@ class NotificationService
         int $conversationId,
         array $conversation = []
     ): void {
+        /*
+     * 1. Conservamos la notificación interna.
+     */
         self::createConversationNotification(
             $userId,
             'new_message',
             $conversationId,
             $conversation
+        );
+
+        /*
+     * 2. Resolvemos el usuario destinatario.
+     */
+        $recipient =
+            self::getEmailRecipient(
+                $userId
+            );
+
+        if (!$recipient) {
+            return;
+        }
+
+        $subjectName =
+            self::conversationSubject(
+                $conversation
+            );
+
+        $emailSubject =
+            "Nuevo mensaje en {$subjectName}";
+
+        $message =
+            'Recibiste un nuevo mensaje en una conversación de Permuok.';
+
+        /*
+     * De momento usamos APP_URL.
+     * Después confirmamos la ruta exacta del frontend
+     * para abrir directamente esa conversación.
+     */
+        $appUrl = rtrim(
+            (string)(
+                $_ENV['APP_URL']
+                ?? 'https://permuok.com'
+            ),
+            '/'
+        );
+
+        $buttonUrl =
+            $appUrl;
+
+        $htmlBody =
+            self::buildEmailLayout(
+                $emailSubject,
+                $message,
+                'Ir a Permuok',
+                $buttonUrl
+            );
+
+        $textBody =
+            $emailSubject .
+            "\n\n" .
+            $message .
+            "\n\n" .
+            $buttonUrl;
+
+        EmailJobService::enqueue(
+            $recipient['email'],
+            'new_message',
+            $emailSubject,
+            $htmlBody,
+            $textBody,
+            $userId,
+            $recipient['name'],
+            'conversation',
+            $conversationId,
+            8
         );
     }
 
@@ -360,5 +430,201 @@ class NotificationService
         $value = trim((string)$value);
 
         return $value !== '' ? "“{$value}”" : 'esta conversación';
+    }
+
+    private static function getEmailRecipient(
+        int $userId
+    ): ?array {
+        if ($userId <= 0) {
+            return null;
+        }
+
+        $pdo = self::db();
+
+        $st = $pdo->prepare("
+        SELECT
+            id,
+            first_name,
+            last_name,
+            email
+        FROM users
+        WHERE id = :id
+          AND is_active = 1
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'id' => $userId,
+        ]);
+
+        $user = $st->fetch(
+            PDO::FETCH_ASSOC
+        );
+
+        if (!$user) {
+            return null;
+        }
+
+        $email = trim(
+            (string)($user['email'] ?? '')
+        );
+
+        if (
+            $email === '' ||
+            !filter_var(
+                $email,
+                FILTER_VALIDATE_EMAIL
+            )
+        ) {
+            return null;
+        }
+
+        $name = trim(
+            (string)($user['first_name'] ?? '') .
+                ' ' .
+                (string)($user['last_name'] ?? '')
+        );
+
+        return [
+            'email' => $email,
+            'name' => $name,
+        ];
+    }
+
+    private static function buildEmailLayout(
+        string $title,
+        string $message,
+        string $buttonText,
+        string $buttonUrl
+    ): string {
+        $safeTitle = htmlspecialchars(
+            $title,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+        $safeMessage = htmlspecialchars(
+            $message,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+        $safeButtonText = htmlspecialchars(
+            $buttonText,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+        $safeButtonUrl = htmlspecialchars(
+            $buttonUrl,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+        return <<<HTML
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+</head>
+<body style="
+    margin:0;
+    padding:0;
+    background:#f8fafc;
+    font-family:Arial,Helvetica,sans-serif;
+    color:#0f172a;
+">
+    <table
+        width="100%"
+        cellpadding="0"
+        cellspacing="0"
+        style="padding:32px 16px;"
+    >
+        <tr>
+            <td align="center">
+                <table
+                    width="100%"
+                    cellpadding="0"
+                    cellspacing="0"
+                    style="
+                        max-width:600px;
+                        background:#ffffff;
+                        border-radius:18px;
+                        overflow:hidden;
+                        border:1px solid #e2e8f0;
+                    "
+                >
+                    <tr>
+                        <td style="
+                            background:#0f172a;
+                            color:#ffffff;
+                            padding:24px 28px;
+                        ">
+                            <div style="
+                                font-size:22px;
+                                font-weight:700;
+                            ">
+                                Permuok
+                            </div>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding:32px 28px;">
+                            <h1 style="
+                                margin:0 0 16px;
+                                font-size:24px;
+                                line-height:1.3;
+                            ">
+                                {$safeTitle}
+                            </h1>
+
+                            <p style="
+                                margin:0 0 26px;
+                                font-size:16px;
+                                line-height:1.6;
+                                color:#475569;
+                            ">
+                                {$safeMessage}
+                            </p>
+
+                            <a
+                                href="{$safeButtonUrl}"
+                                style="
+                                    display:inline-block;
+                                    background:#0f172a;
+                                    color:#ffffff;
+                                    text-decoration:none;
+                                    font-weight:700;
+                                    padding:13px 20px;
+                                    border-radius:10px;
+                                "
+                            >
+                                {$safeButtonText}
+                            </a>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="
+                            border-top:1px solid #e2e8f0;
+                            padding:20px 28px;
+                            font-size:12px;
+                            line-height:1.5;
+                            color:#94a3b8;
+                        ">
+                            Recibís este correo porque tenés actividad
+                            en tu cuenta de Permuok.
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+HTML;
     }
 }
