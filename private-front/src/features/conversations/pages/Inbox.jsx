@@ -5,6 +5,7 @@ import ConversationCard from "../components/ConversationCard";
 import InboxFilters, { InboxTabs } from "../components/InboxFilters";
 import useInboxConversations from "../detail/useInboxConversations";
 import InboxHeader from "../components/InboxHeader";
+import ConversationGroupCard from "../components/ConversationGroupCard";
 
 export default function Inbox() {
   const navigate = useNavigate();
@@ -32,7 +33,10 @@ export default function Inbox() {
     matchUnread,
     handleArchive,
     handleUnarchive,
+    ownGroups,
   } = useInboxConversations();
+
+  const [selectedGroup, setSelectedGroup] = useState(null);
 
   return (
     <main className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 sm:py-8 lg:px-10">
@@ -111,17 +115,70 @@ export default function Inbox() {
             </p>
           </div>
 
-          {visibleItems.map((item) => (
-            <ConversationCard
-              key={item.id}
-              item={item}
-              mode={activeTab}
-              archived={archiveMode === "archived"}
-              onOpen={() => navigate(`/conversations/${item.id}`)}
-              onArchive={() => handleArchive(item)}
-              onUnarchive={() => handleUnarchive(item)}
-            />
-          ))}
+          {activeTab === "own" ? (
+            selectedGroup ? (
+              <div className="space-y-4">
+                <div className="mb-5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedGroup(null)}
+                    className="text-sm font-black text-slate-600 transition hover:text-slate-900"
+                  >
+                    ← Volver a mis publicaciones
+                  </button>
+
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:rounded-3xl sm:p-5">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                      Conversaciones de esta publicación
+                    </p>
+
+                    <h3 className="mt-2 text-lg font-black text-slate-900">
+                      {selectedGroup.subject}
+                    </h3>
+
+                    <p className="mt-1 text-sm font-semibold text-slate-500">
+                      {selectedGroup.conversation_count}{" "}
+                      {selectedGroup.conversation_count === 1
+                        ? "conversación"
+                        : "conversaciones"}
+                    </p>
+                  </div>
+                </div>
+
+                {selectedGroup.conversations.map((item) => (
+                  <ConversationCard
+                    key={item.id}
+                    item={item}
+                    mode="own"
+                    archived={archiveMode === "archived"}
+                    onOpen={() => navigate(`/conversations/${item.id}`)}
+                    onArchive={() => handleArchive(item)}
+                    onUnarchive={() => handleUnarchive(item)}
+                  />
+                ))}
+              </div>
+            ) : (
+              ownGroups.map((group) => (
+                <ConversationGroupCard
+                  key={group.key}
+                  group={group}
+                  onOpen={() => setSelectedGroup(group)}
+                />
+              ))
+            )
+          ) : (
+            visibleItems.map((item) => (
+              <ConversationCard
+                key={item.id}
+                item={item}
+                mode={activeTab}
+                archived={archiveMode === "archived"}
+                onOpen={() => navigate(`/conversations/${item.id}`)}
+                onArchive={() => handleArchive(item)}
+                onUnarchive={() => handleUnarchive(item)}
+              />
+            ))
+          )}
         </section>
       )}
     </main>
