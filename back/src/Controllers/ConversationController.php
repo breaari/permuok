@@ -45,6 +45,22 @@ class ConversationController
         }
     }
 
+    public static function inbox(): void
+    {
+        try {
+            $user = AuthHelper::requireUser();
+
+            $result = ConversationService::getInbox(
+                (int)$user['id'],
+                $_GET
+            );
+
+            self::success($result);
+        } catch (Throwable $e) {
+            self::error($e);
+        }
+    }
+
     public static function show(int $conversationId): void
     {
         try {

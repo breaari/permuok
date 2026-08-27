@@ -629,6 +629,106 @@ LEFT JOIN search_requests sr
         ];
     }
 
+    public static function getInbox(
+        int $userId,
+        array $query = []
+    ): array {
+        $pdo = self::db();
+
+        $allowedTabs = [
+            'own',
+            'external',
+            'matches',
+        ];
+
+        $allowedStatuses = [
+            'all',
+            'open',
+            'negotiating',
+            'visit_scheduled',
+            'closed',
+            'discarded',
+        ];
+
+        $tab = trim(
+            (string)($query['tab'] ?? 'own')
+        );
+
+        if (!in_array($tab, $allowedTabs, true)) {
+            $tab = 'own';
+        }
+
+        $status = trim(
+            (string)($query['status'] ?? 'all')
+        );
+
+        if (!in_array($status, $allowedStatuses, true)) {
+            $status = 'all';
+        }
+
+        $search = trim(
+            (string)($query['search'] ?? '')
+        );
+
+        $showArchived =
+            isset($query['archived']) &&
+            in_array(
+                (string)$query['archived'],
+                ['1', 'true'],
+                true
+            );
+
+        $page = max(
+            1,
+            (int)($query['page'] ?? 1)
+        );
+
+        $limit = max(
+            1,
+            min(
+                50,
+                (int)($query['limit'] ?? 20)
+            )
+        );
+
+        $offset =
+            ($page - 1) * $limit;
+
+        /*
+     * MATCHES:
+     * cada conversación es una fila.
+     */
+        if ($tab === 'matches') {
+            return self::getInboxMatches(
+                $pdo,
+                $userId,
+                $status,
+                $search,
+                $showArchived,
+                $page,
+                $limit,
+                $offset
+            );
+        }
+
+        /*
+     * OWN / EXTERNAL:
+     * se pagina por publicación,
+     * no por conversación.
+     */
+        return self::getInboxGrouped(
+            $pdo,
+            $userId,
+            $tab,
+            $status,
+            $search,
+            $showArchived,
+            $page,
+            $limit,
+            $offset
+        );
+    }
+
     public static function getConversationDetail(int $userId, int $conversationId): array
     {
         self::assertParticipant($userId, $conversationId);
