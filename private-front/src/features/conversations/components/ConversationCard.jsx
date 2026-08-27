@@ -27,14 +27,14 @@ export default function ConversationCard({
 
   return (
     <article
-      className={`group relative overflow-hidden rounded-2xl border bg-white p-4 transition-all sm:rounded-3xl sm:p-5 ${
+      className={`group relative overflow-visible rounded-2xl border bg-white p-4 transition-all sm:rounded-3xl sm:p-5 ${
         unread > 0
           ? "border-emerald-200 shadow-md shadow-emerald-100/40"
           : "border-slate-200 shadow-sm"
       } hover:border-slate-300 hover:shadow-lg sm:hover:-translate-y-0.5`}
     >
       {unread > 0 ? (
-        <div className="absolute left-0 top-0 h-full w-1 bg-emerald-500" />
+        <div className="absolute left-0 top-2 bottom-2 w-1 rounded-full bg-emerald-500" />
       ) : null}
 
       <button type="button" onClick={onOpen} className="w-full text-left">
