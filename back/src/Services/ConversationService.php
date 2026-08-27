@@ -1340,7 +1340,19 @@ LEFT JOIN search_requests sr
                     c.created_at
                 )
             ) AS last_activity_at,
-
+SUBSTRING_INDEX(
+    GROUP_CONCAT(
+        c.id
+        ORDER BY
+            COALESCE(
+                c.last_message_at,
+                c.created_at
+            ) DESC,
+            c.id DESC
+    ),
+    ',',
+    1
+) AS last_conversation_id,
             SUM(
                 (
                     SELECT COUNT(*)
@@ -1393,7 +1405,136 @@ LEFT JOIN search_requests sr
             $stmt->fetchAll(
                 PDO::FETCH_ASSOC
             ) ?: [];
+        $lastConversationIds = [];
 
+        foreach ($items as $item) {
+            $lastConversationId =
+                (int)($item['last_conversation_id'] ?? 0);
+
+            if ($lastConversationId > 0) {
+                $lastConversationIds[] =
+                    $lastConversationId;
+            }
+        }
+
+        $lastConversations = [];
+
+        if ($lastConversationIds) {
+            $lastConversationIds =
+                array_values(
+                    array_unique($lastConversationIds)
+                );
+
+            $placeholders = [];
+
+            $latestParams = [
+                ':user_id' => $userId,
+                ':user_id_unread' => $userId,
+            ];
+
+            foreach (
+                $lastConversationIds
+                as $index => $conversationId
+            ) {
+                $placeholder =
+                    ':conversation_id_' . $index;
+
+                $placeholders[] =
+                    $placeholder;
+
+                $latestParams[$placeholder] =
+                    $conversationId;
+            }
+
+            $inSql =
+                implode(', ', $placeholders);
+
+            $latestStmt = $pdo->prepare("
+        SELECT
+            c.*,
+
+            CASE
+                WHEN cp.role = 'owner'
+                    THEN 'received'
+
+                WHEN cp.role = 'initiator'
+                    THEN 'sent'
+
+                ELSE 'participant'
+            END AS direction,
+
+            cp.role
+                AS participant_role,
+
+            cp.last_read_message_id,
+            cp.last_read_at,
+            cp.archived_at,
+
+            lm.body
+                AS last_message_body,
+
+            lm.sanitized_body
+                AS last_message_sanitized_body,
+
+            lm.sender_user_id
+                AS last_message_sender_user_id,
+
+            lm.created_at
+                AS last_message_created_at,
+
+            (
+                SELECT COUNT(*)
+
+                FROM messages um
+
+                WHERE
+                    um.conversation_id = c.id
+
+                    AND um.deleted_at IS NULL
+
+                    AND um.sender_user_id
+                        <> :user_id_unread
+
+                    AND (
+                        cp.last_read_message_id
+                            IS NULL
+
+                        OR um.id
+                            > cp.last_read_message_id
+                    )
+            ) AS unread_count
+
+        FROM conversations c
+
+        INNER JOIN conversation_participants cp
+            ON cp.conversation_id = c.id
+
+           AND cp.user_id = :user_id
+
+           AND cp.deleted_at IS NULL
+
+        LEFT JOIN messages lm
+            ON lm.id = c.last_message_id
+
+        WHERE
+            c.id IN ({$inSql})
+
+            AND c.deleted_at IS NULL
+    ");
+
+            $latestStmt->execute(
+                $latestParams
+            );
+
+            $latestRows =
+                $latestStmt->fetchAll(
+                    PDO::FETCH_ASSOC
+                ) ?: [];
+
+            foreach ($latestRows as $row) {
+                $lastConversations[(int)$row['id']] = $row;
+            }
+        }
         /*
      * Normalizamos tipos porque PDO puede
      * devolver COUNT/SUM como string.
@@ -1412,6 +1553,16 @@ LEFT JOIN search_requests sr
                 $item['opportunity_type']
                 . ':'
                 . $item['opportunity_id'];
+
+            $lastConversationId =
+                (int)($item['last_conversation_id'] ?? 0);
+
+            $item['last_conversation'] =
+                $lastConversations[$lastConversationId] ?? null;
+
+            unset(
+                $item['last_conversation_id']
+            );
         }
 
         unset($item);
