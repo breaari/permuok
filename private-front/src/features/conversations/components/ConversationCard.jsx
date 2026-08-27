@@ -17,6 +17,7 @@ export default function ConversationCard({
 }) {
   const unread = Number(item?.unread_count || 0);
   const isOwn = mode === "own";
+  const isMatch = mode === "matches";
   const statusMeta = getConversationStatusMeta(item?.status || "open");
 
   return (
@@ -35,9 +36,11 @@ export default function ConversationCard({
         <div className="flex items-start gap-3 sm:gap-4">
           <div
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl sm:h-14 sm:w-14 ${
-              isOwn
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-blue-100 text-blue-700"
+              isMatch
+                ? "bg-violet-100 text-violet-700"
+                : isOwn
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-blue-100 text-blue-700"
             }`}
           >
             <Icon name="messagesSquare" size={20} />
@@ -51,12 +54,18 @@ export default function ConversationCard({
 
                   <Badge
                     className={
-                      isOwn
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-blue-100 text-blue-700"
+                      isMatch
+                        ? "bg-violet-100 text-violet-700"
+                        : isOwn
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-blue-100 text-blue-700"
                     }
                   >
-                    {isOwn ? "Publicación propia" : "Publicación externa"}
+                    {isMatch
+                      ? "Match"
+                      : isOwn
+                        ? "Publicación propia"
+                        : "Publicación externa"}
                   </Badge>
 
                   <Badge className={statusMeta.className}>
