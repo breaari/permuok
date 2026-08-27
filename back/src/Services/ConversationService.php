@@ -1614,17 +1614,19 @@ THEN 1
             ) AS own_conversations,
 
             COUNT(
-                DISTINCT CASE
-                    WHEN c.compatibility_id IS NULL
-                     AND cp.role = 'owner'
-                    THEN CONCAT(
-                        c.opportunity_type,
-                        ':',
-                        c.opportunity_id
-                    )
-                    ELSE NULL
-                END
-            ) AS own_groups,
+    DISTINCT CASE
+        WHEN c.compatibility_id IS NULL
+         AND c.opportunity_type IS NOT NULL
+         AND c.opportunity_id IS NOT NULL
+         AND cp.role = 'owner'
+        THEN CONCAT(
+            c.opportunity_type,
+            ':',
+            c.opportunity_id
+        )
+        ELSE NULL
+    END
+) AS own_groups,
 
             SUM(
                 CASE
@@ -1637,18 +1639,20 @@ THEN 1
                 END
             ) AS external_conversations,
 
-            COUNT(
-                DISTINCT CASE
-                    WHEN c.compatibility_id IS NULL
-                     AND cp.role = 'initiator'
-                    THEN CONCAT(
-                        c.opportunity_type,
-                        ':',
-                        c.opportunity_id
-                    )
-                    ELSE NULL
-                END
-            ) AS external_groups,
+           COUNT(
+    DISTINCT CASE
+        WHEN c.compatibility_id IS NULL
+         AND c.opportunity_type IS NOT NULL
+         AND c.opportunity_id IS NOT NULL
+         AND cp.role = 'initiator'
+        THEN CONCAT(
+            c.opportunity_type,
+            ':',
+            c.opportunity_id
+        )
+        ELSE NULL
+    END
+) AS external_groups,
 
             SUM(
                 CASE
@@ -1692,7 +1696,9 @@ THEN 1
             SUM(
                 CASE
                     WHEN c.compatibility_id IS NULL
-                     AND cp.role = 'owner'
+ AND c.opportunity_type IS NOT NULL
+ AND c.opportunity_id IS NOT NULL
+ AND cp.role = 'owner'
                     THEN (
                         SELECT COUNT(*)
 
@@ -1720,7 +1726,9 @@ THEN 1
             SUM(
                 CASE
                     WHEN c.compatibility_id IS NULL
-                     AND cp.role = 'initiator'
+ AND c.opportunity_type IS NOT NULL
+ AND c.opportunity_id IS NOT NULL
+ AND cp.role = 'initiator'
                     THEN (
                         SELECT COUNT(*)
 
