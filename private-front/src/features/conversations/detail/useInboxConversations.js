@@ -16,7 +16,6 @@ export default function useInboxConversations() {
   const toast = useToast();
 
   const requestIdRef = useRef(0);
-  const initializedRef = useRef(false);
 
   const [activeTab, setActiveTab] = useState("own");
   const [archiveMode, setArchiveMode] = useState("active");
@@ -205,7 +204,6 @@ export default function useInboxConversations() {
         has_more: Boolean(res?.pagination?.has_more),
       });
 
-      initializedRef.current = true;
     } catch (err) {
       if (requestId !== requestIdRef.current) {
         return;
@@ -240,8 +238,21 @@ export default function useInboxConversations() {
       await loadData({
         requestedPage: page,
       });
+
       if (selectedGroup) {
-        await openGroup(selectedGroup, groupPagination.page);
+        const remainingInGroup =
+          Number(selectedGroup.conversation_count || 0) - 1;
+
+        if (remainingInGroup <= 0) {
+          closeGroup();
+        } else {
+          const nextGroup = {
+            ...selectedGroup,
+            conversation_count: remainingInGroup,
+          };
+
+          await openGroup(nextGroup, groupPagination.page);
+        }
       }
     } catch (err) {
       const message = err?.message || "No se pudo archivar la conversación.";
@@ -256,12 +267,24 @@ export default function useInboxConversations() {
       await unarchiveConversation(item.id);
 
       toast.success("Conversación desarchivada.");
-
       await loadData({
         requestedPage: page,
       });
+
       if (selectedGroup) {
-        await openGroup(selectedGroup, groupPagination.page);
+        const remainingInGroup =
+          Number(selectedGroup.conversation_count || 0) - 1;
+
+        if (remainingInGroup <= 0) {
+          closeGroup();
+        } else {
+          const nextGroup = {
+            ...selectedGroup,
+            conversation_count: remainingInGroup,
+          };
+
+          await openGroup(nextGroup, groupPagination.page);
+        }
       }
     } catch (err) {
       const message = err?.message || "No se pudo desarchivar la conversación.";
