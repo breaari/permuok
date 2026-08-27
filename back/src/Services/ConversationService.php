@@ -93,7 +93,8 @@ class ConversationService
                     $conversationId,
                     [
                         'subject' => $subject,
-                    ]
+                    ],
+                    $pdo
                 );
             } else {
                 $conversationId = (int)$conversation['id'];
@@ -112,7 +113,8 @@ class ConversationService
                     $conversationId,
                     [
                         'subject' => $subject ?? null,
-                    ]
+                    ],
+                    $pdo
                 );
             }
 

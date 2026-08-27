@@ -173,7 +173,8 @@ class NotificationService
         string $type,
         int $conversationId,
         array $conversation = [],
-        ?string $customBody = null
+        ?string $customBody = null,
+        ?PDO $pdo = null
     ): void {
         if ($userId <= 0 || $conversationId <= 0) {
             return;
@@ -188,14 +189,16 @@ class NotificationService
             $title,
             $body,
             'conversation',
-            $conversationId
+            $conversationId,
+            $pdo
         );
     }
 
     public static function notifyNewConversation(
         int $userId,
         int $conversationId,
-        array $conversation = []
+        array $conversation = [],
+        ?PDO $pdo = null
     ): void {
         /*
      * 1. Notificación interna.
@@ -204,7 +207,9 @@ class NotificationService
             $userId,
             'new_conversation',
             $conversationId,
-            $conversation
+            $conversation,
+            null,
+            $pdo
         );
 
         /*
@@ -263,14 +268,16 @@ class NotificationService
             $recipient['name'],
             'conversation',
             $conversationId,
-            9
+            9,
+            $pdo
         );
     }
 
     public static function notifyNewMessage(
         int $userId,
         int $conversationId,
-        array $conversation = []
+        array $conversation = [],
+        ?PDO $pdo = null
     ): void {
         /*
      * 1. Conservamos la notificación interna.
@@ -279,7 +286,9 @@ class NotificationService
             $userId,
             'new_message',
             $conversationId,
-            $conversation
+            $conversation,
+            null,
+            $pdo
         );
 
         /*
@@ -346,7 +355,8 @@ class NotificationService
             $recipient['name'],
             'conversation',
             $conversationId,
-            8
+            8,
+            $pdo
         );
     }
 
