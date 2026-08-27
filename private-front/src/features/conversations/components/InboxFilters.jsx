@@ -37,9 +37,11 @@ export function InboxTabs({
   ownUnread,
   externalCount,
   externalUnread,
+  matchCount,
+  matchUnread,
 }) {
   return (
-    <div className="mb-5 grid grid-cols-1 gap-3 sm:mb-6 md:grid-cols-2 md:gap-4">
+    <div className="mb-5 grid grid-cols-1 gap-3 sm:mb-6 md:grid-cols-3 md:gap-4">
       <TabButton
         active={activeTab === "own"}
         title="Mis publicaciones"
@@ -54,6 +56,14 @@ export function InboxTabs({
         count={externalCount}
         unread={externalUnread}
         onClick={() => setActiveTab("external")}
+      />
+
+      <TabButton
+        active={activeTab === "matches"}
+        title="Matches"
+        count={matchCount}
+        unread={matchUnread}
+        onClick={() => setActiveTab("matches")}
       />
     </div>
   );

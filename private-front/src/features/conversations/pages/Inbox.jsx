@@ -24,10 +24,12 @@ export default function Inbox() {
     setSearch,
     ownItems,
     externalItems,
+    matchItems,
     visibleItems,
     statusCounts,
     ownUnread,
     externalUnread,
+    matchUnread,
     handleArchive,
     handleUnarchive,
   } = useInboxConversations();
@@ -43,6 +45,8 @@ export default function Inbox() {
         ownUnread={ownUnread}
         externalCount={externalItems.length}
         externalUnread={externalUnread}
+        matchCount={matchItems.length}
+        matchUnread={matchUnread}
       />
 
       <InboxFilters
@@ -91,7 +95,9 @@ export default function Inbox() {
             <h2 className="text-lg font-black text-slate-900 sm:text-xl">
               {activeTab === "own"
                 ? "Mensajes sobre mis publicaciones"
-                : "Mensajes sobre publicaciones externas"}
+                : activeTab === "external"
+                  ? "Mensajes sobre publicaciones externas"
+                  : "Conversaciones por matches"}
             </h2>
 
             <p className="mt-1 text-sm leading-relaxed text-slate-500">
@@ -99,7 +105,9 @@ export default function Inbox() {
                 ? "Conversaciones archivadas de esta categoría."
                 : activeTab === "own"
                   ? "Consultas que otros usuarios iniciaron sobre tus oportunidades."
-                  : "Consultas que vos iniciaste sobre oportunidades de terceros."}
+                  : activeTab === "external"
+                    ? "Consultas que vos iniciaste sobre oportunidades de terceros."
+                    : "Conversaciones habilitadas cuando ambas partes mostraron interés en un match."}
             </p>
           </div>
 
