@@ -18,6 +18,11 @@ export default function ConversationCard({
   const unread = Number(item?.unread_count || 0);
   const isOwn = mode === "own";
   const isMatch = mode === "matches";
+  const matchScore =
+    item?.compatibility_score !== null &&
+    item?.compatibility_score !== undefined
+      ? Number(item.compatibility_score)
+      : null;
   const statusMeta = getConversationStatusMeta(item?.status || "open");
 
   return (
@@ -62,7 +67,9 @@ export default function ConversationCard({
                     }
                   >
                     {isMatch
-                      ? "Match"
+                      ? matchScore !== null
+                        ? `Match ${Math.round(matchScore)}%`
+                        : "Match"
                       : isOwn
                         ? "Publicación propia"
                         : "Publicación externa"}

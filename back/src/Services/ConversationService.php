@@ -500,8 +500,18 @@ class ConversationService
 
         $stmt = $pdo->prepare("
         SELECT
-            c.*,
-            CASE
+    c.*,
+
+    comp.score AS compatibility_score,
+    comp.match_level AS compatibility_match_level,
+    comp.property_id AS compatibility_property_id,
+    comp.search_request_id AS compatibility_search_request_id,
+
+    CASE
+        WHEN cp.role = 'owner' THEN 'received'
+        WHEN cp.role = 'initiator' THEN 'sent'
+        ELSE 'participant'
+    END AS direction,
                 WHEN cp.role = 'owner' THEN 'received'
                 WHEN cp.role = 'initiator' THEN 'sent'
                 ELSE 'participant'
@@ -528,6 +538,17 @@ class ConversationService
         FROM conversation_participants cp
         INNER JOIN conversations c ON c.id = cp.conversation_id
         LEFT JOIN messages lm ON lm.id = c.last_message_id
+        FROM conversation_participants cp
+
+INNER JOIN conversations c
+    ON c.id = cp.conversation_id
+
+LEFT JOIN compatibilities comp
+    ON comp.id = c.compatibility_id
+   AND comp.deleted_at IS NULL
+
+LEFT JOIN messages lm
+    ON lm.id = c.last_message_id
         WHERE cp.user_id = :user_id
           AND cp.deleted_at IS NULL
           AND c.deleted_at IS NULL
