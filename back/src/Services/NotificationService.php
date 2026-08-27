@@ -196,11 +196,73 @@ class NotificationService
         int $conversationId,
         array $conversation = []
     ): void {
+        /*
+     * 1. Notificación interna.
+     */
         self::createConversationNotification(
             $userId,
             'new_conversation',
             $conversationId,
             $conversation
+        );
+
+        /*
+     * 2. Destinatario del email.
+     */
+        $recipient =
+            self::getEmailRecipient(
+                $userId
+            );
+
+        if (!$recipient) {
+            return;
+        }
+
+        $subjectName =
+            self::conversationSubject(
+                $conversation
+            );
+
+        $emailSubject =
+            "Nueva consulta sobre {$subjectName}";
+
+        $message =
+            'Recibiste una nueva consulta sobre una oportunidad publicada en Permuok.';
+
+        $appUrl = rtrim(
+            (string)(
+                $_ENV['APP_URL']
+                ?? 'https://permuok.com'
+            ),
+            '/'
+        );
+
+        $htmlBody =
+            self::buildEmailLayout(
+                $emailSubject,
+                $message,
+                'Ver consulta',
+                $appUrl
+            );
+
+        $textBody =
+            $emailSubject .
+            "\n\n" .
+            $message .
+            "\n\n" .
+            $appUrl;
+
+        EmailJobService::enqueue(
+            $recipient['email'],
+            'new_conversation',
+            $emailSubject,
+            $htmlBody,
+            $textBody,
+            $userId,
+            $recipient['name'],
+            'conversation',
+            $conversationId,
+            9
         );
     }
 
@@ -361,15 +423,22 @@ class NotificationService
         int $compatibilityId,
         ?int $conversationId = null
     ): void {
-        if ($userId <= 0 || $compatibilityId <= 0) {
+        if (
+            $userId <= 0 ||
+            $compatibilityId <= 0
+        ) {
             return;
         }
 
         /*
-     * Si ya existe conversación, la notificación
-     * lleva directamente al chat.
+     * Si ya existe conversación,
+     * la notificación apunta directamente
+     * al chat.
      */
-        if ($conversationId && $conversationId > 0) {
+        if (
+            $conversationId &&
+            $conversationId > 0
+        ) {
             self::create(
                 $userId,
                 'compatibility_mutual_interest',
@@ -379,16 +448,89 @@ class NotificationService
                 $conversationId
             );
 
+            $relatedType =
+                'conversation';
+
+            $relatedId =
+                $conversationId;
+
+            $buttonText =
+                'Abrir conversación';
+        } else {
+            self::create(
+                $userId,
+                'compatibility_mutual_interest',
+                '¡Hay interés mutuo!',
+                'Ambas inmobiliarias mostraron interés en esta compatibilidad.',
+                'compatibility',
+                $compatibilityId
+            );
+
+            $relatedType =
+                'compatibility';
+
+            $relatedId =
+                $compatibilityId;
+
+            $buttonText =
+                'Ver oportunidad';
+        }
+
+        /*
+     * Email.
+     */
+        $recipient =
+            self::getEmailRecipient(
+                $userId
+            );
+
+        if (!$recipient) {
             return;
         }
 
-        self::create(
-            $userId,
+        $emailSubject =
+            '¡Hay interés mutuo en una oportunidad!';
+
+        $message =
+            $conversationId &&
+            $conversationId > 0
+            ? 'Ambas inmobiliarias mostraron interés en la oportunidad. El chat ya está habilitado para que puedan comenzar a conversar.'
+            : 'Ambas inmobiliarias mostraron interés en una compatibilidad de Permuok.';
+
+        $appUrl = rtrim(
+            (string)(
+                $_ENV['APP_URL']
+                ?? 'https://permuok.com'
+            ),
+            '/'
+        );
+
+        $htmlBody =
+            self::buildEmailLayout(
+                $emailSubject,
+                $message,
+                $buttonText,
+                $appUrl
+            );
+
+        $textBody =
+            $emailSubject .
+            "\n\n" .
+            $message .
+            "\n\n" .
+            $appUrl;
+
+        EmailJobService::enqueue(
+            $recipient['email'],
             'compatibility_mutual_interest',
-            '¡Hay interés mutuo!',
-            'Ambas inmobiliarias mostraron interés en esta compatibilidad.',
-            'compatibility',
-            $compatibilityId
+            $emailSubject,
+            $htmlBody,
+            $textBody,
+            $userId,
+            $recipient['name'],
+            $relatedType,
+            $relatedId,
+            9
         );
     }
     private static function buildConversationTitle(string $type, array $conversation): string

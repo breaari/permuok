@@ -13,7 +13,14 @@ function formatDate(value) {
   if (!value) return "";
 
   try {
-    return new Date(value).toLocaleString("es-AR", {
+    const normalizedValue =
+      typeof value === "string" &&
+      /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)
+        ? `${value.replace(" ", "T")}Z`
+        : value;
+
+    return new Date(normalizedValue).toLocaleString("es-AR", {
+      timeZone: "America/Argentina/Buenos_Aires",
       day: "2-digit",
       month: "2-digit",
       hour: "2-digit",
@@ -25,16 +32,49 @@ function formatDate(value) {
 }
 
 function getNotificationPath(item) {
-  if (item?.related_type === "conversation" && item?.related_id) {
-    return `/conversations/${item.related_id}`;
+  const relatedId = Number(item?.related_id || 0);
+
+  if (!relatedId) {
+    return null;
   }
 
-  if (item?.related_type === "compatibility" && item?.related_id) {
-    return `/compatibilities/${item.related_id}`;
+  switch (item?.type) {
+    case "new_message":
+    case "new_conversation":
+    case "contact_share_requested":
+    case "contact_share_accepted":
+    case "contact_share_rejected":
+    case "conversation_status_changed":
+    case "compatibility_mutual_interest":
+      if (item?.related_type === "conversation") {
+        return `/conversations/${relatedId}`;
+      }
+
+      break;
+
+    case "compatibility_interest":
+    case "high_match":
+      if (item?.related_type === "compatibility") {
+        return `/compatibilities/${relatedId}`;
+      }
+
+      break;
+
+    default:
+      break;
+  }
+
+  if (item?.related_type === "conversation") {
+    return `/conversations/${relatedId}`;
+  }
+
+  if (item?.related_type === "compatibility") {
+    return `/compatibilities/${relatedId}`;
   }
 
   return null;
 }
+
 function getNotificationIcon(type) {
   switch (type) {
     case "new_message":
