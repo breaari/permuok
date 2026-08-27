@@ -38,6 +38,7 @@ export default function Inbox() {
     ownGroups,
     externalGroupCount,
     externalGroups,
+    matchCount,
   } = useInboxConversations();
 
   const [selectedGroupKey, setSelectedGroupKey] = useState(null);
@@ -78,7 +79,7 @@ export default function Inbox() {
         ownUnread={ownUnread}
         externalCount={externalGroupCount}
         externalUnread={externalUnread}
-        matchCount={matchItems.length}
+        matchCount={matchCount}
         matchUnread={matchUnread}
       />
 

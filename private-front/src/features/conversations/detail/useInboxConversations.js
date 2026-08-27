@@ -1,246 +1,135 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   archiveConversation,
-  getConversations,
+  getInboxConversations,
   unarchiveConversation,
 } from "../api/conversations.api";
 
 import { useToast } from "../../../ui/toast/ToastProvider";
 
-function mergeConversationLists(currentItems, incomingItems) {
-  const map = new Map();
-
-  currentItems.forEach((item) => map.set(Number(item.id), item));
-  incomingItems.forEach((item) => map.set(Number(item.id), item));
-
-  return Array.from(map.values()).sort((a, b) => {
-    const aDate = new Date(
-      a?.last_message_at || a?.updated_at || a?.created_at || 0,
-    ).getTime();
-
-    const bDate = new Date(
-      b?.last_message_at || b?.updated_at || b?.created_at || 0,
-    ).getTime();
-
-    return bDate - aDate;
-  });
-}
-
-function countUnread(items) {
-  return items.reduce((acc, item) => acc + Number(item?.unread_count || 0), 0);
-}
-
-function groupConversationsByOpportunity(items) {
-  const groups = new Map();
-
-  items.forEach((item) => {
-    const type = String(item?.opportunity_type || "");
-    const id = Number(item?.opportunity_id || 0);
-
-    if (!type || !id) {
-      return;
-    }
-
-    const key = `${type}:${id}`;
-
-    if (!groups.has(key)) {
-      groups.set(key, {
-        key,
-        opportunity_type: type,
-        opportunity_id: id,
-        subject: item?.subject || "Publicación",
-        conversations: [],
-        conversation_count: 0,
-        unread_count: 0,
-        last_activity_at: null,
-        last_conversation: null,
-      });
-    }
-
-    const group = groups.get(key);
-
-    group.conversations.push(item);
-    group.conversation_count += 1;
-    group.unread_count += Number(item?.unread_count || 0);
-
-    const itemDate =
-      item?.last_message_created_at ||
-      item?.last_message_at ||
-      item?.updated_at ||
-      item?.created_at ||
-      null;
-
-    if (
-      itemDate &&
-      (!group.last_activity_at ||
-        new Date(itemDate).getTime() >
-          new Date(group.last_activity_at).getTime())
-    ) {
-      group.last_activity_at = itemDate;
-      group.last_conversation = item;
-    }
-  });
-
-  return Array.from(groups.values()).sort(
-    (a, b) =>
-      new Date(b.last_activity_at || 0).getTime() -
-      new Date(a.last_activity_at || 0).getTime(),
-  );
-}
+const PAGE_SIZE = 20;
+const SEARCH_DELAY = 350;
 
 export default function useInboxConversations() {
   const toast = useToast();
+
+  const requestIdRef = useRef(0);
   const initializedRef = useRef(false);
 
   const [activeTab, setActiveTab] = useState("own");
   const [archiveMode, setArchiveMode] = useState("active");
   const [activeStatus, setActiveStatus] = useState("all");
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [polling, setPolling] = useState(false);
-  const [error, setError] = useState("");
+
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  const matchItems = useMemo(
-    () => items.filter((item) => Number(item?.compatibility_id || 0) > 0),
-    [items],
-  );
-
-  const ownItems = useMemo(
-    () =>
-      items.filter(
-        (item) => !item?.compatibility_id && item?.direction === "received",
-      ),
-    [items],
-  );
-
-  const ownGroupCount = useMemo(
-    () => groupConversationsByOpportunity(ownItems).length,
-    [ownItems],
-  );
-
-  const externalItems = useMemo(
-    () =>
-      items.filter(
-        (item) => !item?.compatibility_id && item?.direction === "sent",
-      ),
-    [items],
-  );
-
-  const externalGroupCount = useMemo(
-    () => groupConversationsByOpportunity(externalItems).length,
-    [externalItems],
-  );
-
-  const baseItems =
-    activeTab === "own"
-      ? ownItems
-      : activeTab === "external"
-        ? externalItems
-        : matchItems;
-
-  const matchUnread = countUnread(matchItems);
-
-  const statusCounts = useMemo(() => {
-    const counts = {
-      all: baseItems.length,
+  const [items, setItems] = useState([]);
+  const [summary, setSummary] = useState({
+    tabs: {
+      own: {
+        groups: 0,
+        conversations: 0,
+        unread: 0,
+      },
+      external: {
+        groups: 0,
+        conversations: 0,
+        unread: 0,
+      },
+      matches: {
+        conversations: 0,
+        unread: 0,
+      },
+    },
+    statuses: {
+      all: 0,
       open: 0,
       negotiating: 0,
       visit_scheduled: 0,
       closed: 0,
       discarded: 0,
-    };
+    },
+  });
 
-    baseItems.forEach((item) => {
-      const status = String(item?.status || "open");
-      if (counts[status] !== undefined) counts[status] += 1;
-    });
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: PAGE_SIZE,
+    total: 0,
+    total_pages: 0,
+    has_more: false,
+  });
 
-    return counts;
-  }, [baseItems]);
+  const [page, setPage] = useState(1);
 
-  const visibleItems = useMemo(() => {
-    let filtered = baseItems;
+  const [loading, setLoading] = useState(true);
+  const [polling, setPolling] = useState(false);
+  const [error, setError] = useState("");
 
-    if (activeStatus !== "all") {
-      filtered = filtered.filter(
-        (item) => String(item?.status || "open") === activeStatus,
-      );
-    }
+  async function loadData({ silent = false, requestedPage = page } = {}) {
+    const requestId = ++requestIdRef.current;
 
-    if (search.trim()) {
-      const term = search.toLowerCase();
-
-      filtered = filtered.filter((item) => {
-        const searchableText = [
-          item?.subject,
-          item?.last_message_body,
-          item?.last_message_sanitized_body,
-
-          item?.compatibility_property_title,
-          item?.compatibility_search_title,
-
-          item?.compatibility_property_id,
-          item?.compatibility_search_request_id,
-        ]
-          .filter((value) => value !== null && value !== undefined)
-          .join(" ")
-          .toLowerCase();
-
-        return searchableText.includes(term);
-      });
-    }
-
-    return filtered;
-  }, [baseItems, activeStatus, search]);
-
-  const ownGroups = useMemo(
-    () =>
-      groupConversationsByOpportunity(
-        activeTab === "own" ? visibleItems : ownItems,
-      ),
-    [activeTab, visibleItems, ownItems],
-  );
-
-  const externalGroups = useMemo(
-    () =>
-      groupConversationsByOpportunity(
-        activeTab === "external" ? visibleItems : externalItems,
-      ),
-    [activeTab, visibleItems, externalItems],
-  );
-
-  const ownUnread = countUnread(ownItems);
-  const externalUnread = countUnread(externalItems);
-
-  async function loadData({ silent = false } = {}) {
     try {
-      if (!initializedRef.current && !silent) setLoading(true);
-      if (silent) setPolling(true);
+      if (!silent) {
+        setLoading(true);
+      } else {
+        setPolling(true);
+      }
 
       setError("");
 
-      const res = await getConversations({
-        page: 1,
-        limit: 50,
+      const res = await getInboxConversations({
+        tab: activeTab,
+        status: activeStatus,
+        search: debouncedSearch,
+        page: requestedPage,
+        limit: PAGE_SIZE,
         archived: archiveMode === "archived",
       });
 
-      const incomingItems = Array.isArray(res?.items) ? res.items : [];
+      /*
+       * Si llegó una respuesta de una request vieja
+       * después de una más nueva, no la aplicamos.
+       */
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
 
-      setItems((prev) =>
-        silent ? mergeConversationLists(prev, incomingItems) : incomingItems,
-      );
+      const nextItems = Array.isArray(res?.items) ? res.items : [];
+
+      setItems(nextItems);
+
+      setSummary((current) => ({
+        ...current,
+        ...(res?.summary || {}),
+      }));
+
+      setPagination({
+        page: Number(res?.pagination?.page || requestedPage),
+
+        limit: Number(res?.pagination?.limit || PAGE_SIZE),
+
+        total: Number(res?.pagination?.total || 0),
+
+        total_pages: Number(res?.pagination?.total_pages || 0),
+
+        has_more: Boolean(res?.pagination?.has_more),
+      });
 
       initializedRef.current = true;
     } catch (err) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       if (!silent) {
         setError(err?.message || "No se pudieron cargar las conversaciones.");
       }
     } finally {
-      setLoading(false);
-      setPolling(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+        setPolling(false);
+      }
     }
   }
 
@@ -248,13 +137,23 @@ export default function useInboxConversations() {
     try {
       await archiveConversation(item.id);
 
-      setItems((prev) =>
-        prev.filter((row) => Number(row.id) !== Number(item.id)),
-      );
-
       toast.success("Conversación archivada.");
+
+      /*
+       * Recargamos desde backend porque archivar
+       * modifica:
+       * - items
+       * - totals
+       * - grupos
+       * - unread
+       * - status counts
+       */
+      await loadData({
+        requestedPage: page,
+      });
     } catch (err) {
       const message = err?.message || "No se pudo archivar la conversación.";
+
       setError(message);
       toast.error(message);
     }
@@ -264,68 +163,159 @@ export default function useInboxConversations() {
     try {
       await unarchiveConversation(item.id);
 
-      setItems((prev) =>
-        prev.filter((row) => Number(row.id) !== Number(item.id)),
-      );
-
       toast.success("Conversación desarchivada.");
+
+      await loadData({
+        requestedPage: page,
+      });
     } catch (err) {
       const message = err?.message || "No se pudo desarchivar la conversación.";
+
       setError(message);
       toast.error(message);
     }
   }
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  function changePage(nextPage) {
+    const normalizedPage = Math.max(
+      1,
+      Math.min(Number(nextPage) || 1, Math.max(1, pagination.total_pages)),
+    );
 
-  useEffect(() => {
-    initializedRef.current = false;
-    setItems([]);
-    setActiveStatus("all");
-    loadData();
-  }, [archiveMode]);
+    setPage(normalizedPage);
+  }
 
+  /*
+   * Debounce del buscador.
+   *
+   * Evitamos enviar una request por cada tecla.
+   */
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, SEARCH_DELAY);
+
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  /*
+   * Cuando cambia cualquier criterio server-side
+   * volvemos a página 1.
+   */
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, archiveMode, activeStatus, debouncedSearch]);
+
+  /*
+   * Carga principal.
+   */
+  useEffect(() => {
+    loadData({
+      requestedPage: page,
+    });
+  }, [activeTab, archiveMode, activeStatus, debouncedSearch, page]);
+
+  /*
+   * Polling.
+   *
+   * Ya NO hacemos merge de listas.
+   * Refrescamos únicamente la página visible
+   * y sus summaries globales.
+   */
   useEffect(() => {
     const interval = window.setInterval(() => {
-      if (document.hidden) return;
-      loadData({ silent: true });
+      if (document.hidden) {
+        return;
+      }
+
+      loadData({
+        silent: true,
+        requestedPage: page,
+      });
     }, 60000);
 
     return () => window.clearInterval(interval);
-  }, [archiveMode]);
+  }, [activeTab, archiveMode, activeStatus, debouncedSearch, page]);
 
-  useEffect(() => {
-    setActiveStatus("all");
-  }, [activeTab]);
+  /*
+   * Datos ya preparados por backend.
+   */
+  const ownGroups = activeTab === "own" ? items : [];
+
+  const externalGroups = activeTab === "external" ? items : [];
+
+  const matchItems = activeTab === "matches" ? items : [];
+
+  /*
+   * Los filtros ya se aplican server-side.
+   * Conservamos este alias para que Inbox.jsx
+   * no necesite cambiar todo de golpe.
+   */
+  const visibleItems = items;
+
+  const statusCounts = summary?.statuses || {
+    all: 0,
+    open: 0,
+    negotiating: 0,
+    visit_scheduled: 0,
+    closed: 0,
+    discarded: 0,
+  };
+
+  const ownGroupCount = Number(summary?.tabs?.own?.groups || 0);
+
+  const externalGroupCount = Number(summary?.tabs?.external?.groups || 0);
+
+  const ownUnread = Number(summary?.tabs?.own?.unread || 0);
+
+  const externalUnread = Number(summary?.tabs?.external?.unread || 0);
+
+  const matchUnread = Number(summary?.tabs?.matches?.unread || 0);
+
+  const matchCount = Number(summary?.tabs?.matches?.conversations || 0);
 
   return {
     activeTab,
     setActiveTab,
+
     archiveMode,
     setArchiveMode,
+
     activeStatus,
     setActiveStatus,
+
     items,
+
     loading,
     polling,
     error,
+
     search,
     setSearch,
-    ownItems,
-    externalItems,
+
     visibleItems,
     statusCounts,
+
     ownUnread,
     externalUnread,
+    matchUnread,
+
     handleArchive,
     handleUnarchive,
+
     matchItems,
-    matchUnread,
+    matchCount,
+
     ownGroups,
     ownGroupCount,
-    externalGroupCount,
+
     externalGroups,
+    externalGroupCount,
+
+    pagination,
+    page,
+    setPage: changePage,
+
+    reload: loadData,
   };
 }

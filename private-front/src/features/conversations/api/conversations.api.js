@@ -41,6 +41,21 @@ export async function getInboxConversations(params = {}) {
   return unwrap(res);
 }
 
+export async function getInboxGroupConversations(params = {}) {
+  const res = await api.get("/conversations/inbox/group", {
+    params: {
+      tab: params.tab,
+      opportunity_type: params.opportunity_type,
+      opportunity_id: params.opportunity_id,
+      page: params.page || 1,
+      limit: params.limit || 20,
+      archived: params.archived ? 1 : 0,
+    },
+  });
+
+  return unwrap(res);
+}
+
 export async function getConversationDetail(conversationId) {
   const res = await api.get(`/conversations/${conversationId}`);
 
