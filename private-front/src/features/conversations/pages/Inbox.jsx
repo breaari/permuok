@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Icon } from "../../../ui/icons/Index";
@@ -38,13 +39,18 @@ export default function Inbox() {
 
   const [selectedGroup, setSelectedGroup] = useState(null);
 
+  function handleTabChange(tab) {
+    setSelectedGroup(null);
+    setActiveTab(tab);
+  }
+
   return (
     <main className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 sm:py-8 lg:px-10">
       <InboxHeader polling={polling} />
 
       <InboxTabs
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         ownCount={ownItems.length}
         ownUnread={ownUnread}
         externalCount={externalItems.length}
