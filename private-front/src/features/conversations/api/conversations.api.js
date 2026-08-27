@@ -26,6 +26,21 @@ export async function getConversations(params = {}) {
   return unwrap(res);
 }
 
+export async function getInboxConversations(params = {}) {
+  const res = await api.get("/conversations/inbox", {
+    params: {
+      tab: params.tab || "own",
+      status: params.status || "all",
+      search: params.search || "",
+      page: params.page || 1,
+      limit: params.limit || 20,
+      archived: params.archived ? 1 : 0,
+    },
+  });
+
+  return unwrap(res);
+}
+
 export async function getConversationDetail(conversationId) {
   const res = await api.get(`/conversations/${conversationId}`);
 

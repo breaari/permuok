@@ -187,8 +187,28 @@ $routes = [
 
     // Conversations
     'GET /conversations'        => [ConversationController::class, 'index'],
+    'GET /conversations/inbox'  => [ConversationController::class, 'inbox'],
     'POST /conversations/start' => [ConversationController::class, 'start'],
     'GET /conversations/unread-count' => [ConversationController::class, 'unreadCount'],
+    'GET /conversations' => [
+        ConversationController::class,
+        'index'
+    ],
+
+    'GET /conversations/inbox' => [
+        ConversationController::class,
+        'inbox'
+    ],
+
+    'GET /conversations/inbox/group' => [
+        ConversationController::class,
+        'inboxGroup'
+    ],
+
+    'POST /conversations/start' => [
+        ConversationController::class,
+        'start'
+    ],
 
     // Notifications
     'GET /notifications' => [NotificationController::class, 'index'],
