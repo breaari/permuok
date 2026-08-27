@@ -2011,7 +2011,8 @@ THEN 1
                 NotificationService::notifyNewMessage(
                     (int)$receiverId,
                     $conversationId,
-                    self::getConversationById($conversationId)
+                    self::getConversationById($conversationId),
+                    $pdo
                 );
             }
 
