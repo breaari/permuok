@@ -41,7 +41,7 @@ class ConversationService
 
         $pdo = self::db();
         $pdo->beginTransaction();
-
+        $isNewConversation = false;
         try {
             $conversation = self::findExistingConversation(
                 $type,
@@ -51,6 +51,7 @@ class ConversationService
             );
 
             if (!$conversation) {
+                $isNewConversation = true;
                 $subject = self::buildConversationSubject($type, $opportunityId);
 
                 $stmt = $pdo->prepare("
@@ -102,7 +103,10 @@ class ConversationService
 
             self::touchConversation($conversationId, $messageResult['message']['id']);
 
-            if ($ownerUserId !== $userId) {
+            if (
+                !$isNewConversation &&
+                $ownerUserId !== $userId
+            ) {
                 NotificationService::notifyNewMessage(
                     $ownerUserId,
                     $conversationId,
