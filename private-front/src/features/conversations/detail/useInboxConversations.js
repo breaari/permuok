@@ -126,6 +126,11 @@ export default function useInboxConversations() {
     [items],
   );
 
+  const externalGroupCount = useMemo(
+    () => groupConversationsByOpportunity(externalItems).length,
+    [externalItems],
+  );
+
   const baseItems =
     activeTab === "own"
       ? ownItems
@@ -189,6 +194,14 @@ export default function useInboxConversations() {
         activeTab === "own" ? visibleItems : ownItems,
       ),
     [activeTab, visibleItems, ownItems],
+  );
+
+  const externalGroups = useMemo(
+    () =>
+      groupConversationsByOpportunity(
+        activeTab === "external" ? visibleItems : externalItems,
+      ),
+    [activeTab, visibleItems, externalItems],
   );
 
   const ownUnread = countUnread(ownItems);
@@ -305,5 +318,7 @@ export default function useInboxConversations() {
     matchUnread,
     ownGroups,
     ownGroupCount,
+    externalGroupCount,
+    externalGroups,
   };
 }

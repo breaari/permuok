@@ -36,12 +36,21 @@ export default function Inbox() {
     handleUnarchive,
     ownGroupCount,
     ownGroups,
+    externalGroupCount,
+    externalGroups,
   } = useInboxConversations();
 
   const [selectedGroupKey, setSelectedGroupKey] = useState(null);
 
+  const activeGroups =
+    activeTab === "own"
+      ? ownGroups
+      : activeTab === "external"
+        ? externalGroups
+        : [];
+
   const selectedGroup =
-    ownGroups.find((group) => group.key === selectedGroupKey) || null;
+    activeGroups.find((group) => group.key === selectedGroupKey) || null;
 
   function handleTabChange(tab) {
     setSelectedGroupKey(null);
@@ -57,7 +66,7 @@ export default function Inbox() {
         setActiveTab={handleTabChange}
         ownCount={ownGroupCount}
         ownUnread={ownUnread}
-        externalCount={externalItems.length}
+        externalCount={externalGroupCount}
         externalUnread={externalUnread}
         matchCount={matchItems.length}
         matchUnread={matchUnread}
@@ -125,7 +134,7 @@ export default function Inbox() {
             </p>
           </div>
 
-          {activeTab === "own" ? (
+          {activeTab === "own" || activeTab === "external" ? (
             selectedGroup ? (
               <div className="space-y-4">
                 <div className="mb-5">
@@ -134,7 +143,10 @@ export default function Inbox() {
                     onClick={() => setSelectedGroupKey(null)}
                     className="text-sm font-black text-slate-600 transition hover:text-slate-900"
                   >
-                    ← Volver a mis publicaciones
+                    ←{" "}
+                    {activeTab === "own"
+                      ? "Volver a mis publicaciones"
+                      : "Volver a publicaciones externas"}
                   </button>
 
                   <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:rounded-3xl sm:p-5">
@@ -159,7 +171,7 @@ export default function Inbox() {
                   <ConversationCard
                     key={item.id}
                     item={item}
-                    mode="own"
+                    mode={activeTab}
                     archived={archiveMode === "archived"}
                     onOpen={() => navigate(`/conversations/${item.id}`)}
                     onArchive={() => handleArchive(item)}
@@ -168,7 +180,7 @@ export default function Inbox() {
                 ))}
               </div>
             ) : (
-              ownGroups.map((group) => (
+              activeGroups.map((group) => (
                 <ConversationGroupCard
                   key={group.key}
                   group={group}
