@@ -87,11 +87,6 @@ function groupConversationsByOpportunity(items) {
   );
 }
 
-const ownGroups = useMemo(
-  () => groupConversationsByOpportunity(ownItems),
-  [ownItems],
-);
-
 export default function useInboxConversations() {
   const toast = useToast();
   const initializedRef = useRef(false);
@@ -182,6 +177,14 @@ export default function useInboxConversations() {
 
     return filtered;
   }, [baseItems, activeStatus, search]);
+
+  const ownGroups = useMemo(
+    () =>
+      groupConversationsByOpportunity(
+        activeTab === "own" ? visibleItems : ownItems,
+      ),
+    [activeTab, visibleItems, ownItems],
+  );
 
   const ownUnread = countUnread(ownItems);
   const externalUnread = countUnread(externalItems);
