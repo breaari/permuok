@@ -54,6 +54,7 @@ function groupConversationsByOpportunity(items) {
         conversation_count: 0,
         unread_count: 0,
         last_activity_at: null,
+        last_conversation: null,
       });
     }
 
@@ -77,6 +78,7 @@ function groupConversationsByOpportunity(items) {
           new Date(group.last_activity_at).getTime())
     ) {
       group.last_activity_at = itemDate;
+      group.last_conversation = item;
     }
   });
 
