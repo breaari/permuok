@@ -699,7 +699,7 @@ LEFT JOIN search_requests sr
      * cada conversación es una fila.
      */
         if ($tab === 'matches') {
-            return self::getInboxMatches(
+            $result = self::getInboxMatches(
                 $pdo,
                 $userId,
                 $status,
@@ -709,24 +709,29 @@ LEFT JOIN search_requests sr
                 $limit,
                 $offset
             );
+        } else {
+            $result = self::getInboxGrouped(
+                $pdo,
+                $userId,
+                $tab,
+                $status,
+                $search,
+                $showArchived,
+                $page,
+                $limit,
+                $offset
+            );
         }
 
-        /*
-     * OWN / EXTERNAL:
-     * se pagina por publicación,
-     * no por conversación.
-     */
-        return self::getInboxGrouped(
-            $pdo,
-            $userId,
-            $tab,
-            $status,
-            $search,
-            $showArchived,
-            $page,
-            $limit,
-            $offset
-        );
+        $result['summary'] =
+            self::getInboxSummary(
+                $pdo,
+                $userId,
+                $showArchived,
+                $tab
+            );
+
+        return $result;
     }
 
     private static function getInboxMatches(
@@ -1179,6 +1184,331 @@ LEFT JOIN search_requests sr
                 'total' => $total,
                 'total_pages' => $totalPages,
                 'has_more' => $page < $totalPages,
+            ],
+        ];
+    }
+
+    private static function getInboxSummary(
+        PDO $pdo,
+        int $userId,
+        bool $showArchived,
+        string $activeTab
+    ): array {
+        $archiveCondition = $showArchived
+            ? 'cp.archived_at IS NOT NULL'
+            : 'cp.archived_at IS NULL';
+
+        /*
+     * Totales por pestaña.
+     */
+        $tabsStmt = $pdo->prepare("
+        SELECT
+            SUM(
+                CASE
+                    WHEN c.compatibility_id IS NULL
+                     AND cp.role = 'owner'
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS own_conversations,
+
+            COUNT(
+                DISTINCT CASE
+                    WHEN c.compatibility_id IS NULL
+                     AND cp.role = 'owner'
+                    THEN CONCAT(
+                        c.opportunity_type,
+                        ':',
+                        c.opportunity_id
+                    )
+                    ELSE NULL
+                END
+            ) AS own_groups,
+
+            SUM(
+                CASE
+                    WHEN c.compatibility_id IS NULL
+                     AND cp.role = 'initiator'
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS external_conversations,
+
+            COUNT(
+                DISTINCT CASE
+                    WHEN c.compatibility_id IS NULL
+                     AND cp.role = 'initiator'
+                    THEN CONCAT(
+                        c.opportunity_type,
+                        ':',
+                        c.opportunity_id
+                    )
+                    ELSE NULL
+                END
+            ) AS external_groups,
+
+            SUM(
+                CASE
+                    WHEN c.compatibility_id IS NOT NULL
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS match_conversations
+
+        FROM conversation_participants cp
+
+        INNER JOIN conversations c
+            ON c.id = cp.conversation_id
+
+        WHERE
+            cp.user_id = :user_id
+
+            AND cp.deleted_at IS NULL
+
+            AND c.deleted_at IS NULL
+
+            AND {$archiveCondition}
+    ");
+
+        $tabsStmt->execute([
+            ':user_id' => $userId,
+        ]);
+
+        $tabRow =
+            $tabsStmt->fetch(PDO::FETCH_ASSOC)
+            ?: [];
+
+        /*
+     * No leídos por pestaña.
+     *
+     * Los calculamos sobre mensajes reales,
+     * no sobre las páginas cargadas.
+     */
+        $unreadStmt = $pdo->prepare("
+        SELECT
+            SUM(
+                CASE
+                    WHEN c.compatibility_id IS NULL
+                     AND cp.role = 'owner'
+                    THEN (
+                        SELECT COUNT(*)
+
+                        FROM messages m
+
+                        WHERE
+                            m.conversation_id = c.id
+
+                            AND m.deleted_at IS NULL
+
+                            AND m.sender_user_id
+                                <> :user_id_unread_own
+
+                            AND (
+                                cp.last_read_message_id IS NULL
+
+                                OR m.id
+                                    > cp.last_read_message_id
+                            )
+                    )
+                    ELSE 0
+                END
+            ) AS own_unread,
+
+            SUM(
+                CASE
+                    WHEN c.compatibility_id IS NULL
+                     AND cp.role = 'initiator'
+                    THEN (
+                        SELECT COUNT(*)
+
+                        FROM messages m
+
+                        WHERE
+                            m.conversation_id = c.id
+
+                            AND m.deleted_at IS NULL
+
+                            AND m.sender_user_id
+                                <> :user_id_unread_external
+
+                            AND (
+                                cp.last_read_message_id IS NULL
+
+                                OR m.id
+                                    > cp.last_read_message_id
+                            )
+                    )
+                    ELSE 0
+                END
+            ) AS external_unread,
+
+            SUM(
+                CASE
+                    WHEN c.compatibility_id IS NOT NULL
+                    THEN (
+                        SELECT COUNT(*)
+
+                        FROM messages m
+
+                        WHERE
+                            m.conversation_id = c.id
+
+                            AND m.deleted_at IS NULL
+
+                            AND m.sender_user_id
+                                <> :user_id_unread_matches
+
+                            AND (
+                                cp.last_read_message_id IS NULL
+
+                                OR m.id
+                                    > cp.last_read_message_id
+                            )
+                    )
+                    ELSE 0
+                END
+            ) AS match_unread
+
+        FROM conversation_participants cp
+
+        INNER JOIN conversations c
+            ON c.id = cp.conversation_id
+
+        WHERE
+            cp.user_id = :user_id
+
+            AND cp.deleted_at IS NULL
+
+            AND c.deleted_at IS NULL
+
+            AND {$archiveCondition}
+    ");
+
+        $unreadStmt->execute([
+            ':user_id' => $userId,
+            ':user_id_unread_own' => $userId,
+            ':user_id_unread_external' => $userId,
+            ':user_id_unread_matches' => $userId,
+        ]);
+
+        $unreadRow =
+            $unreadStmt->fetch(PDO::FETCH_ASSOC)
+            ?: [];
+
+        /*
+     * Contadores de estado para la pestaña activa.
+     *
+     * Estos SIEMPRE cuentan conversaciones,
+     * tal como definimos en el frontend.
+     */
+        $tabCondition = match ($activeTab) {
+            'matches' =>
+            'c.compatibility_id IS NOT NULL',
+
+            'external' =>
+            "c.compatibility_id IS NULL
+             AND cp.role = 'initiator'",
+
+            default =>
+            "c.compatibility_id IS NULL
+             AND cp.role = 'owner'",
+        };
+
+        $statusStmt = $pdo->prepare("
+        SELECT
+            COUNT(*) AS all_count,
+
+            SUM(c.status = 'open')
+                AS open_count,
+
+            SUM(c.status = 'negotiating')
+                AS negotiating_count,
+
+            SUM(c.status = 'visit_scheduled')
+                AS visit_scheduled_count,
+
+            SUM(c.status = 'closed')
+                AS closed_count,
+
+            SUM(c.status = 'discarded')
+                AS discarded_count
+
+        FROM conversation_participants cp
+
+        INNER JOIN conversations c
+            ON c.id = cp.conversation_id
+
+        WHERE
+            cp.user_id = :user_id
+
+            AND cp.deleted_at IS NULL
+
+            AND c.deleted_at IS NULL
+
+            AND {$archiveCondition}
+
+            AND {$tabCondition}
+    ");
+
+        $statusStmt->execute([
+            ':user_id' => $userId,
+        ]);
+
+        $statusRow =
+            $statusStmt->fetch(PDO::FETCH_ASSOC)
+            ?: [];
+
+        return [
+            'tabs' => [
+                'own' => [
+                    'groups' =>
+                    (int)($tabRow['own_groups'] ?? 0),
+
+                    'conversations' =>
+                    (int)($tabRow['own_conversations'] ?? 0),
+
+                    'unread' =>
+                    (int)($unreadRow['own_unread'] ?? 0),
+                ],
+
+                'external' => [
+                    'groups' =>
+                    (int)($tabRow['external_groups'] ?? 0),
+
+                    'conversations' =>
+                    (int)($tabRow['external_conversations'] ?? 0),
+
+                    'unread' =>
+                    (int)($unreadRow['external_unread'] ?? 0),
+                ],
+
+                'matches' => [
+                    'conversations' =>
+                    (int)($tabRow['match_conversations'] ?? 0),
+
+                    'unread' =>
+                    (int)($unreadRow['match_unread'] ?? 0),
+                ],
+            ],
+
+            'statuses' => [
+                'all' =>
+                (int)($statusRow['all_count'] ?? 0),
+
+                'open' =>
+                (int)($statusRow['open_count'] ?? 0),
+
+                'negotiating' =>
+                (int)($statusRow['negotiating_count'] ?? 0),
+
+                'visit_scheduled' =>
+                (int)($statusRow['visit_scheduled_count'] ?? 0),
+
+                'closed' =>
+                (int)($statusRow['closed_count'] ?? 0),
+
+                'discarded' =>
+                (int)($statusRow['discarded_count'] ?? 0),
             ],
         ];
     }
