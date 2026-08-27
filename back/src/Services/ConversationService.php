@@ -1605,8 +1605,10 @@ SUBSTRING_INDEX(
             SUM(
                 CASE
                     WHEN c.compatibility_id IS NULL
-                     AND cp.role = 'owner'
-                    THEN 1
+ AND c.opportunity_type IS NOT NULL
+ AND c.opportunity_id IS NOT NULL
+ AND cp.role = 'owner'
+THEN 1
                     ELSE 0
                 END
             ) AS own_conversations,
@@ -1627,7 +1629,9 @@ SUBSTRING_INDEX(
             SUM(
                 CASE
                     WHEN c.compatibility_id IS NULL
-                     AND cp.role = 'initiator'
+ AND c.opportunity_type IS NOT NULL
+ AND c.opportunity_id IS NOT NULL
+ AND cp.role = 'initiator'
                     THEN 1
                     ELSE 0
                 END
@@ -1806,11 +1810,15 @@ SUBSTRING_INDEX(
 
             'external' =>
             "c.compatibility_id IS NULL
-             AND cp.role = 'initiator'",
+ AND c.opportunity_type IS NOT NULL
+ AND c.opportunity_id IS NOT NULL
+ AND cp.role = 'initiator'",
 
             default =>
             "c.compatibility_id IS NULL
-             AND cp.role = 'owner'",
+ AND c.opportunity_type IS NOT NULL
+ AND c.opportunity_id IS NOT NULL
+ AND cp.role = 'owner'",
         };
 
         $statusStmt = $pdo->prepare("
