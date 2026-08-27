@@ -363,52 +363,65 @@ class NotificationService
     public static function notifyContactShareRequested(
         int $userId,
         int $conversationId,
-        array $conversation = []
+        array $conversation = [],
+        ?PDO $pdo = null
     ): void {
         self::createConversationNotification(
             $userId,
             'contact_share_requested',
             $conversationId,
-            $conversation
+            $conversation,
+            null,
+            $pdo
         );
     }
+
 
     public static function notifyContactShareAccepted(
         int $userId,
         int $conversationId,
-        array $conversation = []
+        array $conversation = [],
+        ?PDO $pdo = null
     ): void {
         self::createConversationNotification(
             $userId,
             'contact_share_accepted',
             $conversationId,
-            $conversation
+            $conversation,
+            null,
+            $pdo
         );
     }
 
     public static function notifyContactShareRejected(
         int $userId,
         int $conversationId,
-        array $conversation = []
+        array $conversation = [],
+        ?PDO $pdo = null
     ): void {
         self::createConversationNotification(
             $userId,
             'contact_share_rejected',
             $conversationId,
-            $conversation
+            $conversation,
+            null,
+            $pdo
         );
     }
 
     public static function notifyStatusChanged(
         int $userId,
         int $conversationId,
-        array $conversation = []
+        array $conversation = [],
+        ?PDO $pdo = null
     ): void {
         self::createConversationNotification(
             $userId,
             'conversation_status_changed',
             $conversationId,
-            $conversation
+            $conversation,
+            null,
+            $pdo
         );
     }
     public static function notifyCompatibilityInterest(

@@ -2029,9 +2029,14 @@ THEN 1
         int $conversationId,
         array $input
     ): array {
-        self::assertParticipant($userId, $conversationId);
+        self::assertParticipant(
+            $userId,
+            $conversationId
+        );
 
-        $status = trim((string)($input['status'] ?? ''));
+        $status = trim(
+            (string)($input['status'] ?? '')
+        );
 
         $allowedStatuses = [
             'open',
@@ -2041,46 +2046,112 @@ THEN 1
             'discarded',
         ];
 
-        if (!in_array($status, $allowedStatuses, true)) {
-            throw new Exception('Estado de conversación inválido.', 422);
+        if (
+            !in_array(
+                $status,
+                $allowedStatuses,
+                true
+            )
+        ) {
+            throw new Exception(
+                'Estado de conversación inválido.',
+                422
+            );
         }
 
         $pdo = self::db();
 
-        $stmt = $pdo->prepare("
-        UPDATE conversations
-        SET
-            status = :status,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = :conversation_id
-          AND deleted_at IS NULL
-    ");
+        $pdo->beginTransaction();
 
-        $stmt->execute([
-            ':status' => $status,
-            ':conversation_id' => $conversationId,
-        ]);
+        try {
+            /*
+         * 1. Actualizamos el estado.
+         */
+            $stmt = $pdo->prepare("
+            UPDATE conversations
+            SET
+                status = :status,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :conversation_id
+              AND deleted_at IS NULL
+        ");
 
-        $systemMessage = self::createSystemMessage(
-            $conversationId,
-            'El estado de la conversación cambió a: ' . self::conversationStatusLabel($status) . '.'
-        );
-
-        self::touchConversation($conversationId, $systemMessage['id']);
-        $receiverIds = self::getOtherParticipantIds($conversationId, $userId);
-
-        foreach ($receiverIds as $receiverId) {
-            NotificationService::notifyStatusChanged(
-                (int)$receiverId,
+            $stmt->execute([
+                ':status' => $status,
+                ':conversation_id' =>
                 $conversationId,
-                self::getConversationById($conversationId)
-            );
-        }
+            ]);
 
-        return [
-            'conversation' => self::getConversationById($conversationId),
-            'status' => $status,
-        ];
+            /*
+         * 2. Creamos mensaje automático
+         *    dentro de la misma transacción.
+         */
+            $systemMessage =
+                self::createSystemMessage(
+                    $conversationId,
+                    'El estado de la conversación cambió a: '
+                        . self::conversationStatusLabel(
+                            $status
+                        )
+                        . '.'
+                );
+
+            /*
+         * 3. Actualizamos la actividad
+         *    de la conversación.
+         */
+            self::touchConversation(
+                $conversationId,
+                (int)$systemMessage['id']
+            );
+
+            /*
+         * 4. Obtenemos los demás participantes.
+         */
+            $receiverIds =
+                self::getOtherParticipantIds(
+                    $conversationId,
+                    $userId
+                );
+
+            /*
+         * 5. Creamos las notificaciones
+         *    usando explícitamente el mismo PDO.
+         */
+            foreach (
+                $receiverIds as $receiverId
+            ) {
+                NotificationService::notifyStatusChanged(
+                    (int)$receiverId,
+                    $conversationId,
+                    self::getConversationById(
+                        $conversationId
+                    ),
+                    $pdo
+                );
+            }
+
+            /*
+         * 6. Todo salió bien.
+         */
+            $pdo->commit();
+
+            return [
+                'conversation' =>
+                self::getConversationById(
+                    $conversationId
+                ),
+
+                'status' =>
+                $status,
+            ];
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $e;
+        }
     }
 
     public static function archiveConversation(int $userId, int $conversationId): array
@@ -2220,7 +2291,8 @@ THEN 1
             NotificationService::notifyContactShareRequested(
                 (int)$requestedToUserId,
                 $conversationId,
-                $conversation
+                $conversation,
+                $pdo
             );
 
             $pdo->commit();
@@ -2298,11 +2370,11 @@ THEN 1
                     $conversationId,
                     'Ambas partes aceptaron compartir datos de contacto.'
                 );
-
                 NotificationService::notifyContactShareAccepted(
                     (int)$request['requested_by_user_id'],
                     $conversationId,
-                    self::getConversationById($conversationId)
+                    self::getConversationById($conversationId),
+                    $pdo
                 );
             } else {
                 $stmt = $pdo->prepare("
@@ -2327,7 +2399,8 @@ THEN 1
                 NotificationService::notifyContactShareRejected(
                     (int)$request['requested_by_user_id'],
                     $conversationId,
-                    self::getConversationById($conversationId)
+                    self::getConversationById($conversationId),
+                    $pdo
                 );
             }
 
