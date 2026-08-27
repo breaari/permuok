@@ -483,78 +483,125 @@ class ConversationService
             throw $e;
         }
     }
-    public static function listConversations(int $userId, array $query = []): array
-    {
+    public static function listConversations(
+        int $userId,
+        array $query = []
+    ): array {
         $pdo = self::db();
 
-        $limit = max(1, min(50, (int)($query['limit'] ?? 20)));
-        $page = max(1, (int)($query['page'] ?? 1));
+        $limit = max(
+            1,
+            min(
+                50,
+                (int)($query['limit'] ?? 20)
+            )
+        );
+
+        $page = max(
+            1,
+            (int)($query['page'] ?? 1)
+        );
+
         $offset = ($page - 1) * $limit;
 
-        $showArchived = isset($query['archived'])
-            && in_array((string)$query['archived'], ['1', 'true'], true);
+        $showArchived =
+            isset($query['archived']) &&
+            in_array(
+                (string)$query['archived'],
+                ['1', 'true'],
+                true
+            );
 
-        $archivedCondition = $showArchived
+        $archivedCondition =
+            $showArchived
             ? 'cp.archived_at IS NOT NULL'
             : 'cp.archived_at IS NULL';
 
         $stmt = $pdo->prepare("
         SELECT
-    c.*,
+            c.*,
 
-    comp.score AS compatibility_score,
-    comp.match_level AS compatibility_match_level,
-    comp.property_id AS compatibility_property_id,
-    comp.search_request_id AS compatibility_search_request_id,
+            comp.score AS compatibility_score,
+            comp.match_level AS compatibility_match_level,
+            comp.property_id AS compatibility_property_id,
+            comp.search_request_id AS compatibility_search_request_id,
 
-    CASE
-        WHEN cp.role = 'owner' THEN 'received'
-        WHEN cp.role = 'initiator' THEN 'sent'
-        ELSE 'participant'
-    END AS direction,
-                WHEN cp.role = 'owner' THEN 'received'
-                WHEN cp.role = 'initiator' THEN 'sent'
+            CASE
+                WHEN cp.role = 'owner'
+                    THEN 'received'
+
+                WHEN cp.role = 'initiator'
+                    THEN 'sent'
+
                 ELSE 'participant'
             END AS direction,
+
             cp.role AS participant_role,
             cp.last_read_message_id,
             cp.last_read_at,
             cp.archived_at,
-            lm.body AS last_message_body,
-            lm.sanitized_body AS last_message_sanitized_body,
-            lm.sender_user_id AS last_message_sender_user_id,
-            lm.created_at AS last_message_created_at,
+
+            lm.body
+                AS last_message_body,
+
+            lm.sanitized_body
+                AS last_message_sanitized_body,
+
+            lm.sender_user_id
+                AS last_message_sender_user_id,
+
+            lm.created_at
+                AS last_message_created_at,
+
             (
                 SELECT COUNT(*)
                 FROM messages m
-                WHERE m.conversation_id = c.id
-                  AND m.deleted_at IS NULL
-                  AND m.sender_user_id <> :user_id_unread
-                  AND (
-                    cp.last_read_message_id IS NULL
-                    OR m.id > cp.last_read_message_id
-                  )
+
+                WHERE
+                    m.conversation_id = c.id
+
+                    AND m.deleted_at IS NULL
+
+                    AND m.sender_user_id
+                        <> :user_id_unread
+
+                    AND (
+                        cp.last_read_message_id IS NULL
+
+                        OR m.id
+                            > cp.last_read_message_id
+                    )
             ) AS unread_count
-        FROM conversation_participants cp
-        INNER JOIN conversations c ON c.id = cp.conversation_id
-        LEFT JOIN messages lm ON lm.id = c.last_message_id
+
         FROM conversation_participants cp
 
-INNER JOIN conversations c
-    ON c.id = cp.conversation_id
+        INNER JOIN conversations c
+            ON c.id = cp.conversation_id
 
-LEFT JOIN compatibilities comp
-    ON comp.id = c.compatibility_id
-   AND comp.deleted_at IS NULL
+        LEFT JOIN compatibilities comp
+            ON comp.id = c.compatibility_id
+           AND comp.deleted_at IS NULL
 
-LEFT JOIN messages lm
-    ON lm.id = c.last_message_id
-        WHERE cp.user_id = :user_id
-          AND cp.deleted_at IS NULL
-          AND c.deleted_at IS NULL
-          AND {$archivedCondition}
-        ORDER BY COALESCE(c.last_message_at, c.created_at) DESC
-        LIMIT {$limit} OFFSET {$offset}
+        LEFT JOIN messages lm
+            ON lm.id = c.last_message_id
+
+        WHERE
+            cp.user_id = :user_id
+
+            AND cp.deleted_at IS NULL
+
+            AND c.deleted_at IS NULL
+
+            AND {$archivedCondition}
+
+        ORDER BY
+            COALESCE(
+                c.last_message_at,
+                c.created_at
+            ) DESC
+
+        LIMIT {$limit}
+        OFFSET {$offset}
     ");
 
         $stmt->execute([
@@ -562,7 +609,10 @@ LEFT JOIN messages lm
             ':user_id_unread' => $userId,
         ]);
 
-        $items = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $items =
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            ) ?: [];
 
         return [
             'items' => $items,
