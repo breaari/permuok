@@ -1149,7 +1149,14 @@ c.target_seen_at,
                 NotificationService::notifyCompatibilityInterestForRealEstate(
                     $counterpartRealEstateId,
                     $compatibilityId,
-                    $userId
+                    $userId,
+                    $pdo
+                );
+            }
+            if ($status === 'mutual_interest') {
+                ConversationService::createFromCompatibility(
+                    $compatibilityId,
+                    $pdo
                 );
             }
             $pdo->commit();
@@ -1172,11 +1179,7 @@ c.target_seen_at,
      * Interés mutuo:
      * ConversationService crea el chat.
      */
-        if ($status === 'mutual_interest') {
-            ConversationService::createFromCompatibility(
-                $compatibilityId
-            );
-        }
+
 
         return self::getRecommendationDetail(
             $userId,

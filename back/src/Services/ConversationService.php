@@ -127,9 +127,12 @@ class ConversationService
         }
     }
     public static function createFromCompatibility(
-        int $compatibilityId
+        int $compatibilityId,
+        ?PDO $pdo = null
     ): array {
-        $pdo = self::db();
+        $pdo ??= self::db();
+
+        $ownsTransaction = !$pdo->inTransaction();
 
         if ($compatibilityId <= 0) {
             throw new Exception(
@@ -326,7 +329,9 @@ class ConversationService
                 255
             );
 
-        $pdo->beginTransaction();
+        if ($ownsTransaction) {
+            $pdo->beginTransaction();
+        }
 
         try {
             /*
@@ -441,7 +446,9 @@ class ConversationService
                 $pdo
             );
 
-            $pdo->commit();
+            if ($ownsTransaction) {
+                $pdo->commit();
+            }
 
             return [
                 'conversation' =>
@@ -452,7 +459,12 @@ class ConversationService
                 'already_exists' => false,
             ];
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if (
+                $ownsTransaction &&
+                $pdo->inTransaction()
+            ) {
+                $pdo->rollBack();
+            }
 
             /*
          * Si dos requests llegaron casi
