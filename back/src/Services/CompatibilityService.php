@@ -817,10 +817,6 @@ c.target_seen_at,
 
         $isTarget =
             (int)$compatibility['target_real_estate_id'] === $realEstateId;
-        $seenAt =
-            $isSource
-            ? ($row['source_seen_at'] ?? null)
-            : ($row['target_seen_at'] ?? null);
         if (!$isSource && !$isTarget) {
             throw new Exception(
                 'No tenés acceso a esta compatibilidad.',
@@ -1167,19 +1163,6 @@ c.target_seen_at,
 
             throw $e;
         }
-
-        /*
-     * Primer interés:
-     * notificamos a la otra parte,
-     * pero todavía NO creamos conversación.
-     */
-
-
-        /*
-     * Interés mutuo:
-     * ConversationService crea el chat.
-     */
-
 
         return self::getRecommendationDetail(
             $userId,
