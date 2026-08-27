@@ -34,6 +34,7 @@ export default function Inbox() {
     matchUnread,
     handleArchive,
     handleUnarchive,
+    ownGroupCount,
     ownGroups,
   } = useInboxConversations();
 
@@ -54,7 +55,7 @@ export default function Inbox() {
       <InboxTabs
         activeTab={activeTab}
         setActiveTab={handleTabChange}
-        ownCount={ownItems.length}
+        ownCount={ownGroupCount}
         ownUnread={ownUnread}
         externalCount={externalItems.length}
         externalUnread={externalUnread}

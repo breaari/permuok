@@ -113,6 +113,11 @@ export default function useInboxConversations() {
     [items],
   );
 
+  const ownGroupCount = useMemo(
+    () => groupConversationsByOpportunity(ownItems).length,
+    [ownItems],
+  );
+
   const externalItems = useMemo(
     () =>
       items.filter(
@@ -299,5 +304,6 @@ export default function useInboxConversations() {
     matchItems,
     matchUnread,
     ownGroups,
+    ownGroupCount,
   };
 }
