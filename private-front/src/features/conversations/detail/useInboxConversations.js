@@ -173,17 +173,22 @@ export default function useInboxConversations() {
       const term = search.toLowerCase();
 
       filtered = filtered.filter((item) => {
-        return (
-          String(item?.subject || "")
-            .toLowerCase()
-            .includes(term) ||
-          String(item?.last_message_body || "")
-            .toLowerCase()
-            .includes(term) ||
-          String(item?.last_message_sanitized_body || "")
-            .toLowerCase()
-            .includes(term)
-        );
+        const searchableText = [
+          item?.subject,
+          item?.last_message_body,
+          item?.last_message_sanitized_body,
+
+          item?.compatibility_property_title,
+          item?.compatibility_search_title,
+
+          item?.compatibility_property_id,
+          item?.compatibility_search_request_id,
+        ]
+          .filter((value) => value !== null && value !== undefined)
+          .join(" ")
+          .toLowerCase();
+
+        return searchableText.includes(term);
       });
     }
 
