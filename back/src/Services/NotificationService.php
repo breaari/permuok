@@ -418,6 +418,71 @@ class NotificationService
         );
     }
 
+    public static function notifyCompatibilityInterestForRealEstate(
+        int $realEstateId,
+        int $compatibilityId,
+        ?int $excludeUserId = null
+    ): int {
+        if (
+            $realEstateId <= 0 ||
+            $compatibilityId <= 0
+        ) {
+            return 0;
+        }
+
+        $pdo = self::db();
+
+        $sql = "
+        SELECT id
+        FROM users
+        WHERE real_estate_id = :real_estate_id
+          AND role IN (2, 3)
+          AND is_active = 1
+          AND deleted_at IS NULL
+    ";
+
+        $params = [
+            'real_estate_id' => $realEstateId,
+        ];
+
+        if (
+            $excludeUserId !== null &&
+            $excludeUserId > 0
+        ) {
+            $sql .= "
+            AND id <> :exclude_user_id
+        ";
+
+            $params['exclude_user_id'] =
+                $excludeUserId;
+        }
+
+        $sql .= "
+        ORDER BY id ASC
+    ";
+
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+
+        $userIds =
+            $st->fetchAll(
+                PDO::FETCH_COLUMN
+            ) ?: [];
+
+        $created = 0;
+
+        foreach ($userIds as $recipientUserId) {
+            self::notifyCompatibilityInterest(
+                (int)$recipientUserId,
+                $compatibilityId
+            );
+
+            $created++;
+        }
+
+        return $created;
+    }
+
     public static function notifyCompatibilityMutualInterest(
         int $userId,
         int $compatibilityId,

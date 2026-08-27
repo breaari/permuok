@@ -996,13 +996,13 @@ c.target_seen_at,
      * de primer interés es quien creó la publicación
      * de la otra parte.
      */
-        $counterpartUserId =
+        $counterpartRealEstateId =
             $isSource
             ? (int)(
-                $compatibility['property_owner_user_id'] ?? 0
+                $compatibility['target_real_estate_id'] ?? 0
             )
             : (int)(
-                $compatibility['search_owner_user_id'] ?? 0
+                $compatibility['source_real_estate_id'] ?? 0
             );
 
         $responseField =
@@ -1159,13 +1159,13 @@ c.target_seen_at,
             $status === 'one_side_interested' &&
             $response === 'interested' &&
             $previousMyResponse !== 'interested' &&
-            $counterpartUserId > 0 &&
-            $counterpartUserId !== $userId
+            $counterpartRealEstateId > 0
         ) {
-            NotificationService::notifyCompatibilityInterest(
-                $counterpartUserId,
-                $compatibilityId
-            );
+            NotificationService::notifyCompatibilityInterestForRealEstate(
+                    $counterpartRealEstateId,
+                    $compatibilityId,
+                    $userId
+                );
         }
 
         /*
