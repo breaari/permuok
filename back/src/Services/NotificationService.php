@@ -134,9 +134,10 @@ class NotificationService
         string $title,
         ?string $body = null,
         ?string $relatedType = null,
-        ?int $relatedId = null
+        ?int $relatedId = null,
+        ?PDO $pdo = null
     ): void {
-        $pdo = self::db();
+        $pdo ??= self::db();
 
         $stmt = $pdo->prepare("
             INSERT INTO notifications (
@@ -486,7 +487,8 @@ class NotificationService
     public static function notifyCompatibilityMutualInterest(
         int $userId,
         int $compatibilityId,
-        ?int $conversationId = null
+        ?int $conversationId = null,
+        ?PDO $pdo = null
     ): void {
         if (
             $userId <= 0 ||
@@ -510,7 +512,8 @@ class NotificationService
                 '¡Hay interés mutuo!',
                 'Ambas inmobiliarias mostraron interés. Ya pueden comenzar a conversar.',
                 'conversation',
-                $conversationId
+                $conversationId,
+                $pdo
             );
 
             $relatedType =
@@ -528,9 +531,9 @@ class NotificationService
                 '¡Hay interés mutuo!',
                 'Ambas inmobiliarias mostraron interés en esta compatibilidad.',
                 'compatibility',
-                $compatibilityId
+                $compatibilityId,
+                $pdo
             );
-
             $relatedType =
                 'compatibility';
 
@@ -595,7 +598,8 @@ class NotificationService
             $recipient['name'],
             $relatedType,
             $relatedId,
-            9
+            9,
+            $pdo
         );
     }
     private static function buildConversationTitle(string $type, array $conversation): string

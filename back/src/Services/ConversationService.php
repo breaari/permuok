@@ -420,23 +420,26 @@ class ConversationService
                 ':id' => $compatibilityId,
             ]);
 
-            $pdo->commit();
-
             /*
- * Al quedar habilitado el chat,
- * notificamos a ambas partes.
+ * Las notificaciones internas y los email_jobs
+ * forman parte de la misma transacción que
+ * habilita el chat.
  */
             NotificationService::notifyCompatibilityMutualInterest(
                 $sourceUserId,
                 $compatibilityId,
-                $conversationId
+                $conversationId,
+                $pdo
             );
 
             NotificationService::notifyCompatibilityMutualInterest(
                 $targetUserId,
                 $compatibilityId,
-                $conversationId
+                $conversationId,
+                $pdo
             );
+
+            $pdo->commit();
 
             return [
                 'conversation' =>

@@ -28,7 +28,8 @@ class EmailJobService
         ?string $recipientName = null,
         ?string $relatedType = null,
         ?int $relatedId = null,
-        int $priority = 5
+        int $priority = 5,
+        ?PDO $pdo = null
     ): array {
         $emailTo = trim($emailTo);
         $emailType = trim($emailType);
@@ -69,7 +70,7 @@ class EmailJobService
             min(10, $priority)
         );
 
-        $pdo = self::db();
+        $pdo ??= self::db();
 
         $st = $pdo->prepare("
             INSERT INTO email_jobs (
@@ -107,38 +108,38 @@ class EmailJobService
 
         $st->execute([
             'user_id' =>
-                $userId && $userId > 0
+            $userId && $userId > 0
                 ? $userId
                 : null,
 
             'email_to' =>
-                $emailTo,
+            $emailTo,
 
             'recipient_name' =>
-                $recipientName,
+            $recipientName,
 
             'email_type' =>
-                $emailType,
+            $emailType,
 
             'subject' =>
-                $subject,
+            $subject,
 
             'html_body' =>
-                $htmlBody,
+            $htmlBody,
 
             'text_body' =>
-                $textBody,
+            $textBody,
 
             'related_type' =>
-                $relatedType,
+            $relatedType,
 
             'related_id' =>
-                $relatedId && $relatedId > 0
+            $relatedId && $relatedId > 0
                 ? $relatedId
                 : null,
 
             'priority' =>
-                $priority,
+            $priority,
         ]);
 
         $id = (int)$pdo->lastInsertId();
@@ -383,10 +384,10 @@ class EmailJobService
 
         $st->execute([
             'last_error' =>
-                $message,
+            $message,
 
             'id' =>
-                $jobId,
+            $jobId,
         ]);
     }
 
