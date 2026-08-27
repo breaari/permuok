@@ -52,9 +52,19 @@ export default function Inbox() {
   const selectedGroup =
     activeGroups.find((group) => group.key === selectedGroupKey) || null;
 
+  const hasVisibleContent =
+    activeTab === "own" || activeTab === "external"
+      ? activeGroups.length > 0
+      : visibleItems.length > 0;
+
   function handleTabChange(tab) {
     setSelectedGroupKey(null);
     setActiveTab(tab);
+  }
+
+  function handleArchiveModeChange(mode) {
+    setSelectedGroupKey(null);
+    setArchiveMode(mode);
   }
 
   return (
@@ -74,7 +84,7 @@ export default function Inbox() {
 
       <InboxFilters
         archiveMode={archiveMode}
-        setArchiveMode={setArchiveMode}
+        setArchiveMode={handleArchiveModeChange}
         activeStatus={activeStatus}
         setActiveStatus={setActiveStatus}
         statusCounts={statusCounts}
@@ -108,7 +118,7 @@ export default function Inbox() {
               : "Las consultas iniciadas desde publicaciones, búsquedas y desarrollos aparecerán acá."}
           </p>
         </div>
-      ) : !visibleItems.length ? (
+      ) : !hasVisibleContent ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm font-semibold text-slate-400 sm:rounded-3xl sm:p-10">
           No hay conversaciones para este filtro.
         </div>
