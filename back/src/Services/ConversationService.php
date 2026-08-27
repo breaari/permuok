@@ -525,7 +525,8 @@ class ConversationService
             comp.match_level AS compatibility_match_level,
             comp.property_id AS compatibility_property_id,
             comp.search_request_id AS compatibility_search_request_id,
-
+p.title AS compatibility_property_title,
+sr.title AS compatibility_search_title,
             CASE
                 WHEN cp.role = 'owner'
                     THEN 'received'
@@ -581,7 +582,13 @@ class ConversationService
         LEFT JOIN compatibilities comp
             ON comp.id = c.compatibility_id
            AND comp.deleted_at IS NULL
+LEFT JOIN properties p
+    ON p.id = comp.property_id
+   AND p.deleted_at IS NULL
 
+LEFT JOIN search_requests sr
+    ON sr.id = comp.search_request_id
+   AND sr.deleted_at IS NULL
         LEFT JOIN messages lm
             ON lm.id = c.last_message_id
 

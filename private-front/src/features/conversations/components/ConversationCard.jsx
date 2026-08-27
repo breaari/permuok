@@ -89,6 +89,31 @@ export default function ConversationCard({
                 <h3 className="mt-3 line-clamp-2 text-sm font-black leading-snug text-slate-900 sm:text-base">
                   {item?.subject || "Consulta"}
                 </h3>
+                {isMatch ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-xl bg-violet-50 px-3 py-2">
+                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-violet-500">
+                        Propiedad
+                      </p>
+
+                      <p className="mt-1 line-clamp-1 text-xs font-bold text-slate-700">
+                        {item?.compatibility_property_title ||
+                          `Propiedad #${item?.compatibility_property_id || "-"}`}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-slate-50 px-3 py-2">
+                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                        Búsqueda
+                      </p>
+
+                      <p className="mt-1 line-clamp-1 text-xs font-bold text-slate-700">
+                        {item?.compatibility_search_title ||
+                          `Búsqueda #${item?.compatibility_search_request_id || "-"}`}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex shrink-0 items-center justify-between gap-3 sm:block sm:text-right">
