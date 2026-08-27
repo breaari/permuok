@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Icon } from "../../../ui/icons/Index";
@@ -8,40 +7,98 @@ import useInboxConversations from "../detail/useInboxConversations";
 import InboxHeader from "../components/InboxHeader";
 import ConversationGroupCard from "../components/ConversationGroupCard";
 
+function PaginationControls({ page, pagination, onChange }) {
+  const currentPage = Number(page || 1);
+  const totalPages = Number(pagination?.total_pages || 0);
+
+  if (totalPages <= 1) {
+    return null;
+  }
+
+  return (
+    <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm font-semibold text-slate-500">
+        Página <span className="font-black text-slate-900">{currentPage}</span>{" "}
+        de <span className="font-black text-slate-900">{totalPages}</span>
+      </p>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={currentPage <= 1}
+          onClick={() => onChange(currentPage - 1)}
+          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Anterior
+        </button>
+
+        <button
+          type="button"
+          disabled={currentPage >= totalPages}
+          onClick={() => onChange(currentPage + 1)}
+          className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Siguiente
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Inbox() {
   const navigate = useNavigate();
 
   const {
     activeTab,
     setActiveTab,
+
     archiveMode,
     setArchiveMode,
+
     activeStatus,
     setActiveStatus,
+
     items,
+
     loading,
     polling,
     error,
+
     search,
     setSearch,
-    ownItems,
-    externalItems,
-    matchItems,
+
     visibleItems,
     statusCounts,
+
     ownUnread,
     externalUnread,
     matchUnread,
+
     handleArchive,
     handleUnarchive,
+
+    matchCount,
+
     ownGroupCount,
     ownGroups,
+
     externalGroupCount,
     externalGroups,
-    matchCount,
-  } = useInboxConversations();
 
-  const [selectedGroupKey, setSelectedGroupKey] = useState(null);
+    pagination,
+    page,
+    setPage,
+
+    selectedGroup,
+    groupItems,
+    groupLoading,
+    groupError,
+    groupPagination,
+
+    openGroup,
+    closeGroup,
+    changeGroupPage,
+  } = useInboxConversations();
 
   const activeGroups =
     activeTab === "own"
@@ -50,22 +107,29 @@ export default function Inbox() {
         ? externalGroups
         : [];
 
-  const selectedGroup =
-    activeGroups.find((group) => group.key === selectedGroupKey) || null;
-
   const hasVisibleContent =
     activeTab === "own" || activeTab === "external"
       ? activeGroups.length > 0
       : visibleItems.length > 0;
 
   function handleTabChange(tab) {
-    setSelectedGroupKey(null);
+    closeGroup();
     setActiveTab(tab);
   }
 
   function handleArchiveModeChange(mode) {
-    setSelectedGroupKey(null);
+    closeGroup();
     setArchiveMode(mode);
+  }
+
+  function handleStatusChange(status) {
+    closeGroup();
+    setActiveStatus(status);
+  }
+
+  function handleSearchChange(value) {
+    closeGroup();
+    setSearch(value);
   }
 
   return (
@@ -87,10 +151,10 @@ export default function Inbox() {
         archiveMode={archiveMode}
         setArchiveMode={handleArchiveModeChange}
         activeStatus={activeStatus}
-        setActiveStatus={setActiveStatus}
+        setActiveStatus={handleStatusChange}
         statusCounts={statusCounts}
         search={search}
-        setSearch={setSearch}
+        setSearch={handleSearchChange}
       />
 
       {loading ? (
@@ -151,7 +215,7 @@ export default function Inbox() {
                 <div className="mb-5">
                   <button
                     type="button"
-                    onClick={() => setSelectedGroupKey(null)}
+                    onClick={closeGroup}
                     className="text-sm font-black text-slate-600 transition hover:text-slate-900"
                   >
                     ←{" "}
@@ -166,51 +230,89 @@ export default function Inbox() {
                     </p>
 
                     <h3 className="mt-2 text-lg font-black text-slate-900">
-                      {selectedGroup.subject}
+                      {selectedGroup.subject || "Publicación"}
                     </h3>
 
                     <p className="mt-1 text-sm font-semibold text-slate-500">
-                      {selectedGroup.conversation_count}{" "}
-                      {selectedGroup.conversation_count === 1
+                      {Number(selectedGroup.conversation_count || 0)}{" "}
+                      {Number(selectedGroup.conversation_count || 0) === 1
                         ? "conversación"
                         : "conversaciones"}
                     </p>
                   </div>
                 </div>
 
-                {selectedGroup.conversations.map((item) => (
-                  <ConversationCard
-                    key={item.id}
-                    item={item}
-                    mode={activeTab}
-                    archived={archiveMode === "archived"}
-                    onOpen={() => navigate(`/conversations/${item.id}`)}
-                    onArchive={() => handleArchive(item)}
-                    onUnarchive={() => handleUnarchive(item)}
-                  />
-                ))}
+                {groupLoading ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-500">
+                    Cargando conversaciones...
+                  </div>
+                ) : groupError ? (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">
+                    {groupError}
+                  </div>
+                ) : groupItems.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm font-semibold text-slate-400">
+                    No hay conversaciones en esta publicación.
+                  </div>
+                ) : (
+                  <>
+                    {groupItems.map((item) => (
+                      <ConversationCard
+                        key={item.id}
+                        item={item}
+                        mode={activeTab}
+                        archived={archiveMode === "archived"}
+                        onOpen={() => navigate(`/conversations/${item.id}`)}
+                        onArchive={() => handleArchive(item)}
+                        onUnarchive={() => handleUnarchive(item)}
+                      />
+                    ))}
+
+                    <PaginationControls
+                      page={groupPagination?.page || 1}
+                      pagination={groupPagination}
+                      onChange={changeGroupPage}
+                    />
+                  </>
+                )}
               </div>
             ) : (
-              activeGroups.map((group) => (
-                <ConversationGroupCard
-                  key={group.key}
-                  group={group}
-                  onOpen={() => setSelectedGroupKey(group.key)}
+              <>
+                {activeGroups.map((group) => (
+                  <ConversationGroupCard
+                    key={group.key}
+                    group={group}
+                    onOpen={() => openGroup(group)}
+                  />
+                ))}
+
+                <PaginationControls
+                  page={page}
+                  pagination={pagination}
+                  onChange={setPage}
                 />
-              ))
+              </>
             )
           ) : (
-            visibleItems.map((item) => (
-              <ConversationCard
-                key={item.id}
-                item={item}
-                mode={activeTab}
-                archived={archiveMode === "archived"}
-                onOpen={() => navigate(`/conversations/${item.id}`)}
-                onArchive={() => handleArchive(item)}
-                onUnarchive={() => handleUnarchive(item)}
+            <>
+              {visibleItems.map((item) => (
+                <ConversationCard
+                  key={item.id}
+                  item={item}
+                  mode="matches"
+                  archived={archiveMode === "archived"}
+                  onOpen={() => navigate(`/conversations/${item.id}`)}
+                  onArchive={() => handleArchive(item)}
+                  onUnarchive={() => handleUnarchive(item)}
+                />
+              ))}
+
+              <PaginationControls
+                page={page}
+                pagination={pagination}
+                onChange={setPage}
               />
-            ))
+            </>
           )}
         </section>
       )}

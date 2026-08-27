@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   archiveConversation,
   getInboxConversations,
+  getInboxGroupConversations,
   unarchiveConversation,
 } from "../api/conversations.api";
 
@@ -25,6 +26,94 @@ export default function useInboxConversations() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const [items, setItems] = useState([]);
+
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [groupItems, setGroupItems] = useState([]);
+  const [groupLoading, setGroupLoading] = useState(false);
+  const [groupError, setGroupError] = useState("");
+
+  const [groupPagination, setGroupPagination] = useState({
+    page: 1,
+    limit: PAGE_SIZE,
+    total: 0,
+    total_pages: 0,
+    has_more: false,
+  });
+
+  async function openGroup(group, requestedPage = 1) {
+    if (!group) {
+      return;
+    }
+
+    try {
+      setGroupLoading(true);
+      setGroupError("");
+
+      const res = await getInboxGroupConversations({
+        tab: activeTab,
+        opportunity_type: group.opportunity_type,
+        opportunity_id: group.opportunity_id,
+        page: requestedPage,
+        limit: PAGE_SIZE,
+        archived: archiveMode === "archived",
+      });
+
+      setSelectedGroup(group);
+
+      setGroupItems(Array.isArray(res?.items) ? res.items : []);
+
+      setGroupPagination({
+        page: Number(res?.pagination?.page || requestedPage),
+
+        limit: Number(res?.pagination?.limit || PAGE_SIZE),
+
+        total: Number(res?.pagination?.total || 0),
+
+        total_pages: Number(res?.pagination?.total_pages || 0),
+
+        has_more: Boolean(res?.pagination?.has_more),
+      });
+    } catch (err) {
+      setGroupError(
+        err?.message ||
+          "No se pudieron cargar las conversaciones de esta publicación.",
+      );
+    } finally {
+      setGroupLoading(false);
+    }
+  }
+
+  function closeGroup() {
+    setSelectedGroup(null);
+    setGroupItems([]);
+    setGroupError("");
+
+    setGroupPagination({
+      page: 1,
+      limit: PAGE_SIZE,
+      total: 0,
+      total_pages: 0,
+      has_more: false,
+    });
+  }
+
+  async function changeGroupPage(nextPage) {
+    if (!selectedGroup) {
+      return;
+    }
+
+    const normalizedPage = Math.max(
+      1,
+      Math.min(Number(nextPage) || 1, Math.max(1, groupPagination.total_pages)),
+    );
+
+    await openGroup(selectedGroup, normalizedPage);
+  }
+
+  useEffect(() => {
+    closeGroup();
+  }, [activeTab, archiveMode, activeStatus, debouncedSearch]);
+
   const [summary, setSummary] = useState({
     tabs: {
       own: {
@@ -151,6 +240,9 @@ export default function useInboxConversations() {
       await loadData({
         requestedPage: page,
       });
+      if (selectedGroup) {
+        await openGroup(selectedGroup, groupPagination.page);
+      }
     } catch (err) {
       const message = err?.message || "No se pudo archivar la conversación.";
 
@@ -168,6 +260,9 @@ export default function useInboxConversations() {
       await loadData({
         requestedPage: page,
       });
+      if (selectedGroup) {
+        await openGroup(selectedGroup, groupPagination.page);
+      }
     } catch (err) {
       const message = err?.message || "No se pudo desarchivar la conversación.";
 
@@ -317,5 +412,14 @@ export default function useInboxConversations() {
     setPage: changePage,
 
     reload: loadData,
+    selectedGroup,
+    groupItems,
+    groupLoading,
+    groupError,
+    groupPagination,
+
+    openGroup,
+    closeGroup,
+    changeGroupPage,
   };
 }
