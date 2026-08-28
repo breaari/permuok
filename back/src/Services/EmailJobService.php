@@ -71,7 +71,7 @@ class EmailJobService
         );
 
         $pdo ??= self::db();
-
+       
         $st = $pdo->prepare("
             INSERT INTO email_jobs (
                 user_id,
