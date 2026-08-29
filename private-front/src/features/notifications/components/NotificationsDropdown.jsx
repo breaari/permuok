@@ -32,6 +32,10 @@ function formatDate(value) {
 }
 
 function getNotificationPath(item) {
+  if (item?.type === "match_daily_digest") {
+    return "/compatibilities";
+  }
+
   const relatedId = Number(item?.related_id || 0);
 
   if (!relatedId) {
