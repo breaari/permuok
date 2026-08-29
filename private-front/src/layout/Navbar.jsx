@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import useRealtimeStream from "../features/realtime/hooks/useRealtimeStream";
 import { useAuth } from "../features/auth/components/AuthContext";
@@ -54,16 +54,21 @@ export default function Navbar({ title = "Panel", onOpenSidebar }) {
     setConversationsCount,
   } = useNavbarBadges(shouldLoadBadges ? user?.id : null);
 
-  useRealtimeStream({
-    enabled: shouldLoadBadges && Boolean(user?.id),
+  const handleRealtimeNotification = useCallback(() => {
+    setNotificationsCount((prev) => Number(prev || 0) + 1);
+  }, [setNotificationsCount]);
 
-    onNotification: () => {
-      setNotificationsCount((prev) => Number(prev || 0) + 1);
-    },
-
-    onConversationUnread: (data) => {
+  const handleRealtimeConversationUnread = useCallback(
+    (data) => {
       setConversationsCount(Number(data?.count || 0));
     },
+    [setConversationsCount],
+  );
+
+  useRealtimeStream({
+    enabled: shouldLoadBadges && Boolean(user?.id),
+    onNotification: handleRealtimeNotification,
+    onConversationUnread: handleRealtimeConversationUnread,
   });
 
   useEffect(() => {
