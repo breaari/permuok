@@ -2229,80 +2229,157 @@ THEN 1
         };
     }
 
-    public static function requestContactShare(int $userId, int $conversationId): array
-    {
-        self::assertParticipant($userId, $conversationId);
-
-        $pdo = self::db();
-
-        $conversation = self::getConversationById($conversationId);
-
-        if ((int)$conversation['contact_shared'] === 1) {
-            throw new Exception('Los datos de contacto ya fueron compartidos.', 422);
-        }
-
-        $receiverIds = self::getOtherParticipantIds($conversationId, $userId);
-
-        if (!$receiverIds) {
-            throw new Exception('No se encontró destinatario para la solicitud.', 404);
-        }
-
-        $requestedToUserId = (int)$receiverIds[0];
-
-        $existing = self::getPendingContactShareRequest(
-            $conversationId,
+    public static function requestContactShare(
+        int $userId,
+        int $conversationId
+    ): array {
+        self::assertParticipant(
             $userId,
-            $requestedToUserId
+            $conversationId
         );
 
-        if ($existing) {
-            return [
-                'request' => $existing,
-                'already_exists' => true,
-            ];
-        }
+        $pdo = self::db();
 
         $pdo->beginTransaction();
 
         try {
+            /*
+         * Bloqueamos la conversación.
+         *
+         * Esto serializa cualquier intento simultáneo
+         * de solicitar compartir contacto sobre
+         * esta misma conversación.
+         */
             $stmt = $pdo->prepare("
-                INSERT INTO contact_share_requests (
-                    conversation_id,
-                    requested_by_user_id,
-                    requested_to_user_id,
-                    status,
-                    requester_accepted,
-                    receiver_accepted,
-                    expires_at
-                )
-                VALUES (
-                    :conversation_id,
-                    :requested_by_user_id,
-                    :requested_to_user_id,
-                    'pending',
-                    1,
-                    0,
-                    DATE_ADD(NOW(), INTERVAL 7 DAY)
-                )
-            ");
+            SELECT *
+            FROM conversations
+            WHERE id = :conversation_id
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+        ");
 
             $stmt->execute([
                 ':conversation_id' => $conversationId,
-                ':requested_by_user_id' => $userId,
-                ':requested_to_user_id' => $requestedToUserId,
             ]);
 
-            $requestId = (int)$pdo->lastInsertId();
+            $conversation =
+                $stmt->fetch(PDO::FETCH_ASSOC);
 
-            $systemMessage = self::createSystemMessage(
+            if (!$conversation) {
+                throw new Exception(
+                    'Conversación no encontrada.',
+                    404
+                );
+            }
+
+            if (
+                (int)$conversation['contact_shared'] === 1
+            ) {
+                throw new Exception(
+                    'Los datos de contacto ya fueron compartidos.',
+                    422
+                );
+            }
+
+            $receiverIds =
+                self::getOtherParticipantIds(
+                    $conversationId,
+                    $userId
+                );
+
+            if (!$receiverIds) {
+                throw new Exception(
+                    'No se encontró destinatario para la solicitud.',
+                    404
+                );
+            }
+
+            $requestedToUserId =
+                (int)$receiverIds[0];
+
+            /*
+         * Buscamos cualquier solicitud pendiente
+         * de esta conversación.
+         *
+         * No solamente la misma dirección.
+         * Así evitamos que ambas partes creen
+         * solicitudes cruzadas simultáneamente.
+         */
+            $stmt = $pdo->prepare("
+            SELECT *
+            FROM contact_share_requests
+            WHERE conversation_id = :conversation_id
+              AND status = 'pending'
+              AND deleted_at IS NULL
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+
+            $stmt->execute([
+                ':conversation_id' => $conversationId,
+            ]);
+
+            $existing =
+                $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                $pdo->commit();
+
+                return [
+                    'request' => $existing,
+                    'already_exists' => true,
+                ];
+            }
+
+            $stmt = $pdo->prepare("
+            INSERT INTO contact_share_requests (
+                conversation_id,
+                requested_by_user_id,
+                requested_to_user_id,
+                status,
+                requester_accepted,
+                receiver_accepted,
+                expires_at
+            )
+            VALUES (
+                :conversation_id,
+                :requested_by_user_id,
+                :requested_to_user_id,
+                'pending',
+                1,
+                0,
+                DATE_ADD(NOW(), INTERVAL 7 DAY)
+            )
+        ");
+
+            $stmt->execute([
+                ':conversation_id' =>
                 $conversationId,
-                'Solicitud para compartir datos de contacto.'
+
+                ':requested_by_user_id' =>
+                $userId,
+
+                ':requested_to_user_id' =>
+                $requestedToUserId,
+            ]);
+
+            $requestId =
+                (int)$pdo->lastInsertId();
+
+            $systemMessage =
+                self::createSystemMessage(
+                    $conversationId,
+                    'Solicitud para compartir datos de contacto.'
+                );
+
+            self::touchConversation(
+                $conversationId,
+                (int)$systemMessage['id']
             );
 
-            self::touchConversation($conversationId, $systemMessage['id']);
-
             NotificationService::notifyContactShareRequested(
-                (int)$requestedToUserId,
+                $requestedToUserId,
                 $conversationId,
                 $conversation,
                 $pdo
@@ -2311,10 +2388,18 @@ THEN 1
             $pdo->commit();
 
             return [
-                'request' => self::getContactShareRequestById($requestId),
+                'request' =>
+                self::getContactShareRequestById(
+                    $requestId
+                ),
+
+                'already_exists' => false,
             ];
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
