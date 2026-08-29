@@ -183,6 +183,29 @@ export default function useInboxConversations() {
         return;
       }
 
+      const responsePage = Number(res?.pagination?.page || requestedPage);
+
+      const totalPages = Number(res?.pagination?.total_pages || 0);
+
+      /*
+       * Si la página solicitada dejó de existir
+       * porque se archivó/desarchivó el último
+       * elemento, volvemos a la última página válida.
+       */
+      if (totalPages > 0 && responsePage > totalPages) {
+        setPage(totalPages);
+        return;
+      }
+
+      /*
+       * Si ya no queda ningún resultado,
+       * volvemos a página 1.
+       */
+      if (totalPages === 0 && responsePage !== 1) {
+        setPage(1);
+        return;
+      }
+
       const nextItems = Array.isArray(res?.items) ? res.items : [];
 
       setItems(nextItems);
@@ -203,7 +226,6 @@ export default function useInboxConversations() {
 
         has_more: Boolean(res?.pagination?.has_more),
       });
-
     } catch (err) {
       if (requestId !== requestIdRef.current) {
         return;
