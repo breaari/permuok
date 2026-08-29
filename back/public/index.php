@@ -258,7 +258,20 @@ if ($method === 'GET' && preg_match('#^/properties/(\d+)$#', $uri, $m)) {
     PropertyController::detail();
     exit;
 }
+if (
+    $method === 'GET' &&
+    preg_match(
+        '#^/explore/properties/(\d+)$#',
+        $uri,
+        $m
+    )
+) {
+    $_GET['id'] = (int)$m[1];
 
+    PropertyController::exploreDetail();
+
+    exit;
+}
 if ($method === 'PATCH' && preg_match('#^/properties/(\d+)$#', $uri, $m)) {
     $_GET['id'] = (int)$m[1];
     PropertyController::update();
