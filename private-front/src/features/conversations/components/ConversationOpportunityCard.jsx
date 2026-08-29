@@ -23,18 +23,36 @@ function getOpportunityLabel(type) {
 }
 
 function getOpportunityPath(conversation) {
-  if (conversation?.opportunity_url) return conversation.opportunity_url;
-
   const type = conversation?.opportunity_type;
   const id = conversation?.opportunity_id;
 
-  if (!type || !id) return null;
+  if (!type || !id) {
+    return conversation?.opportunity_url || null;
+  }
 
-  if (type === "property") return `/explore/properties/${id}`;
-  if (type === "search_request") return `/explore/search-requests/${id}`;
-  if (type === "development") return `/explore/developments/${id}`;
+  /*
+   * Para propiedades usamos siempre la ruta normal.
+   *
+   * PropertyDetail ya resuelve automáticamente:
+   * - si es propia -> /properties/:id
+   * - si es externa -> fallback a /explore/properties/:id
+   *
+   * Esto también permite abrir correctamente
+   * propiedades involucradas en conversaciones de match.
+   */
+  if (type === "property") {
+    return `/properties/${id}`;
+  }
 
-  return null;
+  if (type === "search_request") {
+    return `/explore/search-requests/${id}`;
+  }
+
+  if (type === "development") {
+    return `/explore/developments/${id}`;
+  }
+
+  return conversation?.opportunity_url || null;
 }
 
 function getImageUrl(conversation) {
