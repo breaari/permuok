@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import useRealtimeStream from "../features/realtime/hooks/useRealtimeStream";
 import { useAuth } from "../features/auth/components/AuthContext";
 import useNavbarBadges from "../features/layout/hooks/useNavbarBadges";
 import NotificationsDropdown from "../features/notifications/components/NotificationsDropdown";
@@ -47,8 +47,24 @@ export default function Navbar({ title = "Panel", onOpenSidebar }) {
 
   const shouldLoadBadges = canSeeMessages || canSeeNotifications;
 
-  const { notificationsCount, setNotificationsCount, conversationsCount } =
-    useNavbarBadges(shouldLoadBadges ? user?.id : null);
+  const {
+    notificationsCount,
+    setNotificationsCount,
+    conversationsCount,
+    setConversationsCount,
+  } = useNavbarBadges(shouldLoadBadges ? user?.id : null);
+
+  useRealtimeStream({
+    enabled: shouldLoadBadges && Boolean(user?.id),
+
+    onNotification: () => {
+      setNotificationsCount((prev) => Number(prev || 0) + 1);
+    },
+
+    onConversationUnread: (data) => {
+      setConversationsCount(Number(data?.count || 0));
+    },
+  });
 
   useEffect(() => {
     function onDoc(e) {
