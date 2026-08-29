@@ -2409,17 +2409,41 @@ THEN 1
         int $conversationId,
         array $input
     ): array {
-        self::assertParticipant($userId, $conversationId);
+        self::assertParticipant(
+            $userId,
+            $conversationId
+        );
 
-        $decision = trim((string)($input['decision'] ?? ''));
+        $decision = trim(
+            (string)($input['decision'] ?? '')
+        );
 
-        if (!in_array($decision, ['accepted', 'rejected'], true)) {
-            throw new Exception('La respuesta debe ser accepted o rejected.', 422);
+        if (
+            !in_array(
+                $decision,
+                ['accepted', 'rejected'],
+                true
+            )
+        ) {
+            throw new Exception(
+                'La respuesta debe ser accepted o rejected.',
+                422
+            );
         }
 
         $pdo = self::db();
 
-        $stmt = $pdo->prepare("
+        $pdo->beginTransaction();
+
+        try {
+            /*
+         * Bloqueamos la solicitud pendiente.
+         *
+         * Si llegan dos respuestas simultáneas,
+         * la segunda espera y luego ya no encontrará
+         * la solicitud como pending.
+         */
+            $stmt = $pdo->prepare("
             SELECT *
             FROM contact_share_requests
             WHERE conversation_id = :conversation_id
@@ -2428,90 +2452,147 @@ THEN 1
               AND deleted_at IS NULL
             ORDER BY id DESC
             LIMIT 1
+            FOR UPDATE
         ");
 
-        $stmt->execute([
-            ':conversation_id' => $conversationId,
-            ':user_id' => $userId,
-        ]);
+            $stmt->execute([
+                ':conversation_id' =>
+                $conversationId,
 
-        $request = $stmt->fetch(PDO::FETCH_ASSOC);
+                ':user_id' =>
+                $userId,
+            ]);
 
-        if (!$request) {
-            throw new Exception('No hay una solicitud pendiente para responder.', 404);
-        }
+            $request =
+                $stmt->fetch(PDO::FETCH_ASSOC);
 
-        $pdo->beginTransaction();
+            if (!$request) {
+                throw new Exception(
+                    'No hay una solicitud pendiente para responder.',
+                    404
+                );
+            }
 
-        try {
             if ($decision === 'accepted') {
                 $stmt = $pdo->prepare("
-                    UPDATE contact_share_requests
-                    SET
-                        status = 'accepted',
-                        receiver_accepted = 1,
-                        responded_at = NOW()
-                    WHERE id = :id
-                ");
+                UPDATE contact_share_requests
+                SET
+                    status = 'accepted',
+                    receiver_accepted = 1,
+                    responded_at = NOW()
+                WHERE id = :id
+                  AND status = 'pending'
+            ");
 
-                $stmt->execute([':id' => $request['id']]);
+                $stmt->execute([
+                    ':id' => $request['id'],
+                ]);
+
+                if ($stmt->rowCount() !== 1) {
+                    throw new Exception(
+                        'La solicitud ya fue respondida.',
+                        409
+                    );
+                }
 
                 $stmt = $pdo->prepare("
-                    UPDATE conversations
-                    SET contact_shared = 1
-                    WHERE id = :conversation_id
-                ");
+                UPDATE conversations
+                SET
+                    contact_shared = 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :conversation_id
+                  AND deleted_at IS NULL
+            ");
 
-                $stmt->execute([':conversation_id' => $conversationId]);
-
-                $systemMessage = self::createSystemMessage(
+                $stmt->execute([
+                    ':conversation_id' =>
                     $conversationId,
-                    'Ambas partes aceptaron compartir datos de contacto.'
-                );
+                ]);
+
+                $systemMessage =
+                    self::createSystemMessage(
+                        $conversationId,
+                        'Ambas partes aceptaron compartir datos de contacto.'
+                    );
+
                 NotificationService::notifyContactShareAccepted(
                     (int)$request['requested_by_user_id'],
                     $conversationId,
-                    self::getConversationById($conversationId),
+                    self::getConversationById(
+                        $conversationId
+                    ),
                     $pdo
                 );
             } else {
                 $stmt = $pdo->prepare("
-                    UPDATE contact_share_requests
-                    SET
-                        status = 'rejected',
-                        rejected_reason = :reason,
-                        responded_at = NOW()
-                    WHERE id = :id
-                ");
+                UPDATE contact_share_requests
+                SET
+                    status = 'rejected',
+                    rejected_reason = :reason,
+                    responded_at = NOW()
+                WHERE id = :id
+                  AND status = 'pending'
+            ");
 
                 $stmt->execute([
-                    ':id' => $request['id'],
-                    ':reason' => trim((string)($input['reason'] ?? '')),
+                    ':id' =>
+                    $request['id'],
+
+                    ':reason' =>
+                    trim(
+                        (string)(
+                            $input['reason']
+                            ?? ''
+                        )
+                    ),
                 ]);
 
-                $systemMessage = self::createSystemMessage(
-                    $conversationId,
-                    'La solicitud para compartir datos fue rechazada.'
-                );
+                if ($stmt->rowCount() !== 1) {
+                    throw new Exception(
+                        'La solicitud ya fue respondida.',
+                        409
+                    );
+                }
+
+                $systemMessage =
+                    self::createSystemMessage(
+                        $conversationId,
+                        'La solicitud para compartir datos fue rechazada.'
+                    );
 
                 NotificationService::notifyContactShareRejected(
                     (int)$request['requested_by_user_id'],
                     $conversationId,
-                    self::getConversationById($conversationId),
+                    self::getConversationById(
+                        $conversationId
+                    ),
                     $pdo
                 );
             }
 
-            self::touchConversation($conversationId, $systemMessage['id']);
+            self::touchConversation(
+                $conversationId,
+                (int)$systemMessage['id']
+            );
 
             $pdo->commit();
 
             return [
-                'request' => self::getContactShareRequestById((int)$request['id']),
-                'conversation' => self::getConversationById($conversationId),
+                'request' =>
+                self::getContactShareRequestById(
+                    (int)$request['id']
+                ),
+
+                'conversation' =>
+                self::getConversationById(
+                    $conversationId
+                ),
             ];
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
