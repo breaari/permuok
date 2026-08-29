@@ -1019,6 +1019,114 @@ c.target_seen_at,
         $pdo->beginTransaction();
 
         try {
+
+            /*
+ * Volvemos a leer la compatibilidad dentro de la
+ * transacción y bloqueamos la fila.
+ *
+ * Si llegan dos respuestas simultáneas, la segunda
+ * espera a que termine la primera y después trabaja
+ * con el estado realmente actualizado.
+ */
+            $stLocked = $pdo->prepare("
+    SELECT
+        c.*,
+
+        sr.created_by_user_id
+            AS search_owner_user_id,
+
+        p.created_by_user_id
+            AS property_owner_user_id
+
+    FROM compatibilities c
+
+    INNER JOIN search_requests sr
+        ON sr.id = c.search_request_id
+       AND sr.deleted_at IS NULL
+
+    INNER JOIN properties p
+        ON p.id = c.property_id
+       AND p.deleted_at IS NULL
+
+    WHERE c.id = :id
+      AND c.deleted_at IS NULL
+
+    LIMIT 1
+    FOR UPDATE
+");
+
+            $stLocked->execute([
+                'id' => $compatibilityId,
+            ]);
+
+            $compatibility =
+                $stLocked->fetch(PDO::FETCH_ASSOC);
+
+            if (!$compatibility) {
+                throw new Exception(
+                    'Compatibilidad no encontrada.',
+                    404
+                );
+            }
+
+            $isSource =
+                (int)$compatibility['source_real_estate_id'] === $realEstateId;
+
+            $isTarget =
+                (int)$compatibility['target_real_estate_id'] === $realEstateId;
+
+            if (!$isSource && !$isTarget) {
+                throw new Exception(
+                    'No tenés acceso a esta compatibilidad.',
+                    403
+                );
+            }
+
+            if (
+                $compatibility['status']
+                === 'chat_enabled'
+            ) {
+                throw new Exception(
+                    'Esta compatibilidad ya tiene una conversación habilitada.',
+                    422
+                );
+            }
+
+            if (
+                $compatibility['status']
+                === 'mutual_interest' &&
+                $response !== 'interested'
+            ) {
+                throw new Exception(
+                    'Esta compatibilidad ya tiene interés mutuo.',
+                    422
+                );
+            }
+
+            $previousMyResponse =
+                $isSource
+                ? $compatibility['source_response']
+                : $compatibility['target_response'];
+
+            $counterpartRealEstateId =
+                $isSource
+                ? (int)($compatibility['target_real_estate_id'] ?? 0)
+                : (int)($compatibility['source_real_estate_id'] ?? 0);
+
+            $responseField =
+                $isSource
+                ? 'source_response'
+                : 'target_response';
+
+            $respondedAtField =
+                $isSource
+                ? 'source_responded_at'
+                : 'target_responded_at';
+
+            $respondedByField =
+                $isSource
+                ? 'source_responded_by_user_id'
+                : 'target_responded_by_user_id';
             $stUpdate = $pdo->prepare("
             UPDATE compatibilities
             SET
