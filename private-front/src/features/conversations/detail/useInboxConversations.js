@@ -57,6 +57,30 @@ export default function useInboxConversations() {
         archived: archiveMode === "archived",
       });
 
+      const responsePage = Number(res?.pagination?.page || requestedPage);
+
+      const totalPages = Number(res?.pagination?.total_pages || 0);
+
+      /*
+       * Si al archivar/desarchivar una conversación
+       * la página actual del grupo dejó de existir,
+       * volvemos a la última página válida.
+       */
+      if (totalPages > 0 && responsePage > totalPages) {
+        await openGroup(group, totalPages);
+        return;
+      }
+
+      /*
+       * Si el grupo quedó sin resultados y estábamos
+       * en una página distinta de la primera,
+       * normalizamos nuevamente a página 1.
+       */
+      if (totalPages === 0 && responsePage !== 1) {
+        await openGroup(group, 1);
+        return;
+      }
+
       setSelectedGroup(group);
 
       setGroupItems(Array.isArray(res?.items) ? res.items : []);
