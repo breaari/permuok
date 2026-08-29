@@ -30,7 +30,7 @@ class RealtimeController
             header('Connection: keep-alive');
             header('X-Accel-Buffering: no');
 
-            $lastNotificationId = 0;
+            $lastNotificationId = self::getLastVisibleNotificationId($userId);
             $lastUnreadCount = null;
             $lastMessageId = self::getLastVisibleMessageId($userId);
 
@@ -100,6 +100,22 @@ class RealtimeController
         return pdo();
     }
 
+    private static function getLastVisibleNotificationId(int $userId): int
+    {
+        $pdo = self::db();
+
+        $stmt = $pdo->prepare("
+        SELECT COALESCE(MAX(id), 0)
+        FROM notifications
+        WHERE user_id = :user_id
+    ");
+
+        $stmt->execute([
+            ':user_id' => $userId,
+        ]);
+
+        return (int)$stmt->fetchColumn();
+    }
     private static function getLastVisibleMessageId(int $userId): int
     {
         $pdo = self::db();
