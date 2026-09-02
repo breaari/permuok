@@ -19,41 +19,41 @@ class OpenAIProvider implements AiProviderInterface
     private int $connectTimeoutSeconds;
     private int $maxRetries;
 
- public function __construct(
-    string $apiKey,
-    string $model,
-    int $timeoutSeconds = 90,
-    int $connectTimeoutSeconds = 15,
-    int $maxRetries = 2
-) {
-    $this->apiKey = trim($apiKey);
-    $this->model = trim($model);
+    public function __construct(
+        string $apiKey,
+        string $model,
+        int $timeoutSeconds = 90,
+        int $connectTimeoutSeconds = 15,
+        int $maxRetries = 2
+    ) {
+        $this->apiKey = trim($apiKey);
+        $this->model = trim($model);
 
-    $this->timeoutSeconds = max(10, $timeoutSeconds);
-    $this->connectTimeoutSeconds = max(
-        5,
-        $connectTimeoutSeconds
-    );
-    $this->maxRetries = max(0, $maxRetries);
-
-    if ($this->apiKey === '') {
-        throw new Exception(
-            'No se configuró la clave de OpenAI'
+        $this->timeoutSeconds = max(10, $timeoutSeconds);
+        $this->connectTimeoutSeconds = max(
+            5,
+            $connectTimeoutSeconds
         );
-    }
+        $this->maxRetries = max(0, $maxRetries);
 
-    if ($this->model === '') {
-        throw new Exception(
-            'No se configuró el modelo de OpenAI'
-        );
-    }
+        if ($this->apiKey === '') {
+            throw new Exception(
+                'No se configuró la clave de OpenAI'
+            );
+        }
 
-    if (!function_exists('curl_init')) {
-        throw new Exception(
-            'La extensión cURL de PHP no está disponible'
-        );
+        if ($this->model === '') {
+            throw new Exception(
+                'No se configuró el modelo de OpenAI'
+            );
+        }
+
+        if (!function_exists('curl_init')) {
+            throw new Exception(
+                'La extensión cURL de PHP no está disponible'
+            );
+        }
     }
-}
 
     /**
      * Analiza una entidad y devuelve el contrato esperado por
@@ -74,14 +74,33 @@ class OpenAIProvider implements AiProviderInterface
 
         $data = $this->extractStructuredData($response);
 
-        return [
-            'data' => $data,
-            'model' => (string)(
-                $response['model'] ?? $this->model
-            ),
-            'tokens_used' => $this->extractTotalTokens(
+        $usage =
+            $this->extractUsage(
                 $response
+            );
+
+        return [
+            'data' =>
+            $data,
+
+            'model' =>
+            (string)(
+                $response['model'] ??
+                $this->model
             ),
+
+            /*
+     * Lo mantenemos por compatibilidad con
+     * AiEnrichmentService y registros existentes.
+     */
+            'tokens_used' =>
+            $usage['total_tokens'],
+
+            /*
+     * Uso detallado para métricas y costos.
+     */
+            'usage' =>
+            $usage,
         ];
     }
 
@@ -138,9 +157,9 @@ class OpenAIProvider implements AiProviderInterface
              * Para extracción estructurada no necesitamos que el modelo
              * haga razonamiento extenso.
              */
-           'reasoning' => [
-    'effort' => 'minimal',
-],
+            'reasoning' => [
+                'effort' => 'minimal',
+            ],
 
             /*
              * Evita almacenar la respuesta en OpenAI.
@@ -437,26 +456,64 @@ class OpenAIProvider implements AiProviderInterface
         );
     }
 
-    private function extractTotalTokens(array $response): int
-    {
-        $usage = $response['usage'] ?? [];
+    private function extractUsage(
+        array $response
+    ): array {
+        $usage =
+            $response['usage'] ?? [];
 
         if (!is_array($usage)) {
-            return 0;
+            $usage = [];
         }
 
-        if (isset($usage['total_tokens'])) {
-            return max(
+        $inputTokens =
+            max(
+                0,
+                (int)(
+                    $usage['input_tokens'] ?? 0
+                )
+            );
+
+        $outputTokens =
+            max(
+                0,
+                (int)(
+                    $usage['output_tokens'] ?? 0
+                )
+            );
+
+        $cachedInputTokens =
+            max(
+                0,
+                (int)(
+                    $usage['input_tokens_details']['cached_tokens'] ?? 0
+                )
+            );
+
+        $totalTokens =
+            isset($usage['total_tokens'])
+            ? max(
                 0,
                 (int)$usage['total_tokens']
+            )
+            : (
+                $inputTokens +
+                $outputTokens
             );
-        }
 
-        return max(
-            0,
-            (int)($usage['input_tokens'] ?? 0) +
-                (int)($usage['output_tokens'] ?? 0)
-        );
+        return [
+            'input_tokens' =>
+            $inputTokens,
+
+            'cached_input_tokens' =>
+            $cachedInputTokens,
+
+            'output_tokens' =>
+            $outputTokens,
+
+            'total_tokens' =>
+            $totalTokens,
+        ];
     }
 
     private function extractApiErrorMessage(
