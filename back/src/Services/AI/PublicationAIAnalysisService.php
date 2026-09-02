@@ -1362,6 +1362,23 @@ image_analysis_json,
             $analysisId,
         ]);
 
+        $stUsageContext = $pdo->prepare("
+    SELECT
+        real_estate_id,
+        created_by_user_id
+    FROM properties
+    WHERE id = :id
+      AND deleted_at IS NULL
+    LIMIT 1
+");
+
+        $stUsageContext->execute([
+            'id' => $propertyId,
+        ]);
+
+        $usageContext =
+            $stUsageContext->fetch(PDO::FETCH_ASSOC) ?: [];
+
         try {
             $totalStartedAt = microtime(true);
 
@@ -1447,32 +1464,6 @@ image_analysis_json,
                 is_array($result['_usage'] ?? null)
                 ? $result['_usage']
                 : [];
-
-            $stUsageContext = $pdo->prepare("
-    SELECT
-        real_estate_id,
-        created_by_user_id
-    FROM properties
-    WHERE id = :id
-    LIMIT 1
-");
-
-            $stUsageContext->execute([
-                'id' => $propertyId,
-            ]);
-
-            $usageContext =
-                $stUsageContext->fetch(PDO::FETCH_ASSOC) ?: [];
-
-            $stUsageContext = $pdo->prepare("
-    SELECT
-        real_estate_id,
-        created_by_user_id
-    FROM properties
-    WHERE id = :id
-      AND deleted_at IS NULL
-    LIMIT 1
-");
 
             $stUsageContext->execute([
                 'id' => $propertyId,
