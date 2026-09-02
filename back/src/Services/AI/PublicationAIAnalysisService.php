@@ -1372,12 +1372,7 @@ image_analysis_json,
     LIMIT 1
 ");
 
-        $stUsageContext->execute([
-            'id' => $propertyId,
-        ]);
-
-        $usageContext =
-            $stUsageContext->fetch(PDO::FETCH_ASSOC) ?: [];
+    
 
         try {
             $totalStartedAt = microtime(true);
