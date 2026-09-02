@@ -1225,6 +1225,7 @@ image_analysis_json,
     }
 
 
+
     public static function processPropertyAnalysis(
         int $propertyId,
         int $analysisId,
@@ -1329,17 +1330,19 @@ image_analysis_json,
                 'La publicación cambió después de solicitar el análisis.',
             ];
         }
+
         /*
- * Antes del análisis IA garantizamos que
- * la evaluación objetiva corresponda al
- * estado actual de la propiedad.
- *
- * Así el índice híbrido nunca combina una
- * IA nueva con un score objetivo anterior.
- */
+     * Antes del análisis IA garantizamos que
+     * la evaluación objetiva corresponda al
+     * estado actual de la propiedad.
+     *
+     * Así el índice híbrido nunca combina una
+     * IA nueva con un score objetivo anterior.
+     */
         PublicationQualityService::analyzeProperty(
             $propertyId
         );
+
         /*
      * Marcamos exactamente esta fila
      * como processing.
@@ -1362,22 +1365,42 @@ image_analysis_json,
             $analysisId,
         ]);
 
+        /*
+     * Contexto de negocio del consumo IA.
+     *
+     * Lo cargamos antes del try para poder
+     * utilizarlo tanto en el log exitoso
+     * como en el log de error.
+     */
         $stUsageContext = $pdo->prepare("
-    SELECT
-        real_estate_id,
-        created_by_user_id
-    FROM properties
-    WHERE id = :id
-      AND deleted_at IS NULL
-    LIMIT 1
-");
+        SELECT
+            real_estate_id,
+            created_by_user_id
 
-    
+        FROM properties
+
+        WHERE id = :id
+          AND deleted_at IS NULL
+
+        LIMIT 1
+    ");
+
+        $stUsageContext->execute([
+            'id' =>
+            $propertyId,
+        ]);
+
+        $usageContext =
+            $stUsageContext->fetch(
+                PDO::FETCH_ASSOC
+            ) ?: [];
 
         try {
-            $totalStartedAt = microtime(true);
+            $totalStartedAt =
+                microtime(true);
 
-            $prepareStartedAt = microtime(true);
+            $prepareStartedAt =
+                microtime(true);
 
             $input =
                 self::preparePropertyInput(
@@ -1388,7 +1411,8 @@ image_analysis_json,
                 microtime(true) -
                 $prepareStartedAt;
 
-            $openAIStartedAt = microtime(true);
+            $openAIStartedAt =
+                microtime(true);
 
             $result =
                 self::callOpenAIForProperty(
@@ -1399,25 +1423,25 @@ image_analysis_json,
                 microtime(true) -
                 $openAIStartedAt;
 
-            $persistStartedAt = microtime(true);
+            $persistStartedAt =
+                microtime(true);
 
             /*
-     * La llamada a OpenAI puede ser larga.
-     * Renovamos la conexión antes de guardar.
-     */
-
+         * La llamada a OpenAI puede ser larga.
+         * Renovamos la conexión antes de guardar.
+         */
             self::completeAnalysis(
                 $analysisId,
                 $result
             );
 
             /*
- * La IA ya quedó persistida.
- *
- * Ahora calculamos y guardamos el índice
- * oficial híbrido correspondiente exactamente
- * a esta versión de la publicación.
- */
+         * La IA ya quedó persistida.
+         *
+         * Ahora calculamos y guardamos el índice
+         * oficial híbrido correspondiente exactamente
+         * a esta versión de la publicación.
+         */
             PublicationQualityScoreService::recalculateAndPersistPropertyScore(
                 $propertyId
             );
@@ -1425,12 +1449,16 @@ image_analysis_json,
             $persistSeconds =
                 microtime(true) -
                 $persistStartedAt;
+
             $totalSeconds =
                 microtime(true) -
                 $totalStartedAt;
 
             echo PHP_EOL;
-            echo "[AI ANALYSIS #{$analysisId}]" . PHP_EOL;
+
+            echo
+            "[AI ANALYSIS #{$analysisId}]" .
+                PHP_EOL;
 
             echo sprintf(
                 "  Preparar datos: %.2f s%s",
@@ -1455,18 +1483,17 @@ image_analysis_json,
                 $totalSeconds,
                 PHP_EOL
             );
+
             $usage =
-                is_array($result['_usage'] ?? null)
+                is_array(
+                    $result['_usage'] ?? null
+                )
                 ? $result['_usage']
                 : [];
 
-            $stUsageContext->execute([
-                'id' => $propertyId,
-            ]);
-
-            $usageContext =
-                $stUsageContext->fetch(PDO::FETCH_ASSOC) ?: [];
-
+            /*
+         * Registramos el consumo real de OpenAI.
+         */
             AiUsageService::log([
                 'provider' =>
                 'openai',
@@ -1484,64 +1511,92 @@ image_analysis_json,
                 $propertyId,
 
                 'real_estate_id' =>
-                isset($usageContext['real_estate_id'])
+                isset(
+                    $usageContext['real_estate_id']
+                )
                     ? (int)$usageContext['real_estate_id']
                     : null,
 
                 'user_id' =>
-                isset($usageContext['created_by_user_id'])
+                isset(
+                    $usageContext['created_by_user_id']
+                )
                     ? (int)$usageContext['created_by_user_id']
                     : null,
 
                 'input_tokens' =>
-                (int)($usage['input_tokens'] ?? 0),
+                (int)(
+                    $usage['input_tokens'] ?? 0
+                ),
 
                 'cached_input_tokens' =>
-                (int)($usage['cached_tokens'] ?? 0),
+                (int)(
+                    $usage['cached_tokens'] ?? 0
+                ),
 
                 'output_tokens' =>
-                (int)($usage['output_tokens'] ?? 0),
+                (int)(
+                    $usage['output_tokens'] ?? 0
+                ),
 
                 'total_tokens' =>
-                (int)($usage['total_tokens'] ?? 0),
+                (int)(
+                    $usage['total_tokens'] ?? 0
+                ),
 
                 'duration_ms' =>
-                (int)round($openAISeconds * 1000),
+                (int)round(
+                    $openAISeconds * 1000
+                ),
 
                 'status' =>
                 'success',
             ]);
-            echo "  Tokens:" . PHP_EOL;
+
+            echo
+            "  Tokens:" .
+                PHP_EOL;
 
             echo sprintf(
                 "    Input:       %d%s",
-                (int)($usage['input_tokens'] ?? 0),
+                (int)(
+                    $usage['input_tokens'] ?? 0
+                ),
                 PHP_EOL
             );
 
             echo sprintf(
                 "    Cached:      %d%s",
-                (int)($usage['cached_tokens'] ?? 0),
+                (int)(
+                    $usage['cached_tokens'] ?? 0
+                ),
                 PHP_EOL
             );
 
             echo sprintf(
                 "    Output:      %d%s",
-                (int)($usage['output_tokens'] ?? 0),
+                (int)(
+                    $usage['output_tokens'] ?? 0
+                ),
                 PHP_EOL
             );
 
             echo sprintf(
                 "    Reasoning:   %d%s",
-                (int)($usage['reasoning_tokens'] ?? 0),
+                (int)(
+                    $usage['reasoning_tokens'] ?? 0
+                ),
                 PHP_EOL
             );
 
             echo sprintf(
                 "    Total:       %d%s",
-                (int)($usage['total_tokens'] ?? 0),
+                (int)(
+                    $usage['total_tokens'] ?? 0
+                ),
                 PHP_EOL
             );
+
             return [
                 'ok' =>
                 true,
@@ -1556,6 +1611,13 @@ image_analysis_json,
                 $result['_model'] ?? null,
             ];
         } catch (Throwable $e) {
+            /*
+         * También registramos los intentos fallidos.
+         *
+         * En un fallo puede no existir información
+         * de tokens porque OpenAI puede haber fallado
+         * antes de devolver usage.
+         */
             AiUsageService::log([
                 'provider' =>
                 'openai',
@@ -1573,12 +1635,16 @@ image_analysis_json,
                 $propertyId,
 
                 'real_estate_id' =>
-                isset($usageContext['real_estate_id'])
+                isset(
+                    $usageContext['real_estate_id']
+                )
                     ? (int)$usageContext['real_estate_id']
                     : null,
 
                 'user_id' =>
-                isset($usageContext['created_by_user_id'])
+                isset(
+                    $usageContext['created_by_user_id']
+                )
                     ? (int)$usageContext['created_by_user_id']
                     : null,
 
@@ -1604,6 +1670,7 @@ image_analysis_json,
             throw $e;
         }
     }
+
     private static function callOpenAIForProperty(
         array $input
     ): array {
