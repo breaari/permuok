@@ -1448,6 +1448,40 @@ image_analysis_json,
                 ? $result['_usage']
                 : [];
 
+
+            AiUsageService::log([
+                'provider' => 'openai',
+
+                'model_name' =>
+                $result['_model'] ?? null,
+
+                'operation' =>
+                'publication_analysis',
+
+                'entity_type' =>
+                'property',
+
+                'entity_id' =>
+                $propertyId,
+
+                'input_tokens' =>
+                (int)($usage['input_tokens'] ?? 0),
+
+                'cached_input_tokens' =>
+                (int)($usage['cached_tokens'] ?? 0),
+
+                'output_tokens' =>
+                (int)($usage['output_tokens'] ?? 0),
+
+                'total_tokens' =>
+                (int)($usage['total_tokens'] ?? 0),
+
+                'duration_ms' =>
+                (int)round($openAISeconds * 1000),
+
+                'status' =>
+                'success',
+            ]);
             echo "  Tokens:" . PHP_EOL;
 
             echo sprintf(
