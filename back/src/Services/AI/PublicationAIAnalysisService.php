@@ -1448,9 +1448,42 @@ image_analysis_json,
                 ? $result['_usage']
                 : [];
 
+            $stUsageContext = $pdo->prepare("
+    SELECT
+        real_estate_id,
+        created_by_user_id
+    FROM properties
+    WHERE id = :id
+    LIMIT 1
+");
+
+            $stUsageContext->execute([
+                'id' => $propertyId,
+            ]);
+
+            $usageContext =
+                $stUsageContext->fetch(PDO::FETCH_ASSOC) ?: [];
+
+            $stUsageContext = $pdo->prepare("
+    SELECT
+        real_estate_id,
+        created_by_user_id
+    FROM properties
+    WHERE id = :id
+      AND deleted_at IS NULL
+    LIMIT 1
+");
+
+            $stUsageContext->execute([
+                'id' => $propertyId,
+            ]);
+
+            $usageContext =
+                $stUsageContext->fetch(PDO::FETCH_ASSOC) ?: [];
 
             AiUsageService::log([
-                'provider' => 'openai',
+                'provider' =>
+                'openai',
 
                 'model_name' =>
                 $result['_model'] ?? null,
@@ -1463,6 +1496,16 @@ image_analysis_json,
 
                 'entity_id' =>
                 $propertyId,
+
+                'real_estate_id' =>
+                isset($usageContext['real_estate_id'])
+                    ? (int)$usageContext['real_estate_id']
+                    : null,
+
+                'user_id' =>
+                isset($usageContext['created_by_user_id'])
+                    ? (int)$usageContext['created_by_user_id']
+                    : null,
 
                 'input_tokens' =>
                 (int)($usage['input_tokens'] ?? 0),
@@ -1527,6 +1570,39 @@ image_analysis_json,
                 $result['_model'] ?? null,
             ];
         } catch (Throwable $e) {
+            AiUsageService::log([
+                'provider' =>
+                'openai',
+
+                'model_name' =>
+                self::DEFAULT_MODEL,
+
+                'operation' =>
+                'publication_analysis',
+
+                'entity_type' =>
+                'property',
+
+                'entity_id' =>
+                $propertyId,
+
+                'real_estate_id' =>
+                isset($usageContext['real_estate_id'])
+                    ? (int)$usageContext['real_estate_id']
+                    : null,
+
+                'user_id' =>
+                isset($usageContext['created_by_user_id'])
+                    ? (int)$usageContext['created_by_user_id']
+                    : null,
+
+                'status' =>
+                'failed',
+
+                'error_message' =>
+                $e->getMessage(),
+            ]);
+
             if ($attempt < $maxAttempts) {
                 self::markAnalysisPendingForRetry(
                     $analysisId,
