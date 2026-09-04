@@ -343,23 +343,26 @@ class AiEnrichmentService
             );
         }
 
-        $context = self::buildSearchRequestContext(
-            $searchRequestId
-        );
+        $context =
+            self::buildSearchRequestContext(
+                $searchRequestId
+            );
 
         $promptVersion =
             AiPromptService::SEARCH_REQUEST_PROMPT_VERSION;
 
-        $sourceHash = self::calculateSourceHash(
-            $context,
-            $promptVersion
-        );
+        $sourceHash =
+            self::calculateSourceHash(
+                $context,
+                $promptVersion
+            );
 
         if (!$force) {
-            $current = self::getCurrentAnalysis(
-                'search_request',
-                $searchRequestId
-            );
+            $current =
+                self::getCurrentAnalysis(
+                    'search_request',
+                    $searchRequestId
+                );
 
             if (
                 $current &&
@@ -367,10 +370,12 @@ class AiEnrichmentService
                     (string)$current['source_hash'],
                     $sourceHash
                 ) &&
-                (string)($current['prompt_version'] ?? '') ===
-                $promptVersion &&
-                (string)($current['extraction_version'] ?? '') ===
-                self::EXTRACTION_VERSION
+                (string)(
+                    $current['prompt_version'] ?? ''
+                ) === $promptVersion &&
+                (string)(
+                    $current['extraction_version'] ?? ''
+                ) === self::EXTRACTION_VERSION
             ) {
                 return self::formatStoredAnalysis(
                     $current,
@@ -385,49 +390,175 @@ class AiEnrichmentService
             );
         }
 
-        $startedAt = microtime(true);
+        /*
+     * buildSearchRequestContext() ya trae
+     * real_estate_id y created_by_user_id.
+     */
+        $realEstateId =
+            isset(
+                $context['search_request']['real_estate_id']
+            )
+            ? (int)$context['search_request']['real_estate_id']
+            : null;
+
+        $userId =
+            isset(
+                $context['search_request']['created_by_user_id']
+            )
+            ? (int)$context['search_request']['created_by_user_id']
+            : null;
+
+        $providerName =
+            self::$provider instanceof OpenAIProvider
+            ? 'openai'
+            : 'unknown';
+
+        $startedAt =
+            microtime(true);
+
+        $providerCallSucceeded =
+            false;
 
         try {
-            $providerResult = self::$provider->analyzeEntity(
-                'search_request',
-                $context,
-                $promptVersion
-            );
+            $providerResult =
+                self::$provider->analyzeEntity(
+                    'search_request',
+                    $context,
+                    $promptVersion
+                );
 
-            $processingTimeMs = (int)round(
-                (microtime(true) - $startedAt) * 1000
-            );
+            $providerCallSucceeded =
+                true;
 
-            $resultData = self::normalizeProviderResult(
-                $providerResult['data'] ?? []
-            );
-            $resultData = self::normalizeSearchRequestResult(
-                $resultData,
-                $context
-            );
-            $modelName = trim(
-                (string)($providerResult['model'] ?? '')
-            );
+            $processingTimeMs =
+                (int)round(
+                    (
+                        microtime(true) -
+                        $startedAt
+                    ) * 1000
+                );
 
-            $tokensUsed = max(
-                0,
-                (int)($providerResult['tokens_used'] ?? 0)
-            );
+            $modelName =
+                trim(
+                    (string)(
+                        $providerResult['model']
+                        ?? ''
+                    )
+                );
 
-            $analysisId = self::saveAnalysis(
-                entityType: 'search_request',
-                entityId: $searchRequestId,
-                sourceHash: $sourceHash,
-                result: $resultData,
-                processingTimeMs: $processingTimeMs,
-                tokensUsed: $tokensUsed,
-                modelName: $modelName !== ''
+            $usage =
+                is_array(
+                    $providerResult['usage']
+                        ?? null
+                )
+                ? $providerResult['usage']
+                : [];
+
+            $tokensUsed =
+                max(
+                    0,
+                    (int)(
+                        $providerResult['tokens_used'] ?? 0
+                    )
+                );
+
+            /*
+         * Registramos el consumo apenas el
+         * proveedor respondió correctamente.
+         */
+            AiUsageService::log([
+                'provider' =>
+                $providerName,
+
+                'model_name' =>
+                $modelName !== ''
                     ? $modelName
                     : null,
-                promptVersion: $promptVersion
-            );
 
-            $saved = self::getAnalysisById($analysisId);
+                'operation' =>
+                'entity_enrichment',
+
+                'entity_type' =>
+                'search_request',
+
+                'entity_id' =>
+                $searchRequestId,
+
+                'real_estate_id' =>
+                $realEstateId,
+
+                'user_id' =>
+                $userId,
+
+                'input_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['input_tokens'] ?? 0
+                    )
+                ),
+
+                'cached_input_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['cached_input_tokens'] ?? 0
+                    )
+                ),
+
+                'output_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['output_tokens'] ?? 0
+                    )
+                ),
+
+                'total_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['total_tokens'] ?? $tokensUsed
+                    )
+                ),
+
+                'duration_ms' =>
+                $processingTimeMs,
+
+                'status' =>
+                'success',
+            ]);
+
+            $resultData =
+                self::normalizeProviderResult(
+                    $providerResult['data']
+                        ?? []
+                );
+
+            $resultData =
+                self::normalizeSearchRequestResult(
+                    $resultData,
+                    $context
+                );
+
+            $analysisId =
+                self::saveAnalysis(
+                    entityType: 'search_request',
+                    entityId: $searchRequestId,
+                    sourceHash: $sourceHash,
+                    result: $resultData,
+                    processingTimeMs: $processingTimeMs,
+                    tokensUsed: $tokensUsed,
+                    modelName: $modelName !== ''
+                        ? $modelName
+                        : null,
+                    promptVersion: $promptVersion
+                );
+
+            $saved =
+                self::getAnalysisById(
+                    $analysisId
+                );
 
             if (!$saved) {
                 throw new Exception(
@@ -440,6 +571,45 @@ class AiEnrichmentService
                 false
             );
         } catch (Throwable $e) {
+            if (!$providerCallSucceeded) {
+                $durationMs =
+                    (int)round(
+                        (
+                            microtime(true) -
+                            $startedAt
+                        ) * 1000
+                    );
+
+                AiUsageService::log([
+                    'provider' =>
+                    $providerName,
+
+                    'operation' =>
+                    'entity_enrichment',
+
+                    'entity_type' =>
+                    'search_request',
+
+                    'entity_id' =>
+                    $searchRequestId,
+
+                    'real_estate_id' =>
+                    $realEstateId,
+
+                    'user_id' =>
+                    $userId,
+
+                    'status' =>
+                    'failed',
+
+                    'duration_ms' =>
+                    $durationMs,
+
+                    'error_message' =>
+                    $e->getMessage(),
+                ]);
+            }
+
             throw new Exception(
                 'No se pudo enriquecer la búsqueda: ' .
                     $e->getMessage(),
@@ -448,9 +618,7 @@ class AiEnrichmentService
             );
         }
     }
-    /**
-     * Devuelve el análisis vigente de una propiedad.
-     */
+
     public static function getPropertyEnrichment(
         int $propertyId
     ): ?array {
