@@ -518,13 +518,13 @@ class DevelopmentAIAnalysisService
         $pdo = self::db();
 
         $st = $pdo->prepare("
-            SELECT *
-            FROM publication_ai_analyses
-            WHERE id = :id
-              AND entity_type = 'development'
-              AND entity_id = :entity_id
-            LIMIT 1
-        ");
+        SELECT *
+        FROM publication_ai_analyses
+        WHERE id = :id
+          AND entity_type = 'development'
+          AND entity_id = :entity_id
+        LIMIT 1
+    ");
 
         $st->execute([
             'id' =>
@@ -535,7 +535,9 @@ class DevelopmentAIAnalysisService
         ]);
 
         $analysis =
-            $st->fetch(PDO::FETCH_ASSOC);
+            $st->fetch(
+                PDO::FETCH_ASSOC
+            );
 
         if (!$analysis) {
             throw new Exception(
@@ -543,6 +545,10 @@ class DevelopmentAIAnalysisService
             );
         }
 
+        /*
+     * Si ya estaba completado no volvemos
+     * a consumir OpenAI.
+     */
         if (
             $analysis['status'] ===
             'completed'
@@ -550,16 +556,18 @@ class DevelopmentAIAnalysisService
             return [
                 'ok' => true,
                 'skipped' => true,
-                'analysis_id' => $analysisId,
+                'analysis_id' =>
+                $analysisId,
                 'reason' =>
                 'El análisis ya estaba completado.',
             ];
         }
 
         /*
-         * Verificamos que el contenido no haya
-         * cambiado desde que se pidió el análisis.
-         */
+     * Verificamos que el desarrollo siga
+     * teniendo exactamente el contenido
+     * que originó este análisis.
+     */
         $currentHash =
             self::buildInputHash(
                 $developmentId
@@ -579,13 +587,13 @@ class DevelopmentAIAnalysisService
             )
         ) {
             $pdo->prepare("
-                UPDATE publication_ai_analyses
-                SET
-                    status = 'failed',
-                    error_message = :message,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = :id
-            ")->execute([
+            UPDATE publication_ai_analyses
+            SET
+                status = 'failed',
+                error_message = :message,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :id
+        ")->execute([
                 'message' =>
                 'El desarrollo cambió después de solicitar el análisis.',
 
@@ -608,17 +616,74 @@ class DevelopmentAIAnalysisService
             ];
         }
 
+        /*
+     * Contexto para atribuir el consumo.
+     */
+        $stUsageContext = $pdo->prepare("
+        SELECT
+            real_estate_id,
+            created_by_user_id
+
+        FROM developments
+
+        WHERE id = :id
+          AND deleted_at IS NULL
+
+        LIMIT 1
+    ");
+
+        $stUsageContext->execute([
+            'id' =>
+            $developmentId,
+        ]);
+
+        $usageContext =
+            $stUsageContext->fetch(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        $realEstateId =
+            isset(
+                $usageContext['real_estate_id']
+            )
+            ? (int)$usageContext['real_estate_id']
+            : null;
+
+        $userId =
+            isset(
+                $usageContext['created_by_user_id']
+            )
+            ? (int)$usageContext['created_by_user_id']
+            : null;
+
+        /*
+     * Marcamos el análisis como processing.
+     */
         $pdo->prepare("
-            UPDATE publication_ai_analyses
-            SET
-                status = 'processing',
-                error_message = NULL,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id
-        ")->execute([
+        UPDATE publication_ai_analyses
+        SET
+            status = 'processing',
+            error_message = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = :id
+    ")->execute([
             'id' =>
             $analysisId,
         ]);
+
+        /*
+     * Controlamos por separado el intento real
+     * a OpenAI para no confundir errores internos
+     * con errores del proveedor.
+     */
+        $providerCallStarted =
+            false;
+
+        $providerCallSucceeded =
+            false;
+
+        $openAIStartedAt =
+            null;
 
         try {
             $input =
@@ -626,20 +691,111 @@ class DevelopmentAIAnalysisService
                     $developmentId
                 );
 
+            $providerCallStarted =
+                true;
+
+            $openAIStartedAt =
+                microtime(true);
+
             $result =
                 self::callOpenAI(
                     $input
                 );
 
+            $openAISeconds =
+                microtime(true) -
+                $openAIStartedAt;
+
+            $providerCallSucceeded =
+                true;
+
+            /*
+         * Registramos el consumo inmediatamente
+         * después de una respuesta válida.
+         */
+            $usage =
+                is_array(
+                    $result['_usage'] ?? null
+                )
+                ? $result['_usage']
+                : [];
+
+            AiUsageService::log([
+                'provider' =>
+                'openai',
+
+                'model_name' =>
+                $result['_model'] ?? null,
+
+                'operation' =>
+                'development_analysis',
+
+                'entity_type' =>
+                'development',
+
+                'entity_id' =>
+                $developmentId,
+
+                'real_estate_id' =>
+                $realEstateId,
+
+                'user_id' =>
+                $userId,
+
+                'input_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['input_tokens'] ?? 0
+                    )
+                ),
+
+                'cached_input_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['cached_tokens'] ?? 0
+                    )
+                ),
+
+                'output_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['output_tokens'] ?? 0
+                    )
+                ),
+
+                'total_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['total_tokens'] ?? 0
+                    )
+                ),
+
+                'duration_ms' =>
+                (int)round(
+                    $openAISeconds * 1000
+                ),
+
+                'status' =>
+                'success',
+            ]);
+
+            /*
+         * OpenAI ya quedó contabilizado.
+         * Ahora persistimos el resultado.
+         */
             self::completeAnalysis(
                 $analysisId,
                 $result
             );
 
             /*
-             * Una vez persistido el análisis IA,
-             * generamos el score oficial híbrido.
-             */
+         * Una vez persistido el análisis IA,
+         * generamos el score oficial híbrido.
+         */
             $quality =
                 DevelopmentQualityScoreService::recalculateAndPersist(
                     $developmentId
@@ -659,6 +815,69 @@ class DevelopmentAIAnalysisService
                 $quality,
             ];
         } catch (Throwable $e) {
+            /*
+         * Sólo registramos failed cuando
+         * realmente hubo un intento a OpenAI
+         * que no devolvió una respuesta válida.
+         */
+            if (
+                $providerCallStarted &&
+                !$providerCallSucceeded
+            ) {
+                $durationMs =
+                    $openAIStartedAt !== null
+                    ? (int)round(
+                        (
+                            microtime(true) -
+                            $openAIStartedAt
+                        ) * 1000
+                    )
+                    : null;
+
+                $configuredModel =
+                    trim(
+                        (string)(
+                            $_ENV['OPENAI_MODEL']
+                            ?? getenv('OPENAI_MODEL')
+                            ?: self::DEFAULT_MODEL
+                        )
+                    );
+
+                AiUsageService::log([
+                    'provider' =>
+                    'openai',
+
+                    'model_name' =>
+                    $configuredModel !== ''
+                        ? $configuredModel
+                        : self::DEFAULT_MODEL,
+
+                    'operation' =>
+                    'development_analysis',
+
+                    'entity_type' =>
+                    'development',
+
+                    'entity_id' =>
+                    $developmentId,
+
+                    'real_estate_id' =>
+                    $realEstateId,
+
+                    'user_id' =>
+                    $userId,
+
+                    'status' =>
+                    'failed',
+
+                    'duration_ms' =>
+                    $durationMs,
+
+                    'error_message' =>
+                    $e->getMessage(),
+                ]);
+            }
+
             if ($attempt < $maxAttempts) {
                 self::markPending(
                     $analysisId,
