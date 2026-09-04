@@ -71,19 +71,11 @@ class SearchRequestAICopyService
             );
         }
 
-        /*
-         * Partimos exactamente de la misma
-         * estructura que usa el análisis IA.
-         */
         $input =
             SearchRequestAIAnalysisService::prepareInput(
                 $searchRequestId
             );
 
-        /*
-         * Si el formulario tiene cambios
-         * todavía no guardados, tienen prioridad.
-         */
         $input =
             self::applyDraftOverrides(
                 $input,
@@ -102,10 +94,6 @@ class SearchRequestAICopyService
                 $promptVersion
             );
 
-        /*
-         * Evitamos repetir siempre
-         * la misma propuesta.
-         */
         $previousOptions =
             self::getPreviousOptions(
                 $searchRequestId,
@@ -113,36 +101,211 @@ class SearchRequestAICopyService
                 $inputHash
             );
 
-        $generated =
-            self::callOpenAI(
-                $input,
-                $copyType,
-                $previousOptions
-            );
+        /*
+     * Contexto para atribuir el consumo.
+     */
+        $pdo = self::db();
 
-        $pdo = self::db(true);
+        $stUsageContext = $pdo->prepare("
+        SELECT real_estate_id
+        FROM search_requests
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $stUsageContext->execute([
+            'id' =>
+            $searchRequestId,
+        ]);
+
+        $usageContext =
+            $stUsageContext->fetch(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        $realEstateId =
+            isset(
+                $usageContext['real_estate_id']
+            )
+            ? (int)$usageContext['real_estate_id']
+            : null;
+
+        $openAIStartedAt =
+            microtime(true);
+
+        try {
+            $generated =
+                self::callOpenAI(
+                    $input,
+                    $copyType,
+                    $previousOptions
+                );
+        } catch (\Throwable $e) {
+            $durationMs =
+                (int)round(
+                    (
+                        microtime(true) -
+                        $openAIStartedAt
+                    ) * 1000
+                );
+
+            $configuredModel =
+                trim(
+                    (string)(
+                        $_ENV['OPENAI_MODEL']
+                        ?? getenv('OPENAI_MODEL')
+                        ?: self::DEFAULT_MODEL
+                    )
+                );
+
+            AiUsageService::log([
+                'provider' =>
+                'openai',
+
+                'model_name' =>
+                $configuredModel !== ''
+                    ? $configuredModel
+                    : self::DEFAULT_MODEL,
+
+                'operation' =>
+                $copyType === 'title'
+                    ? 'search_request_copy_title'
+                    : 'search_request_copy_description',
+
+                'entity_type' =>
+                'search_request',
+
+                'entity_id' =>
+                $searchRequestId,
+
+                'real_estate_id' =>
+                $realEstateId,
+
+                'user_id' =>
+                $userId,
+
+                'status' =>
+                'failed',
+
+                'duration_ms' =>
+                $durationMs,
+
+                'error_message' =>
+                $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+
+        $openAISeconds =
+            microtime(true) -
+            $openAIStartedAt;
+
+        $usage =
+            is_array(
+                $generated['usage'] ?? null
+            )
+            ? $generated['usage']
+            : [];
+
+        AiUsageService::log([
+            'provider' =>
+            'openai',
+
+            'model_name' =>
+            $generated['model'] ?? null,
+
+            'operation' =>
+            $copyType === 'title'
+                ? 'search_request_copy_title'
+                : 'search_request_copy_description',
+
+            'entity_type' =>
+            'search_request',
+
+            'entity_id' =>
+            $searchRequestId,
+
+            'real_estate_id' =>
+            $realEstateId,
+
+            'user_id' =>
+            $userId,
+
+            'input_tokens' =>
+            max(
+                0,
+                (int)(
+                    $usage['input_tokens']
+                    ?? 0
+                )
+            ),
+
+            'cached_input_tokens' =>
+            max(
+                0,
+                (int)(
+                    $usage['cached_input_tokens']
+                    ?? 0
+                )
+            ),
+
+            'output_tokens' =>
+            max(
+                0,
+                (int)(
+                    $usage['output_tokens']
+                    ?? 0
+                )
+            ),
+
+            'total_tokens' =>
+            max(
+                0,
+                (int)(
+                    $usage['total_tokens']
+                    ?? 0
+                )
+            ),
+
+            'duration_ms' =>
+            (int)round(
+                $openAISeconds * 1000
+            ),
+
+            'status' =>
+            'success',
+        ]);
+
+        /*
+     * Reabrimos la conexión después
+     * de la llamada externa.
+     */
+        $pdo =
+            self::db(true);
 
         $st = $pdo->prepare("
-            INSERT INTO publication_ai_copy_generations (
-                entity_type,
-                entity_id,
-                copy_type,
-                content,
-                input_hash,
-                model_name,
-                prompt_version,
-                created_by_user_id
-            ) VALUES (
-                'search_request',
-                :entity_id,
-                :copy_type,
-                :content,
-                :input_hash,
-                :model_name,
-                :prompt_version,
-                :created_by_user_id
-            )
-        ");
+        INSERT INTO publication_ai_copy_generations (
+            entity_type,
+            entity_id,
+            copy_type,
+            content,
+            input_hash,
+            model_name,
+            prompt_version,
+            created_by_user_id
+        ) VALUES (
+            'search_request',
+            :entity_id,
+            :copy_type,
+            :content,
+            :input_hash,
+            :model_name,
+            :prompt_version,
+            :created_by_user_id
+        )
+    ");
 
         $st->execute([
             'entity_id' =>
@@ -1067,12 +1230,73 @@ PROMPT;
             );
         }
 
+        $usage =
+            is_array(
+                $decoded['usage'] ?? null
+            )
+            ? $decoded['usage']
+            : [];
+
+        $inputTokens =
+            max(
+                0,
+                (int)(
+                    $usage['input_tokens']
+                    ?? 0
+                )
+            );
+
+        $cachedInputTokens =
+            max(
+                0,
+                (int)(
+                    $usage['input_tokens_details']['cached_tokens'] ?? 0
+                )
+            );
+
+        $outputTokens =
+            max(
+                0,
+                (int)(
+                    $usage['output_tokens']
+                    ?? 0
+                )
+            );
+
+        $totalTokens =
+            isset($usage['total_tokens'])
+            ? max(
+                0,
+                (int)$usage['total_tokens']
+            )
+            : (
+                $inputTokens +
+                $outputTokens
+            );
+
         return [
             'content' =>
             $outputText,
 
             'model' =>
-            $model,
+            (string)(
+                $decoded['model']
+                ?? $model
+            ),
+
+            'usage' => [
+                'input_tokens' =>
+                $inputTokens,
+
+                'cached_input_tokens' =>
+                $cachedInputTokens,
+
+                'output_tokens' =>
+                $outputTokens,
+
+                'total_tokens' =>
+                $totalTokens,
+            ],
         ];
     }
 }
