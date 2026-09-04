@@ -81,7 +81,7 @@ class DevelopmentAIAnalysisService
 
         $stUnits->execute([
             'development_id' =>
-                $developmentId,
+            $developmentId,
         ]);
 
         $unitTypes =
@@ -101,7 +101,7 @@ class DevelopmentAIAnalysisService
 
         $stAmenities->execute([
             'development_id' =>
-                $developmentId,
+            $developmentId,
         ]);
 
         $amenities =
@@ -132,7 +132,7 @@ class DevelopmentAIAnalysisService
 
         $stImages->execute([
             'development_id' =>
-                $developmentId,
+            $developmentId,
         ]);
 
         $images =
@@ -142,131 +142,125 @@ class DevelopmentAIAnalysisService
 
         return [
             'entity_type' =>
-                'development',
+            'development',
 
             'entity_id' =>
-                $developmentId,
+            $developmentId,
 
             'development' => [
                 'title' =>
-                    trim(
-                        (string)(
-                            $development['title']
-                            ?? ''
-                        )
-                    ),
+                trim(
+                    (string)(
+                        $development['title']
+                        ?? ''
+                    )
+                ),
 
                 'short_description' =>
-                    trim(
-                        (string)(
-                            $development['short_description']
-                            ?? ''
-                        )
-                    ),
+                trim(
+                    (string)(
+                        $development['short_description']
+                        ?? ''
+                    )
+                ),
 
                 'description' =>
-                    trim(
-                        (string)(
-                            $development['description']
-                            ?? ''
-                        )
-                    ),
+                trim(
+                    (string)(
+                        $development['description']
+                        ?? ''
+                    )
+                ),
 
                 'developer_name' =>
-                    $development['developer_name']
+                $development['developer_name']
                     ?? null,
 
                 'construction_company' =>
-                    $development['construction_company']
+                $development['construction_company']
                     ?? null,
 
                 'stage' =>
-                    $development['development_stage']
+                $development['development_stage']
                     ?? null,
 
                 'delivery_date_estimated' =>
-                    $development['delivery_date_estimated']
+                $development['delivery_date_estimated']
                     ?? null,
 
                 'location' => [
                     'country' =>
-                        $development['country']
+                    $development['country']
                         ?? null,
 
                     'province' =>
-                        $development['province']
+                    $development['province']
                         ?? null,
 
                     'city' =>
-                        $development['city']
+                    $development['city']
                         ?? null,
 
                     'zone' =>
-                        $development['zone']
+                    $development['zone']
                         ?? null,
 
                     'address' =>
-                        $development['address']
+                    $development['address']
                         ?? null,
 
                     'formatted_address' =>
-                        $development['formatted_address']
+                    $development['formatted_address']
                         ?? null,
                 ],
 
                 'commercial' => [
                     'currency' =>
-                        $development['currency']
+                    $development['currency']
                         ?? null,
 
                     'price_from' =>
-                        $development['price_from']
+                    $development['price_from']
                         ?? null,
 
                     'price_to' =>
-                        $development['price_to']
+                    $development['price_to']
                         ?? null,
 
                     'total_units' =>
-                        $development['total_units']
+                    $development['total_units']
                         ?? null,
 
                     'available_units' =>
-                        $development['available_units']
+                    $development['available_units']
                         ?? null,
                 ],
 
                 'commercial_resources' => [
                     'has_whatsapp' =>
-                        !empty(
-                            $development['whatsapp_url']
-                        ),
+                    !empty($development['whatsapp_url']),
 
                     'has_brochure' =>
-                        !empty(
-                            $development['brochure_url']
-                        ),
+                    !empty($development['brochure_url']),
 
                     'has_video' =>
-                        !empty(
-                            $development['video_url']
-                        ),
+                    !empty($development['video_url']),
                 ],
 
                 'unit_types' =>
-                    $unitTypes,
+                $unitTypes,
 
                 'amenities' =>
-                    $amenities,
+                $amenities,
 
                 'images' => [
                     'count' =>
-                        count($images),
+                    count($images),
 
                     'has_cover' =>
-                        self::hasCoverImage(
-                            $images
-                        ),
+                    self::hasCoverImage(
+                        $images
+                    ),
                 ],
             ],
         ];
@@ -277,12 +271,12 @@ class DevelopmentAIAnalysisService
     ): string {
         $payload = [
             'prompt_version' =>
-                self::PROMPT_VERSION,
+            self::PROMPT_VERSION,
 
             'input' =>
-                self::prepareInput(
-                    $developmentId
-                ),
+            self::prepareInput(
+                $developmentId
+            ),
         ];
 
         try {
@@ -344,13 +338,13 @@ class DevelopmentAIAnalysisService
 
         $st->execute([
             'entity_id' =>
-                $developmentId,
+            $developmentId,
 
             'input_hash' =>
-                $inputHash,
+            $inputHash,
 
             'prompt_version' =>
-                self::PROMPT_VERSION,
+            self::PROMPT_VERSION,
         ]);
 
         $existing =
@@ -372,19 +366,19 @@ class DevelopmentAIAnalysisService
 
             return [
                 'analysis_id' =>
-                    (int)$existing['id'],
+                (int)$existing['id'],
 
                 'status' =>
-                    'completed',
+                'completed',
 
                 'reused' =>
-                    true,
+                true,
 
                 'queued' =>
-                    false,
+                false,
 
                 'quality' =>
-                    $quality,
+                $quality,
             ];
         }
 
@@ -409,8 +403,7 @@ class DevelopmentAIAnalysisService
 
         /*
          * Si había fallado, lo reactivamos.
-         */
-        elseif (
+         */ elseif (
             $existing &&
             $existing['status'] === 'failed'
         ) {
@@ -427,14 +420,13 @@ class DevelopmentAIAnalysisService
                 WHERE id = :id
             ")->execute([
                 'id' =>
-                    $analysisId,
+                $analysisId,
             ]);
         }
 
         /*
          * Caso nuevo.
-         */
-        else {
+         */ else {
             $stInsert = $pdo->prepare("
                 INSERT INTO publication_ai_analyses (
                     entity_type,
@@ -454,13 +446,13 @@ class DevelopmentAIAnalysisService
 
             $stInsert->execute([
                 'entity_id' =>
-                    $developmentId,
+                $developmentId,
 
                 'prompt_version' =>
-                    self::PROMPT_VERSION,
+                self::PROMPT_VERSION,
 
                 'input_hash' =>
-                    $inputHash,
+                $inputHash,
             ]);
 
             $analysisId =
@@ -486,22 +478,22 @@ class DevelopmentAIAnalysisService
 
         return [
             'analysis_id' =>
-                $analysisId,
+            $analysisId,
 
             'status' =>
-                'pending',
+            'pending',
 
             'reused' =>
-                $existing !== null,
+            $existing !== null,
 
             'queued' =>
-                true,
+            true,
 
             'job_id' =>
-                (int)(
-                    $job['id']
-                    ?? 0
-                ),
+            (int)(
+                $job['id']
+                ?? 0
+            ),
         ];
     }
 
@@ -536,10 +528,10 @@ class DevelopmentAIAnalysisService
 
         $st->execute([
             'id' =>
-                $analysisId,
+            $analysisId,
 
             'entity_id' =>
-                $developmentId,
+            $developmentId,
         ]);
 
         $analysis =
@@ -560,7 +552,7 @@ class DevelopmentAIAnalysisService
                 'skipped' => true,
                 'analysis_id' => $analysisId,
                 'reason' =>
-                    'El análisis ya estaba completado.',
+                'El análisis ya estaba completado.',
             ];
         }
 
@@ -595,24 +587,24 @@ class DevelopmentAIAnalysisService
                 WHERE id = :id
             ")->execute([
                 'message' =>
-                    'El desarrollo cambió después de solicitar el análisis.',
+                'El desarrollo cambió después de solicitar el análisis.',
 
                 'id' =>
-                    $analysisId,
+                $analysisId,
             ]);
 
             return [
                 'ok' =>
-                    true,
+                true,
 
                 'skipped' =>
-                    true,
+                true,
 
                 'analysis_id' =>
-                    $analysisId,
+                $analysisId,
 
                 'reason' =>
-                    'El desarrollo cambió después de solicitar el análisis.',
+                'El desarrollo cambió después de solicitar el análisis.',
             ];
         }
 
@@ -625,7 +617,7 @@ class DevelopmentAIAnalysisService
             WHERE id = :id
         ")->execute([
             'id' =>
-                $analysisId,
+            $analysisId,
         ]);
 
         try {
@@ -655,16 +647,16 @@ class DevelopmentAIAnalysisService
 
             return [
                 'ok' =>
-                    true,
+                true,
 
                 'analysis_id' =>
-                    $analysisId,
+                $analysisId,
 
                 'status' =>
-                    'completed',
+                'completed',
 
                 'quality' =>
-                    $quality,
+                $quality,
             ];
         } catch (Throwable $e) {
             if ($attempt < $maxAttempts) {
@@ -1247,10 +1239,10 @@ PROMPT;
 
         $schema = [
             'type' =>
-                'object',
+            'object',
 
             'additionalProperties' =>
-                false,
+            false,
 
             'properties' => [
                 'title_score' => [
@@ -1283,10 +1275,10 @@ PROMPT;
 
                     'items' => [
                         'type' =>
-                            'object',
+                        'object',
 
                         'additionalProperties' =>
-                            false,
+                        false,
 
                         'properties' => [
                             'field' => [
@@ -1336,14 +1328,14 @@ PROMPT;
 
                 'contradictions' => [
                     'type' =>
-                        'array',
+                    'array',
 
                     'maxItems' =>
-                        5,
+                    5,
 
                     'items' => [
                         'type' =>
-                            'string',
+                        'string',
                     ],
                 ],
             ],
@@ -1360,32 +1352,32 @@ PROMPT;
 
         $body = [
             'model' =>
-                $model,
+            $model,
 
             'reasoning' => [
                 'effort' =>
-                    'low',
+                'low',
             ],
 
             'input' =>
-                $prompt,
+            $prompt,
 
             'text' => [
                 'verbosity' =>
-                    'low',
+                'low',
 
                 'format' => [
                     'type' =>
-                        'json_schema',
+                    'json_schema',
 
                     'name' =>
-                        'development_analysis',
+                    'development_analysis',
 
                     'strict' =>
-                        true,
+                    true,
 
                     'schema' =>
-                        $schema,
+                    $schema,
                 ],
             ],
         ];
@@ -1399,10 +1391,10 @@ PROMPT;
             $ch,
             [
                 CURLOPT_POST =>
-                    true,
+                true,
 
                 CURLOPT_RETURNTRANSFER =>
-                    true,
+                true,
 
                 CURLOPT_HTTPHEADER => [
                     'Authorization: Bearer ' .
@@ -1412,18 +1404,18 @@ PROMPT;
                 ],
 
                 CURLOPT_POSTFIELDS =>
-                    json_encode(
-                        $body,
-                        JSON_UNESCAPED_UNICODE |
-                            JSON_UNESCAPED_SLASHES |
-                            JSON_THROW_ON_ERROR
-                    ),
+                json_encode(
+                    $body,
+                    JSON_UNESCAPED_UNICODE |
+                        JSON_UNESCAPED_SLASHES |
+                        JSON_THROW_ON_ERROR
+                ),
 
                 CURLOPT_CONNECTTIMEOUT =>
-                    15,
+                15,
 
                 CURLOPT_TIMEOUT =>
-                    120,
+                120,
             ]
         );
 
@@ -1472,10 +1464,10 @@ PROMPT;
         ) {
             throw new Exception(
                 'OpenAI API: ' .
-                (
-                    $decoded['error']['message']
-                    ?? 'Error desconocido.'
-                )
+                    (
+                        $decoded['error']['message']
+                        ?? 'Error desconocido.'
+                    )
             );
         }
 
@@ -1528,6 +1520,64 @@ PROMPT;
             $decoded['model']
             ?? $model;
 
+        $usage =
+            is_array(
+                $decoded['usage'] ?? null
+            )
+            ? $decoded['usage']
+            : [];
+
+        $inputTokens =
+            max(
+                0,
+                (int)(
+                    $usage['input_tokens']
+                    ?? 0
+                )
+            );
+
+        $cachedTokens =
+            max(
+                0,
+                (int)(
+                    $usage['input_tokens_details']['cached_tokens'] ?? 0
+                )
+            );
+
+        $outputTokens =
+            max(
+                0,
+                (int)(
+                    $usage['output_tokens']
+                    ?? 0
+                )
+            );
+
+        $totalTokens =
+            isset($usage['total_tokens'])
+            ? max(
+                0,
+                (int)$usage['total_tokens']
+            )
+            : (
+                $inputTokens +
+                $outputTokens
+            );
+
+        $result['_usage'] = [
+            'input_tokens' =>
+            $inputTokens,
+
+            'cached_tokens' =>
+            $cachedTokens,
+
+            'output_tokens' =>
+            $outputTokens,
+
+            'total_tokens' =>
+            $totalTokens,
+        ];
+
         return $result;
     }
 
@@ -1562,39 +1612,39 @@ PROMPT;
 
         $st->execute([
             'title_score' =>
-                $result['title_score'],
+            $result['title_score'],
 
             'description_score' =>
-                $result['description_score'],
+            $result['description_score'],
 
             'consistency_score' =>
-                $result['consistency_score'],
+            $result['consistency_score'],
 
             'matchability_score' =>
-                $result['matchability_score'],
+            $result['matchability_score'],
 
             'suggestions_json' =>
-                json_encode(
-                    $result['suggestions']
+            json_encode(
+                $result['suggestions']
                     ?? [],
-                    JSON_UNESCAPED_UNICODE |
-                        JSON_UNESCAPED_SLASHES
-                ),
+                JSON_UNESCAPED_UNICODE |
+                    JSON_UNESCAPED_SLASHES
+            ),
 
             'contradictions_json' =>
-                json_encode(
-                    $result['contradictions']
+            json_encode(
+                $result['contradictions']
                     ?? [],
-                    JSON_UNESCAPED_UNICODE |
-                        JSON_UNESCAPED_SLASHES
-                ),
+                JSON_UNESCAPED_UNICODE |
+                    JSON_UNESCAPED_SLASHES
+            ),
 
             'model_name' =>
-                $result['_model']
+            $result['_model']
                 ?? null,
 
             'id' =>
-                $analysisId,
+            $analysisId,
         ]);
     }
 
@@ -1611,14 +1661,14 @@ PROMPT;
             WHERE id = :id
         ")->execute([
             'message' =>
-                mb_substr(
-                    $message,
-                    0,
-                    6000
-                ),
+            mb_substr(
+                $message,
+                0,
+                6000
+            ),
 
             'id' =>
-                $analysisId,
+            $analysisId,
         ]);
     }
 
@@ -1635,14 +1685,14 @@ PROMPT;
             WHERE id = :id
         ")->execute([
             'message' =>
-                mb_substr(
-                    $message,
-                    0,
-                    6000
-                ),
+            mb_substr(
+                $message,
+                0,
+                6000
+            ),
 
             'id' =>
-                $analysisId,
+            $analysisId,
         ]);
     }
 
