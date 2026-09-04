@@ -1246,21 +1246,12 @@ image_analysis_json,
 
         $pdo = self::db();
 
-        /*
-     * Recuperamos exactamente el análisis
-     * asociado al job.
-     *
-     * Ya no intentamos adivinarlo mediante
-     * el hash actual de la propiedad.
-     */
         $st = $pdo->prepare("
         SELECT *
         FROM publication_ai_analyses
-
         WHERE id = :id
           AND entity_type = 'property'
           AND entity_id = :entity_id
-
         LIMIT 1
     ");
 
@@ -1284,23 +1275,27 @@ image_analysis_json,
         }
 
         /*
-     * Si ya terminó, el job puede cerrarse
-     * sin volver a llamar a OpenAI.
+     * Si ya terminó, no volvemos
+     * a consumir OpenAI.
      */
-        if ($analysis['status'] === 'completed') {
+        if (
+            $analysis['status'] ===
+            'completed'
+        ) {
             return [
                 'ok' => true,
                 'skipped' => true,
-                'analysis_id' => $analysisId,
+                'analysis_id' =>
+                $analysisId,
                 'reason' =>
                 'El análisis ya había sido completado.',
             ];
         }
 
         /*
-     * Verificamos que la propiedad todavía tenga
-     * exactamente el contenido para el cual se
-     * solicitó este análisis.
+     * Verificamos que la publicación siga
+     * siendo exactamente la que originó
+     * este análisis.
      */
         $currentHash =
             self::buildPropertyInputHash(
@@ -1308,7 +1303,10 @@ image_analysis_json,
             );
 
         $requestedHash =
-            (string)($analysis['input_hash'] ?? '');
+            (string)(
+                $analysis['input_hash']
+                ?? ''
+            );
 
         if (
             $requestedHash === '' ||
@@ -1323,65 +1321,38 @@ image_analysis_json,
             );
 
             return [
-                'ok' => true,
-                'skipped' => true,
-                'analysis_id' => $analysisId,
+                'ok' =>
+                true,
+
+                'skipped' =>
+                true,
+
+                'analysis_id' =>
+                $analysisId,
+
                 'reason' =>
                 'La publicación cambió después de solicitar el análisis.',
             ];
         }
 
         /*
-     * Antes del análisis IA garantizamos que
-     * la evaluación objetiva corresponda al
-     * estado actual de la propiedad.
-     *
-     * Así el índice híbrido nunca combina una
-     * IA nueva con un score objetivo anterior.
+     * Actualizamos primero el análisis objetivo.
+     * Esto todavía no implica consumo de OpenAI.
      */
         PublicationQualityService::analyzeProperty(
             $propertyId
         );
 
         /*
-     * Marcamos exactamente esta fila
-     * como processing.
-     */
-        $stProcessing = $pdo->prepare("
-        UPDATE publication_ai_analyses
-
-        SET
-            status = 'processing',
-            error_message = NULL,
-            updated_at = CURRENT_TIMESTAMP
-
-        WHERE id = :id
-
-        LIMIT 1
-    ");
-
-        $stProcessing->execute([
-            'id' =>
-            $analysisId,
-        ]);
-
-        /*
-     * Contexto de negocio del consumo IA.
-     *
-     * Lo cargamos antes del try para poder
-     * utilizarlo tanto en el log exitoso
-     * como en el log de error.
+     * Contexto para atribuir el consumo.
      */
         $stUsageContext = $pdo->prepare("
         SELECT
             real_estate_id,
             created_by_user_id
-
         FROM properties
-
         WHERE id = :id
           AND deleted_at IS NULL
-
         LIMIT 1
     ");
 
@@ -1394,6 +1365,47 @@ image_analysis_json,
             $stUsageContext->fetch(
                 PDO::FETCH_ASSOC
             ) ?: [];
+
+        $realEstateId =
+            isset(
+                $usageContext['real_estate_id']
+            )
+            ? (int)$usageContext['real_estate_id']
+            : null;
+
+        $userId =
+            isset(
+                $usageContext['created_by_user_id']
+            )
+            ? (int)$usageContext['created_by_user_id']
+            : null;
+
+        /*
+     * Marcamos esta fila como processing.
+     */
+        $stProcessing = $pdo->prepare("
+        UPDATE publication_ai_analyses
+        SET
+            status = 'processing',
+            error_message = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = :id
+        LIMIT 1
+    ");
+
+        $stProcessing->execute([
+            'id' =>
+            $analysisId,
+        ]);
+
+        $providerCallStarted =
+            false;
+
+        $providerCallSucceeded =
+            false;
+
+        $openAIStartedAt =
+            null;
 
         try {
             $totalStartedAt =
@@ -1411,6 +1423,13 @@ image_analysis_json,
                 microtime(true) -
                 $prepareStartedAt;
 
+            /*
+         * A partir de acá existe realmente
+         * un intento contra OpenAI.
+         */
+            $providerCallStarted =
+                true;
+
             $openAIStartedAt =
                 microtime(true);
 
@@ -1423,25 +1442,98 @@ image_analysis_json,
                 microtime(true) -
                 $openAIStartedAt;
 
+            $providerCallSucceeded =
+                true;
+
+            /*
+         * OpenAI ya respondió.
+         *
+         * Registramos el consumo AHORA,
+         * antes de cualquier persistencia posterior.
+         */
+            $usage =
+                is_array(
+                    $result['_usage'] ?? null
+                )
+                ? $result['_usage']
+                : [];
+
+            AiUsageService::log([
+                'provider' =>
+                'openai',
+
+                'model_name' =>
+                $result['_model']
+                    ?? null,
+
+                'operation' =>
+                'publication_analysis',
+
+                'entity_type' =>
+                'property',
+
+                'entity_id' =>
+                $propertyId,
+
+                'real_estate_id' =>
+                $realEstateId,
+
+                'user_id' =>
+                $userId,
+
+                'input_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['input_tokens'] ?? 0
+                    )
+                ),
+
+                'cached_input_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['cached_tokens'] ?? 0
+                    )
+                ),
+
+                'output_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['output_tokens'] ?? 0
+                    )
+                ),
+
+                'total_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['total_tokens'] ?? 0
+                    )
+                ),
+
+                'duration_ms' =>
+                (int)round(
+                    $openAISeconds * 1000
+                ),
+
+                'status' =>
+                'success',
+            ]);
+
+            /*
+         * Desde este punto cualquier error
+         * es interno de PermuOK, no de OpenAI.
+         */
             $persistStartedAt =
                 microtime(true);
 
-            /*
-         * La llamada a OpenAI puede ser larga.
-         * Renovamos la conexión antes de guardar.
-         */
             self::completeAnalysis(
                 $analysisId,
                 $result
             );
 
-            /*
-         * La IA ya quedó persistida.
-         *
-         * Ahora calculamos y guardamos el índice
-         * oficial híbrido correspondiente exactamente
-         * a esta versión de la publicación.
-         */
             PublicationQualityScoreService::recalculateAndPersistPropertyScore(
                 $propertyId
             );
@@ -1484,75 +1576,6 @@ image_analysis_json,
                 PHP_EOL
             );
 
-            $usage =
-                is_array(
-                    $result['_usage'] ?? null
-                )
-                ? $result['_usage']
-                : [];
-
-            /*
-         * Registramos el consumo real de OpenAI.
-         */
-            AiUsageService::log([
-                'provider' =>
-                'openai',
-
-                'model_name' =>
-                $result['_model'] ?? null,
-
-                'operation' =>
-                'publication_analysis',
-
-                'entity_type' =>
-                'property',
-
-                'entity_id' =>
-                $propertyId,
-
-                'real_estate_id' =>
-                isset(
-                    $usageContext['real_estate_id']
-                )
-                    ? (int)$usageContext['real_estate_id']
-                    : null,
-
-                'user_id' =>
-                isset(
-                    $usageContext['created_by_user_id']
-                )
-                    ? (int)$usageContext['created_by_user_id']
-                    : null,
-
-                'input_tokens' =>
-                (int)(
-                    $usage['input_tokens'] ?? 0
-                ),
-
-                'cached_input_tokens' =>
-                (int)(
-                    $usage['cached_tokens'] ?? 0
-                ),
-
-                'output_tokens' =>
-                (int)(
-                    $usage['output_tokens'] ?? 0
-                ),
-
-                'total_tokens' =>
-                (int)(
-                    $usage['total_tokens'] ?? 0
-                ),
-
-                'duration_ms' =>
-                (int)round(
-                    $openAISeconds * 1000
-                ),
-
-                'status' =>
-                'success',
-            ]);
-
             echo
             "  Tokens:" .
                 PHP_EOL;
@@ -1560,7 +1583,8 @@ image_analysis_json,
             echo sprintf(
                 "    Input:       %d%s",
                 (int)(
-                    $usage['input_tokens'] ?? 0
+                    $usage['input_tokens']
+                    ?? 0
                 ),
                 PHP_EOL
             );
@@ -1568,7 +1592,8 @@ image_analysis_json,
             echo sprintf(
                 "    Cached:      %d%s",
                 (int)(
-                    $usage['cached_tokens'] ?? 0
+                    $usage['cached_tokens']
+                    ?? 0
                 ),
                 PHP_EOL
             );
@@ -1576,7 +1601,8 @@ image_analysis_json,
             echo sprintf(
                 "    Output:      %d%s",
                 (int)(
-                    $usage['output_tokens'] ?? 0
+                    $usage['output_tokens']
+                    ?? 0
                 ),
                 PHP_EOL
             );
@@ -1584,7 +1610,8 @@ image_analysis_json,
             echo sprintf(
                 "    Reasoning:   %d%s",
                 (int)(
-                    $usage['reasoning_tokens'] ?? 0
+                    $usage['reasoning_tokens']
+                    ?? 0
                 ),
                 PHP_EOL
             );
@@ -1592,7 +1619,8 @@ image_analysis_json,
             echo sprintf(
                 "    Total:       %d%s",
                 (int)(
-                    $usage['total_tokens'] ?? 0
+                    $usage['total_tokens']
+                    ?? 0
                 ),
                 PHP_EOL
             );
@@ -1608,52 +1636,72 @@ image_analysis_json,
                 'completed',
 
                 'model' =>
-                $result['_model'] ?? null,
+                $result['_model']
+                    ?? null,
             ];
         } catch (Throwable $e) {
             /*
-         * También registramos los intentos fallidos.
-         *
-         * En un fallo puede no existir información
-         * de tokens porque OpenAI puede haber fallado
-         * antes de devolver usage.
+         * Sólo registramos failed cuando
+         * efectivamente comenzó una llamada
+         * a OpenAI y ésta no respondió bien.
          */
-            AiUsageService::log([
-                'provider' =>
-                'openai',
+            if (
+                $providerCallStarted &&
+                !$providerCallSucceeded
+            ) {
+                $durationMs =
+                    $openAIStartedAt !== null
+                    ? (int)round(
+                        (
+                            microtime(true) -
+                            $openAIStartedAt
+                        ) * 1000
+                    )
+                    : null;
 
-                'model_name' =>
-                self::DEFAULT_MODEL,
+                $configuredModel =
+                    trim(
+                        (string)(
+                            $_ENV['OPENAI_MODEL']
+                            ?? getenv('OPENAI_MODEL')
+                            ?: self::DEFAULT_MODEL
+                        )
+                    );
 
-                'operation' =>
-                'publication_analysis',
+                AiUsageService::log([
+                    'provider' =>
+                    'openai',
 
-                'entity_type' =>
-                'property',
+                    'model_name' =>
+                    $configuredModel !== ''
+                        ? $configuredModel
+                        : self::DEFAULT_MODEL,
 
-                'entity_id' =>
-                $propertyId,
+                    'operation' =>
+                    'publication_analysis',
 
-                'real_estate_id' =>
-                isset(
-                    $usageContext['real_estate_id']
-                )
-                    ? (int)$usageContext['real_estate_id']
-                    : null,
+                    'entity_type' =>
+                    'property',
 
-                'user_id' =>
-                isset(
-                    $usageContext['created_by_user_id']
-                )
-                    ? (int)$usageContext['created_by_user_id']
-                    : null,
+                    'entity_id' =>
+                    $propertyId,
 
-                'status' =>
-                'failed',
+                    'real_estate_id' =>
+                    $realEstateId,
 
-                'error_message' =>
-                $e->getMessage(),
-            ]);
+                    'user_id' =>
+                    $userId,
+
+                    'status' =>
+                    'failed',
+
+                    'duration_ms' =>
+                    $durationMs,
+
+                    'error_message' =>
+                    $e->getMessage(),
+                ]);
+            }
 
             if ($attempt < $maxAttempts) {
                 self::markAnalysisPendingForRetry(
