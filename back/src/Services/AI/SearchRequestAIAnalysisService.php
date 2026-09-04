@@ -525,7 +525,7 @@ class SearchRequestAIAnalysisService
                     JSON_UNESCAPED_SLASHES
             );
 
-      $prompt = <<<PROMPT
+        $prompt = <<<PROMPT
 Sos un especialista en búsquedas inmobiliarias B2B.
 
 Analizá esta búsqueda publicada en PermuOK.
@@ -1398,6 +1398,64 @@ PROMPT;
         $result['_model'] =
             $decoded['model']
             ?? $model;
+
+        $usage =
+            is_array(
+                $decoded['usage'] ?? null
+            )
+            ? $decoded['usage']
+            : [];
+
+        $inputTokens =
+            max(
+                0,
+                (int)(
+                    $usage['input_tokens']
+                    ?? 0
+                )
+            );
+
+        $cachedTokens =
+            max(
+                0,
+                (int)(
+                    $usage['input_tokens_details']['cached_tokens'] ?? 0
+                )
+            );
+
+        $outputTokens =
+            max(
+                0,
+                (int)(
+                    $usage['output_tokens']
+                    ?? 0
+                )
+            );
+
+        $totalTokens =
+            isset($usage['total_tokens'])
+            ? max(
+                0,
+                (int)$usage['total_tokens']
+            )
+            : (
+                $inputTokens +
+                $outputTokens
+            );
+
+        $result['_usage'] = [
+            'input_tokens' =>
+            $inputTokens,
+
+            'cached_tokens' =>
+            $cachedTokens,
+
+            'output_tokens' =>
+            $outputTokens,
+
+            'total_tokens' =>
+            $totalTokens,
+        ];
 
         return $result;
     }
