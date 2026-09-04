@@ -383,22 +383,33 @@ class SearchRequestAIAnalysisService
             );
         }
 
+        /*
+     * Si ya está terminado no volvemos a
+     * consumir OpenAI ni generamos usage.
+     */
         if ($analysis['status'] === 'completed') {
             return [
                 'ok' => true,
                 'skipped' => true,
                 'analysis_id' => $analysisId,
-                'reason' => 'El análisis ya estaba completado.',
+                'reason' =>
+                'El análisis ya estaba completado.',
             ];
         }
 
+        /*
+     * Verificamos que el contenido siga siendo
+     * exactamente el que originó este análisis.
+     */
         $currentHash =
             self::buildInputHash(
                 $searchRequestId
             );
 
         $requestedHash =
-            (string)($analysis['input_hash'] ?? '');
+            (string)(
+                $analysis['input_hash'] ?? ''
+            );
 
         if (
             $requestedHash === '' ||
@@ -430,6 +441,47 @@ class SearchRequestAIAnalysisService
             ];
         }
 
+        /*
+     * Contexto de negocio para poder atribuir
+     * el consumo a inmobiliaria y usuario.
+     */
+        $stUsageContext = $pdo->prepare("
+        SELECT
+            real_estate_id,
+            created_by_user_id
+        FROM search_requests
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $stUsageContext->execute([
+            'id' =>
+            $searchRequestId,
+        ]);
+
+        $usageContext =
+            $stUsageContext->fetch(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        $realEstateId =
+            isset(
+                $usageContext['real_estate_id']
+            )
+            ? (int)$usageContext['real_estate_id']
+            : null;
+
+        $userId =
+            isset(
+                $usageContext['created_by_user_id']
+            )
+            ? (int)$usageContext['created_by_user_id']
+            : null;
+
+        /*
+     * Marcamos el análisis como processing.
+     */
         $pdo->prepare("
         UPDATE publication_ai_analyses
         SET
@@ -438,8 +490,23 @@ class SearchRequestAIAnalysisService
             updated_at = CURRENT_TIMESTAMP
         WHERE id = :id
     ")->execute([
-            'id' => $analysisId,
+            'id' =>
+            $analysisId,
         ]);
+
+        /*
+     * Estas dos variables nos permiten distinguir
+     * un fallo real de OpenAI de un fallo posterior
+     * en nuestra propia persistencia.
+     */
+        $providerCallStarted =
+            false;
+
+        $providerCallSucceeded =
+            false;
+
+        $openAIStartedAt =
+            null;
 
         try {
             $input =
@@ -447,33 +514,206 @@ class SearchRequestAIAnalysisService
                     $searchRequestId
                 );
 
+            /*
+         * Desde este punto existe realmente
+         * un intento de consumo del proveedor.
+         */
+            $providerCallStarted =
+                true;
+
+            $openAIStartedAt =
+                microtime(true);
+
             $result =
                 self::callOpenAI(
                     $input
                 );
 
+            $openAISeconds =
+                microtime(true) -
+                $openAIStartedAt;
+
+            $providerCallSucceeded =
+                true;
+
+            /*
+         * OpenAI ya respondió.
+         *
+         * Registramos el consumo ANTES de guardar
+         * el análisis para no perder el costo si
+         * luego falla MySQL o el cálculo de calidad.
+         */
+            $usage =
+                is_array(
+                    $result['_usage'] ?? null
+                )
+                ? $result['_usage']
+                : [];
+
+            AiUsageService::log([
+                'provider' =>
+                'openai',
+
+                'model_name' =>
+                $result['_model'] ?? null,
+
+                'operation' =>
+                'search_request_analysis',
+
+                'entity_type' =>
+                'search_request',
+
+                'entity_id' =>
+                $searchRequestId,
+
+                'real_estate_id' =>
+                $realEstateId,
+
+                'user_id' =>
+                $userId,
+
+                'input_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['input_tokens'] ?? 0
+                    )
+                ),
+
+                'cached_input_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['cached_tokens'] ?? 0
+                    )
+                ),
+
+                'output_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['output_tokens'] ?? 0
+                    )
+                ),
+
+                'total_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['total_tokens'] ?? 0
+                    )
+                ),
+
+                'duration_ms' =>
+                (int)round(
+                    $openAISeconds * 1000
+                ),
+
+                'status' =>
+                'success',
+            ]);
+
+            /*
+         * Recién después del log de consumo
+         * persistimos el resultado funcional.
+         */
             self::completeAnalysis(
                 $analysisId,
                 $result
             );
 
             /*
- * Una vez persistido el análisis IA,
- * recalculamos y guardamos el score
- * oficial híbrido de la búsqueda.
- */
+         * Una vez persistido el análisis IA,
+         * recalculamos y guardamos el score
+         * oficial híbrido de la búsqueda.
+         */
             $quality =
                 SearchRequestQualityScoreService::recalculateAndPersist(
                     $searchRequestId
                 );
 
             return [
-                'ok' => true,
-                'analysis_id' => $analysisId,
-                'status' => 'completed',
-                'quality' => $quality,
+                'ok' =>
+                true,
+
+                'analysis_id' =>
+                $analysisId,
+
+                'status' =>
+                'completed',
+
+                'quality' =>
+                $quality,
             ];
         } catch (Throwable $e) {
+            /*
+         * Sólo registramos un failed de IA cuando
+         * realmente comenzó la llamada y ésta
+         * no llegó a devolver una respuesta válida.
+         *
+         * Si OpenAI respondió correctamente pero
+         * después falló nuestra persistencia, el
+         * consumo ya quedó registrado como success
+         * y NO generamos un falso segundo registro.
+         */
+            if (
+                $providerCallStarted &&
+                !$providerCallSucceeded
+            ) {
+                $durationMs =
+                    $openAIStartedAt !== null
+                    ? (int)round(
+                        (
+                            microtime(true) -
+                            $openAIStartedAt
+                        ) * 1000
+                    )
+                    : null;
+
+                $configuredModel =
+                    trim(
+                        (string)(
+                            $_ENV['OPENAI_MODEL']
+                            ?? getenv('OPENAI_MODEL')
+                            ?: self::DEFAULT_MODEL
+                        )
+                    );
+
+                AiUsageService::log([
+                    'provider' =>
+                    'openai',
+
+                    'model_name' =>
+                    $configuredModel !== ''
+                        ? $configuredModel
+                        : self::DEFAULT_MODEL,
+
+                    'operation' =>
+                    'search_request_analysis',
+
+                    'entity_type' =>
+                    'search_request',
+
+                    'entity_id' =>
+                    $searchRequestId,
+
+                    'real_estate_id' =>
+                    $realEstateId,
+
+                    'user_id' =>
+                    $userId,
+
+                    'status' =>
+                    'failed',
+
+                    'duration_ms' =>
+                    $durationMs,
+
+                    'error_message' =>
+                    $e->getMessage(),
+                ]);
+            }
+
             if ($attempt < $maxAttempts) {
                 self::markPending(
                     $analysisId,
@@ -489,7 +729,7 @@ class SearchRequestAIAnalysisService
             throw $e;
         }
     }
-
+    
     private static function callOpenAI(
         array $input
     ): array {
