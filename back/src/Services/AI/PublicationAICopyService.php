@@ -47,6 +47,7 @@ class PublicationAICopyService
         );
     }
 
+
     private static function generatePropertyCopy(
         int $propertyId,
         string $copyType,
@@ -70,26 +71,28 @@ class PublicationAICopyService
         }
 
         /*
-         * Reutilizamos exactamente la misma
-         * preparación estructurada que usa
-         * el análisis profundo.
-         */
+     * Reutilizamos exactamente la misma
+     * preparación estructurada que usa
+     * el análisis profundo.
+     */
         $input =
             PublicationAIAnalysisService::preparePropertyInput(
                 $propertyId
             );
+
         /*
- * La base de datos funciona como fallback.
- *
- * Si el frontend envió un snapshot del formulario,
- * sus valores tienen prioridad aunque todavía
- * no hayan sido guardados.
- */
+     * La base de datos funciona como fallback.
+     *
+     * Si el frontend envió un snapshot del formulario,
+     * sus valores tienen prioridad aunque todavía
+     * no hayan sido guardados.
+     */
         $input =
             self::applyDraftOverrides(
                 $input,
                 $draft
             );
+
         $promptVersion =
             $copyType === 'title'
             ? self::TITLE_PROMPT_VERSION
@@ -103,10 +106,10 @@ class PublicationAICopyService
             );
 
         /*
-         * Las últimas opciones generadas se incluyen
-         * en el prompt para que "Generar otra opción"
-         * no tienda a devolver exactamente lo mismo.
-         */
+     * Las últimas opciones generadas se incluyen
+     * en el prompt para que "Generar otra opción"
+     * no devuelva exactamente lo mismo.
+     */
         $previousOptions =
             self::getPreviousOptions(
                 $propertyId,
@@ -114,36 +117,222 @@ class PublicationAICopyService
                 $inputHash
             );
 
-        $generated =
-            self::callOpenAI(
-                $input,
-                $copyType,
-                $previousOptions
-            );
+        /*
+     * Obtenemos la inmobiliaria propietaria.
+     *
+     * El userId ya llega como argumento y representa
+     * al usuario que efectivamente pidió generar
+     * el contenido.
+     */
+        $pdo = self::db();
 
-        $pdo = self::db(true);
+        $stUsageContext = $pdo->prepare("
+        SELECT real_estate_id
+        FROM properties
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $stUsageContext->execute([
+            'id' => $propertyId,
+        ]);
+
+        $usageContext =
+            $stUsageContext->fetch(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        $realEstateId =
+            isset($usageContext['real_estate_id'])
+            ? (int)$usageContext['real_estate_id']
+            : null;
+
+        /*
+     * La llamada a OpenAI queda aislada para que
+     * un error posterior de MySQL no sea registrado
+     * falsamente como error del proveedor.
+     */
+        $openAIStartedAt =
+            microtime(true);
+
+        try {
+            $generated =
+                self::callOpenAI(
+                    $input,
+                    $copyType,
+                    $previousOptions
+                );
+        } catch (\Throwable $e) {
+            $durationMs =
+                (int)round(
+                    (
+                        microtime(true) -
+                        $openAIStartedAt
+                    ) * 1000
+                );
+
+            $configuredModel =
+                trim(
+                    (string)(
+                        $_ENV['OPENAI_MODEL']
+                        ?? getenv('OPENAI_MODEL')
+                        ?: self::DEFAULT_MODEL
+                    )
+                );
+
+            AiUsageService::log([
+                'provider' =>
+                'openai',
+
+                'model_name' =>
+                $configuredModel !== ''
+                    ? $configuredModel
+                    : self::DEFAULT_MODEL,
+
+                'operation' =>
+                $copyType === 'title'
+                    ? 'property_copy_title'
+                    : 'property_copy_description',
+
+                'entity_type' =>
+                'property',
+
+                'entity_id' =>
+                $propertyId,
+
+                'real_estate_id' =>
+                $realEstateId,
+
+                'user_id' =>
+                $userId,
+
+                'status' =>
+                'failed',
+
+                'duration_ms' =>
+                $durationMs,
+
+                'error_message' =>
+                $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+
+        $openAISeconds =
+            microtime(true) -
+            $openAIStartedAt;
+
+        /*
+     * OpenAI respondió correctamente.
+     *
+     * Registramos el consumo antes de persistir
+     * publication_ai_copy_generations.
+     */
+        $usage =
+            is_array(
+                $generated['usage'] ?? null
+            )
+            ? $generated['usage']
+            : [];
+
+        AiUsageService::log([
+            'provider' =>
+            'openai',
+
+            'model_name' =>
+            $generated['model'] ?? null,
+
+            'operation' =>
+            $copyType === 'title'
+                ? 'property_copy_title'
+                : 'property_copy_description',
+
+            'entity_type' =>
+            'property',
+
+            'entity_id' =>
+            $propertyId,
+
+            'real_estate_id' =>
+            $realEstateId,
+
+            'user_id' =>
+            $userId,
+
+            'input_tokens' =>
+            max(
+                0,
+                (int)(
+                    $usage['input_tokens']
+                    ?? 0
+                )
+            ),
+
+            'cached_input_tokens' =>
+            max(
+                0,
+                (int)(
+                    $usage['cached_input_tokens']
+                    ?? 0
+                )
+            ),
+
+            'output_tokens' =>
+            max(
+                0,
+                (int)(
+                    $usage['output_tokens']
+                    ?? 0
+                )
+            ),
+
+            'total_tokens' =>
+            max(
+                0,
+                (int)(
+                    $usage['total_tokens']
+                    ?? 0
+                )
+            ),
+
+            'duration_ms' =>
+            (int)round(
+                $openAISeconds * 1000
+            ),
+
+            'status' =>
+            'success',
+        ]);
+
+        /*
+     * Reabrimos conexión después de la llamada larga.
+     */
+        $pdo =
+            self::db(true);
 
         $st = $pdo->prepare("
-            INSERT INTO publication_ai_copy_generations (
-                entity_type,
-                entity_id,
-                copy_type,
-                content,
-                input_hash,
-                model_name,
-                prompt_version,
-                created_by_user_id
-            ) VALUES (
-                'property',
-                :entity_id,
-                :copy_type,
-                :content,
-                :input_hash,
-                :model_name,
-                :prompt_version,
-                :created_by_user_id
-            )
-        ");
+        INSERT INTO publication_ai_copy_generations (
+            entity_type,
+            entity_id,
+            copy_type,
+            content,
+            input_hash,
+            model_name,
+            prompt_version,
+            created_by_user_id
+        ) VALUES (
+            'property',
+            :entity_id,
+            :copy_type,
+            :content,
+            :input_hash,
+            :model_name,
+            :prompt_version,
+            :created_by_user_id
+        )
+    ");
 
         $st->execute([
             'entity_id' =>
@@ -185,6 +374,8 @@ class PublicationAICopyService
             $promptVersion,
         ];
     }
+
+
     private static function applyDraftOverrides(
         array $input,
         array $draft
@@ -1148,6 +1339,50 @@ PROMPT;
             );
         }
 
+        $usage =
+            is_array(
+                $decoded['usage'] ?? null
+            )
+            ? $decoded['usage']
+            : [];
+
+        $inputTokens =
+            max(
+                0,
+                (int)(
+                    $usage['input_tokens']
+                    ?? 0
+                )
+            );
+
+        $cachedInputTokens =
+            max(
+                0,
+                (int)(
+                    $usage['input_tokens_details']['cached_tokens'] ?? 0
+                )
+            );
+
+        $outputTokens =
+            max(
+                0,
+                (int)(
+                    $usage['output_tokens']
+                    ?? 0
+                )
+            );
+
+        $totalTokens =
+            isset($usage['total_tokens'])
+            ? max(
+                0,
+                (int)$usage['total_tokens']
+            )
+            : (
+                $inputTokens +
+                $outputTokens
+            );
+
         return [
             'content' =>
             trim($content),
@@ -1157,6 +1392,20 @@ PROMPT;
                 $decoded['model']
                 ?? $model
             ),
+
+            'usage' => [
+                'input_tokens' =>
+                $inputTokens,
+
+                'cached_input_tokens' =>
+                $cachedInputTokens,
+
+                'output_tokens' =>
+                $outputTokens,
+
+                'total_tokens' =>
+                $totalTokens,
+            ],
         ];
     }
     private static function extractOutputText(
