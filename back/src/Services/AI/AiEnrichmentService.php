@@ -32,24 +32,31 @@ class AiEnrichmentService
         bool $force = false
     ): array {
         if ($propertyId <= 0) {
-            throw new Exception('El ID de la propiedad no es válido');
+            throw new Exception(
+                'El ID de la propiedad no es válido'
+            );
         }
 
-        $context = self::buildPropertyContext($propertyId);
+        $context =
+            self::buildPropertyContext(
+                $propertyId
+            );
 
         $promptVersion =
             AiPromptService::PROPERTY_PROMPT_VERSION;
 
-        $sourceHash = self::calculateSourceHash(
-            $context,
-            $promptVersion
-        );
+        $sourceHash =
+            self::calculateSourceHash(
+                $context,
+                $promptVersion
+            );
 
         if (!$force) {
-            $current = self::getCurrentAnalysis(
-                'property',
-                $propertyId
-            );
+            $current =
+                self::getCurrentAnalysis(
+                    'property',
+                    $propertyId
+                );
 
             if (
                 $current &&
@@ -57,9 +64,12 @@ class AiEnrichmentService
                     (string)$current['source_hash'],
                     $sourceHash
                 ) &&
-                (string)($current['prompt_version'] ?? '') === $promptVersion &&
-                (string)($current['extraction_version'] ?? '') ===
-                self::EXTRACTION_VERSION
+                (string)(
+                    $current['prompt_version'] ?? ''
+                ) === $promptVersion &&
+                (string)(
+                    $current['extraction_version'] ?? ''
+                ) === self::EXTRACTION_VERSION
             ) {
                 return self::formatStoredAnalysis(
                     $current,
@@ -74,45 +84,186 @@ class AiEnrichmentService
             );
         }
 
-        $startedAt = microtime(true);
+        /*
+     * El contexto ya contiene estos datos porque
+     * buildPropertyContext() los obtiene de properties.
+     */
+        $realEstateId =
+            isset(
+                $context['property']['real_estate_id']
+            )
+            ? (int)$context['property']['real_estate_id']
+            : null;
+
+        $userId =
+            isset(
+                $context['property']['created_by_user_id']
+            )
+            ? (int)$context['property']['created_by_user_id']
+            : null;
+
+        /*
+     * Hoy el provider operativo es OpenAI.
+     * Si en el futuro conectamos otro proveedor,
+     * este valor podrá resolverse desde el contrato.
+     */
+        $providerName =
+            self::$provider instanceof OpenAIProvider
+            ? 'openai'
+            : 'unknown';
+
+        $startedAt =
+            microtime(true);
+
+        /*
+     * Nos permite distinguir:
+     *
+     * - falló la llamada al proveedor;
+     * - OpenAI respondió bien pero falló algo
+     *   posterior, como persistencia.
+     *
+     * Si OpenAI respondió, el consumo ya ocurrió
+     * y no debemos registrar además un falso
+     * segundo consumo fallido.
+     */
+        $providerCallSucceeded = false;
 
         try {
-            $providerResult = self::$provider->analyzeEntity(
-                'property',
-                $context,
-                $promptVersion
-            );
+            $providerResult =
+                self::$provider->analyzeEntity(
+                    'property',
+                    $context,
+                    $promptVersion
+                );
 
-            $processingTimeMs = (int)round(
-                (microtime(true) - $startedAt) * 1000
-            );
+            $providerCallSucceeded = true;
 
-            $resultData = self::normalizeProviderResult(
-                $providerResult['data'] ?? []
-            );
+            $processingTimeMs =
+                (int)round(
+                    (
+                        microtime(true) -
+                        $startedAt
+                    ) * 1000
+                );
 
-            $modelName = trim(
-                (string)($providerResult['model'] ?? '')
-            );
+            $modelName =
+                trim(
+                    (string)(
+                        $providerResult['model']
+                        ?? ''
+                    )
+                );
 
-            $tokensUsed = max(
-                0,
-                (int)($providerResult['tokens_used'] ?? 0)
-            );
-            $analysisId = self::saveAnalysis(
-                entityType: 'property',
-                entityId: $propertyId,
-                sourceHash: $sourceHash,
-                result: $resultData,
-                processingTimeMs: $processingTimeMs,
-                tokensUsed: $tokensUsed,
-                modelName: $modelName !== ''
+            $usage =
+                is_array(
+                    $providerResult['usage']
+                        ?? null
+                )
+                ? $providerResult['usage']
+                : [];
+
+            $tokensUsed =
+                max(
+                    0,
+                    (int)(
+                        $providerResult['tokens_used'] ?? 0
+                    )
+                );
+
+            /*
+         * Registramos el consumo inmediatamente
+         * después de una respuesta exitosa del
+         * proveedor.
+         *
+         * Así no perdemos el costo si después
+         * falla la persistencia del análisis.
+         */
+            AiUsageService::log([
+                'provider' =>
+                $providerName,
+
+                'model_name' =>
+                $modelName !== ''
                     ? $modelName
                     : null,
-                promptVersion: $promptVersion
-            );
 
-            $saved = self::getAnalysisById($analysisId);
+                'operation' =>
+                'entity_enrichment',
+
+                'entity_type' =>
+                'property',
+
+                'entity_id' =>
+                $propertyId,
+
+                'real_estate_id' =>
+                $realEstateId,
+
+                'user_id' =>
+                $userId,
+
+                'input_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['input_tokens'] ?? 0
+                    )
+                ),
+
+                'cached_input_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['cached_input_tokens'] ?? 0
+                    )
+                ),
+
+                'output_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['output_tokens'] ?? 0
+                    )
+                ),
+
+                'total_tokens' =>
+                max(
+                    0,
+                    (int)(
+                        $usage['total_tokens'] ?? $tokensUsed
+                    )
+                ),
+
+                'duration_ms' =>
+                $processingTimeMs,
+
+                'status' =>
+                'success',
+            ]);
+
+            $resultData =
+                self::normalizeProviderResult(
+                    $providerResult['data'] ?? []
+                );
+
+            $analysisId =
+                self::saveAnalysis(
+                    entityType: 'property',
+                    entityId: $propertyId,
+                    sourceHash: $sourceHash,
+                    result: $resultData,
+                    processingTimeMs: $processingTimeMs,
+                    tokensUsed: $tokensUsed,
+                    modelName: $modelName !== ''
+                        ? $modelName
+                        : null,
+                    promptVersion: $promptVersion
+                );
+
+            $saved =
+                self::getAnalysisById(
+                    $analysisId
+                );
 
             if (!$saved) {
                 throw new Exception(
@@ -125,6 +276,54 @@ class AiEnrichmentService
                 false
             );
         } catch (Throwable $e) {
+            /*
+         * Sólo registramos "failed" cuando la
+         * llamada al proveedor no llegó a responder
+         * exitosamente.
+         *
+         * Si respondió y luego falló MySQL u otra
+         * parte interna, el consumo ya quedó
+         * registrado arriba como una llamada real.
+         */
+            if (!$providerCallSucceeded) {
+                $durationMs =
+                    (int)round(
+                        (
+                            microtime(true) -
+                            $startedAt
+                        ) * 1000
+                    );
+
+                AiUsageService::log([
+                    'provider' =>
+                    $providerName,
+
+                    'operation' =>
+                    'entity_enrichment',
+
+                    'entity_type' =>
+                    'property',
+
+                    'entity_id' =>
+                    $propertyId,
+
+                    'real_estate_id' =>
+                    $realEstateId,
+
+                    'user_id' =>
+                    $userId,
+
+                    'status' =>
+                    'failed',
+
+                    'duration_ms' =>
+                    $durationMs,
+
+                    'error_message' =>
+                    $e->getMessage(),
+                ]);
+            }
+
             throw new Exception(
                 'No se pudo enriquecer la propiedad: ' .
                     $e->getMessage(),
