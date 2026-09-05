@@ -15,6 +15,9 @@ class AdminDashboardService
     {
         $pdo = self::db();
 
+        $matching =
+            self::matchingStats($pdo);
+
         return [
             'active_real_estates' => self::count($pdo, "
                SELECT COUNT(*)
@@ -66,6 +69,9 @@ WHERE deleted_at IS NULL
 
                 'failed_calls_month' =>
                 self::aiFailedCallsMonth($pdo),
+
+                'matching' =>
+                $matching,
             ],
         ];
     }
@@ -231,5 +237,125 @@ WHERE deleted_at IS NULL
                   '%Y-%m-01'
               )
     ");
+    }
+
+    private static function matchingStats(
+        PDO $pdo
+    ): array {
+        $stmt = $pdo->query("
+        SELECT
+            COUNT(*) AS active_matches,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN score >= 90
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS high_quality_matches,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN status IN (
+                            'one_side_interested',
+                            'mutual_interest',
+                            'chat_enabled'
+                        )
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS matches_with_interest,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN status = 'chat_enabled'
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS chat_enabled_matches
+
+        FROM compatibilities
+
+        WHERE status IN (
+            'detected',
+            'one_side_interested',
+            'mutual_interest',
+            'chat_enabled'
+        )
+    ");
+
+        $row =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        $activeMatches =
+            (int)(
+                $row['active_matches']
+                ?? 0
+            );
+
+        $highQualityMatches =
+            (int)(
+                $row['high_quality_matches']
+                ?? 0
+            );
+
+        $matchesWithInterest =
+            (int)(
+                $row['matches_with_interest']
+                ?? 0
+            );
+
+        $chatEnabledMatches =
+            (int)(
+                $row['chat_enabled_matches']
+                ?? 0
+            );
+
+        return [
+            'active_matches' =>
+            $activeMatches,
+
+            'high_quality_matches' =>
+            $highQualityMatches,
+
+            'matches_with_interest' =>
+            $matchesWithInterest,
+
+            'chat_enabled_matches' =>
+            $chatEnabledMatches,
+
+            'interest_rate_pct' =>
+            $activeMatches > 0
+                ? round(
+                    (
+                        $matchesWithInterest /
+                        $activeMatches
+                    ) * 100,
+                    1
+                )
+                : 0.0,
+
+            'chat_enablement_rate_pct' =>
+            $activeMatches > 0
+                ? round(
+                    (
+                        $chatEnabledMatches /
+                        $activeMatches
+                    ) * 100,
+                    1
+                )
+                : 0.0,
+        ];
     }
 }
