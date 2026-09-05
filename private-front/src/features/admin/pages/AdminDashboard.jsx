@@ -178,6 +178,8 @@ export default function AdminDashboard() {
 
   const activity = stats?.activity || {};
 
+  const users = stats?.users || {};
+
   const systemHealth = stats?.system_health || {};
 
   const hasSystemAlerts = Boolean(systemHealth?.has_alerts);
@@ -269,6 +271,55 @@ export default function AdminDashboard() {
                 value={formatNumber(activity.new_conversations_month)}
                 description="Conversaciones iniciadas durante este mes."
                 icon="messagesSquare"
+              />
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <SectionHeader
+              title="Usuarios"
+              description="Distribución y actividad de los usuarios habilitados en la plataforma."
+            />
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <StatCard
+                title="Usuarios activos"
+                value={formatNumber(users.active_total)}
+                description="Usuarios activos, excluyendo administradores."
+                icon="badgeCheck"
+                onClick={() => navigate("/admin/users")}
+              />
+
+              <StatCard
+                title="Inmobiliarias"
+                value={formatNumber(users.active_real_estate)}
+                description="Usuarios inmobiliaria activos."
+                icon="building2"
+                onClick={() => navigate("/admin/users")}
+              />
+
+              <StatCard
+                title="Agentes"
+                value={formatNumber(users.active_agents)}
+                description="Agentes activos en la plataforma."
+                icon="badgeCheck"
+                onClick={() => navigate("/admin/users")}
+              />
+
+              <StatCard
+                title="Inversores"
+                value={formatNumber(users.active_investors)}
+                description="Inversores activos en la plataforma."
+                icon="badgeCheck"
+                onClick={() => navigate("/admin/users")}
+              />
+
+              <StatCard
+                title="Activos últimos 30 días"
+                value={formatNumber(users.logged_in_last_30_days)}
+                description="Usuarios activos que iniciaron sesión en los últimos 30 días."
+                icon="clock"
+                onClick={() => navigate("/admin/users")}
               />
             </div>
           </section>
