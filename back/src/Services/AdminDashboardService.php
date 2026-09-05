@@ -48,11 +48,14 @@ WHERE deleted_at IS NULL
             "),
 
             'pending_requests' => self::count($pdo, "
-                SELECT COUNT(*)
-                FROM real_estates
-                WHERE status = 'pending'
-                  AND deleted_at IS NULL
-            "),
+    SELECT COUNT(*)
+    FROM real_estates
+    WHERE profile_status IN (
+        1,
+        4
+    )
+      AND deleted_at IS NULL
+"),
 
             'ai' => [
                 'cost_today_usd' =>
