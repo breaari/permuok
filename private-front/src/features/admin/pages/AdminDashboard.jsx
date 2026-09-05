@@ -176,6 +176,8 @@ export default function AdminDashboard() {
 
   const matching = stats?.matching || {};
 
+  const activity = stats?.activity || {};
+
   const systemHealth = stats?.system_health || {};
 
   const hasSystemAlerts = Boolean(systemHealth?.has_alerts);
@@ -225,6 +227,49 @@ export default function AdminDashboard() {
                   icon={item.icon}
                 />
               ))}
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <SectionHeader
+              title="Actividad este mes"
+              description="Movimiento generado durante el mes actual."
+            />
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard
+                title="Nuevas inmobiliarias"
+                value={formatNumber(activity.new_real_estates_month)}
+                description="Cuentas creadas durante este mes."
+                icon="building2"
+              />
+
+              <StatCard
+                title="Nuevas publicaciones"
+                value={formatNumber(activity.new_publications_month)}
+                description={`Propiedades: ${formatNumber(
+                  activity.new_properties_month,
+                )} · Búsquedas: ${formatNumber(
+                  activity.new_search_requests_month,
+                )} · Desarrollos: ${formatNumber(
+                  activity.new_developments_month,
+                )}`}
+                icon="layoutGrid"
+              />
+
+              <StatCard
+                title="Nuevos matches"
+                value={formatNumber(activity.new_matches_month)}
+                description="Compatibilidades detectadas durante este mes."
+                icon="badgeCheck"
+              />
+
+              <StatCard
+                title="Nuevas conversaciones"
+                value={formatNumber(activity.new_conversations_month)}
+                description="Conversaciones iniciadas durante este mes."
+                icon="messagesSquare"
+              />
             </div>
           </section>
 
