@@ -24,6 +24,11 @@ class AdminDashboardService
         $activity =
             self::activityStats($pdo);
 
+        $users =
+            self::userStats($pdo);
+
+
+
         return [
             'active_real_estates' => self::count($pdo, "
                SELECT COUNT(*)
@@ -88,6 +93,9 @@ WHERE deleted_at IS NULL
 
             'activity' =>
             $activity,
+
+            'users' =>
+            $users,
         ];
     }
 
@@ -587,6 +595,107 @@ WHERE deleted_at IS NULL
 
             'new_conversations_month' =>
             $newConversations,
+        ];
+    }
+
+    private static function userStats(
+        PDO $pdo
+    ): array {
+        $stmt = $pdo->query("
+        SELECT
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN is_active = 1
+                          AND role IN (2, 3, 4)
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS active_total,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN is_active = 1
+                          AND role = 2
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS active_real_estate,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN is_active = 1
+                          AND role = 3
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS active_agents,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN is_active = 1
+                          AND role = 4
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS active_investors,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN is_active = 1
+                          AND role IN (2, 3, 4)
+                          AND last_login >=
+                              DATE_SUB(
+                                  UTC_TIMESTAMP(),
+                                  INTERVAL 30 DAY
+                              )
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS logged_in_last_30_days
+
+        FROM users
+
+        WHERE deleted_at IS NULL
+    ");
+
+        $row =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        return [
+            'active_total' =>
+            (int)($row['active_total'] ?? 0),
+
+            'active_real_estate' =>
+            (int)($row['active_real_estate'] ?? 0),
+
+            'active_agents' =>
+            (int)($row['active_agents'] ?? 0),
+
+            'active_investors' =>
+            (int)($row['active_investors'] ?? 0),
+
+            'logged_in_last_30_days' =>
+            (int)(
+                $row['logged_in_last_30_days']
+                ?? 0
+            ),
         ];
     }
 }
