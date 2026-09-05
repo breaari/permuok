@@ -18,6 +18,9 @@ class AdminDashboardService
         $matching =
             self::matchingStats($pdo);
 
+        $systemHealth =
+            self::systemHealthStats($pdo);
+
         return [
             'active_real_estates' => self::count($pdo, "
                SELECT COUNT(*)
@@ -73,6 +76,9 @@ WHERE deleted_at IS NULL
 
             'matching' =>
             $matching,
+
+            'system_health' =>
+            $systemHealth,
         ];
     }
 
@@ -356,6 +362,107 @@ WHERE deleted_at IS NULL
                     1
                 )
                 : 0.0,
+        ];
+    }
+
+    private static function systemHealthStats(
+        PDO $pdo
+    ): array {
+        $compatibilityJobs = $pdo->query("
+        SELECT
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN status = 'pending'
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS pending_jobs,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN status = 'failed'
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS failed_jobs
+
+        FROM compatibility_jobs
+    ")->fetch(
+            PDO::FETCH_ASSOC
+        ) ?: [];
+
+        $emailJobs = $pdo->query("
+        SELECT
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN status = 'pending'
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS pending_jobs,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN status = 'failed'
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS failed_jobs
+
+        FROM email_jobs
+    ")->fetch(
+            PDO::FETCH_ASSOC
+        ) ?: [];
+
+        $compatibilityPending =
+            (int)(
+                $compatibilityJobs['pending_jobs'] ?? 0
+            );
+
+        $compatibilityFailed =
+            (int)(
+                $compatibilityJobs['failed_jobs'] ?? 0
+            );
+
+        $emailPending =
+            (int)(
+                $emailJobs['pending_jobs'] ?? 0
+            );
+
+        $emailFailed =
+            (int)(
+                $emailJobs['failed_jobs'] ?? 0
+            );
+
+        return [
+            'compatibility_jobs_pending' =>
+            $compatibilityPending,
+
+            'compatibility_jobs_failed' =>
+            $compatibilityFailed,
+
+            'email_jobs_pending' =>
+            $emailPending,
+
+            'email_jobs_failed' =>
+            $emailFailed,
+
+            'has_alerts' => (
+                $compatibilityFailed > 0 ||
+                $emailFailed > 0
+            ),
         ];
     }
 }
