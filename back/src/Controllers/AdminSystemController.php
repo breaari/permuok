@@ -68,4 +68,47 @@ class AdminSystemController
             );
         }
     }
+
+    public static function emailJobs(): void
+    {
+        try {
+            self::requireAdmin();
+
+            $status =
+                trim(
+                    (string)(
+                        $_GET['status']
+                        ?? 'failed'
+                    )
+                );
+
+            $page =
+                (int)(
+                    $_GET['page']
+                    ?? 1
+                );
+
+            $limit =
+                (int)(
+                    $_GET['limit']
+                    ?? 20
+                );
+
+            $result =
+                AdminSystemService::emailJobs(
+                    $status,
+                    $page,
+                    $limit
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
+        } catch (\Throwable $e) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                500
+            );
+        }
+    }
 }

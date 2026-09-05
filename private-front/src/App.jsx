@@ -49,6 +49,7 @@ import MultilateralCompatibilities from "./features/compatibilities/pages/Multil
 import MultilateralCompatibilityDetail from "./features/compatibilities/pages/MultilateralCompatibilityDetail";
 
 import AdminCompatibilityJobs from "./features/admin/pages/AdminCompatibilityJobs";
+import AdminEmailJobs from "./features/admin/pages/AdminEmailJobs";
 
 export default function App() {
   return (
@@ -183,6 +184,7 @@ export default function App() {
             path="system/compatibility-jobs"
             element={<AdminCompatibilityJobs />}
           />
+          <Route path="system/email-jobs" element={<AdminEmailJobs />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/app" replace />} />

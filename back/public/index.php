@@ -224,6 +224,16 @@ $routes = [
         AdminSystemController::class,
         'compatibilityJobs'
     ],
+
+    'GET /admin/system/compatibility-jobs' => [
+        AdminSystemController::class,
+        'compatibilityJobs'
+    ],
+
+    'GET /admin/system/email-jobs' => [
+        AdminSystemController::class,
+        'emailJobs'
+    ],
     // Compatibilities / recomendaciones
     'GET /compatibilities/recommendations' =>
     [CompatibilityController::class, 'recommendations'],

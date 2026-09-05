@@ -373,20 +373,25 @@ export default function AdminDashboard() {
                   navigate("/admin/system/compatibility-jobs?status=failed")
                 }
               />
-
               <StatCard
                 title="Emails pendientes"
                 value={formatNumber(systemHealth.email_jobs_pending)}
-                description="Emails esperando procesamiento."
+                description="Emails esperando procesamiento. Ver detalle."
                 icon="clock"
+                onClick={() =>
+                  navigate("/admin/system/email-jobs?status=pending")
+                }
               />
 
               <StatCard
                 title="Emails fallidos"
                 value={formatNumber(systemHealth.email_jobs_failed)}
-                description="Emails que no pudieron enviarse."
+                description="Emails que no pudieron enviarse. Ver detalle."
                 icon="clock"
                 alert={Number(systemHealth.email_jobs_failed) > 0}
+                onClick={() =>
+                  navigate("/admin/system/email-jobs?status=failed")
+                }
               />
             </div>
           </section>
