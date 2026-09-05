@@ -180,6 +180,8 @@ export default function AdminDashboard() {
 
   const users = stats?.users || {};
 
+  const billing = stats?.billing || {};
+
   const systemHealth = stats?.system_health || {};
 
   const hasSystemAlerts = Boolean(systemHealth?.has_alerts);
@@ -320,6 +322,88 @@ export default function AdminDashboard() {
                 description="Usuarios activos que iniciaron sesión en los últimos 30 días."
                 icon="clock"
                 onClick={() => navigate("/admin/users")}
+              />
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <SectionHeader
+              title="Membresías y facturación"
+              description="Estado comercial de los planes contratados por las inmobiliarias."
+            />
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard
+                title="Membresías activas"
+                value={formatNumber(billing.active)}
+                description="Inmobiliarias con una membresía activa."
+                icon="badgeCheck"
+                onClick={() => navigate("/admin/billing?status=active")}
+              />
+
+              <StatCard
+                title="Sin membresía"
+                value={formatNumber(billing.without_membership)}
+                description="Inmobiliarias que todavía no tienen un plan."
+                icon="clock"
+                alert={Number(billing.without_membership) > 0}
+                onClick={() => navigate("/admin/billing?status=none")}
+              />
+
+              <StatCard
+                title="Cancelación programada"
+                value={formatNumber(billing.cancel_at_period_end)}
+                description="Membresías activas que finalizarán al cierre del período."
+                icon="pause"
+                alert={Number(billing.cancel_at_period_end) > 0}
+                onClick={() =>
+                  navigate("/admin/billing?status=cancel_at_period_end")
+                }
+              />
+
+              <StatCard
+                title="Cambio de plan"
+                value={formatNumber(billing.scheduled_change)}
+                description="Membresías con un cambio de plan ya programado."
+                icon="layoutGrid"
+                onClick={() =>
+                  navigate("/admin/billing?status=scheduled_change")
+                }
+              />
+
+              <StatCard
+                title="Pendientes"
+                value={formatNumber(billing.pending)}
+                description="Membresías pendientes de activación."
+                icon="clock"
+                alert={Number(billing.pending) > 0}
+                onClick={() => navigate("/admin/billing?status=pending")}
+              />
+
+              <StatCard
+                title="Vencidas"
+                value={formatNumber(billing.expired)}
+                description="Membresías que ya alcanzaron su vencimiento."
+                icon="clock"
+                alert={Number(billing.expired) > 0}
+                onClick={() => navigate("/admin/billing?status=expired")}
+              />
+
+              <StatCard
+                title="Canceladas"
+                value={formatNumber(billing.cancelled)}
+                description="Membresías canceladas."
+                icon="pause"
+                onClick={() => navigate("/admin/billing?status=cancelled")}
+              />
+
+              <StatCard
+                title="Vencen en 30 días"
+                value={formatNumber(billing.expiring_30_days)}
+                description="Membresías activas cuyo período termina dentro de los próximos 30 días."
+                icon="clock"
+                alert={Number(billing.expiring_30_days) > 0}
+                onClick={() => navigate("/admin/billing?status=active")}
               />
             </div>
           </section>
