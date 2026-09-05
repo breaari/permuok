@@ -48,6 +48,8 @@ import CompatibilityDetail from "./features/compatibilities/pages/CompatibilityD
 import MultilateralCompatibilities from "./features/compatibilities/pages/MultilateralCompatibilities";
 import MultilateralCompatibilityDetail from "./features/compatibilities/pages/MultilateralCompatibilityDetail";
 
+import AdminCompatibilityJobs from "./features/admin/pages/AdminCompatibilityJobs";
+
 export default function App() {
   return (
     <Routes>
@@ -177,6 +179,10 @@ export default function App() {
           <Route path="users/:id" element={<AdminUserDetail />} />
           <Route path="billing" element={<AdminBilling />} />
           <Route path="billing/:id" element={<AdminBillingDetail />} />
+          <Route
+            path="system/compatibility-jobs"
+            element={<AdminCompatibilityJobs />}
+          />
         </Route>
 
         <Route path="*" element={<Navigate to="/app" replace />} />

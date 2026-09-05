@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, unwrap, getErrorMessage } from "../../../api/http";
 import { Icon } from "../../../ui/icons/Index";
+import { useNavigate } from "react-router-dom";
 
 const BUSINESS_CARDS = [
   {
@@ -72,12 +73,23 @@ function formatUsd(value) {
   })}`;
 }
 
-function StatCard({ title, value, description, icon, alert = false }) {
+function StatCard({
+  title,
+  value,
+  description,
+  icon,
+  alert = false,
+  onClick = null,
+}) {
   return (
     <div
+      onClick={onClick || undefined}
       className={[
         "rounded-2xl border bg-white p-5 shadow-sm",
         alert ? "border-rose-200" : "border-slate-200",
+        onClick
+          ? "cursor-pointer transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+          : "",
       ].join(" ")}
     >
       <div className="flex items-start justify-between gap-4">
@@ -131,6 +143,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [stats, setStats] = useState(null);
+
+  const navigate = useNavigate();
 
   const businessCards = useMemo(() => BUSINESS_CARDS, []);
 
@@ -342,16 +356,22 @@ export default function AdminDashboard() {
               <StatCard
                 title="Matching pendientes"
                 value={formatNumber(systemHealth.compatibility_jobs_pending)}
-                description="Trabajos esperando ser procesados."
+                description="Trabajos esperando ser procesados. Ver detalle."
                 icon="clock"
+                onClick={() =>
+                  navigate("/admin/system/compatibility-jobs?status=pending")
+                }
               />
 
               <StatCard
                 title="Matching fallidos"
                 value={formatNumber(systemHealth.compatibility_jobs_failed)}
-                description="Trabajos de compatibilidad que agotaron sus intentos."
+                description="Trabajos que agotaron sus intentos. Ver detalle."
                 icon="clock"
                 alert={Number(systemHealth.compatibility_jobs_failed) > 0}
+                onClick={() =>
+                  navigate("/admin/system/compatibility-jobs?status=failed")
+                }
               />
 
               <StatCard
