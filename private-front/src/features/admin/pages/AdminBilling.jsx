@@ -1,6 +1,6 @@
 // pages/AdminBilling.jsx
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { api, unwrap, getErrorMessage } from "../../../api/http.js";
 import { useAuth } from "../../auth/components/AuthContext";
 import { useToast } from "../../../ui/toast/ToastProvider.jsx";
@@ -385,10 +385,17 @@ export default function AdminBilling() {
   const { user } = useAuth();
   const isAdmin = Number(user?.role) === 1;
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
   if (!isAdmin) return <Navigate to="/" replace />;
 
-  const [tab, setTab] = useState("active");
+  const initialStatus = (() => {
+    const status = searchParams.get("status") || "active";
+
+    return TABS.some((item) => item.key === status) ? status : "active";
+  })();
+
+  const [tab, setTab] = useState(initialStatus);
   const [items, setItems] = useState([]);
   const [meta, setMeta] = useState(null);
   const [counts, setCounts] = useState({
@@ -473,7 +480,6 @@ export default function AdminBilling() {
         setItems([]);
         setMeta(null);
 
-
         toast.error(message);
       } finally {
         if (currentRequestId === requestIdRef.current) {
@@ -494,9 +500,22 @@ export default function AdminBilling() {
     });
   }, [tab, q, loadCounts, loadList]);
 
+  useEffect(() => {
+    const status = searchParams.get("status");
+
+    if (status && TABS.some((item) => item.key === status) && status !== tab) {
+      setTab(status);
+    }
+  }, [searchParams, tab]);
+
   function onChangeTab(nextTab) {
     if (nextTab === tab) return;
+
     setTab(nextTab);
+
+    setSearchParams({
+      status: nextTab,
+    });
   }
 
   function onSearchSubmit(e) {
