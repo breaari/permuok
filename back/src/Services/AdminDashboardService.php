@@ -21,6 +21,9 @@ class AdminDashboardService
         $systemHealth =
             self::systemHealthStats($pdo);
 
+        $activity =
+            self::activityStats($pdo);
+
         return [
             'active_real_estates' => self::count($pdo, "
                SELECT COUNT(*)
@@ -82,6 +85,9 @@ WHERE deleted_at IS NULL
 
             'system_health' =>
             $systemHealth,
+
+            'activity' =>
+            $activity,
         ];
     }
 
@@ -466,6 +472,121 @@ WHERE deleted_at IS NULL
                 $compatibilityFailed > 0 ||
                 $emailFailed > 0
             ),
+        ];
+    }
+
+    private static function activityStats(
+        PDO $pdo
+    ): array {
+        $monthStart = "
+        DATE_FORMAT(
+            UTC_DATE(),
+            '%Y-%m-01'
+        )
+    ";
+
+        $nextMonthStart = "
+        DATE_FORMAT(
+            UTC_DATE() + INTERVAL 1 MONTH,
+            '%Y-%m-01'
+        )
+    ";
+
+        $newRealEstates =
+            self::count(
+                $pdo,
+                "
+            SELECT COUNT(*)
+            FROM real_estates
+            WHERE deleted_at IS NULL
+              AND created_at >= {$monthStart}
+              AND created_at < {$nextMonthStart}
+            "
+            );
+
+        $newProperties =
+            self::count(
+                $pdo,
+                "
+            SELECT COUNT(*)
+            FROM properties
+            WHERE deleted_at IS NULL
+              AND created_at >= {$monthStart}
+              AND created_at < {$nextMonthStart}
+            "
+            );
+
+        $newSearchRequests =
+            self::count(
+                $pdo,
+                "
+            SELECT COUNT(*)
+            FROM search_requests
+            WHERE deleted_at IS NULL
+              AND created_at >= {$monthStart}
+              AND created_at < {$nextMonthStart}
+            "
+            );
+
+        $newDevelopments =
+            self::count(
+                $pdo,
+                "
+            SELECT COUNT(*)
+            FROM developments
+            WHERE deleted_at IS NULL
+              AND created_at >= {$monthStart}
+              AND created_at < {$nextMonthStart}
+            "
+            );
+
+        $newMatches =
+            self::count(
+                $pdo,
+                "
+            SELECT COUNT(*)
+            FROM compatibilities
+            WHERE created_at >= {$monthStart}
+              AND created_at < {$nextMonthStart}
+            "
+            );
+
+        $newConversations =
+            self::count(
+                $pdo,
+                "
+            SELECT COUNT(*)
+            FROM conversations
+            WHERE deleted_at IS NULL
+              AND created_at >= {$monthStart}
+              AND created_at < {$nextMonthStart}
+            "
+            );
+
+        return [
+            'new_real_estates_month' =>
+            $newRealEstates,
+
+            'new_publications_month' => (
+                $newProperties +
+                $newSearchRequests +
+                $newDevelopments
+            ),
+
+            'new_properties_month' =>
+            $newProperties,
+
+            'new_search_requests_month' =>
+            $newSearchRequests,
+
+            'new_developments_month' =>
+            $newDevelopments,
+
+            'new_matches_month' =>
+            $newMatches,
+
+            'new_conversations_month' =>
+            $newConversations,
         ];
     }
 }
