@@ -27,7 +27,8 @@ class AdminDashboardService
         $users =
             self::userStats($pdo);
 
-
+        $billing =
+            self::billingStats($pdo);
 
         return [
             'active_real_estates' => self::count($pdo, "
@@ -96,6 +97,9 @@ WHERE deleted_at IS NULL
 
             'users' =>
             $users,
+
+            'billing' =>
+            $billing,
         ];
     }
 
@@ -694,6 +698,171 @@ WHERE deleted_at IS NULL
             'logged_in_last_30_days' =>
             (int)(
                 $row['logged_in_last_30_days']
+                ?? 0
+            ),
+        ];
+    }
+
+    private static function billingStats(
+        PDO $pdo
+    ): array {
+        $stmt = $pdo->query("
+        SELECT
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN m.status = 1
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS active,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN m.status = 0
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS pending,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN m.status = 2
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS expired,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN m.status = 3
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS cancelled,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN m.id IS NULL
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS without_membership,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN m.status = 1
+                         AND COALESCE(
+                             m.cancel_at_period_end,
+                             0
+                         ) = 1
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS cancel_at_period_end,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN m.status = 1
+                         AND m.scheduled_plan_id
+                             IS NOT NULL
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS scheduled_change,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN m.status = 1
+                         AND m.end_date >= CURDATE()
+                         AND m.end_date <=
+                             DATE_ADD(
+                                 CURDATE(),
+                                 INTERVAL 30 DAY
+                             )
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS expiring_30_days
+
+        FROM real_estates re
+
+        LEFT JOIN memberships m
+            ON m.id = (
+                SELECT m2.id
+                FROM memberships m2
+                WHERE
+                    m2.real_estate_id = re.id
+                    AND m2.deleted_at IS NULL
+                ORDER BY m2.id DESC
+                LIMIT 1
+            )
+
+        WHERE re.deleted_at IS NULL
+    ");
+
+        $row =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        return [
+            'active' =>
+            (int)($row['active'] ?? 0),
+
+            'pending' =>
+            (int)($row['pending'] ?? 0),
+
+            'expired' =>
+            (int)($row['expired'] ?? 0),
+
+            'cancelled' =>
+            (int)($row['cancelled'] ?? 0),
+
+            'without_membership' =>
+            (int)(
+                $row['without_membership']
+                ?? 0
+            ),
+
+            'cancel_at_period_end' =>
+            (int)(
+                $row['cancel_at_period_end']
+                ?? 0
+            ),
+
+            'scheduled_change' =>
+            (int)(
+                $row['scheduled_change']
+                ?? 0
+            ),
+
+            'expiring_30_days' =>
+            (int)(
+                $row['expiring_30_days']
                 ?? 0
             ),
         ];
