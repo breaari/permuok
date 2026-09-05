@@ -69,10 +69,10 @@ WHERE deleted_at IS NULL
 
                 'failed_calls_month' =>
                 self::aiFailedCallsMonth($pdo),
-
-                'matching' =>
-                $matching,
             ],
+
+            'matching' =>
+            $matching,
         ];
     }
 
