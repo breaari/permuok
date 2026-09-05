@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { api, unwrap, getErrorMessage } from "../../../api/http";
 import { Icon } from "../../../ui/icons/Index";
 
-const STAT_CARDS = [
+const BUSINESS_CARDS = [
   {
     key: "active_real_estates",
-    title: "Inmobiliarias activas",
-    description: "Cuentas aprobadas y operativas",
+    title: "Inmobiliarias",
+    description: "Cuentas registradas en la plataforma",
     icon: "building2",
   },
   {
@@ -24,42 +24,105 @@ const STAT_CARDS = [
   {
     key: "paused_publications",
     title: "Publicaciones pausadas",
-    description: "Contenido oculto temporalmente",
+    description: "Contenido temporalmente fuera de circulación",
     icon: "pause",
   },
   {
     key: "active_conversations",
-    title: "Conversaciones activas",
+    title: "Conversaciones",
     description: "Conversaciones creadas en la plataforma",
     icon: "messagesSquare",
   },
   {
     key: "pending_requests",
-    title: "Solicitudes pendientes",
+    title: "Altas pendientes",
     description: "Inmobiliarias esperando revisión",
     icon: "clock",
   },
 ];
 
-function StatCard({ item, value }) {
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString("es-AR");
+}
+
+function formatPercent(value) {
+  return `${Number(value || 0).toLocaleString("es-AR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  })}%`;
+}
+
+function formatUsd(value) {
+  const amount = Number(value || 0);
+
+  if (amount === 0) {
+    return "US$ 0";
+  }
+
+  if (amount < 0.01) {
+    return `US$ ${amount.toLocaleString("en-US", {
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 8,
+    })}`;
+  }
+
+  return `US$ ${amount.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  })}`;
+}
+
+function StatCard({ title, value, description, icon, alert = false }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div
+      className={[
+        "rounded-2xl border bg-white p-5 shadow-sm",
+        alert ? "border-rose-200" : "border-slate-200",
+      ].join(" ")}
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-bold text-slate-500">{item.title}</p>
-          <p className="mt-2 text-3xl font-black tracking-tight text-slate-900">
-            {Number(value || 0).toLocaleString("es-AR")}
+          <p className="text-sm font-bold text-slate-500">{title}</p>
+
+          <p
+            className={[
+              "mt-2 text-3xl font-black tracking-tight",
+              alert ? "text-rose-700" : "text-slate-900",
+            ].join(" ")}
+          >
+            {value}
           </p>
         </div>
 
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-          <Icon name={item.icon} size={21} />
+        <div
+          className={[
+            "flex h-11 w-11 items-center justify-center rounded-xl",
+            alert ? "bg-rose-50 text-rose-700" : "bg-slate-100 text-slate-700",
+          ].join(" ")}
+        >
+          <Icon name={icon} size={21} />
         </div>
       </div>
 
-      <p className="mt-4 text-xs font-medium leading-relaxed text-slate-400">
-        {item.description}
-      </p>
+      {description ? (
+        <p className="mt-4 text-xs font-medium leading-relaxed text-slate-400">
+          {description}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function SectionHeader({ title, description }) {
+  return (
+    <div>
+      <h2 className="text-lg font-black tracking-tight text-slate-900">
+        {title}
+      </h2>
+
+      {description ? (
+        <p className="mt-1 text-sm font-medium text-slate-500">{description}</p>
+      ) : null}
     </div>
   );
 }
@@ -69,7 +132,7 @@ export default function AdminDashboard() {
   const [err, setErr] = useState("");
   const [stats, setStats] = useState(null);
 
-  const cards = useMemo(() => STAT_CARDS, []);
+  const businessCards = useMemo(() => BUSINESS_CARDS, []);
 
   useEffect(() => {
     async function loadStats() {
@@ -79,6 +142,7 @@ export default function AdminDashboard() {
         setStats(null);
 
         const res = await api.get("/admin/dashboard/stats");
+
         const payload = unwrap(res);
 
         setStats(payload?.stats || {});
@@ -93,7 +157,15 @@ export default function AdminDashboard() {
 
     loadStats();
   }, []);
-  
+
+  const ai = stats?.ai || {};
+
+  const matching = stats?.matching || {};
+
+  const systemHealth = stats?.system_health || {};
+
+  const hasSystemAlerts = Boolean(systemHealth?.has_alerts);
+
   return (
     <div className="space-y-8">
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -105,9 +177,9 @@ export default function AdminDashboard() {
           Resumen general
         </h1>
 
-        <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-slate-500">
-          Estado operativo de la plataforma: usuarios, membresías, publicaciones
-          y actividad comercial.
+        <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-500">
+          Estado comercial, matching, consumo de inteligencia artificial y salud
+          operativa de PermuOK.
         </p>
       </div>
 
@@ -122,11 +194,183 @@ export default function AdminDashboard() {
           Cargando métricas...
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {cards.map((item) => (
-            <StatCard key={item.key} item={item} value={stats?.[item.key]} />
-          ))}
-        </div>
+        <>
+          <section className="space-y-4">
+            <SectionHeader
+              title="Negocio"
+              description="Estado general de la actividad comercial de la plataforma."
+            />
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {businessCards.map((item) => (
+                <StatCard
+                  key={item.key}
+                  title={item.title}
+                  value={formatNumber(stats?.[item.key])}
+                  description={item.description}
+                  icon={item.icon}
+                />
+              ))}
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <SectionHeader
+              title="Matching"
+              description="Rendimiento de las compatibilidades detectadas por PermuOK."
+            />
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <StatCard
+                title="Matches activos"
+                value={formatNumber(matching.active_matches)}
+                description="Compatibilidades actualmente vigentes."
+                icon="layoutGrid"
+              />
+
+              <StatCard
+                title="Matches +90"
+                value={formatNumber(matching.high_quality_matches)}
+                description="Compatibilidades de alta calidad."
+                icon="badgeCheck"
+              />
+
+              <StatCard
+                title="Con interés"
+                value={formatNumber(matching.matches_with_interest)}
+                description="Matches donde al menos una parte manifestó interés."
+                icon="messagesSquare"
+              />
+
+              <StatCard
+                title="Chat habilitado"
+                value={formatNumber(matching.chat_enabled_matches)}
+                description="Matches que avanzaron hasta habilitar contacto."
+                icon="messagesSquare"
+              />
+
+              <StatCard
+                title="Tasa de interés"
+                value={formatPercent(matching.interest_rate_pct)}
+                description="Porcentaje de matches con interés."
+                icon="badgeCheck"
+              />
+
+              <StatCard
+                title="Conversión a chat"
+                value={formatPercent(matching.chat_enablement_rate_pct)}
+                description="Porcentaje de matches que llegaron a chat habilitado."
+                icon="badgeCheck"
+              />
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <SectionHeader
+              title="Inteligencia artificial"
+              description="Consumo y costo estimado de las funciones IA."
+            />
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <StatCard
+                title="Costo de hoy"
+                value={formatUsd(ai.cost_today_usd)}
+                description="Consumo estimado de IA durante el día."
+                icon="badgeCheck"
+              />
+
+              <StatCard
+                title="Costo del mes"
+                value={formatUsd(ai.cost_month_usd)}
+                description="Consumo acumulado del mes actual."
+                icon="badgeCheck"
+              />
+
+              <StatCard
+                title="Costo histórico"
+                value={formatUsd(ai.cost_total_usd)}
+                description="Costo registrado desde que comenzó el tracking."
+                icon="badgeCheck"
+              />
+
+              <StatCard
+                title="Llamadas este mes"
+                value={formatNumber(ai.calls_month)}
+                description="Solicitudes registradas a servicios de IA."
+                icon="layoutGrid"
+              />
+
+              <StatCard
+                title="Tokens este mes"
+                value={formatNumber(ai.tokens_month)}
+                description="Tokens procesados en llamadas exitosas."
+                icon="layoutGrid"
+              />
+
+              <StatCard
+                title="Fallos este mes"
+                value={formatNumber(ai.failed_calls_month)}
+                description="Intentos de IA registrados como fallidos."
+                icon="clock"
+                alert={Number(ai.failed_calls_month) > 0}
+              />
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <SectionHeader
+                title="Salud del sistema"
+                description="Estado de las colas y procesos internos."
+              />
+
+              <div
+                className={[
+                  "rounded-full px-3 py-1 text-xs font-black",
+                  hasSystemAlerts
+                    ? "bg-rose-50 text-rose-700"
+                    : "bg-emerald-50 text-emerald-700",
+                ].join(" ")}
+              >
+                {hasSystemAlerts
+                  ? "Requiere atención"
+                  : "Sin errores pendientes"}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard
+                title="Matching pendientes"
+                value={formatNumber(systemHealth.compatibility_jobs_pending)}
+                description="Trabajos esperando ser procesados."
+                icon="clock"
+              />
+
+              <StatCard
+                title="Matching fallidos"
+                value={formatNumber(systemHealth.compatibility_jobs_failed)}
+                description="Trabajos de compatibilidad que agotaron sus intentos."
+                icon="clock"
+                alert={Number(systemHealth.compatibility_jobs_failed) > 0}
+              />
+
+              <StatCard
+                title="Emails pendientes"
+                value={formatNumber(systemHealth.email_jobs_pending)}
+                description="Emails esperando procesamiento."
+                icon="clock"
+              />
+
+              <StatCard
+                title="Emails fallidos"
+                value={formatNumber(systemHealth.email_jobs_failed)}
+                description="Emails que no pudieron enviarse."
+                icon="clock"
+                alert={Number(systemHealth.email_jobs_failed) > 0}
+              />
+            </div>
+          </section>
+        </>
       )}
     </div>
   );
