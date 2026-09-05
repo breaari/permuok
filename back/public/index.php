@@ -65,6 +65,7 @@ use App\Controllers\AdminDashboardController;
 use App\Controllers\AiEnrichmentController;
 use App\Controllers\AiCompatibilityController;
 use App\Controllers\CompatibilityController;
+use App\Controllers\AdminSystemController;
 
 $method = $_SERVER['REQUEST_METHOD'];
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/';
@@ -218,6 +219,11 @@ $routes = [
     'GET /stream' => [RealtimeController::class, 'stream'],
 
     'GET /admin/dashboard/stats' => [AdminDashboardController::class, 'stats'],
+
+    'GET /admin/system/compatibility-jobs' => [
+        AdminSystemController::class,
+        'compatibilityJobs'
+    ],
     // Compatibilities / recomendaciones
     'GET /compatibilities/recommendations' =>
     [CompatibilityController::class, 'recommendations'],
