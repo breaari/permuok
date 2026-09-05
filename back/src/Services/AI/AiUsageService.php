@@ -42,6 +42,56 @@ class AiUsageService
                 )
             );
 
+            $provider =
+                trim(
+                    (string)(
+                        $data['provider']
+                        ?? 'openai'
+                    )
+                );
+
+            $modelName =
+                self::nullableString(
+                    $data['model_name']
+                        ?? null
+                );
+
+            /*
+ * Normalmente el costo se calcula
+ * automáticamente a partir de:
+ *
+ * - proveedor;
+ * - modelo;
+ * - input normal;
+ * - input cacheado;
+ * - output.
+ *
+ * Conservamos además la posibilidad de pasar
+ * estimated_cost_usd explícitamente para
+ * eventuales importaciones o correcciones.
+ */
+            if (
+                array_key_exists(
+                    'estimated_cost_usd',
+                    $data
+                )
+            ) {
+                $estimatedCostUsd =
+                    max(
+                        0,
+                        (float)$data['estimated_cost_usd']
+                    );
+            } else {
+                $estimatedCostUsd =
+                    AiPricingService::calculateEstimatedCostUsd(
+                        $provider,
+                        $modelName,
+                        $inputTokens,
+                        $cachedInputTokens,
+                        $outputTokens
+                    );
+            }
+
             $stmt = $pdo->prepare("
                 INSERT INTO ai_usage_logs (
                     provider,
@@ -80,68 +130,61 @@ class AiUsageService
 
             $stmt->execute([
                 'provider' =>
-                    trim((string)($data['provider'] ?? 'openai')),
+                $provider,
 
                 'model_name' =>
-                    self::nullableString(
-                        $data['model_name'] ?? null
-                    ),
+                $modelName,
 
                 'operation' =>
-                    trim((string)($data['operation'] ?? 'unknown')),
+                trim((string)($data['operation'] ?? 'unknown')),
 
                 'entity_type' =>
-                    self::nullableString(
-                        $data['entity_type'] ?? null
-                    ),
+                self::nullableString(
+                    $data['entity_type'] ?? null
+                ),
 
                 'entity_id' =>
-                    self::nullablePositiveInt(
-                        $data['entity_id'] ?? null
-                    ),
+                self::nullablePositiveInt(
+                    $data['entity_id'] ?? null
+                ),
 
                 'real_estate_id' =>
-                    self::nullablePositiveInt(
-                        $data['real_estate_id'] ?? null
-                    ),
+                self::nullablePositiveInt(
+                    $data['real_estate_id'] ?? null
+                ),
 
                 'user_id' =>
-                    self::nullablePositiveInt(
-                        $data['user_id'] ?? null
-                    ),
+                self::nullablePositiveInt(
+                    $data['user_id'] ?? null
+                ),
 
                 'input_tokens' =>
-                    $inputTokens,
+                $inputTokens,
 
                 'cached_input_tokens' =>
-                    $cachedInputTokens,
+                $cachedInputTokens,
 
                 'output_tokens' =>
-                    $outputTokens,
+                $outputTokens,
 
                 'total_tokens' =>
-                    $totalTokens,
+                $totalTokens,
 
                 'estimated_cost_usd' =>
-                    max(
-                        0,
-                        (float)(
-                            $data['estimated_cost_usd'] ?? 0
-                        )
-                    ),
+                $estimatedCostUsd,
 
                 'status' =>
-                    trim((string)($data['status'] ?? 'success')),
+                trim((string)($data['status'] ?? 'success')),
 
                 'duration_ms' =>
-                    isset($data['duration_ms'])
-                        ? max(0, (int)$data['duration_ms'])
-                        : null,
+                isset($data['duration_ms'])
+                    ? max(0, (int)$data['duration_ms'])
+                    : null,
 
                 'error_message' =>
-                    self::nullableString(
-                        $data['error_message'] ?? null
-                    ),
+                self::nullableString(
+                    $data['error_message'] ?? null
+                ),
             ]);
 
             return (int)$pdo->lastInsertId();
