@@ -381,6 +381,24 @@ export default function AdminDashboard() {
               />
 
               <StatCard
+                title="Pagos pendientes"
+                value={formatNumber(billing.pending_payments)}
+                description="Últimos intentos de pago todavía pendientes de resolución."
+                icon="clock"
+                alert={Number(billing.pending_payments) > 0}
+                onClick={() => navigate("/admin/billing")}
+              />
+
+              <StatCard
+                title="Pagos fallidos"
+                value={formatNumber(billing.failed_payments)}
+                description="Últimos intentos rechazados o cancelados."
+                icon="clock"
+                alert={Number(billing.failed_payments) > 0}
+                onClick={() => navigate("/admin/billing")}
+              />
+
+              <StatCard
                 title="Vencidas"
                 value={formatNumber(billing.expired)}
                 description="Membresías que ya alcanzaron su vencimiento."
