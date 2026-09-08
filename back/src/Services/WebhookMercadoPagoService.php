@@ -553,6 +553,10 @@ class WebhookMercadoPagoService
             'id' =>
             (int)$membership['id'],
         ]);
+
+        self::reactivateBillingPausedContent(
+            (int)$membership['real_estate_id']
+        );
     }
 
     private static function normalizePaymentStatus(
@@ -1033,6 +1037,73 @@ class WebhookMercadoPagoService
 
             'id' =>
             (int)$membership['id'],
+        ]);
+    }
+
+    private static function reactivateBillingPausedContent(
+        int $realEstateId
+    ): void {
+        $pdo = self::db();
+
+        /*
+     * Sólo reactivamos aquello que fue pausado
+     * específicamente por vencimiento de membresía.
+     *
+     * Una pausa manual tiene billing_paused_at = NULL
+     * y por lo tanto nunca entra acá.
+     */
+
+        $stProperties = $pdo->prepare("
+        UPDATE properties
+        SET
+            status = 'published',
+            is_visible = 1,
+            paused_at = NULL,
+            billing_paused_at = NULL
+        WHERE real_estate_id = :real_estate_id
+          AND status = 'paused'
+          AND billing_paused_at IS NOT NULL
+          AND deleted_at IS NULL
+    ");
+
+        $stProperties->execute([
+            'real_estate_id' =>
+            $realEstateId,
+        ]);
+
+        $stSearchRequests = $pdo->prepare("
+        UPDATE search_requests
+        SET
+            status = 'published',
+            is_visible = 1,
+            paused_at = NULL,
+            billing_paused_at = NULL
+        WHERE real_estate_id = :real_estate_id
+          AND status = 'paused'
+          AND billing_paused_at IS NOT NULL
+          AND deleted_at IS NULL
+    ");
+
+        $stSearchRequests->execute([
+            'real_estate_id' =>
+            $realEstateId,
+        ]);
+
+        $stDevelopments = $pdo->prepare("
+        UPDATE developments
+        SET
+            status = 'published',
+            paused_at = NULL,
+            billing_paused_at = NULL
+        WHERE real_estate_id = :real_estate_id
+          AND status = 'paused'
+          AND billing_paused_at IS NOT NULL
+          AND deleted_at IS NULL
+    ");
+
+        $stDevelopments->execute([
+            'real_estate_id' =>
+            $realEstateId,
         ]);
     }
 
