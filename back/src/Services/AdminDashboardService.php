@@ -791,7 +791,33 @@ WHERE deleted_at IS NULL
                 0
             ) AS scheduled_change,
 
-           
+           COALESCE(
+    SUM(
+        CASE
+            WHEN pay.status IN (
+                'created',
+                'pending'
+            )
+            THEN 1
+            ELSE 0
+        END
+    ),
+    0
+) AS pending_payments,
+
+COALESCE(
+    SUM(
+        CASE
+            WHEN pay.status IN (
+                'rejected',
+                'cancelled'
+            )
+            THEN 1
+            ELSE 0
+        END
+    ),
+    0
+) AS failed_payments
 
         FROM real_estates re
 
@@ -805,8 +831,18 @@ WHERE deleted_at IS NULL
                 ORDER BY m2.id DESC
                 LIMIT 1
             )
-
+  LEFT JOIN payments pay
+    ON pay.id = (
+        SELECT p2.id
+        FROM payments p2
+        WHERE
+            p2.real_estate_id = re.id
+        ORDER BY p2.id DESC
+        LIMIT 1
+    )
         WHERE re.deleted_at IS NULL
+
+      
     ");
 
         $row =
@@ -832,7 +868,17 @@ WHERE deleted_at IS NULL
                 $row['without_membership']
                 ?? 0
             ),
+            'pending_payments' =>
+            (int)(
+                $row['pending_payments']
+                ?? 0
+            ),
 
+            'failed_payments' =>
+            (int)(
+                $row['failed_payments']
+                ?? 0
+            ),
             'cancel_at_period_end' =>
             (int)(
                 $row['cancel_at_period_end']
