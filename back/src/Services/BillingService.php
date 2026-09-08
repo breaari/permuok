@@ -216,10 +216,11 @@ class BillingService
 
 
         $st = $pdo->prepare("
-        INSERT INTO memberships
-        (
-            real_estate_id,
-            plan_id,
+       INSERT INTO memberships
+(
+    real_estate_id,
+    billing_user_id,
+    plan_id, 
             scheduled_plan_id,
             billing_cycle,
             status,
@@ -242,6 +243,7 @@ class BillingService
         VALUES
         (
             :real_estate_id,
+              :billing_user_id,
             :plan_id,
             NULL,
             1,
@@ -267,7 +269,7 @@ NULL,
         $st->execute([
             'real_estate_id' =>
             $realEstateId,
-
+            'billing_user_id' => $userId,
             'plan_id' =>
             (int)$plan['id'],
 
