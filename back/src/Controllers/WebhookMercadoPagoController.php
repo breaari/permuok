@@ -10,16 +10,60 @@ class WebhookMercadoPagoController
     public static function handle(): void
     {
         try {
-            // MP puede mandar datos por query o body (según configuración) :contentReference[oaicite:6]{index=6}
-            $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+            $rawBody = file_get_contents(
+                'php://input'
+            );
 
-            $result = WebhookMercadoPagoService::handleNotification($_GET, $payload);
+            $payload = [];
 
-            // MP espera 200 rápido
-            ResponseHelper::ok($result);
+            if (
+                is_string($rawBody)
+                && trim($rawBody) !== ''
+            ) {
+                $decoded = json_decode(
+                    $rawBody,
+                    true
+                );
+
+                if (
+                    json_last_error() === JSON_ERROR_NONE
+                    && is_array($decoded)
+                ) {
+                    $payload = $decoded;
+                }
+            }
+
+            $result =
+                WebhookMercadoPagoService::handleNotification(
+                    $_GET,
+                    $payload
+                );
+
+            /*
+             * Mercado Pago recibió y procesamos
+             * correctamente la notificación.
+             */
+            ResponseHelper::ok(
+                $result,
+                200
+            );
         } catch (\Throwable $e) {
-            // igual devolver 200 para no reintentar infinito en desarrollo
-            ResponseHelper::ok(['ok' => false, 'error' => $e->getMessage()]);
+            /*
+             * Si ocurrió un error real,
+             * NO debemos responder 200.
+             *
+             * Así Mercado Pago puede volver
+             * a intentar la notificación.
+             */
+            error_log(
+                '[MercadoPago Webhook] '
+                    . $e->getMessage()
+            );
+
+            ResponseHelper::fail(
+                'No se pudo procesar la notificación.',
+                500
+            );
         }
     }
 }
