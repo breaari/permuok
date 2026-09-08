@@ -14,6 +14,7 @@ class BillingCycleService
     private static function db(): PDO
     {
         require_once __DIR__ . '/../../db.php';
+
         return pdo();
     }
 
@@ -21,25 +22,39 @@ class BillingCycleService
     {
         $pdo = self::db();
 
+        /*
+         * Sólo procesamos membresías activas cuyo
+         * período efectivamente ya terminó.
+         *
+         * Las renovaciones recurrentes NO se generan
+         * acá. Las genera exclusivamente el webhook
+         * cuando Mercado Pago confirma el pago.
+         */
         $st = $pdo->prepare("
             SELECT *
             FROM memberships
             WHERE status = :active_status
+              AND end_date IS NOT NULL
               AND end_date < CURDATE()
               AND deleted_at IS NULL
             ORDER BY id ASC
         ");
 
         $st->execute([
-            'active_status' => self::MEMBERSHIP_STATUS_ACTIVE,
+            'active_status' =>
+            self::MEMBERSHIP_STATUS_ACTIVE,
         ]);
 
-        $memberships = $st->fetchAll() ?: [];
+        $memberships =
+            $st->fetchAll() ?: [];
 
         $processed = 0;
         $cancelled = 0;
         $expired = 0;
-        $renewedWithScheduledPlan = 0;
+
+        $recurringExpired = 0;
+        $legacyExpired = 0;
+
         $pausedProperties = 0;
         $pausedSearchRequests = 0;
         $pausedDevelopments = 0;
@@ -48,199 +63,235 @@ class BillingCycleService
             $pdo->beginTransaction();
 
             try {
-                $membershipId = (int)$membership['id'];
-                $realEstateId = (int)$membership['real_estate_id'];
+                $membershipId =
+                    (int)$membership['id'];
 
-                $scheduledPlanId = isset($membership['scheduled_plan_id']) && $membership['scheduled_plan_id'] !== null
-                    ? (int)$membership['scheduled_plan_id']
-                    : null;
+                $realEstateId =
+                    (int)$membership['real_estate_id'];
 
-                $cancelAtPeriodEnd = (int)($membership['cancel_at_period_end'] ?? 0) === 1;
+                $cancelAtPeriodEnd =
+                    (int)(
+                        $membership['cancel_at_period_end']
+                        ?? 0
+                    ) === 1;
 
+                $subscriptionId = trim(
+                    (string)(
+                        $membership['mp_preapproval_id']
+                        ?? ''
+                    )
+                );
+
+                $isRecurring =
+                    $subscriptionId !== '';
+
+                /*
+                 * 1. CANCELACIÓN PROGRAMADA
+                 *
+                 * El usuario ya había cancelado
+                 * la renovación automática.
+                 *
+                 * Ahora que terminó el período
+                 * pagado, cerramos definitivamente
+                 * la membresía.
+                 */
                 if ($cancelAtPeriodEnd) {
                     $stCancel = $pdo->prepare("
                         UPDATE memberships
                         SET
                             status = :cancelled_status,
-                            cancelled_at = COALESCE(cancelled_at, NOW())
+                            cancelled_at =
+                                COALESCE(
+                                    cancelled_at,
+                                    NOW()
+                                ),
+                            scheduled_plan_id = NULL,
+                            scheduled_change_at = NULL
                         WHERE id = :id
                         LIMIT 1
                     ");
 
                     $stCancel->execute([
-                        'cancelled_status' => self::MEMBERSHIP_STATUS_CANCELLED,
-                        'id' => $membershipId,
+                        'cancelled_status' =>
+                        self::MEMBERSHIP_STATUS_CANCELLED,
+
+                        'id' =>
+                        $membershipId,
                     ]);
 
-                    $counts = self::pauseRealEstateContent($realEstateId);
+                    $counts =
+                        self::pauseRealEstateContent(
+                            $realEstateId
+                        );
 
-                    $pausedProperties += $counts['properties'];
-                    $pausedSearchRequests += $counts['search_requests'];
-                    $pausedDevelopments += $counts['developments'];
+                    $pausedProperties +=
+                        $counts['properties'];
+
+                    $pausedSearchRequests +=
+                        $counts['search_requests'];
+
+                    $pausedDevelopments +=
+                        $counts['developments'];
 
                     $cancelled++;
                     $processed++;
 
                     $pdo->commit();
+
                     continue;
                 }
 
-                if ($scheduledPlanId) {
-                    $plan = self::getPlanById($scheduledPlanId);
-
-                    if (!$plan) {
-                        $stExpire = $pdo->prepare("
-                            UPDATE memberships
-                            SET
-                                status = :expired_status,
-                                scheduled_plan_id = NULL,
-                                scheduled_change_at = NULL
-                            WHERE id = :id
-                            LIMIT 1
-                        ");
-
-                        $stExpire->execute([
-                            'expired_status' => self::MEMBERSHIP_STATUS_EXPIRED,
-                            'id' => $membershipId,
-                        ]);
-
-                        $counts = self::pauseRealEstateContent($realEstateId);
-
-                        $pausedProperties += $counts['properties'];
-                        $pausedSearchRequests += $counts['search_requests'];
-                        $pausedDevelopments += $counts['developments'];
-
-                        $expired++;
-                        $processed++;
-
-                        $pdo->commit();
-                        continue;
-                    }
-
-                    $stExpireCurrent = $pdo->prepare("
+                /*
+                 * 2. SUSCRIPCIÓN RECURRENTE
+                 *
+                 * Si llegamos acá significa que
+                 * end_date venció y ningún webhook
+                 * de pago aprobado abrió un nuevo
+                 * período.
+                 *
+                 * IMPORTANTE:
+                 * NO extendemos fechas.
+                 * NO aplicamos scheduled_plan_id.
+                 * NO creamos otra membership.
+                 *
+                 * Sin pago aprobado no hay renovación.
+                 */
+                if ($isRecurring) {
+                    $stExpire = $pdo->prepare("
                         UPDATE memberships
-                        SET status = :expired_status
+                        SET
+                            status = :expired_status
                         WHERE id = :id
+                          AND status = :active_status
                         LIMIT 1
                     ");
 
-                    $stExpireCurrent->execute([
-                        'expired_status' => self::MEMBERSHIP_STATUS_EXPIRED,
-                        'id' => $membershipId,
+                    $stExpire->execute([
+                        'expired_status' =>
+                        self::MEMBERSHIP_STATUS_EXPIRED,
+
+                        'active_status' =>
+                        self::MEMBERSHIP_STATUS_ACTIVE,
+
+                        'id' =>
+                        $membershipId,
                     ]);
 
-                    $startDate = date('Y-m-d');
-                    $endDate = date(
-                        'Y-m-d',
-                        strtotime($startDate . ' +' . ((int)$plan['duration_days'] - 1) . ' days')
-                    );
+                    $counts =
+                        self::pauseRealEstateContent(
+                            $realEstateId
+                        );
 
-                    $stInsert = $pdo->prepare("
-                        INSERT INTO memberships
-                        (
-                            real_estate_id,
-                            plan_id,
-                            scheduled_plan_id,
-                            billing_cycle,
-                            status,
-                            cancel_at_period_end,
-                            cancelled_at,
-                            start_date,
-                            end_date,
-                            scheduled_change_at,
-                            max_users,
-                            max_agents,
-                            max_investors,
-                            can_publish_projects,
-                            can_view_projects,
-                            mp_last_payment_id,
-                            created_at
-                        )
-                        VALUES
-                        (
-                            :real_estate_id,
-                            :plan_id,
-                            NULL,
-                            :billing_cycle,
-                            :status,
-                            0,
-                            NULL,
-                            :start_date,
-                            :end_date,
-                            NULL,
-                            :max_users,
-                            :max_agents,
-                            :max_investors,
-                            :can_publish_projects,
-                            :can_view_projects,
-                            NULL,
-                            NOW()
-                        )
-                    ");
+                    $pausedProperties +=
+                        $counts['properties'];
 
-                    $stInsert->execute([
-                        'real_estate_id' => $realEstateId,
-                        'plan_id' => (int)$plan['id'],
-                        'billing_cycle' => (int)($membership['billing_cycle'] ?? 1),
-                        'status' => self::MEMBERSHIP_STATUS_ACTIVE,
-                        'start_date' => $startDate,
-                        'end_date' => $endDate,
-                        'max_users' => (int)($plan['max_users'] ?? 1),
-                        'max_agents' => (int)($plan['max_agents'] ?? 0),
-                        'max_investors' => (int)($plan['max_investors'] ?? 0),
-                        'can_publish_projects' => (int)($plan['can_publish_projects'] ?? 0),
-                        'can_view_projects' => (int)($plan['can_view_projects'] ?? 0),
-                    ]);
+                    $pausedSearchRequests +=
+                        $counts['search_requests'];
 
-                    $renewedWithScheduledPlan++;
+                    $pausedDevelopments +=
+                        $counts['developments'];
+
+                    $expired++;
+                    $recurringExpired++;
                     $processed++;
 
                     $pdo->commit();
+
                     continue;
                 }
 
+                /*
+                 * 3. MEMBRESÍA HISTÓRICA / MANUAL
+                 *
+                 * No tiene mp_preapproval_id.
+                 *
+                 * Conservamos la posibilidad de que
+                 * venza normalmente, pero eliminamos
+                 * definitivamente la renovación gratis
+                 * que antes creaba otra membership.
+                 */
                 $stExpire = $pdo->prepare("
                     UPDATE memberships
-                    SET status = :expired_status
+                    SET
+                        status = :expired_status,
+                        scheduled_plan_id = NULL,
+                        scheduled_change_at = NULL
                     WHERE id = :id
+                      AND status = :active_status
                     LIMIT 1
                 ");
 
                 $stExpire->execute([
-                    'expired_status' => self::MEMBERSHIP_STATUS_EXPIRED,
-                    'id' => $membershipId,
+                    'expired_status' =>
+                    self::MEMBERSHIP_STATUS_EXPIRED,
+
+                    'active_status' =>
+                    self::MEMBERSHIP_STATUS_ACTIVE,
+
+                    'id' =>
+                    $membershipId,
                 ]);
 
-                $counts = self::pauseRealEstateContent($realEstateId);
+                $counts =
+                    self::pauseRealEstateContent(
+                        $realEstateId
+                    );
 
-                $pausedProperties += $counts['properties'];
-                $pausedSearchRequests += $counts['search_requests'];
-                $pausedDevelopments += $counts['developments'];
+                $pausedProperties +=
+                    $counts['properties'];
+
+                $pausedSearchRequests +=
+                    $counts['search_requests'];
+
+                $pausedDevelopments +=
+                    $counts['developments'];
 
                 $expired++;
+                $legacyExpired++;
                 $processed++;
 
                 $pdo->commit();
             } catch (\Throwable $e) {
-                $pdo->rollBack();
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+
                 throw $e;
             }
         }
 
         return [
             'ok' => true,
-            'processed' => $processed,
-            'cancelled' => $cancelled,
-            'expired' => $expired,
-            'renewed_with_scheduled_plan' => $renewedWithScheduledPlan,
-            'paused_properties' => $pausedProperties,
-            'paused_search_requests' => $pausedSearchRequests,
-            'paused_developments' => $pausedDevelopments,
+
+            'processed' =>
+            $processed,
+
+            'cancelled' =>
+            $cancelled,
+
+            'expired' =>
+            $expired,
+
+            'recurring_expired' =>
+            $recurringExpired,
+
+            'legacy_expired' =>
+            $legacyExpired,
+
+            'paused_properties' =>
+            $pausedProperties,
+
+            'paused_search_requests' =>
+            $pausedSearchRequests,
+
+            'paused_developments' =>
+            $pausedDevelopments,
         ];
     }
 
-    private static function pauseRealEstateContent(int $realEstateId): array
-    {
+    private static function pauseRealEstateContent(
+        int $realEstateId
+    ): array {
         $pdo = self::db();
 
         $stProperties = $pdo->prepare("
@@ -255,7 +306,8 @@ class BillingCycleService
         ");
 
         $stProperties->execute([
-            'real_estate_id' => $realEstateId,
+            'real_estate_id' =>
+            $realEstateId,
         ]);
 
         $stSearchRequests = $pdo->prepare("
@@ -270,7 +322,8 @@ class BillingCycleService
         ");
 
         $stSearchRequests->execute([
-            'real_estate_id' => $realEstateId,
+            'real_estate_id' =>
+            $realEstateId,
         ]);
 
         $stDevelopments = $pdo->prepare("
@@ -284,35 +337,19 @@ class BillingCycleService
         ");
 
         $stDevelopments->execute([
-            'real_estate_id' => $realEstateId,
+            'real_estate_id' =>
+            $realEstateId,
         ]);
 
         return [
-            'properties' => $stProperties->rowCount(),
-            'search_requests' => $stSearchRequests->rowCount(),
-            'developments' => $stDevelopments->rowCount(),
+            'properties' =>
+            $stProperties->rowCount(),
+
+            'search_requests' =>
+            $stSearchRequests->rowCount(),
+
+            'developments' =>
+            $stDevelopments->rowCount(),
         ];
-    }
-
-    private static function getPlanById(int $planId): ?array
-    {
-        $pdo = self::db();
-
-        $st = $pdo->prepare("
-            SELECT *
-            FROM plans
-            WHERE id = :id
-              AND is_active = 1
-              AND deleted_at IS NULL
-            LIMIT 1
-        ");
-
-        $st->execute([
-            'id' => $planId,
-        ]);
-
-        $row = $st->fetch();
-
-        return $row ?: null;
     }
 }
