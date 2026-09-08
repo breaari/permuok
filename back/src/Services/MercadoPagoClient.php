@@ -40,6 +40,16 @@ class MercadoPagoClient
         );
     }
 
+    public static function getAuthorizedPaymentById(
+        string $authorizedPaymentId
+    ): array {
+        return self::request(
+            'GET',
+            'https://api.mercadopago.com/authorized_payments/'
+                . urlencode($authorizedPaymentId)
+        );
+    }
+
     public static function updateSubscription(
         string $subscriptionId,
         array $payload
