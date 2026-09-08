@@ -891,11 +891,7 @@ COALESCE(
                 ?? 0
             ),
 
-            'expiring_30_days' =>
-            (int)(
-                $row['expiring_30_days']
-                ?? 0
-            ),
+          
         ];
     }
 }
