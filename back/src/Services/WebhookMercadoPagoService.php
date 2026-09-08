@@ -14,27 +14,164 @@ class WebhookMercadoPagoService
     private static function db(): PDO
     {
         require_once __DIR__ . '/../../db.php';
+
         return pdo();
     }
 
-    public static function handleNotification(array $query, array $body): array
-    {
-        $paymentId =
-            $query['data.id'] ?? $query['id'] ??
-            ($body['data']['id'] ?? $body['id'] ?? null);
+    public static function handleNotification(
+        array $query,
+        array $body
+    ): array {
+        $type = (string)(
+            $body['type']
+            ?? $query['type']
+            ?? $query['topic']
+            ?? ''
+        );
 
-        if (!$paymentId) {
-            return ['ok' => true, 'ignored' => 'no_payment_id'];
+        if ($type === 'subscription_preapproval') {
+            return self::handleSubscriptionPreapproval(
+                $query,
+                $body
+            );
         }
 
-        $mpPayment = MercadoPagoClient::getPaymentById((string)$paymentId);
+        return self::handlePaymentNotification(
+            $query,
+            $body
+        );
+    }
 
-        $status = (string)($mpPayment['status'] ?? '');
-        $statusDetail = (string)($mpPayment['status_detail'] ?? '');
-        $externalRef = (string)($mpPayment['external_reference'] ?? '');
+    private static function handleSubscriptionPreapproval(
+        array $query,
+        array $body
+    ): array {
+        $subscriptionId =
+            $body['data']['id']
+            ?? $body['id']
+            ?? $query['data.id']
+            ?? $query['id']
+            ?? null;
+
+        if (!$subscriptionId) {
+            return [
+                'ok' => true,
+                'ignored' => 'no_subscription_id',
+            ];
+        }
+
+        $subscription =
+            MercadoPagoClient::getSubscriptionById(
+                (string)$subscriptionId
+            );
+
+        $mpStatus = (string)(
+            $subscription['status']
+            ?? ''
+        );
+
+        if ($mpStatus === '') {
+            return [
+                'ok' => true,
+                'ignored' => 'subscription_without_status',
+            ];
+        }
+
+        $pdo = self::db();
+
+        $st = $pdo->prepare("
+            SELECT *
+            FROM memberships
+            WHERE mp_preapproval_id = :subscription_id
+              AND deleted_at IS NULL
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+
+        $st->execute([
+            'subscription_id' =>
+            (string)$subscriptionId,
+        ]);
+
+        $membership = $st->fetch();
+
+        if (!$membership) {
+            return [
+                'ok' => true,
+                'ignored' => 'membership_not_found',
+                'subscription_id' =>
+                (string)$subscriptionId,
+            ];
+        }
+
+        $st = $pdo->prepare("
+            UPDATE memberships
+            SET
+                mp_subscription_status = :status,
+                mp_subscription_updated_at = NOW()
+            WHERE id = :id
+            LIMIT 1
+        ");
+
+        $st->execute([
+            'status' => $mpStatus,
+            'id' => (int)$membership['id'],
+        ]);
+
+        return [
+            'ok' => true,
+            'processed' => true,
+            'type' => 'subscription_preapproval',
+            'subscription_id' =>
+            (string)$subscriptionId,
+            'status' => $mpStatus,
+            'membership_id' =>
+            (int)$membership['id'],
+        ];
+    }
+
+    private static function handlePaymentNotification(
+        array $query,
+        array $body
+    ): array {
+        $paymentId =
+            $query['data.id']
+            ?? $query['id']
+            ?? ($body['data']['id'] ?? null)
+            ?? ($body['id'] ?? null);
+
+        if (!$paymentId) {
+            return [
+                'ok' => true,
+                'ignored' => 'no_payment_id',
+            ];
+        }
+
+        $mpPayment =
+            MercadoPagoClient::getPaymentById(
+                (string)$paymentId
+            );
+
+        $status = (string)(
+            $mpPayment['status']
+            ?? ''
+        );
+
+        $statusDetail = (string)(
+            $mpPayment['status_detail']
+            ?? ''
+        );
+
+        $externalRef = (string)(
+            $mpPayment['external_reference']
+            ?? ''
+        );
 
         if ($externalRef === '') {
-            return ['ok' => true, 'ignored' => 'no_external_reference'];
+            return [
+                'ok' => true,
+                'ignored' => 'no_external_reference',
+            ];
         }
 
         $pdo = self::db();
@@ -45,17 +182,28 @@ class WebhookMercadoPagoService
             WHERE external_reference = :ext
             LIMIT 1
         ");
-        $st->execute(['ext' => $externalRef]);
+
+        $st->execute([
+            'ext' => $externalRef,
+        ]);
+
         $row = $st->fetch();
 
         if (!$row) {
-            return ['ok' => true, 'ignored' => 'payment_not_found'];
+            return [
+                'ok' => true,
+                'ignored' => 'payment_not_found',
+            ];
         }
 
         $newStatus = $row['status'];
+
         if ($status === 'approved') {
             $newStatus = 'approved';
-        } elseif ($status === 'pending' || $status === 'in_process') {
+        } elseif (
+            $status === 'pending'
+            || $status === 'in_process'
+        ) {
             $newStatus = 'pending';
         } elseif ($status === 'rejected') {
             $newStatus = 'rejected';
@@ -70,20 +218,39 @@ class WebhookMercadoPagoService
                 mp_status = :st,
                 mp_status_detail = :std,
                 status = :local_status,
-                approved_at = IF(:local_status = 'approved', NOW(), approved_at)
+                approved_at = IF(
+                    :local_status = 'approved',
+                    NOW(),
+                    approved_at
+                )
             WHERE id = :id
             LIMIT 1
         ");
+
         $st->execute([
-            'mpid' => (int)$paymentId,
-            'st' => $status,
-            'std' => $statusDetail,
-            'local_status' => $newStatus,
-            'id' => (int)$row['id'],
+            'mpid' =>
+            (int)$paymentId,
+
+            'st' =>
+            $status,
+
+            'std' =>
+            $statusDetail,
+
+            'local_status' =>
+            $newStatus,
+
+            'id' =>
+            (int)$row['id'],
         ]);
 
         if ($newStatus === 'approved') {
-            if (str_contains($externalRef, '-upgrade-')) {
+            if (
+                str_contains(
+                    $externalRef,
+                    '-upgrade-'
+                )
+            ) {
                 self::applyUpgradeFromPayment(
                     (int)$row['real_estate_id'],
                     (int)$row['plan_id'],
@@ -98,7 +265,12 @@ class WebhookMercadoPagoService
                 ];
             }
 
-            if (str_contains($externalRef, '-new-')) {
+            if (
+                str_contains(
+                    $externalRef,
+                    '-new-'
+                )
+            ) {
                 self::activateMembershipFromPayment(
                     (int)$row['real_estate_id'],
                     (int)$row['plan_id'],
@@ -121,22 +293,47 @@ class WebhookMercadoPagoService
             ];
         }
 
-        return ['ok' => true, 'processed' => true, 'status' => $newStatus];
+        return [
+            'ok' => true,
+            'processed' => true,
+            'status' => $newStatus,
+        ];
     }
 
-    private static function activateMembershipFromPayment(int $realEstateId, int $planId, int $mpPaymentId): void
-    {
+    private static function activateMembershipFromPayment(
+        int $realEstateId,
+        int $planId,
+        int $mpPaymentId
+    ): void {
         $pdo = self::db();
 
-        $plan = self::getPlan($planId);
+        $plan = self::getPlan(
+            $planId
+        );
+
         if (!$plan) {
             return;
         }
 
         $start = date('Y-m-d');
-        $end = date('Y-m-d', strtotime($start . ' +' . ((int)$plan['duration_days'] - 1) . ' days'));
 
-        // vencer membresías activas previas, si por algún motivo existieran
+        $end = date(
+            'Y-m-d',
+            strtotime(
+                $start
+                    . ' +'
+                    . (
+                        (int)$plan['duration_days']
+                        - 1
+                    )
+                    . ' days'
+            )
+        );
+
+        /*
+         * Vencer membresías activas previas,
+         * si por algún motivo existieran.
+         */
         $pdo->prepare("
             UPDATE memberships
             SET status = :expired_status
@@ -144,9 +341,14 @@ class WebhookMercadoPagoService
               AND status = :active_status
               AND deleted_at IS NULL
         ")->execute([
-            'expired_status' => self::MEMBERSHIP_STATUS_EXPIRED,
-            'active_status' => self::MEMBERSHIP_STATUS_ACTIVE,
-            're' => $realEstateId,
+            'expired_status' =>
+            self::MEMBERSHIP_STATUS_EXPIRED,
+
+            'active_status' =>
+            self::MEMBERSHIP_STATUS_ACTIVE,
+
+            're' =>
+            $realEstateId,
         ]);
 
         $st = $pdo->prepare("
@@ -191,26 +393,69 @@ class WebhookMercadoPagoService
                 NOW()
             )
         ");
+
         $st->execute([
-            're' => $realEstateId,
-            'plan' => $planId,
-            'status' => self::MEMBERSHIP_STATUS_ACTIVE,
-            'start' => $start,
-            'end' => $end,
-            'max_users' => (int)($plan['max_users'] ?? 1),
-            'max_agents' => (int)$plan['max_agents'],
-            'max_investors' => (int)$plan['max_investors'],
-            'can_publish_projects' => (int)$plan['can_publish_projects'],
-            'can_view_projects' => (int)($plan['can_view_projects'] ?? 0),
-            'mpid' => $mpPaymentId,
+            're' =>
+            $realEstateId,
+
+            'plan' =>
+            $planId,
+
+            'status' =>
+            self::MEMBERSHIP_STATUS_ACTIVE,
+
+            'start' =>
+            $start,
+
+            'end' =>
+            $end,
+
+            'max_users' =>
+            (int)(
+                $plan['max_users']
+                ?? 1
+            ),
+
+            'max_agents' =>
+            (int)(
+                $plan['max_agents']
+                ?? 0
+            ),
+
+            'max_investors' =>
+            (int)(
+                $plan['max_investors']
+                ?? 0
+            ),
+
+            'can_publish_projects' =>
+            (int)(
+                $plan['can_publish_projects']
+                ?? 0
+            ),
+
+            'can_view_projects' =>
+            (int)(
+                $plan['can_view_projects']
+                ?? 0
+            ),
+
+            'mpid' =>
+            $mpPaymentId,
         ]);
     }
 
-    private static function applyUpgradeFromPayment(int $realEstateId, int $planId, int $mpPaymentId): void
-    {
+    private static function applyUpgradeFromPayment(
+        int $realEstateId,
+        int $planId,
+        int $mpPaymentId
+    ): void {
         $pdo = self::db();
 
-        $plan = self::getPlan($planId);
+        $plan = self::getPlan(
+            $planId
+        );
+
         if (!$plan) {
             return;
         }
@@ -225,10 +470,15 @@ class WebhookMercadoPagoService
             ORDER BY id DESC
             LIMIT 1
         ");
+
         $st->execute([
-            're' => $realEstateId,
-            'active_status' => self::MEMBERSHIP_STATUS_ACTIVE,
+            're' =>
+            $realEstateId,
+
+            'active_status' =>
+            self::MEMBERSHIP_STATUS_ACTIVE,
         ]);
+
         $membership = $st->fetch();
 
         if (!$membership) {
@@ -252,20 +502,52 @@ class WebhookMercadoPagoService
             WHERE id = :id
             LIMIT 1
         ");
+
         $st->execute([
-            'plan_id' => $planId,
-            'max_users' => (int)($plan['max_users'] ?? 1),
-            'max_agents' => (int)$plan['max_agents'],
-            'max_investors' => (int)$plan['max_investors'],
-            'can_publish_projects' => (int)$plan['can_publish_projects'],
-            'can_view_projects' => (int)($plan['can_view_projects'] ?? 0),
-            'mpid' => $mpPaymentId,
-            'id' => (int)$membership['id'],
+            'plan_id' =>
+            $planId,
+
+            'max_users' =>
+            (int)(
+                $plan['max_users']
+                ?? 1
+            ),
+
+            'max_agents' =>
+            (int)(
+                $plan['max_agents']
+                ?? 0
+            ),
+
+            'max_investors' =>
+            (int)(
+                $plan['max_investors']
+                ?? 0
+            ),
+
+            'can_publish_projects' =>
+            (int)(
+                $plan['can_publish_projects']
+                ?? 0
+            ),
+
+            'can_view_projects' =>
+            (int)(
+                $plan['can_view_projects']
+                ?? 0
+            ),
+
+            'mpid' =>
+            $mpPaymentId,
+
+            'id' =>
+            (int)$membership['id'],
         ]);
     }
 
-    private static function getPlan(int $planId): ?array
-    {
+    private static function getPlan(
+        int $planId
+    ): ?array {
         $pdo = self::db();
 
         $st = $pdo->prepare("
@@ -275,7 +557,11 @@ class WebhookMercadoPagoService
               AND deleted_at IS NULL
             LIMIT 1
         ");
-        $st->execute(['id' => $planId]);
+
+        $st->execute([
+            'id' => $planId,
+        ]);
+
         $row = $st->fetch();
 
         return $row ?: null;
