@@ -458,30 +458,115 @@ NULL,
         }
 
         if ($changeType === 'downgrade') {
+            $subscriptionId = trim(
+                (string)(
+                    $membership['mp_preapproval_id']
+                    ?? ''
+                )
+            );
+
+            /*
+     * Si pertenece al nuevo sistema recurrente,
+     * dejamos configurado desde ahora el importe
+     * que deberá cobrarse en la próxima renovación.
+     *
+     * El plan local NO cambia todavía.
+     */
+            if ($subscriptionId !== '') {
+                $subscription =
+                    MercadoPagoClient::updateSubscription(
+                        $subscriptionId,
+                        [
+                            'auto_recurring' => [
+                                'transaction_amount' =>
+                                (float)$targetPlan['price_ars'],
+
+                                'currency_id' => 'ARS',
+                            ],
+                        ]
+                    );
+
+                $mpStatus = (string)(
+                    $subscription['status']
+                    ?? (
+                        $membership['mp_subscription_status']
+                        ?? ''
+                    )
+                );
+            } else {
+                /*
+         * Membresía histórica/manual:
+         * conserva el comportamiento local anterior.
+         */
+                $mpStatus = null;
+            }
+
             $st = $pdo->prepare("
-                UPDATE memberships
-                SET
-                    scheduled_plan_id = :scheduled_plan_id,
-                    scheduled_change_at = :scheduled_change_at,
-                    cancel_at_period_end = 0,
-                    cancelled_at = NULL
-                WHERE id = :id
-                LIMIT 1
-            ");
+        UPDATE memberships
+        SET
+            scheduled_plan_id = :scheduled_plan_id,
+            scheduled_change_at = :scheduled_change_at,
+            cancel_at_period_end = 0,
+            cancelled_at = NULL,
+
+            mp_subscription_status =
+                CASE
+                    WHEN :mp_status IS NOT NULL
+                    THEN :mp_status_value
+                    ELSE mp_subscription_status
+                END,
+
+            mp_subscription_updated_at =
+                CASE
+                    WHEN :mp_status_date IS NOT NULL
+                    THEN NOW()
+                    ELSE mp_subscription_updated_at
+                END
+
+        WHERE id = :id
+        LIMIT 1
+    ");
+
             $st->execute([
-                'scheduled_plan_id' => (int)$targetPlan['id'],
-                'scheduled_change_at' => $membership['end_date'] . ' 00:00:00',
-                'id' => (int)$membership['id'],
+                'scheduled_plan_id' =>
+                (int)$targetPlan['id'],
+
+                'scheduled_change_at' =>
+                $membership['end_date']
+                    . ' 00:00:00',
+
+                'mp_status' =>
+                $mpStatus,
+
+                'mp_status_value' =>
+                $mpStatus,
+
+                'mp_status_date' =>
+                $mpStatus,
+
+                'id' =>
+                (int)$membership['id'],
             ]);
 
             return [
                 'scheduled' => true,
                 'change_type' => 'downgrade',
                 'mode' => 'next_cycle',
-                'current_plan' => $currentPlan,
-                'target_plan' => $targetPlan,
-                'effective_at' => $membership['end_date'],
-                'message' => 'El cambio quedó programado para la próxima renovación.',
+
+                'current_plan' =>
+                $currentPlan,
+
+                'target_plan' =>
+                $targetPlan,
+
+                'subscription_updated' =>
+                $subscriptionId !== '',
+
+                'effective_at' =>
+                $membership['end_date'],
+
+                'message' =>
+                'El cambio quedó programado para la próxima renovación.',
             ];
         }
 
