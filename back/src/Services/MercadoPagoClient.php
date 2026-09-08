@@ -20,6 +20,38 @@ class MercadoPagoClient
         return $res;
     }
 
+    public static function createSubscription(
+        array $payload
+    ): array {
+        return self::request(
+            'POST',
+            'https://api.mercadopago.com/preapproval',
+            $payload
+        );
+    }
+
+    public static function getSubscriptionById(
+        string $subscriptionId
+    ): array {
+        return self::request(
+            'GET',
+            'https://api.mercadopago.com/preapproval/'
+                . urlencode($subscriptionId)
+        );
+    }
+
+    public static function updateSubscription(
+        string $subscriptionId,
+        array $payload
+    ): array {
+        return self::request(
+            'PUT',
+            'https://api.mercadopago.com/preapproval/'
+                . urlencode($subscriptionId),
+            $payload
+        );
+    }
+
     public static function getPaymentById(string $paymentId): array
     {
         // GET /v1/payments/{id} :contentReference[oaicite:5]{index=5}
@@ -39,8 +71,34 @@ class MercadoPagoClient
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
         if ($method === 'POST') {
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($json ?? [], JSON_UNESCAPED_UNICODE));
+            curl_setopt(
+                $ch,
+                CURLOPT_POST,
+                true
+            );
+        }
+
+        if (in_array(
+            $method,
+            ['POST', 'PUT'],
+            true
+        )) {
+            if ($method === 'PUT') {
+                curl_setopt(
+                    $ch,
+                    CURLOPT_CUSTOMREQUEST,
+                    'PUT'
+                );
+            }
+
+            curl_setopt(
+                $ch,
+                CURLOPT_POSTFIELDS,
+                json_encode(
+                    $json ?? [],
+                    JSON_UNESCAPED_UNICODE
+                )
+            );
         }
 
         $raw = curl_exec($ch);
