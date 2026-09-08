@@ -791,22 +791,7 @@ WHERE deleted_at IS NULL
                 0
             ) AS scheduled_change,
 
-            COALESCE(
-                SUM(
-                    CASE
-                        WHEN m.status = 1
-                         AND m.end_date >= CURDATE()
-                         AND m.end_date <=
-                             DATE_ADD(
-                                 CURDATE(),
-                                 INTERVAL 30 DAY
-                             )
-                        THEN 1
-                        ELSE 0
-                    END
-                ),
-                0
-            ) AS expiring_30_days
+           
 
         FROM real_estates re
 

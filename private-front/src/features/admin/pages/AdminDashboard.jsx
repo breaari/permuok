@@ -396,15 +396,6 @@ export default function AdminDashboard() {
                 icon="pause"
                 onClick={() => navigate("/admin/billing?status=cancelled")}
               />
-
-              <StatCard
-                title="Vencen en 30 días"
-                value={formatNumber(billing.expiring_30_days)}
-                description="Membresías activas cuyo período termina dentro de los próximos 30 días."
-                icon="clock"
-                alert={Number(billing.expiring_30_days) > 0}
-                onClick={() => navigate("/admin/billing?status=active")}
-              />
             </div>
           </section>
 

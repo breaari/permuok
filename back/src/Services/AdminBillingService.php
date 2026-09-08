@@ -29,7 +29,7 @@ class AdminBillingService
             'pending' => 'pending',
             'expired' => 'expired',
             'cancelled' => 'cancelled',
-            'expiring_30_days' => 'expiring_30_days',
+            
             default => 'active',
         };
     }
@@ -89,39 +89,7 @@ class AdminBillingService
         return !empty($row['membership_id']) && !empty($row['scheduled_plan_id']);
     }
 
-    private static function expiresWithin30Days(
-        ?array $row
-    ): bool {
-        if (
-            empty($row['membership_id']) ||
-            empty($row['end_date'])
-        ) {
-            return false;
-        }
-
-        if (
-            self::resolveMembershipAdminStatus($row)
-            !== 'active'
-        ) {
-            return false;
-        }
-
-        $today = new \DateTimeImmutable('today');
-        $limit = $today->modify('+30 days');
-
-        try {
-            $endDate = new \DateTimeImmutable(
-                (string)$row['end_date']
-            );
-        } catch (\Throwable) {
-            return false;
-        }
-
-        return (
-            $endDate >= $today &&
-            $endDate <= $limit
-        );
-    }
+   
 
     private static function buildStatusFilter(string $normalizedStatus, array $rows): array
     {
@@ -152,8 +120,6 @@ class AdminBillingService
                 $status === 'active'
                     && self::hasScheduledChange($row),
 
-                'expiring_30_days' =>
-                self::expiresWithin30Days($row),
 
                 default =>
                 $status === 'active',
@@ -355,7 +321,7 @@ class AdminBillingService
             'pending' => 0,
             'expired' => 0,
             'cancelled' => 0,
-            'expiring_30_days' => 0,
+           
         ];
 
         foreach ($rows as $row) {
@@ -372,11 +338,7 @@ class AdminBillingService
             if ($status === 'active' && self::hasScheduledChange($row)) {
                 $counts['scheduled_change']++;
             }
-            if (
-                self::expiresWithin30Days($row)
-            ) {
-                $counts['expiring_30_days']++;
-            }
+           
         }
 
         return $counts;
