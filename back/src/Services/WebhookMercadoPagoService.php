@@ -22,11 +22,13 @@ class WebhookMercadoPagoService
         array $query,
         array $body
     ): array {
-        $type = (string)(
-            $body['type']
-            ?? $query['type']
-            ?? $query['topic']
-            ?? ''
+        $type = trim(
+            (string)(
+                $body['type']
+                ?? $query['type']
+                ?? $query['topic']
+                ?? ''
+            )
         );
 
         if ($type === 'subscription_preapproval') {
@@ -43,10 +45,27 @@ class WebhookMercadoPagoService
             );
         }
 
-        return self::handlePaymentNotification(
-            $query,
-            $body
-        );
+        if ($type === 'payment') {
+            return self::handlePaymentNotification(
+                $query,
+                $body
+            );
+        }
+
+        /*
+     * Mercado Pago puede enviar otros tópicos
+     * que no forman parte de este flujo.
+     *
+     * Los reconocemos como recibidos, pero no
+     * intentamos tratarlos como si fueran pagos.
+     */
+        return [
+            'ok' => true,
+            'ignored' => 'unsupported_notification_type',
+            'type' => $type !== ''
+                ? $type
+                : null,
+        ];
     }
 
     private static function handleSubscriptionPreapproval(
