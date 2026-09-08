@@ -645,6 +645,9 @@ class WebhookMercadoPagoService
             ];
         }
 
+        $wasAlreadyApproved =
+            (string)($row['status'] ?? '') === 'approved';
+
         $newStatus =
             self::normalizePaymentStatus(
                 $status
@@ -694,7 +697,10 @@ class WebhookMercadoPagoService
             (int)$row['id'],
         ]);
 
-        if ($newStatus === 'approved') {
+        if (
+            $newStatus === 'approved'
+            && !$wasAlreadyApproved
+        ) {
             if (
                 str_contains(
                     $externalRef,
@@ -885,15 +891,15 @@ class WebhookMercadoPagoService
         }
 
         $st = $pdo->prepare("
-            SELECT *
-            FROM memberships
-            WHERE real_estate_id = :re
-              AND status = :active_status
-              AND end_date >= CURDATE()
-              AND deleted_at IS NULL
-            ORDER BY id DESC
-            LIMIT 1
-        ");
+        SELECT *
+        FROM memberships
+        WHERE real_estate_id = :re
+          AND status = :active_status
+          AND end_date >= CURDATE()
+          AND deleted_at IS NULL
+        ORDER BY id DESC
+        LIMIT 1
+    ");
 
         $st->execute([
             're' =>
@@ -909,23 +915,90 @@ class WebhookMercadoPagoService
             return;
         }
 
+        $subscriptionId = trim(
+            (string)(
+                $membership['mp_preapproval_id']
+                ?? ''
+            )
+        );
+
+        $mpSubscriptionStatus =
+            $membership['mp_subscription_status']
+            ?? null;
+
+        /*
+     * Nuevo sistema recurrente:
+     * una vez acreditado el diferencial,
+     * actualizamos también el importe
+     * de las próximas renovaciones.
+     */
+        if ($subscriptionId !== '') {
+            $subscription =
+                MercadoPagoClient::updateSubscription(
+                    $subscriptionId,
+                    [
+                        'auto_recurring' => [
+                            'transaction_amount' =>
+                            (float)$plan['price_ars'],
+
+                            'currency_id' =>
+                            'ARS',
+                        ],
+                    ]
+                );
+
+            $mpSubscriptionStatus =
+                (string)(
+                    $subscription['status']
+                    ?? $mpSubscriptionStatus
+                    ?? 'authorized'
+                );
+        }
+
+        /*
+     * El período NO empieza nuevamente.
+     *
+     * El usuario ya había pagado el período
+     * actual. Sólo obtiene las prestaciones
+     * superiores desde ahora y conserva
+     * la misma fecha de vencimiento.
+     */
         $st = $pdo->prepare("
-            UPDATE memberships
-            SET
-                plan_id = :plan_id,
-                scheduled_plan_id = NULL,
-                scheduled_change_at = NULL,
-                cancel_at_period_end = 0,
-                cancelled_at = NULL,
-                max_users = :max_users,
-                max_agents = :max_agents,
-                max_investors = :max_investors,
-                can_publish_projects = :can_publish_projects,
-                can_view_projects = :can_view_projects,
-                mp_last_payment_id = :mpid
-            WHERE id = :id
-            LIMIT 1
-        ");
+        UPDATE memberships
+        SET
+            plan_id = :plan_id,
+
+            scheduled_plan_id = NULL,
+            scheduled_change_at = NULL,
+
+            cancel_at_period_end = 0,
+            cancelled_at = NULL,
+
+            max_users = :max_users,
+            max_agents = :max_agents,
+            max_investors = :max_investors,
+            can_publish_projects = :can_publish_projects,
+            can_view_projects = :can_view_projects,
+
+            mp_last_payment_id = :mpid,
+
+            mp_subscription_status =
+                CASE
+                    WHEN :mp_status IS NOT NULL
+                    THEN :mp_status_value
+                    ELSE mp_subscription_status
+                END,
+
+            mp_subscription_updated_at =
+                CASE
+                    WHEN :mp_status_date IS NOT NULL
+                    THEN NOW()
+                    ELSE mp_subscription_updated_at
+                END
+
+        WHERE id = :id
+        LIMIT 1
+    ");
 
         $st->execute([
             'plan_id' =>
@@ -948,6 +1021,15 @@ class WebhookMercadoPagoService
 
             'mpid' =>
             $mpPaymentId,
+
+            'mp_status' =>
+            $mpSubscriptionStatus,
+
+            'mp_status_value' =>
+            $mpSubscriptionStatus,
+
+            'mp_status_date' =>
+            $mpSubscriptionStatus,
 
             'id' =>
             (int)$membership['id'],
