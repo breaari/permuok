@@ -214,21 +214,6 @@ class BillingService
             );
         }
 
-        $startDate =
-            date('Y-m-d');
-
-        $endDate =
-            date(
-                'Y-m-d',
-                strtotime(
-                    $startDate
-                        . ' +'
-                        . (
-                            (int)$plan['duration_days'] - 1
-                        )
-                        . ' days'
-                )
-            );
 
         $st = $pdo->prepare("
         INSERT INTO memberships
@@ -263,8 +248,8 @@ class BillingService
             0,
             0,
             NULL,
-            :start_date,
-            :end_date,
+            NULL,
+NULL,
             NULL,
             :max_users,
             :max_agents,
@@ -285,12 +270,6 @@ class BillingService
 
             'plan_id' =>
             (int)$plan['id'],
-
-            'start_date' =>
-            $startDate,
-
-            'end_date' =>
-            $endDate,
 
             'max_users' =>
             (int)(
