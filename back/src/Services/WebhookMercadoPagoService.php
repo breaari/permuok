@@ -189,7 +189,10 @@ class WebhookMercadoPagoService
         ]);
 
         $membership = $st->fetch();
-
+        $effectivePlanId =
+            !empty($membership['scheduled_plan_id'])
+            ? (int)$membership['scheduled_plan_id']
+            : (int)$membership['plan_id'];
         if (!$membership) {
             return [
                 'ok' => true,
@@ -326,7 +329,7 @@ class WebhookMercadoPagoService
                 $billingUserId,
 
                 'plan_id' =>
-                (int)$membership['plan_id'],
+                $effectivePlanId,
 
                 'external_reference' =>
                 $externalReference,
@@ -454,8 +457,18 @@ class WebhookMercadoPagoService
     ): void {
         $pdo = self::db();
 
+        /*
+     * Si había un downgrade programado,
+     * el nuevo período comienza ya con
+     * ese plan.
+     */
+        $effectivePlanId =
+            !empty($membership['scheduled_plan_id'])
+            ? (int)$membership['scheduled_plan_id']
+            : (int)$membership['plan_id'];
+
         $plan = self::getPlan(
-            (int)$membership['plan_id']
+            $effectivePlanId
         );
 
         if (!$plan) {
@@ -478,19 +491,36 @@ class WebhookMercadoPagoService
         );
 
         $st = $pdo->prepare("
-            UPDATE memberships
-            SET
-                status = :active_status,
-                start_date = :start_date,
-                end_date = :end_date,
-                mp_last_payment_id = :mp_payment_id,
-                mp_subscription_status = 'authorized',
-                mp_subscription_updated_at = NOW()
-            WHERE id = :id
-            LIMIT 1
-        ");
+        UPDATE memberships
+        SET
+            plan_id = :plan_id,
+
+            scheduled_plan_id = NULL,
+            scheduled_change_at = NULL,
+
+            status = :active_status,
+
+            start_date = :start_date,
+            end_date = :end_date,
+
+            max_users = :max_users,
+            max_agents = :max_agents,
+            max_investors = :max_investors,
+            can_publish_projects = :can_publish_projects,
+            can_view_projects = :can_view_projects,
+
+            mp_last_payment_id = :mp_payment_id,
+            mp_subscription_status = 'authorized',
+            mp_subscription_updated_at = NOW()
+
+        WHERE id = :id
+        LIMIT 1
+    ");
 
         $st->execute([
+            'plan_id' =>
+            $effectivePlanId,
+
             'active_status' =>
             self::MEMBERSHIP_STATUS_ACTIVE,
 
@@ -499,6 +529,21 @@ class WebhookMercadoPagoService
 
             'end_date' =>
             $end,
+
+            'max_users' =>
+            (int)($plan['max_users'] ?? 1),
+
+            'max_agents' =>
+            (int)($plan['max_agents'] ?? 0),
+
+            'max_investors' =>
+            (int)($plan['max_investors'] ?? 0),
+
+            'can_publish_projects' =>
+            (int)($plan['can_publish_projects'] ?? 0),
+
+            'can_view_projects' =>
+            (int)($plan['can_view_projects'] ?? 0),
 
             'mp_payment_id' =>
             $mpPaymentId,
