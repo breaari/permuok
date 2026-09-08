@@ -294,16 +294,27 @@ class BillingCycleService
     ): array {
         $pdo = self::db();
 
+        /*
+     * Sólo marcamos billing_paused_at en contenido
+     * que estaba efectivamente publicado.
+     *
+     * Así podemos distinguir después:
+     *
+     * - pausa manual → billing_paused_at IS NULL
+     * - pausa por facturación → billing_paused_at IS NOT NULL
+     */
+
         $stProperties = $pdo->prepare("
-            UPDATE properties
-            SET
-                status = 'paused',
-                is_visible = 0,
-                paused_at = NOW()
-            WHERE real_estate_id = :real_estate_id
-              AND status = 'published'
-              AND deleted_at IS NULL
-        ");
+        UPDATE properties
+        SET
+            status = 'paused',
+            is_visible = 0,
+            paused_at = NOW(),
+            billing_paused_at = NOW()
+        WHERE real_estate_id = :real_estate_id
+          AND status = 'published'
+          AND deleted_at IS NULL
+    ");
 
         $stProperties->execute([
             'real_estate_id' =>
@@ -311,15 +322,16 @@ class BillingCycleService
         ]);
 
         $stSearchRequests = $pdo->prepare("
-            UPDATE search_requests
-            SET
-                status = 'paused',
-                is_visible = 0,
-                paused_at = NOW()
-            WHERE real_estate_id = :real_estate_id
-              AND status = 'published'
-              AND deleted_at IS NULL
-        ");
+        UPDATE search_requests
+        SET
+            status = 'paused',
+            is_visible = 0,
+            paused_at = NOW(),
+            billing_paused_at = NOW()
+        WHERE real_estate_id = :real_estate_id
+          AND status = 'published'
+          AND deleted_at IS NULL
+    ");
 
         $stSearchRequests->execute([
             'real_estate_id' =>
@@ -327,14 +339,15 @@ class BillingCycleService
         ]);
 
         $stDevelopments = $pdo->prepare("
-            UPDATE developments
-            SET
-                status = 'paused',
-                paused_at = NOW()
-            WHERE real_estate_id = :real_estate_id
-              AND status = 'published'
-              AND deleted_at IS NULL
-        ");
+        UPDATE developments
+        SET
+            status = 'paused',
+            paused_at = NOW(),
+            billing_paused_at = NOW()
+        WHERE real_estate_id = :real_estate_id
+          AND status = 'published'
+          AND deleted_at IS NULL
+    ");
 
         $stDevelopments->execute([
             'real_estate_id' =>
