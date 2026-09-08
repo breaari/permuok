@@ -86,18 +86,20 @@ class BillingService
      * en lugar de crear duplicados.
      */
         $st = $pdo->prepare("
-        SELECT *
-        FROM memberships
-        WHERE real_estate_id = :re
-          AND status = 0
-          AND mp_preapproval_id IS NOT NULL
-          AND deleted_at IS NULL
-        ORDER BY id DESC
-        LIMIT 1
-    ");
+    SELECT *
+    FROM memberships
+    WHERE real_estate_id = :re
+      AND plan_id = :plan_id
+      AND status = 0
+      AND mp_preapproval_id IS NOT NULL
+      AND deleted_at IS NULL
+    ORDER BY id DESC
+    LIMIT 1
+");
 
         $st->execute([
             're' => $realEstateId,
+            'plan_id' => (int)$plan['id'],
         ]);
 
         $pendingMembership =
