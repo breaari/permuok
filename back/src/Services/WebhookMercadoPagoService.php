@@ -189,10 +189,7 @@ class WebhookMercadoPagoService
         ]);
 
         $membership = $st->fetch();
-        $effectivePlanId =
-            !empty($membership['scheduled_plan_id'])
-            ? (int)$membership['scheduled_plan_id']
-            : (int)$membership['plan_id'];
+
         if (!$membership) {
             return [
                 'ok' => true,
@@ -201,6 +198,11 @@ class WebhookMercadoPagoService
                 $subscriptionId,
             ];
         }
+
+        $effectivePlanId =
+            !empty($membership['scheduled_plan_id'])
+            ? (int)$membership['scheduled_plan_id']
+            : (int)$membership['plan_id'];
 
         $billingUserId =
             isset($membership['billing_user_id'])
