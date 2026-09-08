@@ -557,30 +557,105 @@ NULL,
     {
         $pdo = self::db();
 
-        $user = self::getValidRealEstateUser($userId);
-        $membership = self::getRequiredActiveMembership((int)$user['real_estate_id']);
+        $user = self::getValidRealEstateUser(
+            $userId
+        );
+
+        $membership =
+            self::getRequiredActiveMembership(
+                (int)$user['real_estate_id']
+            );
+
+        $subscriptionId = trim(
+            (string)(
+                $membership['mp_preapproval_id']
+                ?? ''
+            )
+        );
+
+        /*
+     * Si esta membresía pertenece al nuevo
+     * sistema recurrente, cancelamos también
+     * la suscripción en Mercado Pago.
+     *
+     * Esto evita que se genere otro cobro.
+     * El acceso local sigue vigente hasta
+     * end_date.
+     */
+        if ($subscriptionId !== '') {
+            $subscription =
+                MercadoPagoClient::updateSubscription(
+                    $subscriptionId,
+                    [
+                        'status' => 'cancelled',
+                    ]
+                );
+
+            $mpStatus = (string)(
+                $subscription['status']
+                ?? 'cancelled'
+            );
+        } else {
+            /*
+         * Membresías históricas/manuales
+         * no tienen preapproval.
+         */
+            $mpStatus = null;
+        }
 
         $st = $pdo->prepare("
-            UPDATE memberships
-            SET
-                cancel_at_period_end = 1,
-                cancelled_at = NOW(),
-                scheduled_plan_id = NULL,
-                scheduled_change_at = NULL
-            WHERE id = :id
-            LIMIT 1
-        ");
+        UPDATE memberships
+        SET
+            cancel_at_period_end = 1,
+            cancelled_at = NOW(),
+            scheduled_plan_id = NULL,
+            scheduled_change_at = NULL,
+            mp_subscription_status =
+                CASE
+                    WHEN :mp_status IS NOT NULL
+                    THEN :mp_status_value
+                    ELSE mp_subscription_status
+                END,
+            mp_subscription_updated_at =
+                CASE
+                    WHEN :mp_status_date IS NOT NULL
+                    THEN NOW()
+                    ELSE mp_subscription_updated_at
+                END
+        WHERE id = :id
+        LIMIT 1
+    ");
+
         $st->execute([
-            'id' => (int)$membership['id'],
+            'mp_status' =>
+            $mpStatus,
+
+            'mp_status_value' =>
+            $mpStatus,
+
+            'mp_status_date' =>
+            $mpStatus,
+
+            'id' =>
+            (int)$membership['id'],
         ]);
 
         return [
             'cancelled' => true,
-            'effective_until' => $membership['end_date'],
-            'message' => 'La cancelación quedó programada al fin del período actual.',
+
+            'subscription_cancelled' =>
+            $subscriptionId !== '',
+
+            'effective_until' =>
+            $membership['end_date'],
+
+            'message' =>
+            'La renovación automática fue cancelada. '
+                . 'La membresía seguirá activa hasta '
+                . $membership['end_date']
+                . '.',
         ];
     }
-
     public static function getPaymentStatus(int $userId, ?string $preferenceId, ?string $externalRef): array
     {
         $pdo = self::db();
