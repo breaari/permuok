@@ -26,94 +26,329 @@ class BillingService
         return $st->fetchAll() ?: [];
     }
 
-    public static function createPreference(int $userId, string $planCode): array
-    {
+    public static function createPreference(
+        int $userId,
+        string $planCode
+    ): array {
         $pdo = self::db();
 
-        $mpToken = trim((string)($_ENV['MP_ACCESS_TOKEN'] ?? ''));
-        if ($mpToken === '') {
-            throw new \Exception("MP_ACCESS_TOKEN no configurado");
-        }
-
-        $frontUrl = trim((string)($_ENV['FRONT_URL'] ?? ''));
-        if ($frontUrl === '') {
-            throw new \Exception("FRONT_URL no configurado");
-        }
-        $frontUrl = rtrim($frontUrl, '/');
-
-        $notificationUrl = trim((string)($_ENV['MP_NOTIFICATION_URL'] ?? ''));
-        if ($notificationUrl === '') {
-            throw new \Exception("MP_NOTIFICATION_URL no configurado");
-        }
-
-        $user = self::getValidRealEstateUser($userId);
-        self::getBillableRealEstate((int)$user['real_estate_id']);
-
-        $activeMembership = self::getActiveMembership((int)$user['real_estate_id']);
-        if ($activeMembership) {
-            $until = $activeMembership['end_date'] ?? null;
-            throw new \Exception("Ya tenés una membresía activa hasta {$until}. No podés generar un nuevo pago.");
-        }
-
-        $plan = self::getPlanByCode($planCode);
-        if (!$plan) {
-            throw new \Exception("Plan no encontrado");
-        }
-
-        $externalRef = "re{$user['real_estate_id']}-u{$userId}-p{$plan['id']}-new-" . bin2hex(random_bytes(6));
-
-        $st = $pdo->prepare("
-            INSERT INTO payments
-            (real_estate_id, user_id, plan_id, external_reference, amount_ars, currency, status)
-            VALUES (:re, :u, :p, :ext, :amt, 'ARS', 'created')
-        ");
-        $st->execute([
-            're' => (int)$user['real_estate_id'],
-            'u'  => $userId,
-            'p'  => (int)$plan['id'],
-            'ext' => $externalRef,
-            'amt' => (int)$plan['price_ars'],
-        ]);
-
-        $paymentRowId = (int)$pdo->lastInsertId();
-
-        $pref = self::buildMercadoPagoPreference(
-            title: (string)$plan['name'],
-            amount: (int)$plan['price_ars'],
-            externalRef: $externalRef
+        $frontUrl = trim(
+            (string)($_ENV['FRONT_URL'] ?? '')
         );
 
-        $resp = MercadoPagoClient::createPreference($pref);
-
-        if (empty($resp['id'])) {
-            throw new \Exception("No se pudo crear la preferencia");
+        if ($frontUrl === '') {
+            throw new \Exception(
+                "FRONT_URL no configurado"
+            );
         }
 
-        $isTest = str_starts_with($mpToken, 'TEST-');
-        $initPoint = $isTest
-            ? ($resp['sandbox_init_point'] ?? null)
-            : ($resp['init_point'] ?? null);
+        $frontUrl = rtrim($frontUrl, '/');
 
-        if (!$initPoint) {
-            throw new \Exception("No se pudo obtener el link de pago");
+        $user = self::getValidRealEstateUser(
+            $userId
+        );
+
+        $realEstateId =
+            (int)$user['real_estate_id'];
+
+        self::getBillableRealEstate(
+            $realEstateId
+        );
+
+        $activeMembership =
+            self::getActiveMembership(
+                $realEstateId
+            );
+
+        if ($activeMembership) {
+            $until =
+                $activeMembership['end_date']
+                ?? null;
+
+            throw new \Exception(
+                "Ya tenés una membresía activa hasta {$until}."
+            );
         }
+
+        $plan = self::getPlanByCode(
+            $planCode
+        );
+
+        if (!$plan) {
+            throw new \Exception(
+                "Plan no encontrado"
+            );
+        }
+
+        /*
+     * Si ya existe una suscripción pendiente,
+     * reutilizamos el checkout de Mercado Pago
+     * en lugar de crear duplicados.
+     */
+        $st = $pdo->prepare("
+        SELECT *
+        FROM memberships
+        WHERE real_estate_id = :re
+          AND status = 0
+          AND mp_preapproval_id IS NOT NULL
+          AND deleted_at IS NULL
+        ORDER BY id DESC
+        LIMIT 1
+    ");
+
+        $st->execute([
+            're' => $realEstateId,
+        ]);
+
+        $pendingMembership =
+            $st->fetch();
+
+        if ($pendingMembership) {
+            try {
+                $subscription =
+                    MercadoPagoClient::getSubscriptionById(
+                        (string)
+                        $pendingMembership['mp_preapproval_id']
+                    );
+
+                $initPoint =
+                    $subscription['init_point']
+                    ?? null;
+
+                $mpStatus =
+                    $subscription['status']
+                    ?? 'pending';
+
+                if ($initPoint) {
+                    return [
+                        'subscription_id' =>
+                        (string)
+                        $pendingMembership['mp_preapproval_id'],
+
+                        'init_point' =>
+                        (string)$initPoint,
+
+                        'status' =>
+                        (string)$mpStatus,
+
+                        'membership_id' =>
+                        (int)
+                        $pendingMembership['id'],
+                    ];
+                }
+            } catch (\Throwable) {
+                /*
+             * Si Mercado Pago ya no reconoce
+             * esa suscripción, seguimos y
+             * generamos una nueva.
+             */
+            }
+        }
+
+        $externalRef =
+            "re{$realEstateId}"
+            . "-u{$userId}"
+            . "-p{$plan['id']}"
+            . "-subscription-"
+            . bin2hex(
+                random_bytes(6)
+            );
+
+        $payload = [
+            'reason' =>
+            'PermuOK - '
+                . (string)$plan['name'],
+
+            'external_reference' =>
+            $externalRef,
+
+            'payer_email' =>
+            (string)$user['email'],
+
+            'auto_recurring' => [
+                'frequency' => 1,
+                'frequency_type' => 'months',
+                'transaction_amount' =>
+                (float)$plan['price_ars'],
+                'currency_id' => 'ARS',
+            ],
+
+            'back_url' =>
+            $frontUrl . '/billing',
+
+            'status' => 'pending',
+        ];
+
+        $subscription =
+            MercadoPagoClient::createSubscription(
+                $payload
+            );
+
+        $subscriptionId =
+            (string)(
+                $subscription['id']
+                ?? ''
+            );
+
+        $initPoint =
+            (string)(
+                $subscription['init_point']
+                ?? ''
+            );
+
+        $mpStatus =
+            (string)(
+                $subscription['status']
+                ?? 'pending'
+            );
+
+        if (
+            $subscriptionId === '' ||
+            $initPoint === ''
+        ) {
+            throw new \Exception(
+                "Mercado Pago no devolvió "
+                    . "una suscripción válida"
+            );
+        }
+
+        $startDate =
+            date('Y-m-d');
+
+        $endDate =
+            date(
+                'Y-m-d',
+                strtotime(
+                    $startDate
+                        . ' +'
+                        . (
+                            (int)$plan['duration_days'] - 1
+                        )
+                        . ' days'
+                )
+            );
 
         $st = $pdo->prepare("
-            UPDATE payments
-            SET preference_id=:pid, status='pending'
-            WHERE id=:id
-            LIMIT 1
-        ");
+        INSERT INTO memberships
+        (
+            real_estate_id,
+            plan_id,
+            scheduled_plan_id,
+            billing_cycle,
+            status,
+            cancel_at_period_end,
+            cancelled_at,
+            start_date,
+            end_date,
+            scheduled_change_at,
+            max_users,
+            max_agents,
+            max_investors,
+            can_publish_projects,
+            can_view_projects,
+            mp_last_payment_id,
+            mp_preapproval_id,
+            mp_subscription_status,
+            mp_subscription_updated_at,
+            created_at
+        )
+        VALUES
+        (
+            :real_estate_id,
+            :plan_id,
+            NULL,
+            1,
+            0,
+            0,
+            NULL,
+            :start_date,
+            :end_date,
+            NULL,
+            :max_users,
+            :max_agents,
+            :max_investors,
+            :can_publish_projects,
+            :can_view_projects,
+            NULL,
+            :mp_preapproval_id,
+            :mp_subscription_status,
+            NOW(),
+            NOW()
+        )
+    ");
+
         $st->execute([
-            'pid' => (string)$resp['id'],
-            'id'  => $paymentRowId
+            'real_estate_id' =>
+            $realEstateId,
+
+            'plan_id' =>
+            (int)$plan['id'],
+
+            'start_date' =>
+            $startDate,
+
+            'end_date' =>
+            $endDate,
+
+            'max_users' =>
+            (int)(
+                $plan['max_users']
+                ?? 1
+            ),
+
+            'max_agents' =>
+            (int)(
+                $plan['max_agents']
+                ?? 0
+            ),
+
+            'max_investors' =>
+            (int)(
+                $plan['max_investors']
+                ?? 0
+            ),
+
+            'can_publish_projects' =>
+            (int)(
+                $plan['can_publish_projects']
+                ?? 0
+            ),
+
+            'can_view_projects' =>
+            (int)(
+                $plan['can_view_projects']
+                ?? 0
+            ),
+
+            'mp_preapproval_id' =>
+            $subscriptionId,
+
+            'mp_subscription_status' =>
+            $mpStatus,
         ]);
 
         return [
-            'payment_id' => $paymentRowId,
-            'preference_id' => (string)$resp['id'],
-            'init_point' => (string)$initPoint,
-            'external_reference' => $externalRef,
+            'subscription_id' =>
+            $subscriptionId,
+
+            /*
+         * Lo mantenemos temporalmente
+         * para no romper frontend viejo.
+         */
+            'preference_id' =>
+            $subscriptionId,
+
+            'init_point' =>
+            $initPoint,
+
+            'external_reference' =>
+            $externalRef,
+
+            'status' =>
+            $mpStatus,
+
+            'membership_id' =>
+            (int)$pdo->lastInsertId(),
         ];
     }
 
