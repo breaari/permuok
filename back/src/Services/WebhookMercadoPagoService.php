@@ -276,6 +276,10 @@ class WebhookMercadoPagoService
 
         $paymentRow = $st->fetch();
 
+        $wasAlreadyApproved =
+            $paymentRow
+            && (string)($paymentRow['status'] ?? '') === 'approved';
+
         if (!$paymentRow) {
             $st = $pdo->prepare("
                 INSERT INTO payments
@@ -415,7 +419,10 @@ class WebhookMercadoPagoService
             ]);
         }
 
-        if ($localStatus === 'approved') {
+        if (
+            $localStatus === 'approved'
+            && !$wasAlreadyApproved
+        ) {
             self::activateOrRenewSubscriptionMembership(
                 $membership,
                 $mpPaymentId
