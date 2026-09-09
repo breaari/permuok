@@ -155,7 +155,32 @@ class BillingService
             . bin2hex(
                 random_bytes(6)
             );
+        $mpToken = trim(
+            (string)($_ENV['MP_ACCESS_TOKEN'] ?? '')
+        );
 
+        $isMpTest =
+            str_starts_with(
+                $mpToken,
+                'TEST-'
+            );
+
+        $payerEmail =
+            (string)$user['email'];
+
+        if ($isMpTest) {
+            $testPayerEmail = trim(
+                (string)(
+                    $_ENV['MP_TEST_PAYER_EMAIL']
+                    ?? ''
+                )
+            );
+
+            if ($testPayerEmail !== '') {
+                $payerEmail =
+                    $testPayerEmail;
+            }
+        }
         $payload = [
             'reason' =>
             'PermuOK - '
@@ -165,7 +190,7 @@ class BillingService
             $externalRef,
 
             'payer_email' =>
-            (string)$user['email'],
+            $payerEmail,
 
             'auto_recurring' => [
                 'frequency' => 1,
