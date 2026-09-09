@@ -155,14 +155,10 @@ class BillingService
             . bin2hex(
                 random_bytes(6)
             );
-        $mpToken = trim(
-            (string)($_ENV['MP_ACCESS_TOKEN'] ?? '')
-        );
-
         $isMpTest =
-            str_starts_with(
-                $mpToken,
-                'TEST-'
+            filter_var(
+                $_ENV['MP_IS_TEST'] ?? false,
+                FILTER_VALIDATE_BOOLEAN
             );
 
         $payerEmail =
@@ -176,10 +172,14 @@ class BillingService
                 )
             );
 
-            if ($testPayerEmail !== '') {
-                $payerEmail =
-                    $testPayerEmail;
+            if ($testPayerEmail === '') {
+                throw new \Exception(
+                    'MP_TEST_PAYER_EMAIL no configurado'
+                );
             }
+
+            $payerEmail =
+                $testPayerEmail;
         }
         $payload = [
             'reason' =>
