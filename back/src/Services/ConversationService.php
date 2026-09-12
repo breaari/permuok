@@ -132,7 +132,8 @@ class ConversationService
         $ownerUserId =
             self::findOpportunityOwner(
                 $type,
-                $opportunityId
+                $opportunityId,
+                $userId
             );
 
         if (!$ownerUserId) {
