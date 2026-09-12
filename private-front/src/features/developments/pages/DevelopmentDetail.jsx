@@ -180,6 +180,7 @@ export default function DevelopmentDetail() {
 
     try {
       setActionLoading(true);
+      setErr("");
 
       const res = await startConversation({
         opportunity_type: "development",
@@ -188,17 +189,28 @@ export default function DevelopmentDetail() {
       });
 
       const conversationId =
-        res?.conversation?.id || res?.conversation_id || res?.id;
+        res?.conversation?.conversation?.id ||
+        res?.conversation?.id ||
+        res?.conversation_id ||
+        res?.id;
 
       if (!conversationId) {
-        throw new Error("No se pudo obtener la conversación creada.");
+        throw new Error("No se pudo obtener la conversación.");
       }
 
       setContactModalOpen(false);
-      toast.success("Consulta enviada correctamente.");
+
+      if (res?.already_exists) {
+        toast.info(
+          "Ya habías consultado este desarrollo. Te llevamos a la conversación existente.",
+        );
+      } else {
+        toast.success("Consulta enviada correctamente.");
+      }
+
       navigate(`/conversations/${conversationId}`);
     } catch (e) {
-      toast.error(e?.message || "No se pudo iniciar la conversación.");
+      toast.error(getErrorMessage(e, "No se pudo iniciar la conversación."));
     } finally {
       setActionLoading(false);
     }
