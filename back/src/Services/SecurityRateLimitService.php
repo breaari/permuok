@@ -23,7 +23,7 @@ class SecurityRateLimitService
         string $identifier,
         int $maxAttempts,
         int $windowSeconds
-    ): void {
+    ): array {
         $action = trim($action);
         $identifier = trim($identifier);
 
@@ -45,62 +45,68 @@ class SecurityRateLimitService
             $identifier
         );
 
-        $windowCutoff = date(
-            'Y-m-d H:i:s',
-            time() - $windowSeconds
-        );
-
-        /*
-         * La actualización es atómica.
-         *
-         * Si dos solicitudes llegan simultáneamente,
-         * MySQL incrementa correctamente el contador.
-         */
         $stmt = $pdo->prepare("
-            INSERT INTO security_rate_limits (
-                action,
-                identifier_hash,
-                window_started_at,
-                attempts
-            )
-            VALUES (
-                :action,
-                :identifier_hash,
-                NOW(),
-                1
-            )
-            ON DUPLICATE KEY UPDATE
-                attempts = CASE
-                    WHEN window_started_at < :window_cutoff
-                        THEN 1
-                    ELSE attempts + 1
-                END,
+        INSERT INTO security_rate_limits (
+            action,
+            identifier_hash,
+            window_started_at,
+            attempts
+        )
+        VALUES (
+            :action,
+            :identifier_hash,
+            NOW(),
+            1
+        )
+        ON DUPLICATE KEY UPDATE
+            attempts = CASE
+                WHEN window_started_at <
+                    DATE_SUB(
+                        NOW(),
+                        INTERVAL {$windowSeconds} SECOND
+                    )
+                    THEN 1
+                ELSE attempts + 1
+            END,
 
-                window_started_at = CASE
-                    WHEN window_started_at < :window_cutoff_reset
-                        THEN NOW()
-                    ELSE window_started_at
-                END,
+            window_started_at = CASE
+                WHEN window_started_at <
+                    DATE_SUB(
+                        NOW(),
+                        INTERVAL {$windowSeconds} SECOND
+                    )
+                    THEN NOW()
+                ELSE window_started_at
+            END,
 
-                updated_at = NOW()
-        ");
+            updated_at = NOW()
+    ");
 
         $stmt->execute([
             ':action' => $action,
             ':identifier_hash' => $identifierHash,
-            ':window_cutoff' => $windowCutoff,
-            ':window_cutoff_reset' => $windowCutoff,
         ]);
 
         $stmt = $pdo->prepare("
-            SELECT
-                attempts,
-                window_started_at
-            FROM security_rate_limits
-            WHERE action = :action
-              AND identifier_hash = :identifier_hash
-            LIMIT 1
-        ");
+    SELECT
+        attempts,
+        window_started_at,
+        GREATEST(
+            1,
+            TIMESTAMPDIFF(
+                SECOND,
+                NOW(),
+                DATE_ADD(
+                    window_started_at,
+                    INTERVAL {$windowSeconds} SECOND
+                )
+            )
+        ) AS retry_after
+    FROM security_rate_limits
+    WHERE action = :action
+      AND identifier_hash = :identifier_hash
+    LIMIT 1
+");
 
         $stmt->execute([
             ':action' => $action,
@@ -110,32 +116,56 @@ class SecurityRateLimitService
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$row) {
-            return;
+            return [
+                'attempts' => 0,
+                'remaining' => $maxAttempts,
+                'retry_after' => 0,
+            ];
         }
 
         $attempts = (int)$row['attempts'];
 
-        if ($attempts <= $maxAttempts) {
-            return;
-        }
-
-        $windowStartedAt =
-            strtotime((string)$row['window_started_at'])
-            ?: time();
+        $remaining = max(
+            0,
+            $maxAttempts - $attempts
+        );
 
         $retryAfter = max(
             1,
-            ($windowStartedAt + $windowSeconds) - time()
+            (int)($row['retry_after'] ?? $windowSeconds)
         );
 
         header(
-            'Retry-After: ' . $retryAfter
+            'X-RateLimit-Limit: ' . $maxAttempts
         );
 
-        ResponseHelper::fail(
-            'Demasiados intentos. Esperá unos minutos y volvé a intentar.',
-            429
+        header(
+            'X-RateLimit-Remaining: ' . $remaining
         );
+
+        if ($attempts >= $maxAttempts) {
+            header(
+                'Retry-After: ' . $retryAfter
+            );
+
+            ResponseHelper::fail(
+                'Por seguridad, pausamos temporalmente los intentos de inicio de sesión. Podrás volver a probar en ' .
+                    $retryAfter .
+                    ' segundos.',
+                429,
+                [
+                    'code' => 'RATE_LIMIT_EXCEEDED',
+                    'retry_after' => $retryAfter,
+                    'remaining_attempts' => 0,
+                ]
+            );
+        }
+
+        return [
+            'attempts' => $attempts,
+            'remaining' => $remaining,
+            'retry_after' => $retryAfter,
+        ];
     }
 
     /**

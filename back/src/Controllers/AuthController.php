@@ -80,12 +80,13 @@ class AuthController
         $loginIdentifier =
             $emailNormalized . '|' . $clientIp;
 
-        SecurityRateLimitService::hit(
-            'auth_login_email_ip',
-            $loginIdentifier,
-            5,
-            15 * 60
-        );
+        $loginRateLimit =
+            SecurityRateLimitService::hit(
+                'auth_login_email_ip',
+                $loginIdentifier,
+                5,
+                15 * 60
+            );
 
         /*
          * Segundo límite:
@@ -106,11 +107,32 @@ class AuthController
             );
 
         if ($result === false) {
+            $remainingAttempts =
+                (int)($loginRateLimit['remaining'] ?? 0);
+
+            if ($remainingAttempts === 1) {
+                $message =
+                    'El email o la contraseña no coinciden. Por seguridad, te queda 1 intento antes de pausar temporalmente el acceso durante 15 minutos.';
+            } elseif ($remainingAttempts === 2) {
+                $message =
+                    'El email o la contraseña no coinciden. Te quedan 2 intentos antes de que el acceso se pause temporalmente durante 15 minutos.';
+            } else {
+                $message =
+                    'El email o la contraseña no coinciden. Revisá los datos ingresados y volvé a intentar.';
+            }
+
             ResponseHelper::fail(
-                'Credenciales inválidas',
-                401
+                $message,
+                401,
+                [
+                    'code' => 'INVALID_CREDENTIALS',
+                    'remaining_attempts' =>
+                    $remainingAttempts,
+                ]
             );
         }
+
+
 
         if (
             is_array($result) &&
