@@ -31,7 +31,25 @@ export default function Login() {
       toast.success("Sesión iniciada correctamente.");
       nav("/gate", { replace: true });
     } catch (e) {
-      toast.error(getErrorMessage(e, "No se pudo iniciar sesión"));
+      const message = getErrorMessage(e, "No se pudo iniciar sesión");
+
+      if (String(message).toLowerCase().includes("suspendido")) {
+        toast.error(
+          "Cuenta suspendida. El acceso de esta inmobiliaria fue suspendido por el administrador.",
+        );
+
+        return;
+      }
+
+      if (String(message).toLowerCase().includes("desactivado")) {
+        toast.error(
+          "Usuario desactivado. Esta cuenta no tiene acceso habilitado a PermuOK.",
+        );
+
+        return;
+      }
+
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }

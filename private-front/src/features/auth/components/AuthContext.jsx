@@ -45,20 +45,46 @@ export function AuthProvider({ children }) {
         setError(null);
 
         const res = await api.get("/me");
+
         const payload = unwrap(res);
 
         setMe(payload);
+
         return payload;
-      } catch {
+      } catch (e) {
+        const message = getErrorMessage(e, "No se pudo cargar la sesión");
+
         clearTokens();
         setMe(null);
-        return null;
+
+        if (String(message).toLowerCase().includes("inmobiliaria suspendida")) {
+          const suspendedError = new Error(
+            "El acceso de esta inmobiliaria fue suspendido por el administrador.",
+          );
+
+          suspendedError.code = "REAL_ESTATE_SUSPENDED";
+
+          throw suspendedError;
+        }
+
+        if (String(message).toLowerCase().includes("usuario inactivo")) {
+          const inactiveError = new Error(
+            "Tu usuario se encuentra desactivado.",
+          );
+
+          inactiveError.code = "USER_INACTIVE";
+
+          throw inactiveError;
+        }
+
+        throw e;
       } finally {
         loadMeInFlight.current = null;
       }
     })();
 
     loadMeInFlight.current = p;
+
     return p;
   }
 
@@ -90,11 +116,9 @@ export function AuthProvider({ children }) {
         refresh_token: payload.refresh_token,
       });
 
-      const current = await loadMe({ force: true });
-
-      if (!current) {
-        throw new Error("No se pudo cargar la sesión del usuario");
-      }
+      const current = await loadMe({
+        force: true,
+      });
 
       return current;
     } catch (e) {
@@ -165,6 +189,40 @@ export function AuthProvider({ children }) {
         setLoading(false);
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    function handleBlockedSession(event) {
+      const detail = event?.detail || {};
+
+      clearTokens();
+      setMe(null);
+
+      if (detail.reason === "real_estate_suspended") {
+        setError(
+          "El acceso de esta inmobiliaria fue suspendido por el administrador.",
+        );
+
+        return;
+      }
+
+      if (detail.reason === "user_inactive") {
+        setError("Tu usuario se encuentra desactivado.");
+
+        return;
+      }
+
+      setError("Tu sesión ya no se encuentra habilitada.");
+    }
+
+    window.addEventListener("permuok:session-blocked", handleBlockedSession);
+
+    return () => {
+      window.removeEventListener(
+        "permuok:session-blocked",
+        handleBlockedSession,
+      );
+    };
   }, []);
 
   const user = me?.user ?? null;

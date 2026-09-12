@@ -1,5 +1,4 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "");
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "");
 
 if (!API_BASE_URL) {
   throw new Error("VITE_API_BASE_URL no está configurada");
@@ -130,6 +129,43 @@ function buildError(res, data) {
   return err;
 }
 
+function handleBlockedAccountResponse(res, data) {
+  if (res.status !== 403) {
+    return;
+  }
+
+  const message =
+    data && typeof data === "object"
+      ? String(data.message || data.error || "")
+      : String(data || "");
+
+  const normalizedMessage = message.toLowerCase().trim();
+
+  const isSuspended = normalizedMessage.includes("inmobiliaria suspendida");
+
+  const isInactiveUser = normalizedMessage.includes("usuario inactivo");
+
+  if (!isSuspended && !isInactiveUser) {
+    return;
+  }
+
+  clearTokens();
+
+  const publicMessage = isSuspended
+    ? "El acceso de esta inmobiliaria fue suspendido por el administrador."
+    : "Tu usuario se encuentra desactivado.";
+
+  window.dispatchEvent(
+    new CustomEvent("permuok:session-blocked", {
+      detail: {
+        reason: isSuspended ? "real_estate_suspended" : "user_inactive",
+
+        message: publicMessage,
+      },
+    }),
+  );
+}
+
 async function doRefresh() {
   const refreshToken = getRefreshToken();
 
@@ -245,6 +281,8 @@ async function request(
   const data = await parseResponse(res);
 
   if (!res.ok) {
+    handleBlockedAccountResponse(res, data);
+
     throw buildError(res, data);
   }
 
