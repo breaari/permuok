@@ -556,7 +556,8 @@ class AdminRealEstateService
             'id' => $realEstateId,
         ]);
 
-        $realEstate = $st->fetch(PDO::FETCH_ASSOC);
+        $realEstate =
+            $st->fetch(PDO::FETCH_ASSOC);
 
         if (!$realEstate) {
             throw new \Exception(
@@ -565,28 +566,44 @@ class AdminRealEstateService
         }
 
         $profileStatus =
-            (int)($realEstate['profile_status'] ?? 0);
+            (int)(
+                $realEstate['profile_status']
+                ?? 0
+            );
+
+        $allowedProfileStatuses = [
+            RealEstateProfileStatus::APPROVED,
+            RealEstateProfileStatus::CHANGES_PENDING,
+        ];
 
         if (
-            $profileStatus !==
-            RealEstateProfileStatus::APPROVED
+            !in_array(
+                $profileStatus,
+                $allowedProfileStatuses,
+                true
+            )
         ) {
             throw new \Exception(
-                "Sólo se puede suspender o reactivar una inmobiliaria aprobada"
+                "Sólo se puede suspender o reactivar una inmobiliaria previamente aprobada"
             );
         }
 
-        $newStatus = $isActive ? 1 : 0;
+        $newStatus =
+            $isActive
+            ? 1
+            : 0;
 
         if (
-            (int)$realEstate['status'] ===
-            $newStatus
+            (int)$realEstate['status']
+            === $newStatus
         ) {
             return [
                 'real_estate_id' =>
                 $realEstateId,
+
                 'status' =>
                 $newStatus,
+
                 'changed' =>
                 false,
             ];
@@ -601,15 +618,20 @@ class AdminRealEstateService
     ");
 
         $st->execute([
-            'status' => $newStatus,
-            'id' => $realEstateId,
+            'status' =>
+            $newStatus,
+
+            'id' =>
+            $realEstateId,
         ]);
 
         return [
             'real_estate_id' =>
             $realEstateId,
+
             'status' =>
             $newStatus,
+
             'changed' =>
             true,
         ];

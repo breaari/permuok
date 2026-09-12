@@ -41,6 +41,11 @@ export default function AdminRealEstateDetail() {
   const isPendingReview =
     stage === "initial_review" || stage === "changes_pending";
   const isChangesPending = stage === "changes_pending";
+
+  const canManageOperationalStatus =
+    stage === "approved" || stage === "changes_pending";
+
+  const isOperationallyActive = Number(re?.status) === 1;
   const showMembershipCard =
     stage === "approved" || stage === "changes_pending";
 
@@ -119,6 +124,46 @@ export default function AdminRealEstateDetail() {
       await load();
     } catch (e) {
       setErr(e?.data?.message || e?.message || "No se pudo rechazar");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleOperationalStatus() {
+    if (!re?.id || !canManageOperationalStatus) {
+      return;
+    }
+
+    const nextIsActive = !isOperationallyActive;
+
+    const confirmed = window.confirm(
+      nextIsActive
+        ? `¿Querés reactivar la inmobiliaria "${re?.name || ""}"? Sus usuarios volverán a poder operar en la plataforma.`
+        : `¿Querés suspender la inmobiliaria "${re?.name || ""}"? La inmobiliaria, sus agentes y sus inversores dejarán de poder operar inmediatamente.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setBusy(true);
+    setErr("");
+
+    try {
+      await api.post("/admin/real-estates/operational-status", {
+        real_estate_id: re.id,
+        is_active: nextIsActive,
+      });
+
+      await load();
+    } catch (e) {
+      setErr(
+        e?.data?.message ||
+          e?.message ||
+          (nextIsActive
+            ? "No se pudo reactivar la inmobiliaria."
+            : "No se pudo suspender la inmobiliaria."),
+      );
     } finally {
       setBusy(false);
     }
@@ -220,30 +265,60 @@ export default function AdminRealEstateDetail() {
               <AdminLicensesSection licenses={licenses} />
 
               <AdminAdministrativeStatusCard
-                isActive={stage === "rejected" ? 0 : 1}
-                deactivatedAt={re?.validated_at}
-                deactivationReason={re?.validation_note}
+                isActive={isOperationallyActive ? 1 : 0}
                 formatDate={formatDate}
                 statusLabel={(value) =>
-                  Number(value) === 1 ? "Activa" : "Rechazada"
+                  Number(value) === 1 ? "Activa" : "Suspendida"
                 }
-                actionLabel={null}
                 compact={true}
                 customStatusLabel={
-                  stage === "rejected" ? "Rechazada" : "Activa"
+                  stage === "rejected"
+                    ? "Rechazada"
+                    : canManageOperationalStatus
+                      ? isOperationallyActive
+                        ? "Activa"
+                        : "Suspendida"
+                      : "Pendiente"
                 }
-                customStatusTone={stage === "rejected" ? "danger" : "success"}
+                customStatusTone={
+                  stage === "rejected"
+                    ? "danger"
+                    : canManageOperationalStatus
+                      ? isOperationallyActive
+                        ? "success"
+                        : "warning"
+                      : "neutral"
+                }
                 customNote={
                   stage === "rejected"
                     ? re?.validation_note
                       ? `"${re.validation_note}"`
-                      : "—"
-                    : "La cuenta se encuentra operativa a nivel administrativo."
+                      : "La solicitud fue rechazada."
+                    : canManageOperationalStatus
+                      ? isOperationallyActive
+                        ? "La cuenta se encuentra operativa. Sus usuarios pueden utilizar la plataforma."
+                        : "La cuenta está suspendida. La inmobiliaria, sus agentes y sus inversores no pueden operar."
+                      : "La inmobiliaria todavía no se encuentra habilitada para operar."
+                }
+                actionLabel={
+                  canManageOperationalStatus
+                    ? isOperationallyActive
+                      ? "Suspender inmobiliaria"
+                      : "Reactivar inmobiliaria"
+                    : null
+                }
+                actionDisabled={busy}
+                onAction={toggleOperationalStatus}
+                actionClassName={
+                  isOperationallyActive
+                    ? "bg-rose-600 hover:bg-rose-700 text-white"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white"
                 }
                 showDeactivatedBy={false}
                 showDeactivatedAt={false}
                 showDeactivationReason={true}
               />
+              
               {showMembershipCard && (
                 <AdminMembershipCard
                   membership={re?.membership}
