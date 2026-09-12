@@ -62,8 +62,6 @@ use App\Controllers\ConversationController;
 use App\Controllers\NotificationController;
 use App\Controllers\RealtimeController;
 use App\Controllers\AdminDashboardController;
-use App\Controllers\AiEnrichmentController;
-use App\Controllers\AiCompatibilityController;
 use App\Controllers\CompatibilityController;
 use App\Controllers\AdminSystemController;
 
@@ -769,58 +767,7 @@ if ($method === 'POST' && preg_match('#^/conversations/(\d+)/unarchive$#', $uri,
     ConversationController::unarchive((int)$m[1]);
     exit;
 }
-if (
-    $method === 'POST' &&
-    preg_match(
-        '#^/ai/properties/(\d+)/analyze$#',
-        $uri,
-        $matches
-    )
-) {
-    AiEnrichmentController::analyzeProperty(
-        (int)$matches[1]
-    );
-    exit;
-}
-if (
-    $method === 'GET' &&
-    preg_match(
-        '#^/ai/properties/(\d+)/analysis$#',
-        $uri,
-        $matches
-    )
-) {
-    AiEnrichmentController::propertyAnalysis(
-        (int)$matches[1]
-    );
-    exit;
-}
-if (
-    $method === 'POST' &&
-    preg_match(
-        '#^/ai/search-requests/(\d+)/analyze$#',
-        $uri,
-        $matches
-    )
-) {
-    AiEnrichmentController::analyzeSearchRequest(
-        (int)$matches[1]
-    );
-    exit;
-}
-if (
-    $method === 'GET' &&
-    preg_match(
-        '#^/ai/search-requests/(\d+)/analysis$#',
-        $uri,
-        $matches
-    )
-) {
-    AiEnrichmentController::searchRequestAnalysis(
-        (int)$matches[1]
-    );
-    exit;
-}
+
 if (
     $method === 'POST' &&
     preg_match(
@@ -903,27 +850,10 @@ if (
     exit;
 }
 
-if (
-    $method === 'POST' &&
-    preg_match(
-        '#^/ai/compatibilities/search-requests/(\d+)/calculate$#',
-        $uri,
-        $matches
-    )
-) {
-    AiCompatibilityController::calculateForSearchRequest(
-        (int)$matches[1]
-    );
-    exit;
-}
 http_response_code(404);
+
 echo json_encode([
-    'error' => 'Ruta no encontrada',
-    'debug' => [
-        'method' => $method,
-        'uri' => $uri,
-        'key' => $key,
-        'request_uri' => $_SERVER['REQUEST_URI'] ?? null,
-        'script_name' => $_SERVER['SCRIPT_NAME'] ?? null,
-    ],
+    'success' => false,
+    'status' => 404,
+    'message' => 'Ruta no encontrada',
 ]);
