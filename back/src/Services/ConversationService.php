@@ -45,7 +45,8 @@ class ConversationService
         $ownerUserId =
             self::findOpportunityOwner(
                 $type,
-                $opportunityId
+                $opportunityId,
+                $userId
             );
 
         if (!$ownerUserId) {
@@ -2899,29 +2900,107 @@ THEN 1
         }
     }
 
-    private static function findOpportunityOwner(string $type, int $id): ?int
-    {
+    private static function findOpportunityOwner(
+        string $type,
+        int $id,
+        int $requesterUserId
+    ): ?int {
         $pdo = self::db();
 
-        $table = match ($type) {
-            'property' => 'properties',
-            'search_request' => 'search_requests',
-            'development' => 'developments',
+        /*
+     * El tipo ya fue validado por validateOpportunityType().
+     * Usamos una lista cerrada para determinar tabla y visibilidad.
+     */
+        $config = match ($type) {
+            'property' => [
+                'table' => 'properties',
+                'requires_visibility' => true,
+            ],
+            'search_request' => [
+                'table' => 'search_requests',
+                'requires_visibility' => true,
+            ],
+            'development' => [
+                'table' => 'developments',
+                'requires_visibility' => false,
+            ],
         };
 
-        $stmt = $pdo->prepare("
-            SELECT created_by_user_id
-            FROM {$table}
-            WHERE id = :id
-              AND deleted_at IS NULL
-            LIMIT 1
-        ");
+        $table = $config['table'];
 
-        $stmt->execute([':id' => $id]);
+        $visibilityCondition =
+            $config['requires_visibility']
+            ? 'AND opportunity.is_visible = 1'
+            : '';
+
+        /*
+     * Obtenemos la inmobiliaria actual del solicitante.
+     */
+        $requesterStmt = $pdo->prepare("
+        SELECT real_estate_id
+        FROM users
+        WHERE id = :user_id
+          AND is_active = 1
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $requesterStmt->execute([
+            ':user_id' => $requesterUserId,
+        ]);
+
+        $requesterRealEstateId =
+            (int)($requesterStmt->fetchColumn() ?: 0);
+
+        if ($requesterRealEstateId <= 0) {
+            throw new Exception(
+                'El usuario no está vinculado a una inmobiliaria.',
+                403
+            );
+        }
+
+        /*
+     * La publicación debe:
+     *
+     * - estar publicada;
+     * - estar visible, cuando corresponde;
+     * - pertenecer a otra inmobiliaria;
+     * - pertenecer a una inmobiliaria activa;
+     * - tener un usuario propietario activo.
+     */
+        $stmt = $pdo->prepare("
+        SELECT owner.id
+        FROM {$table} opportunity
+
+        INNER JOIN users owner
+            ON owner.id = opportunity.created_by_user_id
+           AND owner.is_active = 1
+           AND owner.deleted_at IS NULL
+
+        INNER JOIN real_estates real_estate
+            ON real_estate.id = opportunity.real_estate_id
+           AND real_estate.status = 1
+           AND real_estate.deleted_at IS NULL
+
+        WHERE opportunity.id = :id
+          AND opportunity.status = 'published'
+          AND opportunity.deleted_at IS NULL
+          {$visibilityCondition}
+          AND opportunity.real_estate_id <> :requester_real_estate_id
+
+        LIMIT 1
+    ");
+
+        $stmt->execute([
+            ':id' => $id,
+            ':requester_real_estate_id' => $requesterRealEstateId,
+        ]);
 
         $ownerId = $stmt->fetchColumn();
 
-        return $ownerId ? (int)$ownerId : null;
+        return $ownerId
+            ? (int)$ownerId
+            : null;
     }
 
     private static function buildConversationSubject(string $type, int $id): string
@@ -3120,7 +3199,7 @@ THEN 1
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
-    
+
     private static function getOtherParticipantIds(
         int $conversationId,
         int $userId
