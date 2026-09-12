@@ -83,8 +83,9 @@ export default function AdminUserStatusModal({
             </>
           ) : (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              Al activar este usuario, esta cuenta volverá a tener acceso a la
-              plataforma.
+              Se habilitará nuevamente esta cuenta de usuario. El acceso
+              efectivo también dependerá del estado operativo y la membresía de
+              la inmobiliaria asociada.
             </div>
           )}
 

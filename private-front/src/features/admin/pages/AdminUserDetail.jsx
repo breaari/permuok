@@ -233,16 +233,23 @@ export default function AdminUserDetail() {
                     : "bg-primary hover:bg-primary/90 text-white"
                 }
               />
-
-              <AdminMembershipCard
-                membership={detail?.membership}
-                membershipStatus={detail?.membership_status}
-                membershipLabel={membershipLabel}
-                membershipTone={membershipTone}
-                formatDate={formatDate}
-                onViewMore={() => navigate("/admin/users")}
-                emptyMessage="Este usuario no tiene una membresía activa asociada."
-              />
+              {isRealEstateUser && (
+                <AdminMembershipCard
+                  membership={detail?.membership}
+                  membershipStatus={detail?.membership_status}
+                  membershipLabel={membershipLabel}
+                  membershipTone={membershipTone}
+                  formatDate={formatDate}
+                  onViewMore={() =>
+                    navigate(
+                      `/admin/billing?q=${encodeURIComponent(
+                        detail?.real_estate_name || "",
+                      )}`,
+                    )
+                  }
+                  emptyMessage="Esta inmobiliaria no tiene una membresía activa asociada."
+                />
+              )}
             </div>
           </div>
         )}
