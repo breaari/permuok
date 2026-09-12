@@ -170,24 +170,31 @@ class AuthService
         }
     }
 
-    private static function realEstateAccess(int $userId): array
-    {
+    private static function realEstateAccess(
+        int $userId
+    ): array {
         $pdo = self::db();
 
         $stmt = $pdo->prepare("
-            SELECT
-                r.id,
-                r.status,
-                r.profile_status,
-                r.validation_note,
-                r.review_requested_at,
-                r.changes_requested_at
-            FROM real_estates r
-            JOIN users u ON u.real_estate_id = r.id
-            WHERE u.id = :user_id
-            LIMIT 1
-        ");
-        $stmt->execute(['user_id' => $userId]);
+        SELECT
+            r.id,
+            r.status,
+            r.profile_status,
+            r.validation_note,
+            r.review_requested_at,
+            r.changes_requested_at
+        FROM real_estates r
+        JOIN users u
+            ON u.real_estate_id = r.id
+        WHERE u.id = :user_id
+          AND r.deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $stmt->execute([
+            'user_id' => $userId,
+        ]);
+
         $realEstate = $stmt->fetch();
 
         if (!$realEstate) {
@@ -200,92 +207,230 @@ class AuthService
             ];
         }
 
-        $realEstateSummary = self::getRealEstateSummary((int)$realEstate['id']);
-        $profileStatus = (int)($realEstate['profile_status'] ?? self::PROFILE_DRAFT);
+        $realEstateSummary =
+            self::getRealEstateSummary(
+                (int)$realEstate['id']
+            );
 
-        if ($profileStatus === self::PROFILE_DRAFT) {
+        $profileStatus =
+            (int)(
+                $realEstate['profile_status']
+                ?? self::PROFILE_DRAFT
+            );
+
+        if (
+            $profileStatus ===
+            self::PROFILE_DRAFT
+        ) {
             return [
                 'level' => 'real_estate_draft',
                 'limits' => null,
                 'usage' => null,
                 'features' => [],
-                'real_estate' => $realEstateSummary,
+                'real_estate' =>
+                $realEstateSummary,
             ];
         }
 
-        if ($profileStatus === self::PROFILE_INITIAL_REVIEW) {
+        if (
+            $profileStatus ===
+            self::PROFILE_INITIAL_REVIEW
+        ) {
             return [
                 'level' => 'real_estate_review',
                 'limits' => null,
                 'usage' => null,
                 'features' => [],
-                'real_estate' => $realEstateSummary,
+                'real_estate' =>
+                $realEstateSummary,
             ];
         }
 
-        if ($profileStatus === self::PROFILE_REJECTED) {
+        if (
+            $profileStatus ===
+            self::PROFILE_REJECTED
+        ) {
             return [
                 'level' => 'real_estate_rejected',
                 'limits' => null,
                 'usage' => null,
                 'features' => [],
-                'real_estate' => $realEstateSummary,
+                'real_estate' =>
+                $realEstateSummary,
             ];
         }
 
-        $membership = self::getActiveMembership((int)$realEstate['id']);
+        /*
+    |--------------------------------------------------------------------------
+    | SUSPENSIÓN ADMINISTRATIVA
+    |--------------------------------------------------------------------------
+    */
+
+        if ((int)$realEstate['status'] !== 1) {
+            return [
+                'level' =>
+                'real_estate_suspended',
+                'limits' =>
+                null,
+                'usage' =>
+                null,
+                'features' =>
+                [],
+                'real_estate' =>
+                $realEstateSummary,
+            ];
+        }
+
+        $membership =
+            self::getActiveMembership(
+                (int)$realEstate['id']
+            );
 
         if (!$membership) {
             return [
-                'level' => $profileStatus === self::PROFILE_CHANGES_PENDING
+                'level' =>
+                $profileStatus ===
+                    self::PROFILE_CHANGES_PENDING
                     ? 'real_estate_unpaid_changes_pending'
                     : 'real_estate_unpaid',
-                'limits' => null,
-                'usage' => null,
+
+                'limits' =>
+                null,
+
+                'usage' =>
+                null,
+
                 'features' => [
-                    'profile_changes_pending' => $profileStatus === self::PROFILE_CHANGES_PENDING,
+                    'profile_changes_pending' =>
+                    $profileStatus ===
+                        self::PROFILE_CHANGES_PENDING,
                 ],
-                'real_estate' => $realEstateSummary,
+
+                'real_estate' =>
+                $realEstateSummary,
             ];
         }
 
-        $usage = self::getRealEstateUsage((int)$realEstate['id']);
+        $usage =
+            self::getRealEstateUsage(
+                (int)$realEstate['id']
+            );
 
         return [
-            'level' => $profileStatus === self::PROFILE_CHANGES_PENDING
+            'level' =>
+            $profileStatus ===
+                self::PROFILE_CHANGES_PENDING
                 ? 'real_estate_active_changes_pending'
                 : 'real_estate_active',
+
             'limits' => [
-                'real_estate_users' => (int)($membership['max_users'] ?? 1),
-                'agents' => (int)$membership['max_agents'],
-                'investors' => (int)$membership['max_investors'],
+                'real_estate_users' =>
+                (int)(
+                    $membership['max_users']
+                    ?? 1
+                ),
+
+                'agents' =>
+                (int)$membership['max_agents'],
+
+                'investors' =>
+                (int)$membership['max_investors'],
             ],
-            'usage' => $usage,
+
+            'usage' =>
+            $usage,
+
             'features' => [
-                'publish_projects' => (bool)$membership['can_publish_projects'],
-                'view_projects' => (bool)$membership['can_view_projects'],
-                'profile_changes_pending' => $profileStatus === self::PROFILE_CHANGES_PENDING,
+                'publish_projects' =>
+                (bool)$membership['can_publish_projects'],
+
+                'view_projects' =>
+                (bool)$membership['can_view_projects'],
+
+                'profile_changes_pending' =>
+                $profileStatus ===
+                    self::PROFILE_CHANGES_PENDING,
             ],
+
             'membership' => [
-                'id' => (int)$membership['id'],
-                'plan_id' => isset($membership['plan_id']) ? (int)$membership['plan_id'] : null,
-                'scheduled_plan_id' => isset($membership['scheduled_plan_id']) && $membership['scheduled_plan_id'] !== null
+                'id' =>
+                (int)$membership['id'],
+
+                'plan_id' =>
+                isset($membership['plan_id'])
+                    ? (int)$membership['plan_id']
+                    : null,
+
+                'scheduled_plan_id' =>
+                isset(
+                    $membership['scheduled_plan_id']
+                )
+                    &&
+                    $membership['scheduled_plan_id'] !== null
                     ? (int)$membership['scheduled_plan_id']
                     : null,
-                'start_date' => $membership['start_date'] ?? null,
-                'end_date' => $membership['end_date'] ?? null,
-                'status' => (int)($membership['status'] ?? 0),
-                'cancel_at_period_end' => (int)($membership['cancel_at_period_end'] ?? 0),
-                'cancelled_at' => $membership['cancelled_at'] ?? null,
-                'scheduled_change_at' => $membership['scheduled_change_at'] ?? null,
+
+                'start_date' =>
+                $membership['start_date'] ?? null,
+
+                'end_date' =>
+                $membership['end_date'] ?? null,
+
+                'status' =>
+                (int)(
+                    $membership['status'] ?? 0
+                ),
+
+                'cancel_at_period_end' =>
+                (int)(
+                    $membership['cancel_at_period_end'] ?? 0
+                ),
+
+                'cancelled_at' =>
+                $membership['cancelled_at'] ?? null,
+
+                'scheduled_change_at' =>
+                $membership['scheduled_change_at'] ?? null,
             ],
-            'real_estate' => $realEstateSummary,
+
+            'real_estate' =>
+            $realEstateSummary,
         ];
     }
 
-    private static function agentAccess($realEstateId): array
-    {
-        $realEstateId = $realEstateId !== null ? (int)$realEstateId : null;
+    private static function isRealEstateActive(
+        int $realEstateId
+    ): bool {
+        $pdo = self::db();
+
+        $stmt = $pdo->prepare("
+        SELECT status
+        FROM real_estates
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $stmt->execute([
+            'id' => $realEstateId,
+        ]);
+
+        $row = $stmt->fetch();
+
+        if (!$row) {
+            return false;
+        }
+
+        return (int)$row['status'] === 1;
+    }
+
+    private static function agentAccess(
+        $realEstateId
+    ): array {
+        $realEstateId =
+            $realEstateId !== null
+            ? (int)$realEstateId
+            : null;
 
         if (!$realEstateId) {
             return [
@@ -297,7 +442,31 @@ class AuthService
             ];
         }
 
-        $membership = self::getActiveMembership($realEstateId);
+        if (
+            !self::isRealEstateActive(
+                $realEstateId
+            )
+        ) {
+            return [
+                'level' =>
+                'agent_real_estate_suspended',
+                'limits' =>
+                null,
+                'usage' =>
+                null,
+                'features' =>
+                [],
+                'real_estate' =>
+                self::getRealEstateSummary(
+                    $realEstateId
+                ),
+            ];
+        }
+
+        $membership =
+            self::getActiveMembership(
+                $realEstateId
+            );
 
         if (!$membership) {
             return [
@@ -305,56 +474,129 @@ class AuthService
                 'limits' => null,
                 'usage' => null,
                 'features' => [],
-                'real_estate' => self::getRealEstateSummary($realEstateId),
+                'real_estate' =>
+                self::getRealEstateSummary(
+                    $realEstateId
+                ),
             ];
         }
 
         return [
-            'level' => 'agent_active',
-            'limits' => null,
-            'usage' => null,
+            'level' =>
+            'agent_active',
+
+            'limits' =>
+            null,
+
+            'usage' =>
+            null,
+
             'features' => [
-                'publish_projects' => (bool)($membership['can_publish_projects'] ?? false),
-                'view_projects'    => (bool)($membership['can_view_projects'] ?? false),
+                'publish_projects' =>
+                (bool)(
+                    $membership['can_publish_projects'] ?? false
+                ),
+
+                'view_projects' =>
+                (bool)(
+                    $membership['can_view_projects'] ?? false
+                ),
             ],
-            'real_estate' => self::getRealEstateSummary($realEstateId),
+
+            'real_estate' =>
+            self::getRealEstateSummary(
+                $realEstateId
+            ),
         ];
     }
 
-    private static function investorAccess($realEstateId): array
-    {
-        $realEstateId = $realEstateId !== null ? (int)$realEstateId : null;
+    private static function investorAccess(
+        $realEstateId
+    ): array {
+        $realEstateId =
+            $realEstateId !== null
+            ? (int)$realEstateId
+            : null;
 
         if (!$realEstateId) {
             return [
-                'level' => 'investor_unlinked',
-                'limits' => null,
-                'usage' => null,
-                'features' => [],
-                'real_estate' => null,
+                'level' =>
+                'investor_unlinked',
+                'limits' =>
+                null,
+                'usage' =>
+                null,
+                'features' =>
+                [],
+                'real_estate' =>
+                null,
             ];
         }
 
-        $membership = self::getActiveMembership($realEstateId);
+        if (
+            !self::isRealEstateActive(
+                $realEstateId
+            )
+        ) {
+            return [
+                'level' =>
+                'investor_real_estate_suspended',
+                'limits' =>
+                null,
+                'usage' =>
+                null,
+                'features' =>
+                [],
+                'real_estate' =>
+                self::getRealEstateSummary(
+                    $realEstateId
+                ),
+            ];
+        }
+
+        $membership =
+            self::getActiveMembership(
+                $realEstateId
+            );
 
         if (!$membership) {
             return [
-                'level' => 'investor_restricted',
-                'limits' => null,
-                'usage' => null,
-                'features' => [],
-                'real_estate' => self::getRealEstateSummary($realEstateId),
+                'level' =>
+                'investor_restricted',
+                'limits' =>
+                null,
+                'usage' =>
+                null,
+                'features' =>
+                [],
+                'real_estate' =>
+                self::getRealEstateSummary(
+                    $realEstateId
+                ),
             ];
         }
 
         return [
-            'level' => 'investor_active',
-            'limits' => null,
-            'usage' => null,
+            'level' =>
+            'investor_active',
+
+            'limits' =>
+            null,
+
+            'usage' =>
+            null,
+
             'features' => [
-                'view_projects' => (bool)($membership['can_view_projects'] ?? false),
+                'view_projects' =>
+                (bool)(
+                    $membership['can_view_projects'] ?? false
+                ),
             ],
-            'real_estate' => self::getRealEstateSummary($realEstateId),
+
+            'real_estate' =>
+            self::getRealEstateSummary(
+                $realEstateId
+            ),
         ];
     }
 
