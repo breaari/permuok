@@ -207,4 +207,78 @@ class AdminRealEstateController
             );
         }
     }
+
+    public static function operationalCounts(): void
+    {
+        try {
+            self::requireAdmin();
+
+            $q =
+                isset($_GET['q'])
+                ? (string)$_GET['q']
+                : null;
+
+            $counts =
+                AdminRealEstateService::operationalCounts(
+                    $q
+                );
+
+            ResponseHelper::ok([
+                'counts' =>
+                $counts,
+            ]);
+        } catch (\Throwable $e) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                500
+            );
+        }
+    }
+
+    public static function operationalList(): void
+    {
+        try {
+            self::requireAdmin();
+
+            $status =
+                (string)(
+                    $_GET['status']
+                    ?? 'all'
+                );
+
+            $page =
+                (int)(
+                    $_GET['page']
+                    ?? 1
+                );
+
+            $perPage =
+                (int)(
+                    $_GET['per_page']
+                    ?? 10
+                );
+
+            $q =
+                isset($_GET['q'])
+                ? (string)$_GET['q']
+                : null;
+
+            $data =
+                AdminRealEstateService::operationalList(
+                    $status,
+                    $page,
+                    $perPage,
+                    $q
+                );
+
+            ResponseHelper::ok(
+                $data
+            );
+        } catch (\Throwable $e) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                422
+            );
+        }
+    }
 }

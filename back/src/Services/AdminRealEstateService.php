@@ -237,6 +237,455 @@ class AdminRealEstateService
         ];
     }
 
+    public static function operationalCounts(
+        ?string $q = null
+    ): array {
+        $pdo = self::db();
+
+        $params = [];
+        $whereQ =
+            self::buildSearchWhere(
+                $q,
+                $params
+            );
+
+        $sql = "
+        SELECT
+            SUM(
+                CASE
+                    WHEN r.status = 1
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS active,
+
+            SUM(
+                CASE
+                    WHEN r.status = 0
+                    AND r.profile_status IN (
+                        :approved,
+                        :changes_pending
+                    )
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS suspended,
+
+            COUNT(*) AS total
+
+        FROM real_estates r
+
+        WHERE r.deleted_at IS NULL
+          AND r.profile_status IN (
+              :approved_filter,
+              :changes_pending_filter
+          )
+
+        {$whereQ}
+    ";
+
+        $st = $pdo->prepare($sql);
+
+        $st->execute([
+            ...$params,
+
+            'approved' =>
+            RealEstateProfileStatus::APPROVED,
+
+            'changes_pending' =>
+            RealEstateProfileStatus::CHANGES_PENDING,
+
+            'approved_filter' =>
+            RealEstateProfileStatus::APPROVED,
+
+            'changes_pending_filter' =>
+            RealEstateProfileStatus::CHANGES_PENDING,
+        ]);
+
+        $row =
+            $st->fetch(PDO::FETCH_ASSOC)
+            ?: [];
+
+        return [
+            'total' =>
+            (int)($row['total'] ?? 0),
+
+            'active' =>
+            (int)($row['active'] ?? 0),
+
+            'suspended' =>
+            (int)($row['suspended'] ?? 0),
+        ];
+    }
+
+    public static function operationalList(
+        string $status,
+        int $page,
+        int $perPage,
+        ?string $q = null
+    ): array {
+        $pdo = self::db();
+
+        $page =
+            max(1, $page);
+
+        $perPage =
+            min(
+                max(1, $perPage),
+                50
+            );
+
+        $status =
+            strtolower(
+                trim($status)
+            );
+
+        if (
+            !in_array(
+                $status,
+                [
+                    'all',
+                    'active',
+                    'suspended',
+                ],
+                true
+            )
+        ) {
+            $status = 'all';
+        }
+
+        $params = [];
+
+        $where = "
+        r.deleted_at IS NULL
+
+        AND r.profile_status IN (
+            :approved,
+            :changes_pending
+        )
+    ";
+
+        $params['approved'] =
+            RealEstateProfileStatus::APPROVED;
+
+        $params['changes_pending'] =
+            RealEstateProfileStatus::CHANGES_PENDING;
+
+        $where .=
+            self::buildSearchWhere(
+                $q,
+                $params
+            );
+
+        if ($status === 'active') {
+            $where .= "
+            AND r.status = 1
+        ";
+        }
+
+        if ($status === 'suspended') {
+            $where .= "
+            AND r.status = 0
+        ";
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Total
+    |--------------------------------------------------------------------------
+    */
+
+        $countSql = "
+        SELECT COUNT(*)
+
+        FROM real_estates r
+
+        WHERE {$where}
+    ";
+
+        $countSt =
+            $pdo->prepare(
+                $countSql
+            );
+
+        foreach (
+            $params as $key => $value
+        ) {
+            $countSt->bindValue(
+                ':' . $key,
+                $value
+            );
+        }
+
+        $countSt->execute();
+
+        $total =
+            (int)$countSt->fetchColumn();
+
+        $offset =
+            ($page - 1)
+            * $perPage;
+
+        /*
+    |--------------------------------------------------------------------------
+    | Listado
+    |--------------------------------------------------------------------------
+    */
+
+        $sql = "
+        SELECT
+            r.id,
+            r.name,
+            r.legal_name,
+            r.cuit,
+            r.email,
+            r.phone,
+            r.address,
+            r.status,
+            r.profile_status,
+            r.approved_at,
+            r.created_at,
+
+            (
+                SELECT COUNT(*)
+                FROM users u
+                WHERE u.real_estate_id = r.id
+                  AND u.deleted_at IS NULL
+            ) AS users_count,
+
+            (
+                SELECT COUNT(*)
+                FROM properties p
+                WHERE p.real_estate_id = r.id
+                  AND p.deleted_at IS NULL
+            ) AS properties_count,
+
+            (
+                SELECT COUNT(*)
+                FROM search_requests sr
+                WHERE sr.real_estate_id = r.id
+                  AND sr.deleted_at IS NULL
+            ) AS search_requests_count,
+
+            (
+                SELECT COUNT(*)
+                FROM developments d
+                WHERE d.real_estate_id = r.id
+                  AND d.deleted_at IS NULL
+            ) AS developments_count,
+
+            m.id AS membership_id,
+            m.status AS membership_raw_status,
+            m.start_date AS membership_start_date,
+            m.end_date AS membership_end_date,
+
+            pl.id AS plan_id,
+            pl.name AS plan_name,
+            pl.code AS plan_code
+
+        FROM real_estates r
+
+        LEFT JOIN memberships m
+            ON m.id = (
+                SELECT m2.id
+                FROM memberships m2
+                WHERE m2.real_estate_id = r.id
+                  AND m2.deleted_at IS NULL
+                ORDER BY m2.id DESC
+                LIMIT 1
+            )
+
+        LEFT JOIN plans pl
+            ON pl.id = m.plan_id
+
+        WHERE {$where}
+
+        ORDER BY
+            r.name ASC,
+            r.id DESC
+
+        LIMIT {$perPage}
+        OFFSET {$offset}
+    ";
+
+        $st =
+            $pdo->prepare(
+                $sql
+            );
+
+        foreach (
+            $params as $key => $value
+        ) {
+            $st->bindValue(
+                ':' . $key,
+                $value
+            );
+        }
+
+        $st->execute();
+
+        $rows =
+            $st->fetchAll(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        $items =
+            array_map(
+                function (
+                    array $row
+                ): array {
+                    $rawMembershipStatus =
+                        $row['membership_raw_status'] !== null
+                        ? (int)$row['membership_raw_status']
+                        : null;
+
+                    $membershipStatus =
+                        'none';
+
+                    if (
+                        $rawMembershipStatus === 1
+                        &&
+                        !empty($row['membership_end_date'])
+                        &&
+                        $row['membership_end_date'] >= date('Y-m-d')
+                    ) {
+                        $membershipStatus =
+                            'active';
+                    } elseif (
+                        $rawMembershipStatus === 1
+                    ) {
+                        $membershipStatus =
+                            'expired';
+                    } elseif (
+                        $rawMembershipStatus === 0
+                    ) {
+                        $membershipStatus =
+                            'pending';
+                    } elseif (
+                        $rawMembershipStatus === 2
+                    ) {
+                        $membershipStatus =
+                            'expired';
+                    } elseif (
+                        $rawMembershipStatus === 3
+                    ) {
+                        $membershipStatus =
+                            'cancelled';
+                    }
+
+                    return [
+                        'id' =>
+                        (int)$row['id'],
+
+                        'name' =>
+                        $row['name'],
+
+                        'legal_name' =>
+                        $row['legal_name'],
+
+                        'cuit' =>
+                        $row['cuit'],
+
+                        'email' =>
+                        $row['email'],
+
+                        'phone' =>
+                        $row['phone'],
+
+                        'address' =>
+                        $row['address'],
+
+                        'status' =>
+                        (int)$row['status'],
+
+                        'profile_status' =>
+                        (int)$row['profile_status'],
+
+                        'approved_at' =>
+                        $row['approved_at'],
+
+                        'created_at' =>
+                        $row['created_at'],
+
+                        'users_count' =>
+                        (int)$row['users_count'],
+
+                        'properties_count' =>
+                        (int)$row['properties_count'],
+
+                        'search_requests_count' =>
+                        (int)$row['search_requests_count'],
+
+                        'developments_count' =>
+                        (int)$row['developments_count'],
+
+                        'membership_status' =>
+                        $membershipStatus,
+
+                        'membership' =>
+                        $row['membership_id'] !== null
+                            ? [
+                                'id' =>
+                                (int)$row['membership_id'],
+
+                                'status' =>
+                                $rawMembershipStatus,
+
+                                'start_date' =>
+                                $row['membership_start_date'],
+
+                                'end_date' =>
+                                $row['membership_end_date'],
+                            ]
+                            : null,
+
+                        'plan' =>
+                        $row['plan_id'] !== null
+                            ? [
+                                'id' =>
+                                (int)$row['plan_id'],
+
+                                'name' =>
+                                $row['plan_name'],
+
+                                'code' =>
+                                $row['plan_code'],
+                            ]
+                            : null,
+                    ];
+                },
+                $rows
+            );
+
+        return [
+            'items' =>
+            $items,
+
+            'meta' => [
+                'status' =>
+                $status,
+
+                'page' =>
+                $page,
+
+                'per_page' =>
+                $perPage,
+
+                'total' =>
+                $total,
+
+                'pages' =>
+                (int)ceil(
+                    $total
+                        / max(
+                            1,
+                            $perPage
+                        )
+                ),
+            ],
+        ];
+    }
+
     public static function validate(
         int $adminUserId,
         int $realEstateId,

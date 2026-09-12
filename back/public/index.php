@@ -139,6 +139,19 @@ $routes = [
         'operationalStatus'
     ],
 
+
+    'GET /admin/real-estates/operational/counts' =>
+    [
+        AdminRealEstateController::class,
+        'operationalCounts'
+    ],
+
+    'GET /admin/real-estates/operational' =>
+    [
+        AdminRealEstateController::class,
+        'operationalList'
+    ],
+
     // Billing
     'GET /plans'                        => [BillingController::class, 'listPlans'],
     'POST /billing/create-preference'   => [BillingController::class, 'createPreference'],
