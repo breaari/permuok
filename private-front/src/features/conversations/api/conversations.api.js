@@ -114,3 +114,17 @@ export async function getUnreadConversationsCount() {
   const res = await api.get("/conversations/unread-count");
   return unwrap(res);
 }
+
+export async function getExistingConversation({
+  opportunity_type,
+  opportunity_id,
+}) {
+  const res = await api.get("/conversations/existing", {
+    params: {
+      opportunity_type,
+      opportunity_id,
+    },
+  });
+
+  return unwrap(res);
+}

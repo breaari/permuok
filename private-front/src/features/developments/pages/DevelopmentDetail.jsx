@@ -9,7 +9,10 @@ import {
 import { getErrorMessage } from "../../../api/http";
 import { useAuth } from "../../auth/components/AuthContext";
 import { useToast } from "../../../ui/toast/ToastProvider";
-import { startConversation } from "../../conversations/api/conversations.api";
+import {
+  getExistingConversation,
+  startConversation,
+} from "../../conversations/api/conversations.api";
 import StartConversationModal from "../../conversations/components/StartConversationModal";
 
 import DetailSection from "../../shared/detail/components/DetailSection";
@@ -45,7 +48,7 @@ export default function DevelopmentDetail() {
   const location = useLocation();
   const { id } = useParams();
   const toast = useToast();
-
+  const [existingConversationId, setExistingConversationId] = useState(null);
   const role = Number(user?.role || 0);
   const canAccess = role === 2 || role === 3 || role === 4;
   const isInvestor = role === 4;
@@ -95,6 +98,25 @@ export default function DevelopmentDetail() {
         setDetail(payload);
         setDetailMode(mode);
         setActiveImageIndex(0);
+
+        if (canContact) {
+          try {
+            const existing = await getExistingConversation({
+              opportunity_type: "development",
+              opportunity_id: Number(id),
+            });
+
+            if (!cancelled) {
+              setExistingConversationId(
+                existing?.exists ? Number(existing.conversation_id) : null,
+              );
+            }
+          } catch {
+            if (!cancelled) {
+              setExistingConversationId(null);
+            }
+          }
+        }
       } catch (e) {
         if (cancelled) return;
 
@@ -164,6 +186,11 @@ export default function DevelopmentDetail() {
       toast.info(
         "Las cuentas inversoras pueden explorar oportunidades, pero no iniciar conversaciones.",
       );
+      return;
+    }
+
+    if (existingConversationId) {
+      navigate(`/conversations/${existingConversationId}`);
       return;
     }
 
@@ -287,6 +314,9 @@ export default function DevelopmentDetail() {
                 summarySpecs={summarySpecs}
                 actionLoading={actionLoading}
                 canContact={canContact}
+                contactLabel={
+                  existingConversationId ? "Ver conversación" : undefined
+                }
                 contactDisabledReason={
                   !canContact
                     ? "Las cuentas inversoras pueden explorar desarrollos, pero no iniciar conversaciones ni propuestas."

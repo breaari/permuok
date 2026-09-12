@@ -8,7 +8,10 @@ import {
 
 import { api, unwrap, getErrorMessage } from "../../../api/http";
 import { useAuth } from "../../auth/components/AuthContext";
-import { startConversation } from "../../conversations/api/conversations.api";
+import {
+  getExistingConversation,
+  startConversation,
+} from "../../conversations/api/conversations.api";
 import StartConversationModal from "../../conversations/components/StartConversationModal";
 
 import DetailSection from "../../shared/detail/components/DetailSection";
@@ -51,7 +54,7 @@ export default function PropertyDetail() {
   const location = useLocation();
   const { id } = useParams();
   const toast = useToast();
-
+  const [existingConversationId, setExistingConversationId] = useState(null);
   const role = Number(user?.role || 0);
   const canAccess = role === 2 || role === 3 || role === 4;
   const isInvestor = role === 4;
@@ -102,6 +105,25 @@ export default function PropertyDetail() {
         setData(payload);
         setDetailMode(mode);
         setActiveImageIndex(0);
+
+        if (canContact) {
+          try {
+            const existing = await getExistingConversation({
+              opportunity_type: "property",
+              opportunity_id: Number(id),
+            });
+
+            if (!cancelled) {
+              setExistingConversationId(
+                existing?.exists ? Number(existing.conversation_id) : null,
+              );
+            }
+          } catch {
+            if (!cancelled) {
+              setExistingConversationId(null);
+            }
+          }
+        }
       } catch (e) {
         if (cancelled) return;
 
@@ -140,6 +162,14 @@ export default function PropertyDetail() {
     property?.country,
   ]);
 
+  function handleContactAction() {
+    if (existingConversationId) {
+      navigate(`/conversations/${existingConversationId}`);
+      return;
+    }
+
+    setContactModalOpen(true);
+  }
   const backPath =
     detailMode === "explore" ? "/explore/properties" : "/properties";
 
@@ -250,9 +280,10 @@ export default function PropertyDetail() {
                     : ""
                 }
                 onContact={
-                  canContact
-                    ? () => setContactModalOpen(true)
-                    : handleBlockedContact
+                  canContact ? handleContactAction : handleBlockedContact
+                }
+                contactLabel={
+                  existingConversationId ? "Ver conversación" : undefined
                 }
               />
             </div>

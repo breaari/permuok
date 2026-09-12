@@ -13,6 +13,77 @@ class ConversationService
         return pdo();
     }
 
+    public static function findExistingForOpportunity(
+        int $userId,
+        array $input
+    ): array {
+        $type =
+            trim(
+                (string)(
+                    $input['opportunity_type']
+                    ?? ''
+                )
+            );
+
+        $opportunityId =
+            (int)(
+                $input['opportunity_id']
+                ?? 0
+            );
+
+        self::validateOpportunityType(
+            $type
+        );
+
+        if ($opportunityId <= 0) {
+            throw new Exception(
+                'La oportunidad es obligatoria.',
+                422
+            );
+        }
+
+        $ownerUserId =
+            self::findOpportunityOwner(
+                $type,
+                $opportunityId
+            );
+
+        if (!$ownerUserId) {
+            throw new Exception(
+                'No se encontró el propietario de la oportunidad.',
+                404
+            );
+        }
+
+        if ($ownerUserId === $userId) {
+            return [
+                'exists' => false,
+                'conversation_id' => null,
+            ];
+        }
+
+        $conversation =
+            self::findExistingConversation(
+                $type,
+                $opportunityId,
+                $userId,
+                $ownerUserId
+            );
+
+        if (!$conversation) {
+            return [
+                'exists' => false,
+                'conversation_id' => null,
+            ];
+        }
+
+        return [
+            'exists' => true,
+            'conversation_id' =>
+            (int)$conversation['id'],
+        ];
+    }
+
     public static function startConversation(
         int $userId,
         array $input

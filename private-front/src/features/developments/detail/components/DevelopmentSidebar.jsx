@@ -32,6 +32,7 @@ export default function DevelopmentSidebar({
   actionLoading,
   canContact = true,
   contactDisabledReason = "",
+  contactLabel = "",
 }) {
   const progress = getUnitsProgress(development);
 
@@ -114,7 +115,9 @@ export default function DevelopmentSidebar({
               : "cursor-not-allowed bg-slate-300 text-slate-600"
           }`}
         >
-          {canContact ? "Consultar desarrollo" : "Solo visualización"}
+          {canContact
+            ? contactLabel || "Consultar desarrollo"
+            : "Solo visualización"}
         </button>
 
         {!canContact && contactDisabledReason ? (

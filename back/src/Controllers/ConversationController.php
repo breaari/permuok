@@ -250,10 +250,10 @@ class ConversationController
         }
     }
 
-   
 
 
-     public static function inboxGroup(): void
+
+    public static function inboxGroup(): void
     {
         try {
             $user = AuthHelper::requireUser();
@@ -262,6 +262,24 @@ class ConversationController
                 (int)$user['id'],
                 $_GET
             );
+
+            self::success($result);
+        } catch (Throwable $e) {
+            self::error($e);
+        }
+    }
+
+    public static function existing(): void
+    {
+        try {
+            $user =
+                AuthHelper::requireUser();
+
+            $result =
+                ConversationService::findExistingForOpportunity(
+                    (int)$user['id'],
+                    $_GET
+                );
 
             self::success($result);
         } catch (Throwable $e) {

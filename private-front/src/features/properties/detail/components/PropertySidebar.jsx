@@ -10,6 +10,7 @@ export default function PropertySidebar({
   summarySpecs = [],
   canContact = true,
   contactDisabledReason = "",
+  contactLabel = "",
   onContact,
 }) {
   return (
@@ -61,9 +62,10 @@ export default function PropertySidebar({
           }`}
         >
           {canContact
-            ? detailMode === "explore"
-              ? "Iniciar propuesta de permuta"
-              : "Ver oportunidad de intercambio"
+            ? contactLabel ||
+              (detailMode === "explore"
+                ? "Iniciar propuesta de permuta"
+                : "Ver oportunidad de intercambio")
             : "Solo visualización"}
         </button>
 

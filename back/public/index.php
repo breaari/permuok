@@ -216,6 +216,12 @@ $routes = [
         'start'
     ],
 
+    'GET /conversations/existing' =>
+    [
+        ConversationController::class,
+        'existing'
+    ],
+
     // Notifications
     'GET /notifications' => [NotificationController::class, 'index'],
     'GET /notifications/unread-count' => [NotificationController::class, 'unreadCount'],

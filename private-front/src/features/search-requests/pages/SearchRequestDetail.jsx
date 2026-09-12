@@ -9,7 +9,10 @@ import {
 import { api, getErrorMessage, unwrap } from "../../../api/http";
 import { useAuth } from "../../auth/components/AuthContext";
 import { Icon } from "../../../ui/icons/Index";
-import { startConversation } from "../../conversations/api/conversations.api";
+import {
+  getExistingConversation,
+  startConversation,
+} from "../../conversations/api/conversations.api";
 import StartConversationModal from "../../conversations/components/StartConversationModal";
 
 import DetailSection from "../../shared/detail/components/DetailSection";
@@ -40,7 +43,7 @@ export default function SearchRequestDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
-
+  const [existingConversationId, setExistingConversationId] = useState(null);
   const role = Number(user?.role || 0);
   const canAccess = role === 2 || role === 3 || role === 4;
   const isInvestor = role === 4;
@@ -91,6 +94,25 @@ export default function SearchRequestDetail() {
 
         setDetail(payload);
         setDetailMode(mode);
+
+        if (canContact) {
+          try {
+            const existing = await getExistingConversation({
+              opportunity_type: "search_request",
+              opportunity_id: Number(id),
+            });
+
+            if (!cancelled) {
+              setExistingConversationId(
+                existing?.exists ? Number(existing.conversation_id) : null,
+              );
+            }
+          } catch {
+            if (!cancelled) {
+              setExistingConversationId(null);
+            }
+          }
+        }
       } catch (error) {
         if (cancelled) return;
 
@@ -123,6 +145,15 @@ export default function SearchRequestDetail() {
     () => extractAmenities(detail, request),
     [detail, request],
   );
+
+  function handleContactAction() {
+    if (existingConversationId) {
+      navigate(`/conversations/${existingConversationId}`);
+      return;
+    }
+
+    setContactModalOpen(true);
+  }
 
   const summaryItems = useMemo(
     () => buildSearchRequestSummary(request, propertyTypes),
