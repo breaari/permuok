@@ -713,7 +713,8 @@ class AdminDashboardService
                 SUM(
                     CASE
                         WHEN m.status = 1
-                        THEN 1
+ AND m.end_date >= CURDATE()
+THEN 1
                         ELSE 0
                     END
                 ),
@@ -768,10 +769,11 @@ class AdminDashboardService
                 SUM(
                     CASE
                         WHEN m.status = 1
-                         AND COALESCE(
-                             m.cancel_at_period_end,
-                             0
-                         ) = 1
+ AND m.end_date >= CURDATE()
+ AND COALESCE(
+     m.cancel_at_period_end,
+     0
+ ) = 1
                         THEN 1
                         ELSE 0
                     END
@@ -783,8 +785,8 @@ class AdminDashboardService
                 SUM(
                     CASE
                         WHEN m.status = 1
-                         AND m.scheduled_plan_id
-                             IS NOT NULL
+ AND m.end_date >= CURDATE()
+ AND m.scheduled_plan_id IS NOT NULL
                         THEN 1
                         ELSE 0
                     END
