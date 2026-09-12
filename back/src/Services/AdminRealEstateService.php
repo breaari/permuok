@@ -535,6 +535,86 @@ class AdminRealEstateService
         ];
     }
 
+    public static function setOperationalStatus(
+        int $realEstateId,
+        bool $isActive
+    ): array {
+        $pdo = self::db();
+
+        $st = $pdo->prepare("
+        SELECT
+            id,
+            status,
+            profile_status
+        FROM real_estates
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'id' => $realEstateId,
+        ]);
+
+        $realEstate = $st->fetch(PDO::FETCH_ASSOC);
+
+        if (!$realEstate) {
+            throw new \Exception(
+                "Inmobiliaria no encontrada"
+            );
+        }
+
+        $profileStatus =
+            (int)($realEstate['profile_status'] ?? 0);
+
+        if (
+            $profileStatus !==
+            RealEstateProfileStatus::APPROVED
+        ) {
+            throw new \Exception(
+                "Sólo se puede suspender o reactivar una inmobiliaria aprobada"
+            );
+        }
+
+        $newStatus = $isActive ? 1 : 0;
+
+        if (
+            (int)$realEstate['status'] ===
+            $newStatus
+        ) {
+            return [
+                'real_estate_id' =>
+                $realEstateId,
+                'status' =>
+                $newStatus,
+                'changed' =>
+                false,
+            ];
+        }
+
+        $st = $pdo->prepare("
+        UPDATE real_estates
+        SET status = :status
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'status' => $newStatus,
+            'id' => $realEstateId,
+        ]);
+
+        return [
+            'real_estate_id' =>
+            $realEstateId,
+            'status' =>
+            $newStatus,
+            'changed' =>
+            true,
+        ];
+    }
+
     public static function getDetail(
         int $realEstateId
     ): array {

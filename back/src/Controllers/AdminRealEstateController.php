@@ -140,4 +140,71 @@ class AdminRealEstateController
             ResponseHelper::fail($e->getMessage(), 422);
         }
     }
+
+    public static function operationalStatus(): void
+    {
+        try {
+            self::requireAdmin();
+
+            $payload =
+                json_decode(
+                    file_get_contents('php://input'),
+                    true
+                ) ?? [];
+
+            $realEstateId =
+                (int)(
+                    $payload['real_estate_id']
+                    ?? 0
+                );
+
+            if ($realEstateId <= 0) {
+                ResponseHelper::fail(
+                    'real_estate_id requerido',
+                    422
+                );
+            }
+
+            if (
+                !array_key_exists(
+                    'is_active',
+                    $payload
+                )
+            ) {
+                ResponseHelper::fail(
+                    'is_active requerido',
+                    422
+                );
+            }
+
+            $isActive =
+                filter_var(
+                    $payload['is_active'],
+                    FILTER_VALIDATE_BOOLEAN,
+                    FILTER_NULL_ON_FAILURE
+                );
+
+            if ($isActive === null) {
+                ResponseHelper::fail(
+                    'is_active inválido',
+                    422
+                );
+            }
+
+            $result =
+                AdminRealEstateService::setOperationalStatus(
+                    $realEstateId,
+                    $isActive
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
+        } catch (\Throwable $e) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                422
+            );
+        }
+    }
 }

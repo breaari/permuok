@@ -133,6 +133,11 @@ $routes = [
     'GET /admin/real-estates/pending'  => [AdminRealEstateController::class, 'pending'],
     'GET /admin/real-estates/approved' => [AdminRealEstateController::class, 'approved'],
     'GET /admin/real-estates/rejected' => [AdminRealEstateController::class, 'rejected'],
+    'POST /admin/real-estates/operational-status' =>
+    [
+        AdminRealEstateController::class,
+        'operationalStatus'
+    ],
 
     // Billing
     'GET /plans'                        => [BillingController::class, 'listPlans'],
