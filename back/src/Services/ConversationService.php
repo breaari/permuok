@@ -3092,21 +3092,35 @@ THEN 1
     {
         $pdo = self::db();
 
+        /*
+     * No devolvemos datos personales.
+     *
+     * El email, teléfono, nombre y datos de la inmobiliaria
+     * solamente deben entregarse mediante contact_data,
+     * después de que ambas partes acepten compartirlos.
+     */
         $stmt = $pdo->prepare("
         SELECT
-            cp.*,
-            u.email
+            cp.id,
+            cp.conversation_id,
+            cp.user_id,
+            cp.role,
+            cp.last_read_message_id,
+            cp.last_read_at,
+            cp.archived_at
         FROM conversation_participants cp
-        INNER JOIN users u ON u.id = cp.user_id
         WHERE cp.conversation_id = :conversation_id
           AND cp.deleted_at IS NULL
         ORDER BY cp.id ASC
     ");
 
-        $stmt->execute([':conversation_id' => $conversationId]);
+        $stmt->execute([
+            ':conversation_id' => $conversationId,
+        ]);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
+    
     private static function getOtherParticipantIds(
         int $conversationId,
         int $userId
