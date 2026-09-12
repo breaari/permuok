@@ -13,119 +13,231 @@ class ConversationService
         return pdo();
     }
 
-    public static function startConversation(int $userId, array $input): array
-    {
-        $type = trim((string)($input['opportunity_type'] ?? ''));
-        $opportunityId = (int)($input['opportunity_id'] ?? 0);
-        $message = trim((string)($input['message'] ?? ''));
+    public static function startConversation(
+        int $userId,
+        array $input
+    ): array {
+        $type =
+            trim(
+                (string)(
+                    $input['opportunity_type']
+                    ?? ''
+                )
+            );
 
-        self::validateOpportunityType($type);
+        $opportunityId =
+            (int)(
+                $input['opportunity_id']
+                ?? 0
+            );
+
+        $message =
+            trim(
+                (string)(
+                    $input['message']
+                    ?? ''
+                )
+            );
+
+        self::validateOpportunityType(
+            $type
+        );
 
         if ($opportunityId <= 0) {
-            throw new Exception('La oportunidad es obligatoria.', 422);
+            throw new Exception(
+                'La oportunidad es obligatoria.',
+                422
+            );
         }
 
         if ($message === '') {
-            throw new Exception('El mensaje inicial es obligatorio.', 422);
+            throw new Exception(
+                'El mensaje inicial es obligatorio.',
+                422
+            );
         }
 
-        $ownerUserId = self::findOpportunityOwner($type, $opportunityId);
+        $ownerUserId =
+            self::findOpportunityOwner(
+                $type,
+                $opportunityId
+            );
 
         if (!$ownerUserId) {
-            throw new Exception('No se encontró el propietario de la oportunidad.', 404);
+            throw new Exception(
+                'No se encontró el propietario de la oportunidad.',
+                404
+            );
         }
 
         if ($ownerUserId === $userId) {
-            throw new Exception('No podés iniciar una conversación sobre tu propia publicación.', 422);
+            throw new Exception(
+                'No podés iniciar una conversación sobre tu propia publicación.',
+                422
+            );
         }
 
-        $pdo = self::db();
-        $pdo->beginTransaction();
-        $isNewConversation = false;
-        try {
-            $conversation = self::findExistingConversation(
+        /*
+    |--------------------------------------------------------------------------
+    | CONVERSACIÓN EXISTENTE
+    |--------------------------------------------------------------------------
+    |
+    | Si ya existe una conversación para esta oportunidad entre estos usuarios,
+    | NO creamos otro mensaje inicial.
+    |
+    | El usuario debe continuar escribiendo dentro del chat existente.
+    |
+    */
+
+        $existingConversation =
+            self::findExistingConversation(
                 $type,
                 $opportunityId,
                 $userId,
                 $ownerUserId
             );
 
-            if (!$conversation) {
-                $isNewConversation = true;
-                $subject = self::buildConversationSubject($type, $opportunityId);
+        if ($existingConversation) {
+            $conversationId =
+                (int)$existingConversation['id'];
 
-                $stmt = $pdo->prepare("
-                    INSERT INTO conversations (
-                        opportunity_type,
-                        opportunity_id,
-                        created_by_user_id,
-                        owner_user_id,
-                        subject,
-                        status,
-                        contact_shared
-                    )
-                    VALUES (
-                        :type,
-                        :opportunity_id,
-                        :created_by_user_id,
-                        :owner_user_id,
-                        :subject,
-                        'open',
-                        0
-                    )
-                ");
+            return [
+                'conversation' =>
+                self::getConversationDetail(
+                    $userId,
+                    $conversationId
+                ),
 
-                $stmt->execute([
-                    ':type' => $type,
-                    ':opportunity_id' => $opportunityId,
-                    ':created_by_user_id' => $userId,
-                    ':owner_user_id' => $ownerUserId,
-                    ':subject' => $subject,
-                ]);
+                'conversation_id' =>
+                $conversationId,
 
-                $conversationId = (int)$pdo->lastInsertId();
+                'already_exists' =>
+                true,
 
-                self::addParticipant($conversationId, $userId, 'initiator');
-                self::addParticipant($conversationId, $ownerUserId, 'owner');
+                'message_sent' =>
+                false,
+            ];
+        }
 
-                NotificationService::notifyNewConversation(
-                    $ownerUserId,
-                    $conversationId,
-                    [
-                        'subject' => $subject,
-                    ],
-                    $pdo
+        /*
+    |--------------------------------------------------------------------------
+    | NUEVA CONVERSACIÓN
+    |--------------------------------------------------------------------------
+    */
+
+        $pdo = self::db();
+
+        $pdo->beginTransaction();
+
+        try {
+            $subject =
+                self::buildConversationSubject(
+                    $type,
+                    $opportunityId
                 );
-            } else {
-                $conversationId = (int)$conversation['id'];
-            }
 
-            $messageResult = self::createMessage($conversationId, $userId, $message);
+            $stmt = $pdo->prepare("
+            INSERT INTO conversations (
+                opportunity_type,
+                opportunity_id,
+                created_by_user_id,
+                owner_user_id,
+                subject,
+                status,
+                contact_shared
+            )
+            VALUES (
+                :type,
+                :opportunity_id,
+                :created_by_user_id,
+                :owner_user_id,
+                :subject,
+                'open',
+                0
+            )
+        ");
 
-            self::touchConversation($conversationId, $messageResult['message']['id']);
+            $stmt->execute([
+                ':type' =>
+                $type,
 
-            if (
-                !$isNewConversation &&
-                $ownerUserId !== $userId
-            ) {
-                NotificationService::notifyNewMessage(
-                    $ownerUserId,
+                ':opportunity_id' =>
+                $opportunityId,
+
+                ':created_by_user_id' =>
+                $userId,
+
+                ':owner_user_id' =>
+                $ownerUserId,
+
+                ':subject' =>
+                $subject,
+            ]);
+
+            $conversationId =
+                (int)$pdo->lastInsertId();
+
+            self::addParticipant(
+                $conversationId,
+                $userId,
+                'initiator'
+            );
+
+            self::addParticipant(
+                $conversationId,
+                $ownerUserId,
+                'owner'
+            );
+
+            $messageResult =
+                self::createMessage(
                     $conversationId,
-                    [
-                        'subject' => $subject ?? null,
-                    ],
-                    $pdo
+                    $userId,
+                    $message
                 );
-            }
+
+            self::touchConversation(
+                $conversationId,
+                (int)$messageResult['message']['id']
+            );
+
+            NotificationService::notifyNewConversation(
+                $ownerUserId,
+                $conversationId,
+                [
+                    'subject' =>
+                    $subject,
+                ],
+                $pdo
+            );
 
             $pdo->commit();
 
-            return self::getConversationDetail($userId, $conversationId);
+            return [
+                'conversation' =>
+                self::getConversationDetail(
+                    $userId,
+                    $conversationId
+                ),
+
+                'conversation_id' =>
+                $conversationId,
+
+                'already_exists' =>
+                false,
+
+                'message_sent' =>
+                true,
+            ];
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
+
     public static function createFromCompatibility(
         int $compatibilityId,
         ?PDO $pdo = null

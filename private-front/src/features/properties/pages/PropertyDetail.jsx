@@ -171,13 +171,25 @@ export default function PropertyDetail() {
       });
 
       const conversationId =
-        res?.conversation?.id || res?.conversation_id || res?.id;
+        res?.conversation?.conversation?.id ||
+        res?.conversation?.id ||
+        res?.conversation_id ||
+        res?.id;
 
       if (!conversationId) {
-        throw new Error("No se pudo obtener la conversación creada.");
+        throw new Error("No se pudo obtener la conversación.");
       }
 
       setContactModalOpen(false);
+
+      if (res?.already_exists) {
+        toast.info(
+          "Ya habías consultado esta publicación. Te llevamos a la conversación existente.",
+        );
+      } else {
+        toast.success("Consulta enviada correctamente.");
+      }
+
       navigate(`/conversations/${conversationId}`);
     } catch (e) {
       toast.error(getErrorMessage(e, "No se pudo iniciar la conversación."));
