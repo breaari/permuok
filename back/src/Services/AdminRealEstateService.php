@@ -257,31 +257,42 @@ class AdminRealEstateService
         }
 
         $st = $pdo->prepare("
-            SELECT
-                id,
-                profile_status,
-                status,
-                review_requested_at,
-                changes_requested_at
-            FROM real_estates
-            WHERE id = :id
-              AND deleted_at IS NULL
-            LIMIT 1
-        ");
-        $st->execute(['id' => $realEstateId]);
+        SELECT
+            id,
+            profile_status,
+            status,
+            review_requested_at,
+            changes_requested_at
+        FROM real_estates
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'id' => $realEstateId,
+        ]);
+
         $re = $st->fetch();
 
         if (!$re) {
             throw new \Exception("Inmobiliaria no encontrada");
         }
 
-        $currentProfileStatus = (int)($re['profile_status'] ?? 0);
+        $currentProfileStatus =
+            (int)($re['profile_status'] ?? 0);
 
-        if (!in_array($currentProfileStatus, [
-            RealEstateProfileStatus::INITIAL_REVIEW,
-            RealEstateProfileStatus::CHANGES_PENDING,
-        ], true)) {
-            throw new \Exception("La solicitud no está pendiente de revisión");
+        if (!in_array(
+            $currentProfileStatus,
+            [
+                RealEstateProfileStatus::INITIAL_REVIEW,
+                RealEstateProfileStatus::CHANGES_PENDING,
+            ],
+            true
+        )) {
+            throw new \Exception(
+                "La solicitud no está pendiente de revisión"
+            );
         }
 
         $pdo->beginTransaction();
@@ -289,60 +300,86 @@ class AdminRealEstateService
         try {
             if ($action === 'approve') {
                 $st = $pdo->prepare("
-                    UPDATE real_estates
-                    SET
-                      profile_status = :approved_profile_status,
-                      validation_status = 1,
-                      validation_note = NULL,
-                      approved_at = NOW(),
-                      approved_by = :admin_id,
-                      validated_at = NOW(),
-                      review_requested_at = CASE
-                          WHEN review_requested_at IS NULL THEN NOW()
-                          ELSE review_requested_at
-                      END,
-                      changes_requested_at = NULL
-                    WHERE id = :id
-                    LIMIT 1
-                ");
+                UPDATE real_estates
+                SET
+                    status = 1,
+                    profile_status = :approved_profile_status,
+                    validation_status = 1,
+                    validation_note = NULL,
+                    approved_at = NOW(),
+                    approved_by = :admin_id,
+                    validated_at = NOW(),
+                    review_requested_at = CASE
+                        WHEN review_requested_at IS NULL
+                            THEN NOW()
+                        ELSE review_requested_at
+                    END,
+                    changes_requested_at = NULL
+                WHERE id = :id
+                LIMIT 1
+            ");
+
                 $st->execute([
-                    'approved_profile_status' => RealEstateProfileStatus::APPROVED,
+                    'approved_profile_status' =>
+                    RealEstateProfileStatus::APPROVED,
                     'admin_id' => $adminUserId,
                     'id' => $realEstateId,
                 ]);
             } else {
                 $st = $pdo->prepare("
-                    UPDATE real_estates
-                    SET
-                      profile_status = :rejected_profile_status,
-                      validation_status = 2,
-                      validation_note = :validation_note,
-                      approved_at = NULL,
-                      approved_by = NULL,
-                      validated_at = NOW(),
-                      changes_requested_at = NULL
-                    WHERE id = :id
-                    LIMIT 1
-                ");
+                UPDATE real_estates
+                SET
+                    status = 0,
+                    profile_status = :rejected_profile_status,
+                    validation_status = 2,
+                    validation_note = :validation_note,
+                    approved_at = NULL,
+                    approved_by = NULL,
+                    validated_at = NOW(),
+                    changes_requested_at = NULL
+                WHERE id = :id
+                LIMIT 1
+            ");
+
                 $st->execute([
-                    'rejected_profile_status' => RealEstateProfileStatus::REJECTED,
-                    'validation_note' => $validationNote,
-                    'id' => $realEstateId,
+                    'rejected_profile_status' =>
+                    RealEstateProfileStatus::REJECTED,
+                    'validation_note' =>
+                    $validationNote,
+                    'id' =>
+                    $realEstateId,
                 ]);
             }
 
             $pdo->commit();
 
             return [
-                'real_estate_id' => $realEstateId,
-                'action' => $action,
-                'profile_status' => $action === 'approve'
+                'real_estate_id' =>
+                $realEstateId,
+
+                'action' =>
+                $action,
+
+                'profile_status' =>
+                $action === 'approve'
                     ? RealEstateProfileStatus::APPROVED
                     : RealEstateProfileStatus::REJECTED,
-                'validation_note' => $action === 'reject' ? $validationNote : null,
+
+                'status' =>
+                $action === 'approve'
+                    ? 1
+                    : 0,
+
+                'validation_note' =>
+                $action === 'reject'
+                    ? $validationNote
+                    : null,
             ];
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
