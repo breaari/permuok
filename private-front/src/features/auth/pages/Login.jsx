@@ -219,15 +219,11 @@ export default function Login() {
           </div>
         )}
 
-        <Button type="submit" disabled={submitting || isBlocked}>
-          {submitting
-            ? "Ingresando..."
-            : isBlocked
-              ? `VOLVÉ A INTENTAR EN ${formatRemainingTime(
-                  blockedSeconds,
-                ).toUpperCase()}`
-              : "INICIAR SESIÓN"}
-        </Button>
+        {!isBlocked && (
+          <Button type="submit" disabled={submitting || isBlocked}>
+            {submitting ? "Ingresando..." : "INICIAR SESIÓN"}
+          </Button>
+        )}
       </form>
 
       <div className="mt-10 pt-6 border-t border-slate-100 text-center">
