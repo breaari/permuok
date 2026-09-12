@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, unwrap } from "../../../api/http.js";
 import { Icon } from "../../../ui/icons/Index";
 import RejectModal from "../components/RejectModal.jsx";
@@ -28,7 +28,15 @@ import {
 export default function AdminRealEstateDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const location = useLocation();
 
+  const backPath = location.state?.from || "/admin/real-estates";
+
+  const backLabel = location.state?.backLabel || "Volver a solicitudes";
+
+  function handleBack() {
+    navigate(backPath);
+  }
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -197,14 +205,14 @@ export default function AdminRealEstateDetail() {
       <div className="space-y-8 pb-28">
         {loading ? (
           <AdminDetailHeader
-            backLabel="Volver a solicitudes"
-            onBack={() => navigate("/admin/real-estates")}
+            backLabel={backLabel}
+            onBack={handleBack}
             subtitle="Cargando detalle..."
           />
         ) : (
           <AdminDetailHeader
-            backLabel="Volver a solicitudes"
-            onBack={() => navigate("/admin/real-estates")}
+            backLabel={backLabel}
+            onBack={handleBack}
             badge={<ReviewStatusPill realEstate={re} />}
             subtitle={getHeaderSubtitle()}
           />
