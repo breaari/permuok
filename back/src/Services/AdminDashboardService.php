@@ -32,18 +32,19 @@ class AdminDashboardService
 
         return [
             'active_real_estates' => self::count($pdo, "
-               SELECT COUNT(*)
-FROM real_estates
-WHERE deleted_at IS NULL
-            "),
+    SELECT COUNT(*)
+    FROM real_estates
+    WHERE status = 1
+      AND deleted_at IS NULL
+"),
 
             'active_memberships' => self::count($pdo, "
-                SELECT COUNT(*)
-                FROM memberships
-                WHERE status = 1
-                  AND deleted_at IS NULL
-            "),
-
+    SELECT COUNT(*)
+    FROM memberships
+    WHERE status = 1
+      AND end_date >= CURDATE()
+      AND deleted_at IS NULL
+"),
             'active_publications' =>
             self::countPublications($pdo, 'published'),
 
@@ -891,7 +892,7 @@ COALESCE(
                 ?? 0
             ),
 
-          
+
         ];
     }
 }
