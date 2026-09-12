@@ -161,6 +161,8 @@ class SecurityRateLimitService
             );
         }
 
+
+
         return [
             'attempts' => $attempts,
             'remaining' => $remaining,
@@ -169,31 +171,30 @@ class SecurityRateLimitService
     }
 
     /**
- * Comprueba si un identificador tiene un bloqueo activo.
- *
- * No incrementa intentos.
- */
-public static function check(
-    string $action,
-    string $identifier
-): void {
-    $action = trim($action);
-    $identifier = trim($identifier);
+     * Comprueba si el identificador tiene un bloqueo activo.
+     * No registra ni incrementa intentos.
+     */
+    public static function check(
+        string $action,
+        string $identifier
+    ): void {
+        $action = trim($action);
+        $identifier = trim($identifier);
 
-    if ($action === '' || $identifier === '') {
-        throw new \InvalidArgumentException(
-            'Configuración de rate limit inválida.'
+        if ($action === '' || $identifier === '') {
+            throw new \InvalidArgumentException(
+                'Configuración de rate limit inválida.'
+            );
+        }
+
+        $pdo = self::db();
+
+        $identifierHash = hash(
+            'sha256',
+            $identifier
         );
-    }
 
-    $pdo = self::db();
-
-    $identifierHash = hash(
-        'sha256',
-        $identifier
-    );
-
-    $stmt = $pdo->prepare("
+        $stmt = $pdo->prepare("
         SELECT
             GREATEST(
                 0,
@@ -209,89 +210,89 @@ public static function check(
         LIMIT 1
     ");
 
-    $stmt->execute([
-        ':action' => $action,
-        ':identifier_hash' => $identifierHash,
-    ]);
+        $stmt->execute([
+            ':action' => $action,
+            ':identifier_hash' => $identifierHash,
+        ]);
 
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$row) {
-        return;
-    }
+        if (!$row) {
+            return;
+        }
 
-    $retryAfter = (int)($row['retry_after'] ?? 0);
+        $retryAfter =
+            (int)($row['retry_after'] ?? 0);
 
-    if ($retryAfter <= 0) {
-        return;
-    }
+        if ($retryAfter <= 0) {
+            return;
+        }
 
-    header(
-        'Retry-After: ' . $retryAfter
-    );
+        header(
+            'Retry-After: ' . $retryAfter
+        );
 
-    ResponseHelper::fail(
-        'Alcanzaste el límite de intentos. Esperá un momento para volver a probar.',
-        429,
-        [
-            'code' => 'RATE_LIMIT_EXCEEDED',
-            'retry_after' => $retryAfter,
-            'remaining_attempts' => 0,
-        ]
-    );
-}
-
-/**
- * Registra exclusivamente un intento fallido.
- *
- * Los bloqueos progresivos son:
- * 1.º: 30 segundos
- * 2.º: 5 minutos
- * 3.º y siguientes: 15 minutos
- */
-public static function recordFailure(
-    string $action,
-    string $identifier,
-    int $maxAttempts = 5,
-    array $penalties = [30, 300, 900]
-): array {
-    $action = trim($action);
-    $identifier = trim($identifier);
-
-    $penalties = array_values(
-        array_filter(
-            array_map('intval', $penalties),
-            static fn (int $seconds): bool =>
-                $seconds > 0
-        )
-    );
-
-    if (
-        $action === '' ||
-        $identifier === '' ||
-        $maxAttempts <= 0 ||
-        $penalties === []
-    ) {
-        throw new \InvalidArgumentException(
-            'Configuración de rate limit inválida.'
+        ResponseHelper::fail(
+            'Alcanzaste el límite de intentos. Esperá un momento para volver a probar.',
+            429,
+            [
+                'code' => 'RATE_LIMIT_EXCEEDED',
+                'retry_after' => $retryAfter,
+                'remaining_attempts' => 0,
+            ]
         );
     }
 
-    $pdo = self::db();
-
-    $identifierHash = hash(
-        'sha256',
-        $identifier
-    );
-
-    /*
-     * Si dos intentos llegan al mismo tiempo,
-     * la transacción mantiene consistente el contador.
+    /**
+     * Registra solamente un intento fallido.
+     *
+     * Bloqueos progresivos:
+     * 1.º bloqueo: 30 segundos.
+     * 2.º bloqueo: 5 minutos.
+     * 3.º bloqueo y siguientes: 15 minutos.
      */
-    $pdo->beginTransaction();
+    public static function recordFailure(
+        string $action,
+        string $identifier,
+        int $maxAttempts = 5,
+        array $penalties = [30, 300, 900]
+    ): array {
+        $action = trim($action);
+        $identifier = trim($identifier);
 
-    try {
-        $stmt = $pdo->prepare("
+        $penalties = array_values(
+            array_filter(
+                array_map(
+                    'intval',
+                    $penalties
+                ),
+                static fn(int $seconds): bool =>
+                $seconds > 0
+            )
+        );
+
+        if (
+            $action === '' ||
+            $identifier === '' ||
+            $maxAttempts <= 0 ||
+            $penalties === []
+        ) {
+            throw new \InvalidArgumentException(
+                'Configuración de rate limit inválida.'
+            );
+        }
+
+        $pdo = self::db();
+
+        $identifierHash = hash(
+            'sha256',
+            $identifier
+        );
+
+        $pdo->beginTransaction();
+
+        try {
+            $stmt = $pdo->prepare("
             SELECT
                 attempts,
                 penalty_level,
@@ -310,18 +311,18 @@ public static function recordFailure(
             FOR UPDATE
         ");
 
-        $stmt->execute([
-            ':action' => $action,
-            ':identifier_hash' => $identifierHash,
-        ]);
+            $stmt->execute([
+                ':action' => $action,
+                ':identifier_hash' => $identifierHash,
+            ]);
 
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        /*
-         * Primer error para este identificador.
+            /*
+         * Primer intento incorrecto.
          */
-        if (!$row) {
-            $stmt = $pdo->prepare("
+            if (!$row) {
+                $stmt = $pdo->prepare("
                 INSERT INTO security_rate_limits (
                     action,
                     identifier_hash,
@@ -340,56 +341,62 @@ public static function recordFailure(
                 )
             ");
 
-            $stmt->execute([
-                ':action' => $action,
-                ':identifier_hash' => $identifierHash,
-            ]);
+                $stmt->execute([
+                    ':action' => $action,
+                    ':identifier_hash' => $identifierHash,
+                ]);
 
-            $pdo->commit();
+                $pdo->commit();
 
-            return [
-                'attempts' => 1,
-                'remaining' => max(
-                    0,
-                    $maxAttempts - 1
-                ),
-                'retry_after' => 0,
-            ];
-        }
+                return [
+                    'attempts' => 1,
+                    'remaining' => max(
+                        0,
+                        $maxAttempts - 1
+                    ),
+                    'retry_after' => 0,
+                ];
+            }
 
-        /*
-         * Defensa adicional por si otro pedido alcanzó
-         * el bloqueo mientras este estaba esperando.
+            /*
+         * Otro pedido pudo haber activado el bloqueo
+         * mientras esta solicitud esperaba.
          */
-        $activeRetryAfter =
-            (int)($row['retry_after'] ?? 0);
+            $activeRetryAfter =
+                (int)($row['retry_after'] ?? 0);
 
-        if ($activeRetryAfter > 0) {
-            $pdo->commit();
+            if ($activeRetryAfter > 0) {
+                $pdo->commit();
 
-            header(
-                'Retry-After: ' . $activeRetryAfter
-            );
+                header(
+                    'Retry-After: ' . $activeRetryAfter
+                );
 
-            ResponseHelper::fail(
-                'Alcanzaste el límite de intentos. Esperá un momento para volver a probar.',
-                429,
-                [
-                    'code' => 'RATE_LIMIT_EXCEEDED',
+                ResponseHelper::fail(
+                    'Alcanzaste el límite de intentos. Esperá un momento para volver a probar.',
+                    429,
+                    [
+                        'code' => 'RATE_LIMIT_EXCEEDED',
+                        'retry_after' => $activeRetryAfter,
+                        'remaining_attempts' => 0,
+                    ]
+                );
+
+                return [
+                    'attempts' => 0,
+                    'remaining' => 0,
                     'retry_after' => $activeRetryAfter,
-                    'remaining_attempts' => 0,
-                ]
-            );
-        }
+                ];
+            }
 
-        $attempts =
-            (int)$row['attempts'] + 1;
+            $attempts =
+                (int)$row['attempts'] + 1;
 
-        /*
-         * Todavía puede volver a intentarlo.
+            /*
+         * Todavía quedan intentos disponibles.
          */
-        if ($attempts < $maxAttempts) {
-            $stmt = $pdo->prepare("
+            if ($attempts < $maxAttempts) {
+                $stmt = $pdo->prepare("
                 UPDATE security_rate_limits
                 SET
                     attempts = :attempts,
@@ -399,39 +406,39 @@ public static function recordFailure(
                   AND identifier_hash = :identifier_hash
             ");
 
-            $stmt->execute([
-                ':attempts' => $attempts,
-                ':action' => $action,
-                ':identifier_hash' => $identifierHash,
-            ]);
+                $stmt->execute([
+                    ':attempts' => $attempts,
+                    ':action' => $action,
+                    ':identifier_hash' => $identifierHash,
+                ]);
 
-            $pdo->commit();
+                $pdo->commit();
 
-            return [
-                'attempts' => $attempts,
-                'remaining' => max(
-                    0,
-                    $maxAttempts - $attempts
-                ),
-                'retry_after' => 0,
-            ];
-        }
+                return [
+                    'attempts' => $attempts,
+                    'remaining' => max(
+                        0,
+                        $maxAttempts - $attempts
+                    ),
+                    'retry_after' => 0,
+                ];
+            }
 
-        /*
-         * Alcanzó el límite.
+            /*
+         * Se alcanzó el límite.
          */
-        $currentPenaltyLevel =
-            (int)$row['penalty_level'];
+            $currentPenaltyLevel =
+                (int)$row['penalty_level'];
 
-        $newPenaltyLevel = min(
-            $currentPenaltyLevel + 1,
-            count($penalties)
-        );
+            $newPenaltyLevel = min(
+                $currentPenaltyLevel + 1,
+                count($penalties)
+            );
 
-        $penaltySeconds =
-            $penalties[$newPenaltyLevel - 1];
+            $penaltySeconds =
+                $penalties[$newPenaltyLevel - 1];
 
-        $stmt = $pdo->prepare("
+            $stmt = $pdo->prepare("
             UPDATE security_rate_limits
             SET
                 attempts = 0,
@@ -446,37 +453,42 @@ public static function recordFailure(
               AND identifier_hash = :identifier_hash
         ");
 
-        $stmt->execute([
-            ':penalty_level' => $newPenaltyLevel,
-            ':action' => $action,
-            ':identifier_hash' => $identifierHash,
-        ]);
+            $stmt->execute([
+                ':penalty_level' => $newPenaltyLevel,
+                ':action' => $action,
+                ':identifier_hash' => $identifierHash,
+            ]);
 
-        $pdo->commit();
+            $pdo->commit();
 
-        header(
-            'Retry-After: ' . $penaltySeconds
-        );
+            header(
+                'Retry-After: ' . $penaltySeconds
+            );
 
-        ResponseHelper::fail(
-            'Alcanzaste el límite de intentos. Esperá un momento para volver a probar.',
-            429,
-            [
-                'code' => 'RATE_LIMIT_EXCEEDED',
+            ResponseHelper::fail(
+                'Alcanzaste el límite de intentos. Esperá un momento para volver a probar.',
+                429,
+                [
+                    'code' => 'RATE_LIMIT_EXCEEDED',
+                    'retry_after' => $penaltySeconds,
+                    'remaining_attempts' => 0,
+                    'penalty_level' => $newPenaltyLevel,
+                ]
+            );
+
+            return [
+                'attempts' => 0,
+                'remaining' => 0,
                 'retry_after' => $penaltySeconds,
-                'remaining_attempts' => 0,
-                'penalty_level' => $newPenaltyLevel,
-            ]
-        );
-    } catch (\Throwable $e) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
+            ];
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $e;
         }
-
-        throw $e;
     }
-}
-
 
     /**
      * Reinicia un contador, por ejemplo después
