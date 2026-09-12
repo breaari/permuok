@@ -61,7 +61,7 @@ class AuthController
             $password === ''
         ) {
             ResponseHelper::fail(
-                'Email y password son requeridos',
+                'Email y contraseña son requeridos.',
                 422
             );
         }
@@ -72,34 +72,26 @@ class AuthController
         $clientIp =
             SecurityRateLimitService::clientIp();
 
-        /*
-         * Primer límite:
-         * máximo 5 intentos para la misma combinación
-         * de cuenta e IP cada 15 minutos.
-         */
         $loginIdentifier =
             $emailNormalized . '|' . $clientIp;
 
-        $loginRateLimit =
-            SecurityRateLimitService::hit(
-                'auth_login_email_ip',
-                $loginIdentifier,
-                5,
-                15 * 60
-            );
-
         /*
-         * Segundo límite:
-         * máximo 30 intentos totales sobre una cuenta
-         * cada 15 minutos, aunque se utilicen distintas IP.
+         * Primero comprobamos si existe un bloqueo.
+         * Estas funciones no incrementan intentos.
          */
-        SecurityRateLimitService::hit(
-            'auth_login_account',
-            $emailNormalized,
-            30,
-            15 * 60
+        SecurityRateLimitService::check(
+            'auth_login_email_ip',
+            $loginIdentifier
         );
 
+        SecurityRateLimitService::check(
+            'auth_login_account',
+            $emailNormalized
+        );
+
+        /*
+         * Recién ahora comprobamos las credenciales.
+         */
         $result =
             AuthService::login(
                 $emailNormalized,
@@ -107,15 +99,45 @@ class AuthController
             );
 
         if ($result === false) {
+            /*
+             * Protección general de la cuenta:
+             * 30 errores desde distintas IP generan
+             * una pausa de 15 minutos.
+             */
+            SecurityRateLimitService::recordFailure(
+                'auth_login_account',
+                $emailNormalized,
+                30,
+                [15 * 60]
+            );
+
+            /*
+             * Protección progresiva para email + IP:
+             *
+             * Primer bloqueo: 30 segundos.
+             * Segundo bloqueo: 5 minutos.
+             * Tercero y siguientes: 15 minutos.
+             */
+            $loginRateLimit =
+                SecurityRateLimitService::recordFailure(
+                    'auth_login_email_ip',
+                    $loginIdentifier,
+                    5,
+                    [30, 5 * 60, 15 * 60]
+                );
+
             $remainingAttempts =
-                (int)($loginRateLimit['remaining'] ?? 0);
+                (int)(
+                    $loginRateLimit['remaining']
+                    ?? 0
+                );
 
             if ($remainingAttempts === 1) {
                 $message =
-                    'El email o la contraseña no coinciden. Por seguridad, te queda 1 intento antes de pausar temporalmente el acceso durante 15 minutos.';
+                    'Los datos ingresados no coinciden. Revisalos antes de volver a intentar: si el próximo intento tampoco es correcto, deberás esperar un momento para probar nuevamente.';
             } elseif ($remainingAttempts === 2) {
                 $message =
-                    'El email o la contraseña no coinciden. Te quedan 2 intentos antes de que el acceso se pause temporalmente durante 15 minutos.';
+                    'Los datos ingresados no coinciden. Revisalos con atención antes de volver a intentar. Te quedan 2 intentos disponibles.';
             } else {
                 $message =
                     'El email o la contraseña no coinciden. Revisá los datos ingresados y volvé a intentar.';
@@ -132,8 +154,6 @@ class AuthController
             );
         }
 
-
-
         if (
             is_array($result) &&
             isset($result['error'])
@@ -145,8 +165,8 @@ class AuthController
         }
 
         /*
-         * Un login correcto reinicia los contadores
-         * asociados a esa cuenta.
+         * Si el ingreso es correcto, eliminamos
+         * los intentos y penalizaciones acumulados.
          */
         SecurityRateLimitService::clear(
             'auth_login_email_ip',
