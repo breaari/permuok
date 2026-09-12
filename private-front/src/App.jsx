@@ -13,6 +13,7 @@ import Billing from "./features/billing/pages/Billing";
 import AdminPanel from "./features/admin/pages/AdminPanel";
 import AdminRealEstates from "./features/admin/pages/AdminRealEstates";
 import AdminRealEstateDetail from "./features/admin/pages/AdminRealEstateDetail";
+import AdminRealEstateManagement from "./features/admin/pages/AdminRealEstateManagement";
 
 import AppLayout from "./layout/AppLayout";
 import ChangePlan from "./features/billing/pages/ChangePlan";
@@ -174,6 +175,10 @@ export default function App() {
 
         <Route path="admin" element={<AdminPanel />}>
           <Route index element={<AdminDashboard />} />
+          <Route
+            path="real-estate-management"
+            element={<AdminRealEstateManagement />}
+          />
           <Route path="real-estates" element={<AdminRealEstates />} />
           <Route path="real-estates/:id" element={<AdminRealEstateDetail />} />
           <Route path="users" element={<AdminUsers />} />

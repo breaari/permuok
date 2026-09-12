@@ -124,6 +124,13 @@ export default function Sidebar({ mobile = false, onNavigate }) {
               Dashboard
             </Item>
             <Item
+              to="/admin/real-estate-management"
+              icon={<Icon name="building2" />}
+              onClick={onNavigate}
+            >
+              Inmobiliarias
+            </Item>
+            <Item
               to="/admin/real-estates"
               icon={<Icon name="shieldCheck" />}
               onClick={onNavigate}
