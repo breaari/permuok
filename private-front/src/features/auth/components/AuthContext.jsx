@@ -93,11 +93,16 @@ export function AuthProvider({ children }) {
     setLoading(true);
 
     try {
-      const res = await api.post("/auth/login", { email, password });
+      const res = await api.post("/auth/login", {
+        email,
+        password,
+      });
+
       const payload = unwrap(res);
 
       if (typeof payload === "string") {
         const clean = payload.replace(/<[^>]+>/g, "").trim();
+
         throw new Error(clean || "Error inesperado del servidor");
       }
 
@@ -123,8 +128,24 @@ export function AuthProvider({ children }) {
       return current;
     } catch (e) {
       const message = getErrorMessage(e, "No se pudo iniciar sesión");
+
       setError(message);
-      throw new Error(message);
+
+      /*
+       * Conservamos status, data y retry_after.
+       * Login.jsx los necesita para mostrar
+       * la cuenta regresiva.
+       */
+      if (e instanceof Error) {
+        e.message = message;
+        throw e;
+      }
+
+      const loginError = new Error(message);
+      loginError.data = e?.data;
+      loginError.status = e?.status;
+
+      throw loginError;
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,5 @@
 // src/pages/Login.jsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../components/AuthContext";
 import { getErrorMessage } from "../../../api/http.js";
@@ -9,6 +9,31 @@ import AuthLayout from "../../../layout/AuthLayout.jsx";
 import Input from "../../../ui/components/Input";
 import Button from "../../../ui/components/Button";
 import { Icon } from "../../../ui/icons/Index";
+
+function normalizeEmail(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
+function formatRemainingTime(totalSeconds) {
+  const seconds = Math.max(0, Math.ceil(Number(totalSeconds) || 0));
+
+  if (seconds < 60) {
+    return `${seconds} ${seconds === 1 ? "segundo" : "segundos"}`;
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  if (remainingSeconds === 0) {
+    return `${minutes} ${minutes === 1 ? "minuto" : "minutos"}`;
+  }
+
+  return `${minutes}:${
+    remainingSeconds < 10 ? "0" : ""
+  }${remainingSeconds} min`;
+}
 
 export default function Login() {
   const { login } = useAuth();
@@ -20,18 +45,71 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const [blockedSeconds, setBlockedSeconds] = useState(0);
+
+  const [blockedEmail, setBlockedEmail] = useState("");
+
+  const currentEmail = normalizeEmail(email);
+
+  const isBlocked = blockedSeconds > 0 && blockedEmail === currentEmail;
+
+  useEffect(() => {
+    if (blockedSeconds <= 0) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setBlockedSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [blockedSeconds > 0]);
+
+  useEffect(() => {
+    if (blockedSeconds !== 0) {
+      return;
+    }
+
+    setBlockedEmail("");
+  }, [blockedSeconds]);
+
   async function onSubmit(e) {
     e.preventDefault();
+
+    if (isBlocked) {
+      return;
+    }
 
     try {
       setSubmitting(true);
 
-      await login(email.trim().toLowerCase(), password);
+      await login(currentEmail, password);
 
       toast.success("Sesión iniciada correctamente.");
-      nav("/gate", { replace: true });
-    } catch (e) {
-      const message = getErrorMessage(e, "No se pudo iniciar sesión");
+
+      nav("/gate", {
+        replace: true,
+      });
+    } catch (error) {
+      const message = getErrorMessage(error, "No se pudo iniciar sesión");
+
+      const errorDetails =
+        error?.data?.errors && typeof error.data.errors === "object"
+          ? error.data.errors
+          : {};
+
+      const errorCode = errorDetails.code || null;
+
+      const retryAfter = Math.max(0, Number(errorDetails.retry_after) || 0);
+
+      if (errorCode === "RATE_LIMIT_EXCEEDED" && retryAfter > 0) {
+        setBlockedEmail(currentEmail);
+        setBlockedSeconds(Math.ceil(retryAfter));
+
+        return;
+      }
 
       if (String(message).toLowerCase().includes("suspendido")) {
         toast.error(
@@ -103,7 +181,7 @@ export default function Login() {
               <button
                 type="button"
                 className="text-slate-400 hover:text-slate-600"
-                onClick={() => setShowPass((s) => !s)}
+                onClick={() => setShowPass((current) => !current)}
                 tabIndex={-1}
                 aria-label={
                   showPass ? "Ocultar contraseña" : "Mostrar contraseña"
@@ -118,8 +196,37 @@ export default function Login() {
           />
         </div>
 
-        <Button type="submit" disabled={submitting}>
-          {submitting ? "Ingresando..." : "INICIAR SESIÓN"}
+        {isBlocked && (
+          <div
+            className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+            role="alert"
+            aria-live="polite"
+          >
+            <div className="flex items-start gap-3">
+              <Icon name="clock" className="mt-0.5 text-amber-600" />
+
+              <div>
+                <p className="text-sm font-semibold text-amber-900">
+                  Esperá un momento antes de volver a intentar
+                </p>
+
+                <p className="mt-1 text-sm text-amber-800">
+                  Podrás probar nuevamente en{" "}
+                  <strong>{formatRemainingTime(blockedSeconds)}</strong>.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <Button type="submit" disabled={submitting || isBlocked}>
+          {submitting
+            ? "Ingresando..."
+            : isBlocked
+              ? `VOLVÉ A INTENTAR EN ${formatRemainingTime(
+                  blockedSeconds,
+                ).toUpperCase()}`
+              : "INICIAR SESIÓN"}
         </Button>
       </form>
 
