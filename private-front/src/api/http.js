@@ -30,10 +30,7 @@ export function getRefreshToken() {
 }
 
 export function setTokens({ access_token, refresh_token }) {
-  console.log("[AUTH] setTokens()", {
-    hasAccessToken: !!access_token,
-    hasRefreshToken: !!refresh_token,
-  });
+
 
   if (access_token) {
     localStorage.setItem(ACCESS_KEY, access_token);
@@ -169,15 +166,9 @@ function handleBlockedAccountResponse(res, data) {
 async function doRefresh() {
   const refreshToken = getRefreshToken();
 
-  console.log("[AUTH] tryRefresh()", {
-    hasRefreshToken: !!refreshToken,
-    refreshTokenPreview: refreshToken
-      ? `${refreshToken.slice(0, 16)}...`
-      : null,
-  });
 
   if (!refreshToken) {
-    console.log("[AUTH] No refresh token found");
+   
     return false;
   }
 
@@ -206,11 +197,6 @@ async function doRefresh() {
     clearTokens();
     return false;
   } catch (error) {
-    console.log("[AUTH] Refresh failed", {
-      status: error?.status,
-      message: error?.message,
-      data: error?.data,
-    });
 
     clearTokens();
     return false;
@@ -259,7 +245,7 @@ async function request(
   });
 
   if (res.status === 401 && retry && path !== "/refresh") {
-    console.log("[HTTP] 401 detected, trying refresh...", { url });
+    
 
     const refreshed = await tryRefresh();
 

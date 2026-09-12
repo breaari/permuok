@@ -11,11 +11,13 @@ $dotenv->load();
 |--------------------------------------------------------------------------
 */
 $allowedOrigins = [
+    // Desarrollo local
     'http://localhost:5173',
     'http://127.0.0.1:5173',
+
+    // Producción
     'https://permuok.com',
-    'http://permuok.com',
-    'permuok.com',
+    'https://www.permuok.com',
 ];
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -26,6 +28,32 @@ if (in_array($origin, $allowedOrigins, true)) {
 header('Access-Control-Allow-Credentials: true');
 header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+/*
+|--------------------------------------------------------------------------
+| Cabeceras generales de seguridad
+|--------------------------------------------------------------------------
+*/
+
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('Referrer-Policy: no-referrer');
+header(
+    'Permissions-Policy: camera=(), microphone=(), geolocation=()'
+);
+
+/*
+ * HSTS solamente tiene efecto sobre conexiones HTTPS.
+ * Obliga al navegador a continuar utilizando HTTPS.
+ */
+if (
+    isset($_SERVER['HTTPS']) &&
+    $_SERVER['HTTPS'] !== 'off'
+) {
+    header(
+        'Strict-Transport-Security: max-age=31536000; includeSubDomains'
+    );
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
