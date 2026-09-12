@@ -34,8 +34,7 @@ class AdminDashboardService
             'active_real_estates' => self::count($pdo, "
     SELECT COUNT(*)
     FROM real_estates
-    WHERE status = 1
-      AND deleted_at IS NULL
+    WHERE deleted_at IS NULL
 "),
 
             'active_memberships' => self::count($pdo, "

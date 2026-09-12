@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api, unwrap } from "../../../api/http.js";
 import { Icon } from "../../../ui/icons/Index";
 import RejectModal from "../components/RejectModal.jsx";
-
+import AdminOperationalStatusModal from "../components/AdminOperationalStatusModal.jsx";
 import AdminDetailHeader from "../components/detail/AdminDetailHeader";
 import AdminDetailLoading from "../components/detail/AdminDetailLoading";
 import AdminDetailEmpty from "../components/detail/AdminDetailEmpty";
@@ -58,6 +58,8 @@ export default function AdminRealEstateDetail() {
   );
 
   const [rejectOpen, setRejectOpen] = useState(false);
+
+  const [operationalModalOpen, setOperationalModalOpen] = useState(false);
 
   async function load() {
     setErr("");
@@ -129,22 +131,20 @@ export default function AdminRealEstateDetail() {
     }
   }
 
-  async function toggleOperationalStatus() {
+  function openOperationalStatusModal() {
+    if (!re?.id || !canManageOperationalStatus || busy) {
+      return;
+    }
+
+    setOperationalModalOpen(true);
+  }
+
+  async function confirmOperationalStatusChange() {
     if (!re?.id || !canManageOperationalStatus) {
       return;
     }
 
     const nextIsActive = !isOperationallyActive;
-
-    const confirmed = window.confirm(
-      nextIsActive
-        ? `¿Querés reactivar la inmobiliaria "${re?.name || ""}"? Sus usuarios volverán a poder operar en la plataforma.`
-        : `¿Querés suspender la inmobiliaria "${re?.name || ""}"? La inmobiliaria, sus agentes y sus inversores dejarán de poder operar inmediatamente.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
 
     setBusy(true);
     setErr("");
@@ -154,6 +154,8 @@ export default function AdminRealEstateDetail() {
         real_estate_id: re.id,
         is_active: nextIsActive,
       });
+
+      setOperationalModalOpen(false);
 
       await load();
     } catch (e) {
@@ -308,7 +310,7 @@ export default function AdminRealEstateDetail() {
                     : null
                 }
                 actionDisabled={busy}
-                onAction={toggleOperationalStatus}
+                onAction={openOperationalStatusModal}
                 actionClassName={
                   isOperationallyActive
                     ? "bg-rose-600 hover:bg-rose-700 text-white"
@@ -318,7 +320,7 @@ export default function AdminRealEstateDetail() {
                 showDeactivatedAt={false}
                 showDeactivationReason={true}
               />
-              
+
               {showMembershipCard && (
                 <AdminMembershipCard
                   membership={re?.membership}
@@ -420,6 +422,17 @@ export default function AdminRealEstateDetail() {
               setRejectOpen(false);
             }}
             onConfirm={rejectConfirm}
+          />
+          <AdminOperationalStatusModal
+            open={operationalModalOpen}
+            realEstate={re}
+            isActive={isOperationallyActive}
+            busy={busy}
+            onClose={() => {
+              if (busy) return;
+              setOperationalModalOpen(false);
+            }}
+            onConfirm={confirmOperationalStatusChange}
           />
         </>
       )}
