@@ -601,154 +601,166 @@ re.facebook AS real_estate_facebook,
         ];
     }
 
-    public static function updateStatus(int $adminUserId, int $userId, int $isActive, ?string $reason = null): array
-    {
+    public static function updateStatus(
+        int $adminUserId,
+        int $userId,
+        int $isActive,
+        ?string $reason = null
+    ): array {
         $pdo = self::db();
 
+        if (!in_array($isActive, [0, 1], true)) {
+            throw new Exception(
+                "Estado inválido"
+            );
+        }
+
         $st = $pdo->prepare("
-            SELECT id, role, real_estate_id, is_active
-            FROM users
+        SELECT
+            id,
+            role,
+            real_estate_id,
+            is_active
+        FROM users
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'id' => $userId,
+        ]);
+
+        $target = $st->fetch();
+
+        if (!$target) {
+            throw new Exception(
+                "Usuario no encontrado"
+            );
+        }
+
+        if (
+            (int)$target['role']
+            === self::ROLE_SUPER_ADMIN
+        ) {
+            throw new Exception(
+                "No podés modificar un super admin"
+            );
+        }
+
+        if (
+            (int)$target['id']
+            === $adminUserId
+        ) {
+            throw new Exception(
+                "No podés modificar tu propio estado"
+            );
+        }
+
+        $reason =
+            trim(
+                (string)$reason
+            );
+
+        if (
+            $isActive === 0
+            && $reason === ''
+        ) {
+            throw new Exception(
+                "El motivo de desactivación es requerido"
+            );
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Sin cambios
+    |--------------------------------------------------------------------------
+    */
+
+        if (
+            (int)$target['is_active']
+            === $isActive
+        ) {
+            return [
+                'updated' => false,
+                'user_id' => $userId,
+                'is_active' => $isActive,
+                'reason' =>
+                $isActive === 0
+                    ? $reason
+                    : null,
+            ];
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Activar usuario
+    |--------------------------------------------------------------------------
+    */
+
+        if ($isActive === 1) {
+            $st = $pdo->prepare("
+            UPDATE users
+            SET
+                is_active = 1,
+                deactivation_reason = NULL,
+                deactivated_at = NULL,
+                deactivated_by = NULL
             WHERE id = :id
               AND deleted_at IS NULL
             LIMIT 1
         ");
-        $st->execute(['id' => $userId]);
-        $target = $st->fetch();
 
-        if (!$target) {
-            throw new Exception("Usuario no encontrado");
-        }
-
-        if ((int)$target['role'] === self::ROLE_SUPER_ADMIN) {
-            throw new Exception("No podés modificar un super admin");
-        }
-
-        if ((int)$target['id'] === (int)$adminUserId) {
-            throw new Exception("No podés modificar tu propio estado");
-        }
-
-        $reason = trim((string)$reason);
-
-        if ($isActive === 0 && $reason === '') {
-            throw new Exception("El motivo de desactivación es requerido");
-        }
-
-        $pdo->beginTransaction();
-
-        try {
-            if ((int)$target['role'] === self::ROLE_REAL_ESTATE) {
-                self::updateRealEstateTreeStatus(
-                    $pdo,
-                    (int)$adminUserId,
-                    (int)$target['id'],
-                    (int)$target['real_estate_id'],
-                    $isActive,
-                    $reason
-                );
-            } else {
-                if ($isActive === 1) {
-                    $st = $pdo->prepare("
-                        UPDATE users
-                        SET
-                            is_active = 1,
-                            deactivation_reason = NULL,
-                            deactivated_at = NULL,
-                            deactivated_by = NULL
-                        WHERE id = :id
-                        LIMIT 1
-                    ");
-                    $st->execute(['id' => $userId]);
-                } else {
-                    $st = $pdo->prepare("
-                        UPDATE users
-                        SET
-                            is_active = 0,
-                            deactivation_reason = :reason,
-                            deactivated_at = NOW(),
-                            deactivated_by = :admin_id
-                        WHERE id = :id
-                        LIMIT 1
-                    ");
-                    $st->execute([
-                        'reason' => $reason,
-                        'admin_id' => $adminUserId,
-                        'id' => $userId,
-                    ]);
-                }
-            }
-
-            $pdo->commit();
+            $st->execute([
+                'id' => $userId,
+            ]);
 
             return [
                 'updated' => true,
                 'user_id' => $userId,
-                'is_active' => $isActive,
-                'reason' => $isActive === 0 ? $reason : null,
+                'is_active' => 1,
+                'reason' => null,
             ];
-        } catch (\Throwable $e) {
-            $pdo->rollBack();
-            throw $e;
-        }
-    }
-
-    private static function updateRealEstateTreeStatus(
-        PDO $pdo,
-        int $adminUserId,
-        int $realEstateUserId,
-        ?int $realEstateId,
-        int $isActive,
-        string $reason
-    ): void {
-        if (!$realEstateId) {
-            throw new Exception("La inmobiliaria no está vinculada");
         }
 
-        if ($isActive === 1) {
-            $st = $pdo->prepare("
-                UPDATE users
-                SET
-                    is_active = 1,
-                    deactivation_reason = NULL,
-                    deactivated_at = NULL,
-                    deactivated_by = NULL
-                WHERE (
-                    id = :owner_id
-                    OR (
-                        real_estate_id = :real_estate_id
-                        AND role IN (" . self::ROLE_AGENT . ", " . self::ROLE_INVESTOR . ")
-                    )
-                )
-                  AND deleted_at IS NULL
-            ");
-            $st->execute([
-                'owner_id' => $realEstateUserId,
-                'real_estate_id' => $realEstateId,
-            ]);
-
-            return;
-        }
+        /*
+    |--------------------------------------------------------------------------
+    | Desactivar usuario
+    |--------------------------------------------------------------------------
+    |
+    | Importante:
+    | esto afecta únicamente a esta cuenta.
+    |
+    | Para bloquear una inmobiliaria completa debe utilizarse
+    | la suspensión administrativa de la inmobiliaria.
+    |--------------------------------------------------------------------------
+    */
 
         $st = $pdo->prepare("
-            UPDATE users
-            SET
-                is_active = 0,
-                deactivation_reason = :reason,
-                deactivated_at = NOW(),
-                deactivated_by = :admin_id
-            WHERE (
-                id = :owner_id
-                OR (
-                    real_estate_id = :real_estate_id
-                    AND role IN (" . self::ROLE_AGENT . ", " . self::ROLE_INVESTOR . ")
-                )
-            )
-              AND deleted_at IS NULL
-        ");
+        UPDATE users
+        SET
+            is_active = 0,
+            deactivation_reason = :reason,
+            deactivated_at = NOW(),
+            deactivated_by = :admin_id
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
         $st->execute([
             'reason' => $reason,
             'admin_id' => $adminUserId,
-            'owner_id' => $realEstateUserId,
-            'real_estate_id' => $realEstateId,
+            'id' => $userId,
         ]);
+
+        return [
+            'updated' => true,
+            'user_id' => $userId,
+            'is_active' => 0,
+            'reason' => $reason,
+        ];
     }
+
+   
 }
