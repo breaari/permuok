@@ -319,10 +319,9 @@ export default function SearchRequestDetail() {
                 ? "Las cuentas inversoras pueden explorar búsquedas, pero no iniciar conversaciones ni propuestas."
                 : ""
             }
-            onContact={
-              canContact
-                ? () => setContactModalOpen(true)
-                : handleBlockedContact
+            onContact={canContact ? handleContactAction : handleBlockedContact}
+            contactLabel={
+              existingConversationId ? "Ver conversación" : undefined
             }
           />
         </div>

@@ -21,7 +21,9 @@ function normalizeSidebarItems(quickFacts = [], summaryItems = []) {
 
   return merged.filter((item) => {
     const label = String(item?.label || "").trim();
+
     const value = item?.value;
+
     const key = label.toLowerCase();
 
     if (!label) return false;
@@ -30,6 +32,7 @@ function normalizeSidebarItems(quickFacts = [], summaryItems = []) {
     if (seen.has(key)) return false;
 
     seen.add(key);
+
     return true;
   });
 }
@@ -40,11 +43,14 @@ export default function SearchRequestSidebar({
   summaryItems = [],
   canContact = true,
   contactDisabledReason = "",
+  contactLabel = "",
   onContact,
 }) {
   const items = normalizeSidebarItems(quickFacts, summaryItems);
 
-  const buttonLabel = canContact ? "Contactar intercambio" : "Solo visualización";
+  const buttonLabel = canContact
+    ? contactLabel || "Contactar intercambio"
+    : "Solo visualización";
 
   return (
     <div className="space-y-6 lg:col-span-4">
