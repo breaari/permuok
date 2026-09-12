@@ -384,54 +384,240 @@ class AdminRealEstateService
         }
     }
 
-    public static function getDetail(int $realEstateId): array
-    {
+    private static function getMembershipSummary(
+        int $realEstateId
+    ): array {
         $pdo = self::db();
 
         $st = $pdo->prepare("
-            SELECT
-                r.id,
-                r.name,
-                r.legal_name,
-                r.cuit,
-                r.email,
-                r.phone,
-                r.address,
-                r.website,
-                r.instagram,
-                r.facebook,
-                r.status,
-                r.profile_status,
-                r.validation_status,
-                r.validation_note,
-                r.review_requested_at,
-                r.changes_requested_at,
-                r.approved_at,
-                r.approved_by,
-                u.email AS approved_by_email,
-                r.created_at,
-                r.validated_at,
-                r.address_place_id,
-                r.address_lat,
-                r.address_lng
-            FROM real_estates r
-            LEFT JOIN users u ON u.id = r.approved_by
-            WHERE r.deleted_at IS NULL
-              AND r.id = :id
-            LIMIT 1
-        ");
-        $st->execute(['id' => $realEstateId]);
-        $re = $st->fetch();
+        SELECT
+            m.id,
+            m.plan_id,
+            m.scheduled_plan_id,
+            m.status,
+            m.billing_cycle,
+            m.cancel_at_period_end,
+            m.cancelled_at,
+            m.start_date,
+            m.end_date,
+            m.scheduled_change_at,
+            m.mp_last_payment_id,
 
-        if (!$re) {
-            throw new \Exception("Inmobiliaria no encontrada");
+            p.code AS plan_code,
+            p.name AS plan_name,
+            p.price_ars AS plan_price_ars,
+
+            sp.code AS scheduled_plan_code,
+            sp.name AS scheduled_plan_name,
+            sp.price_ars AS scheduled_plan_price_ars
+
+        FROM memberships m
+
+        LEFT JOIN plans p
+            ON p.id = m.plan_id
+
+        LEFT JOIN plans sp
+            ON sp.id = m.scheduled_plan_id
+
+        WHERE m.real_estate_id = :real_estate_id
+          AND m.deleted_at IS NULL
+
+        ORDER BY m.id DESC
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'real_estate_id' => $realEstateId,
+        ]);
+
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            return [
+                'membership' => null,
+                'membership_status' => 'none',
+                'plan' => null,
+                'scheduled_plan' => null,
+            ];
         }
 
-        $re['admin_profile_stage'] = RealEstateService::resolveAdminProfileStage($re);
+        $rawStatus = (int)$row['status'];
+
+        if ($rawStatus === 0) {
+            $membershipStatus = 'pending';
+        } elseif ($rawStatus === 2) {
+            $membershipStatus = 'expired';
+        } elseif ($rawStatus === 3) {
+            $membershipStatus = 'cancelled';
+        } elseif (
+            $rawStatus === 1 &&
+            !empty($row['end_date']) &&
+            $row['end_date'] < date('Y-m-d')
+        ) {
+            $membershipStatus = 'expired';
+        } elseif (
+            $rawStatus === 1 &&
+            (int)($row['cancel_at_period_end'] ?? 0) === 1
+        ) {
+            $membershipStatus = 'cancel_at_period_end';
+        } elseif (
+            $rawStatus === 1 &&
+            !empty($row['scheduled_plan_id'])
+        ) {
+            $membershipStatus = 'scheduled_change';
+        } elseif ($rawStatus === 1) {
+            $membershipStatus = 'active';
+        } else {
+            $membershipStatus = 'none';
+        }
+
+        return [
+            'membership' => [
+                'id' => (int)$row['id'],
+                'plan_id' => $row['plan_id'] !== null
+                    ? (int)$row['plan_id']
+                    : null,
+                'scheduled_plan_id' =>
+                $row['scheduled_plan_id'] !== null
+                    ? (int)$row['scheduled_plan_id']
+                    : null,
+                'status' => $rawStatus,
+                'billing_cycle' =>
+                $row['billing_cycle'] !== null
+                    ? (int)$row['billing_cycle']
+                    : null,
+                'cancel_at_period_end' =>
+                (int)($row['cancel_at_period_end'] ?? 0),
+                'cancelled_at' =>
+                $row['cancelled_at'] ?? null,
+                'start_date' =>
+                $row['start_date'] ?? null,
+                'end_date' =>
+                $row['end_date'] ?? null,
+                'scheduled_change_at' =>
+                $row['scheduled_change_at'] ?? null,
+                'mp_last_payment_id' =>
+                $row['mp_last_payment_id'] !== null
+                    ? (int)$row['mp_last_payment_id']
+                    : null,
+            ],
+
+            'membership_status' =>
+            $membershipStatus,
+
+            'plan' => $row['plan_id'] !== null
+                ? [
+                    'id' => (int)$row['plan_id'],
+                    'code' => $row['plan_code'] ?? null,
+                    'name' => $row['plan_name'] ?? null,
+                    'price_ars' =>
+                    isset($row['plan_price_ars'])
+                        ? (int)$row['plan_price_ars']
+                        : null,
+                ]
+                : null,
+
+            'scheduled_plan' =>
+            $row['scheduled_plan_id'] !== null
+                ? [
+                    'id' =>
+                    (int)$row['scheduled_plan_id'],
+                    'code' =>
+                    $row['scheduled_plan_code'] ?? null,
+                    'name' =>
+                    $row['scheduled_plan_name'] ?? null,
+                    'price_ars' =>
+                    isset($row['scheduled_plan_price_ars'])
+                        ? (int)$row['scheduled_plan_price_ars']
+                        : null,
+                ]
+                : null,
+        ];
+    }
+
+    public static function getDetail(
+        int $realEstateId
+    ): array {
+        $pdo = self::db();
+
+        $st = $pdo->prepare("
+        SELECT
+            r.id,
+            r.name,
+            r.legal_name,
+            r.cuit,
+            r.email,
+            r.phone,
+            r.address,
+            r.website,
+            r.instagram,
+            r.facebook,
+            r.status,
+            r.profile_status,
+            r.validation_status,
+            r.validation_note,
+            r.review_requested_at,
+            r.changes_requested_at,
+            r.approved_at,
+            r.approved_by,
+            u.email AS approved_by_email,
+            r.created_at,
+            r.validated_at,
+            r.address_place_id,
+            r.address_lat,
+            r.address_lng
+
+        FROM real_estates r
+
+        LEFT JOIN users u
+            ON u.id = r.approved_by
+
+        WHERE r.deleted_at IS NULL
+          AND r.id = :id
+
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'id' => $realEstateId,
+        ]);
+
+        $re = $st->fetch(PDO::FETCH_ASSOC);
+
+        if (!$re) {
+            throw new \Exception(
+                "Inmobiliaria no encontrada"
+            );
+        }
+
+        $re['admin_profile_stage'] =
+            RealEstateService::resolveAdminProfileStage(
+                $re
+            );
+
+        $billing =
+            self::getMembershipSummary(
+                $realEstateId
+            );
+
+        $re['membership'] =
+            $billing['membership'];
+
+        $re['membership_status'] =
+            $billing['membership_status'];
+
+        $re['plan'] =
+            $billing['plan'];
+
+        $re['scheduled_plan'] =
+            $billing['scheduled_plan'];
 
         return [
             'real_estate' => $re,
-            'licenses' => self::listLicenses($realEstateId),
+            'licenses' =>
+            self::listLicenses(
+                $realEstateId
+            ),
         ];
     }
 

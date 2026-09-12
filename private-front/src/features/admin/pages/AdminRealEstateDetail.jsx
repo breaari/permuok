@@ -252,9 +252,15 @@ export default function AdminRealEstateDetail() {
                   membershipTone={membershipStatusClasses(
                     re?.membership_status,
                   )}
+                  plan={re?.plan}
+                  scheduledPlan={re?.scheduled_plan}
                   formatDate={formatDate}
-                  onViewMore={() => navigate("/admin/memberships")}
-                  emptyMessage="Esta inmobiliaria todavía no tiene una membresía activa asociada."
+                  onViewMore={() =>
+                    navigate(
+                      `/admin/billing?q=${encodeURIComponent(re?.name || "")}`,
+                    )
+                  }
+                  emptyMessage="Esta inmobiliaria todavía no tiene una membresía asociada."
                 />
               )}
             </div>
