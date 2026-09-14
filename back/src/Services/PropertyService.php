@@ -26,9 +26,14 @@ class PropertyService
         int $propertyId,
         array $draft = []
     ): array {
-        self::getOwnedProperty(
+        [$user] = self::getOwnedProperty(
             $userId,
             $propertyId
+        );
+
+        self::consumeAICopyLimits(
+            $userId,
+            (int)$user['real_estate_id']
         );
 
         return PublicationAICopyService::generatePropertyTitle(
@@ -43,15 +48,104 @@ class PropertyService
         int $propertyId,
         array $draft = []
     ): array {
-        self::getOwnedProperty(
+        [$user] = self::getOwnedProperty(
             $userId,
             $propertyId
+        );
+
+        self::consumeAICopyLimits(
+            $userId,
+            (int)$user['real_estate_id']
         );
 
         return PublicationAICopyService::generatePropertyDescription(
             $propertyId,
             $userId,
             $draft
+        );
+    }
+
+    public static function requestAIAnalysis(
+        int $userId,
+        int $propertyId
+    ): array {
+        /*
+     * Primero validamos la propiedad.
+     * Una propiedad ajena no consume cupo.
+     */
+        [$user] = self::getOwnedProperty(
+            $userId,
+            $propertyId
+        );
+
+        self::consumeAIAnalysisLimits(
+            $userId,
+            (int)$user['real_estate_id']
+        );
+
+        return PublicationAIAnalysisService::requestPropertyAnalysis(
+            $propertyId
+        );
+    }
+
+    /**
+     * Límites para generación inmediata
+     * de títulos y descripciones.
+     */
+    private static function consumeAICopyLimits(
+        int $userId,
+        int $realEstateId
+    ): void {
+        /*
+     * Máximo 10 generaciones combinadas
+     * cada 5 minutos por usuario.
+     */
+        SecurityRateLimitService::consume(
+            'ai_copy_user',
+            (string)$userId,
+            10,
+            5 * 60
+        );
+
+        /*
+     * Máximo 100 operaciones de IA
+     * por inmobiliaria cada 24 horas.
+     */
+        SecurityRateLimitService::consume(
+            'ai_daily_real_estate',
+            (string)$realEstateId,
+            100,
+            24 * 60 * 60
+        );
+    }
+
+    /**
+     * Límites para solicitar análisis profundos.
+     */
+    private static function consumeAIAnalysisLimits(
+        int $userId,
+        int $realEstateId
+    ): void {
+        /*
+     * Máximo 10 solicitudes de análisis
+     * por usuario cada hora.
+     */
+        SecurityRateLimitService::consume(
+            'ai_analysis_user',
+            (string)$userId,
+            10,
+            60 * 60
+        );
+
+        /*
+     * Comparte el cupo diario general
+     * con títulos y descripciones.
+     */
+        SecurityRateLimitService::consume(
+            'ai_daily_real_estate',
+            (string)$realEstateId,
+            100,
+            24 * 60 * 60
         );
     }
 
@@ -62,26 +156,6 @@ class PropertyService
         }
 
         return '/property-images/' . $imageId . '/view';
-    }
-
-    public static function requestAIAnalysis(
-        int $userId,
-        int $propertyId
-    ): array {
-        /*
-     * Valida usuario y propiedad.
-     *
-     * Sólo puede analizar una propiedad perteneciente
-     * a su propia inmobiliaria.
-     */
-        self::getOwnedProperty(
-            $userId,
-            $propertyId
-        );
-
-        return PublicationAIAnalysisService::requestPropertyAnalysis(
-            $propertyId
-        );
     }
 
     public static function getAIAnalysis(
