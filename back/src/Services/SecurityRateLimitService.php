@@ -491,6 +491,220 @@ class SecurityRateLimitService
     }
 
     /**
+     * Consume un cupo para una operación con IA.
+     *
+     * A diferencia de hit():
+     * - permite exactamente la cantidad configurada;
+     * - el siguiente intento responde 429;
+     * - utiliza mensajes específicos para IA;
+     * - devuelve el tiempo restante.
+     */
+    public static function consume(
+        string $action,
+        string $identifier,
+        int $maxRequests,
+        int $windowSeconds
+    ): array {
+        $action = trim($action);
+        $identifier = trim($identifier);
+
+        if (
+            $action === '' ||
+            $identifier === '' ||
+            $maxRequests <= 0 ||
+            $windowSeconds <= 0
+        ) {
+            throw new \InvalidArgumentException(
+                'Configuración de límite de IA inválida.'
+            );
+        }
+
+        $pdo = self::db();
+
+        $identifierHash = hash(
+            'sha256',
+            $identifier
+        );
+
+        /*
+     * Incremento atómico para soportar
+     * solicitudes simultáneas.
+     */
+        $stmt = $pdo->prepare("
+        INSERT INTO security_rate_limits (
+            action,
+            identifier_hash,
+            window_started_at,
+            attempts,
+            blocked_until,
+            penalty_level
+        )
+        VALUES (
+            :action,
+            :identifier_hash,
+            NOW(),
+            1,
+            NULL,
+            0
+        )
+        ON DUPLICATE KEY UPDATE
+            attempts = CASE
+                WHEN window_started_at <
+                    DATE_SUB(
+                        NOW(),
+                        INTERVAL {$windowSeconds} SECOND
+                    )
+                    THEN 1
+                ELSE attempts + 1
+            END,
+
+            window_started_at = CASE
+                WHEN window_started_at <
+                    DATE_SUB(
+                        NOW(),
+                        INTERVAL {$windowSeconds} SECOND
+                    )
+                    THEN NOW()
+                ELSE window_started_at
+            END,
+
+            updated_at = NOW()
+    ");
+
+        $stmt->execute([
+            ':action' => $action,
+            ':identifier_hash' => $identifierHash,
+        ]);
+
+        $stmt = $pdo->prepare("
+        SELECT
+            attempts,
+
+            GREATEST(
+                1,
+                TIMESTAMPDIFF(
+                    SECOND,
+                    NOW(),
+                    DATE_ADD(
+                        window_started_at,
+                        INTERVAL {$windowSeconds} SECOND
+                    )
+                )
+            ) AS retry_after
+
+        FROM security_rate_limits
+
+        WHERE action = :action
+          AND identifier_hash = :identifier_hash
+
+        LIMIT 1
+    ");
+
+        $stmt->execute([
+            ':action' => $action,
+            ':identifier_hash' => $identifierHash,
+        ]);
+
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            return [
+                'used' => 0,
+                'remaining' => $maxRequests,
+                'retry_after' => 0,
+            ];
+        }
+
+        $used =
+            (int)$row['attempts'];
+
+        $remaining = max(
+            0,
+            $maxRequests - $used
+        );
+
+        $retryAfter = max(
+            1,
+            (int)($row['retry_after'] ?? $windowSeconds)
+        );
+
+        header(
+            'X-RateLimit-Limit: ' . $maxRequests
+        );
+
+        header(
+            'X-RateLimit-Remaining: ' . $remaining
+        );
+
+        /*
+     * Permitimos exactamente maxRequests.
+     * Recién bloqueamos la solicitud siguiente.
+     */
+        if ($used > $maxRequests) {
+            header(
+                'Retry-After: ' . $retryAfter
+            );
+
+            if ($retryAfter < 60) {
+                $waitText =
+                    $retryAfter .
+                    (
+                        $retryAfter === 1
+                        ? ' segundo'
+                        : ' segundos'
+                    );
+            } elseif ($retryAfter < 3600) {
+                $minutes =
+                    (int)ceil($retryAfter / 60);
+
+                $waitText =
+                    $minutes .
+                    (
+                        $minutes === 1
+                        ? ' minuto'
+                        : ' minutos'
+                    );
+            } else {
+                $hours =
+                    (int)ceil($retryAfter / 3600);
+
+                $waitText =
+                    $hours .
+                    (
+                        $hours === 1
+                        ? ' hora'
+                        : ' horas'
+                    );
+            }
+
+            ResponseHelper::fail(
+                'Alcanzaste el límite temporal de funciones con IA. Podrás volver a utilizarlas en ' .
+                    $waitText .
+                    '.',
+                429,
+                [
+                    'code' => 'AI_RATE_LIMIT_EXCEEDED',
+                    'retry_after' => $retryAfter,
+                    'remaining_requests' => 0,
+                ]
+            );
+
+            return [
+                'used' => $used,
+                'remaining' => 0,
+                'retry_after' => $retryAfter,
+            ];
+        }
+
+        return [
+            'used' => $used,
+            'remaining' => $remaining,
+            'retry_after' => $retryAfter,
+        ];
+    }
+
+
+    /**
      * Reinicia un contador, por ejemplo después
      * de un inicio de sesión correcto.
      */
