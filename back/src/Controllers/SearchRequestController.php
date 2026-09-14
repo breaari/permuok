@@ -9,6 +9,7 @@ use App\Services\MembershipGuard;
 use App\Services\AI\SearchRequestAIAnalysisService;
 use App\Services\AI\SearchRequestQualityScoreService;
 use App\Services\AI\SearchRequestAICopyService;
+use App\Services\SecurityRateLimitService;
 
 class SearchRequestController
 {
@@ -162,45 +163,6 @@ class SearchRequestController
         }
     }
 
-    public static function requestAIAnalysis(): void
-    {
-        try {
-            $auth = AuthHelper::requireUser();
-
-            MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
-            );
-
-            $id = (int)($_GET['id'] ?? 0);
-
-            if ($id <= 0) {
-                throw new \Exception(
-                    'El ID de la búsqueda no es válido.'
-                );
-            }
-
-            /*
-         * Valida que la búsqueda pertenezca
-         * a la inmobiliaria del usuario.
-         */
-            SearchRequestService::getDetail(
-                (int)$auth['id'],
-                $id
-            );
-
-            $result =
-                SearchRequestAIAnalysisService::requestAnalysis(
-                    $id
-                );
-
-            ResponseHelper::ok($result);
-        } catch (\Throwable $e) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                400
-            );
-        }
-    }
 
     public static function getQuality(): void
     {
@@ -251,6 +213,56 @@ class SearchRequestController
         }
     }
 
+
+    public static function requestAIAnalysis(): void
+    {
+        try {
+            $auth =
+                AuthHelper::requireUser();
+
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
+
+            $id =
+                (int)($_GET['id'] ?? 0);
+
+            if ($id <= 0) {
+                throw new \Exception(
+                    'El ID de la búsqueda no es válido.'
+                );
+            }
+
+            /*
+         * Primero verificamos pertenencia.
+         * Una búsqueda ajena no consume cupo.
+         */
+            SearchRequestService::getDetail(
+                (int)$auth['id'],
+                $id
+            );
+
+            self::consumeAIAnalysisLimits(
+                (int)$auth['id'],
+                (int)$auth['real_estate_id']
+            );
+
+            $result =
+                SearchRequestAIAnalysisService::requestAnalysis(
+                    $id
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
+        } catch (\Throwable $e) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                400
+            );
+        }
+    }
+
     public static function generateAITitle(): void
     {
         try {
@@ -271,12 +283,16 @@ class SearchRequestController
             }
 
             /*
-         * Verificamos ownership antes de
-         * generar contenido con IA.
+         * Primero verificamos pertenencia.
          */
             SearchRequestService::getDetail(
                 (int)$auth['id'],
                 $id
+            );
+
+            self::consumeAICopyLimits(
+                (int)$auth['id'],
+                (int)$auth['real_estate_id']
             );
 
             $data =
@@ -286,9 +302,7 @@ class SearchRequestController
                 ) ?? [];
 
             $draft =
-                is_array(
-                    $data['draft'] ?? null
-                )
+                is_array($data['draft'] ?? null)
                 ? $data['draft']
                 : [];
 
@@ -330,12 +344,16 @@ class SearchRequestController
             }
 
             /*
-         * Verificamos ownership antes de
-         * generar contenido con IA.
+         * Primero verificamos pertenencia.
          */
             SearchRequestService::getDetail(
                 (int)$auth['id'],
                 $id
+            );
+
+            self::consumeAICopyLimits(
+                (int)$auth['id'],
+                (int)$auth['real_estate_id']
             );
 
             $data =
@@ -345,9 +363,7 @@ class SearchRequestController
                 ) ?? [];
 
             $draft =
-                is_array(
-                    $data['draft'] ?? null
-                )
+                is_array($data['draft'] ?? null)
                 ? $data['draft']
                 : [];
 
@@ -367,5 +383,43 @@ class SearchRequestController
                 400
             );
         }
+    }
+
+    private static function consumeAICopyLimits(
+        int $userId,
+        int $realEstateId
+    ): void {
+        SecurityRateLimitService::consume(
+            'ai_copy_user',
+            (string)$userId,
+            10,
+            5 * 60
+        );
+
+        SecurityRateLimitService::consume(
+            'ai_daily_real_estate',
+            (string)$realEstateId,
+            100,
+            24 * 60 * 60
+        );
+    }
+
+    private static function consumeAIAnalysisLimits(
+        int $userId,
+        int $realEstateId
+    ): void {
+        SecurityRateLimitService::consume(
+            'ai_analysis_user',
+            (string)$userId,
+            10,
+            60 * 60
+        );
+
+        SecurityRateLimitService::consume(
+            'ai_daily_real_estate',
+            (string)$realEstateId,
+            100,
+            24 * 60 * 60
+        );
     }
 }
