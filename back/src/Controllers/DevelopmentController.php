@@ -376,7 +376,7 @@ class DevelopmentController
         SecurityRateLimitService::consume(
             'ai_copy_user',
             (string)$userId,
-            10,
+            30,
             5 * 60
         );
 
@@ -395,14 +395,14 @@ class DevelopmentController
         SecurityRateLimitService::consume(
             'ai_analysis_user',
             (string)$userId,
-            10,
+            20,
             60 * 60
         );
 
         SecurityRateLimitService::consume(
             'ai_daily_real_estate',
             (string)$realEstateId,
-            100,
+            1000,
             24 * 60 * 60
         );
     }
