@@ -114,7 +114,7 @@ class PropertyService
         SecurityRateLimitService::consume(
             'ai_daily_real_estate',
             (string)$realEstateId,
-            100,
+            1000,
             24 * 60 * 60
         );
     }
