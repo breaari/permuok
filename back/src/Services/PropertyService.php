@@ -149,13 +149,17 @@ class PropertyService
         );
     }
 
-    private static function imageViewUrl(?int $imageId): ?string
-    {
-        if (!$imageId) {
+    private static function imageViewUrl(
+        ?int $imageId
+    ): ?string {
+        if (!$imageId || $imageId <= 0) {
             return null;
         }
 
-        return '/property-images/' . $imageId . '/view';
+        return ImageUrlSignatureService::generate(
+            'property',
+            $imageId
+        );
     }
 
     public static function getAIAnalysis(

@@ -16,13 +16,17 @@ class DevelopmentService
         return pdo();
     }
 
-    private static function imageViewUrl(?int $imageId): ?string
-    {
-        if (!$imageId) {
+    private static function imageViewUrl(
+        ?int $imageId
+    ): ?string {
+        if (!$imageId || $imageId <= 0) {
             return null;
         }
 
-        return '/development-images/' . $imageId . '/view';
+        return ImageUrlSignatureService::generate(
+            'development',
+            $imageId
+        );
     }
 
     private static function getValidUser(int $userId): array
