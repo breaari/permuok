@@ -3500,8 +3500,10 @@ THEN 1
         return $conversation;
     }
 
-    private static function getOpportunityImageUrl(string $type, int $id): ?string
-    {
+    private static function getOpportunityImageUrl(
+        string $type,
+        int $id
+    ): ?string {
         $pdo = self::db();
 
         if ($type === 'property') {
@@ -3510,15 +3512,26 @@ THEN 1
             FROM property_images
             WHERE property_id = :id
               AND deleted_at IS NULL
-            ORDER BY is_cover DESC, sort_order ASC, id ASC
+            ORDER BY
+                is_cover DESC,
+                sort_order ASC,
+                id ASC
             LIMIT 1
         ");
 
-            $stmt->execute([':id' => $id]);
+            $stmt->execute([
+                ':id' => $id,
+            ]);
 
-            $imageId = $stmt->fetchColumn();
+            $imageId =
+                (int)($stmt->fetchColumn() ?: 0);
 
-            return $imageId ? '/property-images/' . $imageId . '/view' : null;
+            return $imageId > 0
+                ? ImageUrlSignatureService::generate(
+                    'property',
+                    $imageId
+                )
+                : null;
         }
 
         if ($type === 'development') {
@@ -3527,15 +3540,26 @@ THEN 1
             FROM development_images
             WHERE development_id = :id
               AND deleted_at IS NULL
-            ORDER BY is_cover DESC, sort_order ASC, id ASC
+            ORDER BY
+                is_cover DESC,
+                sort_order ASC,
+                id ASC
             LIMIT 1
         ");
 
-            $stmt->execute([':id' => $id]);
+            $stmt->execute([
+                ':id' => $id,
+            ]);
 
-            $imageId = $stmt->fetchColumn();
+            $imageId =
+                (int)($stmt->fetchColumn() ?: 0);
 
-            return $imageId ? '/development-images/' . $imageId . '/view' : null;
+            return $imageId > 0
+                ? ImageUrlSignatureService::generate(
+                    'development',
+                    $imageId
+                )
+                : null;
         }
 
         return null;

@@ -1612,9 +1612,10 @@ c.target_seen_at,
 
                 'cover_image_url' =>
                 !empty($row['property_cover_image_id'])
-                    ? '/property-images/' .
-                    (int)$row['property_cover_image_id'] .
-                    '/view'
+                    ? ImageUrlSignatureService::generate(
+                        'property',
+                        (int)$row['property_cover_image_id']
+                    )
                     : null,
             ],
 

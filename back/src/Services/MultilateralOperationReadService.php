@@ -607,10 +607,11 @@ ml.cash_difference_direction
                 'status' => $leg['offered_property_status'],
 
                 'cover_image_url' =>
-                $leg['offered_property_cover_image_id']
-                    ? '/property-images/' .
-                    $leg['offered_property_cover_image_id'] .
-                    '/view'
+                !empty($leg['offered_property_cover_image_id'])
+                    ? ImageUrlSignatureService::generate(
+                        'property',
+                        (int)$leg['offered_property_cover_image_id']
+                    )
                     : null,
             ];
 
@@ -634,10 +635,11 @@ ml.cash_difference_direction
                 'status' => $leg['property_status'],
 
                 'cover_image_url' =>
-                $leg['property_cover_image_id']
-                    ? '/property-images/' .
-                    $leg['property_cover_image_id'] .
-                    '/view'
+                !empty($leg['property_cover_image_id'])
+                    ? ImageUrlSignatureService::generate(
+                        'property',
+                        (int)$leg['property_cover_image_id']
+                    )
                     : null,
             ];
 

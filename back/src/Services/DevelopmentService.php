@@ -695,8 +695,40 @@ class DevelopmentService
             $row['images'] = [];
 
             if (!empty($row['images_json'])) {
-                $decoded = json_decode((string)$row['images_json'], true);
-                $row['images'] = is_array($decoded) ? $decoded : [];
+                $decoded =
+                    json_decode(
+                        (string)$row['images_json'],
+                        true
+                    );
+
+                $decoded =
+                    is_array($decoded)
+                    ? $decoded
+                    : [];
+
+                $row['images'] =
+                    array_map(
+                        static function (
+                            array $image
+                        ): array {
+                            $imageId =
+                                (int)($image['id'] ?? 0);
+
+                            $image['id'] =
+                                $imageId;
+
+                            $image['view_url'] =
+                                $imageId > 0
+                                ? ImageUrlSignatureService::generate(
+                                    'development',
+                                    $imageId
+                                )
+                                : null;
+
+                            return $image;
+                        },
+                        $decoded
+                    );
             }
 
             unset($row['images_json']);
@@ -871,8 +903,40 @@ class DevelopmentService
             $row['images'] = [];
 
             if (!empty($row['images_json'])) {
-                $decoded = json_decode((string)$row['images_json'], true);
-                $row['images'] = is_array($decoded) ? $decoded : [];
+                $decoded =
+                    json_decode(
+                        (string)$row['images_json'],
+                        true
+                    );
+
+                $decoded =
+                    is_array($decoded)
+                    ? $decoded
+                    : [];
+
+                $row['images'] =
+                    array_map(
+                        static function (
+                            array $image
+                        ): array {
+                            $imageId =
+                                (int)($image['id'] ?? 0);
+
+                            $image['id'] =
+                                $imageId;
+
+                            $image['view_url'] =
+                                $imageId > 0
+                                ? ImageUrlSignatureService::generate(
+                                    'development',
+                                    $imageId
+                                )
+                                : null;
+
+                            return $image;
+                        },
+                        $decoded
+                    );
             }
 
             unset($row['images_json']);

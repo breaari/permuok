@@ -11,22 +11,33 @@ class ExploreService
         require_once __DIR__ . '/../../db.php';
         return pdo();
     }
-    private static function imageViewUrl(?int $imageId): ?string
-    {
-        if (!$imageId) {
+    
+    private static function imageViewUrl(
+        ?int $imageId
+    ): ?string {
+        if (!$imageId || $imageId <= 0) {
             return null;
         }
 
-        return '/property-images/' . $imageId . '/view';
+        return ImageUrlSignatureService::generate(
+            'property',
+            $imageId
+        );
     }
-    private static function developmentImageViewUrl(?int $imageId): ?string
-    {
-        if (!$imageId) {
+
+    private static function developmentImageViewUrl(
+        ?int $imageId
+    ): ?string {
+        if (!$imageId || $imageId <= 0) {
             return null;
         }
 
-        return '/development-images/' . $imageId . '/view';
+        return ImageUrlSignatureService::generate(
+            'development',
+            $imageId
+        );
     }
+
     private static function getUserRealEstateId(int $userId): ?int
     {
         $pdo = self::db();
