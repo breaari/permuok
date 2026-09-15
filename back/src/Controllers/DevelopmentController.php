@@ -10,6 +10,7 @@ use App\Services\MembershipGuard;
 use App\Services\AI\DevelopmentAIAnalysisService;
 use App\Services\AI\DevelopmentQualityScoreService;
 use App\Services\AI\DevelopmentAICopyService;
+use App\Services\SecurityRateLimitService;
 
 class DevelopmentController
 {
@@ -165,50 +166,6 @@ class DevelopmentController
         }
     }
 
-    public static function requestAIAnalysis(): void
-    {
-        try {
-            $auth =
-                AuthHelper::requireUser();
-
-            MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
-            );
-
-            $id =
-                (int)($_GET['id'] ?? 0);
-
-            if ($id <= 0) {
-                throw new \Exception(
-                    'El ID del desarrollo no es válido.'
-                );
-            }
-
-            /*
-         * Verifica que el desarrollo pertenezca
-         * a la inmobiliaria del usuario.
-         */
-            DevelopmentService::assertOwnedDevelopment(
-                (int)$auth['id'],
-                $id
-            );
-
-            $result =
-                DevelopmentAIAnalysisService::requestAnalysis(
-                    $id
-                );
-
-            ResponseHelper::ok(
-                $result
-            );
-        } catch (\Throwable $e) {
-            ResponseHelper::error(
-                $e->getMessage(),
-                400
-            );
-        }
-    }
-
     public static function getQuality(): void
     {
         try {
@@ -247,6 +204,55 @@ class DevelopmentController
         }
     }
 
+    public static function requestAIAnalysis(): void
+    {
+        try {
+            $auth =
+                AuthHelper::requireUser();
+
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
+
+            $id =
+                (int)($_GET['id'] ?? 0);
+
+            if ($id <= 0) {
+                throw new \Exception(
+                    'El ID del desarrollo no es válido.'
+                );
+            }
+
+            /*
+         * Primero verificamos pertenencia.
+         * Un desarrollo ajeno no consume cupo.
+         */
+            DevelopmentService::assertOwnedDevelopment(
+                (int)$auth['id'],
+                $id
+            );
+
+            self::consumeAIAnalysisLimits(
+                (int)$auth['id'],
+                (int)$auth['real_estate_id']
+            );
+
+            $result =
+                DevelopmentAIAnalysisService::requestAnalysis(
+                    $id
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
+        } catch (\Throwable $e) {
+            ResponseHelper::error(
+                $e->getMessage(),
+                400
+            );
+        }
+    }
+
     public static function generateAITitle(): void
     {
         try {
@@ -271,6 +277,11 @@ class DevelopmentController
                 $id
             );
 
+            self::consumeAICopyLimits(
+                (int)$auth['id'],
+                (int)$auth['real_estate_id']
+            );
+
             $data =
                 json_decode(
                     file_get_contents('php://input'),
@@ -278,9 +289,7 @@ class DevelopmentController
                 ) ?? [];
 
             $draft =
-                is_array(
-                    $data['draft'] ?? null
-                )
+                is_array($data['draft'] ?? null)
                 ? $data['draft']
                 : [];
 
@@ -326,6 +335,11 @@ class DevelopmentController
                 $id
             );
 
+            self::consumeAICopyLimits(
+                (int)$auth['id'],
+                (int)$auth['real_estate_id']
+            );
+
             $data =
                 json_decode(
                     file_get_contents('php://input'),
@@ -333,9 +347,7 @@ class DevelopmentController
                 ) ?? [];
 
             $draft =
-                is_array(
-                    $data['draft'] ?? null
-                )
+                is_array($data['draft'] ?? null)
                 ? $data['draft']
                 : [];
 
@@ -355,5 +367,43 @@ class DevelopmentController
                 400
             );
         }
+    }
+
+    private static function consumeAICopyLimits(
+        int $userId,
+        int $realEstateId
+    ): void {
+        SecurityRateLimitService::consume(
+            'ai_copy_user',
+            (string)$userId,
+            10,
+            5 * 60
+        );
+
+        SecurityRateLimitService::consume(
+            'ai_daily_real_estate',
+            (string)$realEstateId,
+            100,
+            24 * 60 * 60
+        );
+    }
+
+    private static function consumeAIAnalysisLimits(
+        int $userId,
+        int $realEstateId
+    ): void {
+        SecurityRateLimitService::consume(
+            'ai_analysis_user',
+            (string)$userId,
+            10,
+            60 * 60
+        );
+
+        SecurityRateLimitService::consume(
+            'ai_daily_real_estate',
+            (string)$realEstateId,
+            100,
+            24 * 60 * 60
+        );
     }
 }
