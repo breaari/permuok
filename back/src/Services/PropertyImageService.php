@@ -21,6 +21,34 @@ class PropertyImageService
         return pdo();
     }
 
+    private static function assertActiveMembership(
+        int $realEstateId
+    ): void {
+        $pdo = self::db();
+
+        $stmt = $pdo->prepare("
+        SELECT id
+        FROM memberships
+        WHERE real_estate_id = :real_estate_id
+          AND status = 1
+          AND deleted_at IS NULL
+          AND end_date >= CURDATE()
+        ORDER BY end_date DESC, id DESC
+        LIMIT 1
+    ");
+
+        $stmt->execute([
+            'real_estate_id' => $realEstateId,
+        ]);
+
+        if (!$stmt->fetchColumn()) {
+            throw new Exception(
+                'Tu membresía no está activa. Regularizá tu plan para continuar usando esta función.',
+                402
+            );
+        }
+    }
+
     private static function queueQualityRecalculation(
         int $propertyId
     ): void {
@@ -88,6 +116,10 @@ class PropertyImageService
             throw new Exception("El usuario no está vinculado a una inmobiliaria");
         }
 
+        self::assertActiveMembership(
+            (int)$user['real_estate_id']
+        );
+
         $stProperty = $pdo->prepare("
             SELECT *
             FROM properties
@@ -100,6 +132,10 @@ class PropertyImageService
             'id' => $propertyId,
             'real_estate_id' => (int)$user['real_estate_id'],
         ]);
+
+        self::assertActiveMembership(
+            (int)$user['real_estate_id']
+        );
         $property = $stProperty->fetch();
 
         if (!$property) {
