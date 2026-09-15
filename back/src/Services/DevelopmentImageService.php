@@ -279,6 +279,48 @@ class DevelopmentImageService
         return 'developments/' . $filename;
     }
 
+    private static function removeStoredFile(
+        string $relativePath
+    ): void {
+        if (
+            !str_starts_with(
+                $relativePath,
+                'developments/'
+            )
+        ) {
+            return;
+        }
+
+        $filename = basename($relativePath);
+
+        if ($filename === '') {
+            return;
+        }
+
+        $baseDir = self::getUploadBaseDir();
+        $baseRealPath = realpath($baseDir);
+
+        $filePath = $baseDir . '/' . $filename;
+        $fileRealPath = realpath($filePath);
+
+        if (
+            $baseRealPath === false ||
+            $fileRealPath === false ||
+            dirname($fileRealPath) !== $baseRealPath ||
+            !is_file($fileRealPath)
+        ) {
+            return;
+        }
+
+        if (!unlink($fileRealPath)) {
+            error_log(
+                '[DEVELOPMENT IMAGE CLEANUP] ' .
+                    'No se pudo eliminar el archivo: ' .
+                    $fileRealPath
+            );
+        }
+    }
+
     private static function ensureSingleCover(int $developmentId): void
     {
         $pdo = self::db();
@@ -323,61 +365,128 @@ class DevelopmentImageService
         ")->execute(['id' => $firstId]);
     }
 
-    public static function upload(int $userId, int $developmentId, array $files): array
-    {
-        [, $development] = self::getOwnedDevelopmentRow($userId, $developmentId);
+    public static function upload(
+        int $userId,
+        int $developmentId,
+        array $files
+    ): array {
+        [, $development] =
+            self::getOwnedDevelopmentRow(
+                $userId,
+                $developmentId
+            );
 
-        if (!in_array($development['status'], ['draft', 'paused', 'archived', 'published'], true)) {
-            throw new Exception("No se pueden cargar imágenes en el estado actual del desarrollo");
+        if (
+            !in_array(
+                $development['status'],
+                [
+                    'draft',
+                    'paused',
+                    'archived',
+                    'published',
+                ],
+                true
+            )
+        ) {
+            throw new Exception(
+                'No se pueden cargar imágenes en el estado actual del desarrollo'
+            );
         }
 
-        $normalizedFiles = self::normalizeFilesArray($files);
+        $normalizedFiles =
+            self::normalizeFilesArray($files);
+
         if (!$normalizedFiles) {
-            throw new Exception("No se recibieron imágenes");
+            throw new Exception(
+                'No se recibieron imágenes'
+            );
         }
 
-        $currentCount = self::countActiveImages($developmentId);
-        if (($currentCount + count($normalizedFiles)) > self::MAX_IMAGES) {
-            throw new Exception("Podés tener hasta 5 imágenes por desarrollo");
+        $currentCount =
+            self::countActiveImages(
+                $developmentId
+            );
+
+        if (
+            ($currentCount + count($normalizedFiles))
+            > self::MAX_IMAGES
+        ) {
+            throw new Exception(
+                'Podés tener hasta 5 imágenes por desarrollo'
+            );
         }
 
         $pdo = self::db();
+        $storedPaths = [];
+
         $pdo->beginTransaction();
 
         try {
-            $sortOrder = self::nextSortOrder($developmentId);
-            $isFirstImage = $currentCount === 0;
+            $sortOrder =
+                self::nextSortOrder(
+                    $developmentId
+                );
 
-            foreach ($normalizedFiles as $index => $file) {
-                $relativePath = self::storeUploadedFile($file, $developmentId);
+            $isFirstImage =
+                $currentCount === 0;
+
+            foreach (
+                $normalizedFiles as $index => $file
+            ) {
+                $relativePath =
+                    self::storeUploadedFile(
+                        $file,
+                        $developmentId
+                    );
+
+                $storedPaths[] = $relativePath;
 
                 $st = $pdo->prepare("
-                    INSERT INTO development_images (
-                        development_id,
-                        file_path,
-                        sort_order,
-                        is_cover
-                    ) VALUES (
-                        :development_id,
-                        :file_path,
-                        :sort_order,
-                        :is_cover
-                    )
-                ");
+                INSERT INTO development_images (
+                    development_id,
+                    file_path,
+                    sort_order,
+                    is_cover
+                ) VALUES (
+                    :development_id,
+                    :file_path,
+                    :sort_order,
+                    :is_cover
+                )
+            ");
+
                 $st->execute([
-                    'development_id' => $developmentId,
-                    'file_path' => $relativePath,
-                    'sort_order' => $sortOrder + $index,
-                    'is_cover' => ($isFirstImage && $index === 0) ? 1 : 0,
+                    'development_id' =>
+                    $developmentId,
+                    'file_path' =>
+                    $relativePath,
+                    'sort_order' =>
+                    $sortOrder + $index,
+                    'is_cover' => ($isFirstImage && $index === 0)
+                        ? 1
+                        : 0,
                 ]);
             }
 
-            self::ensureSingleCover($developmentId);
+            self::ensureSingleCover(
+                $developmentId
+            );
 
             $pdo->commit();
-            return DevelopmentService::getDetail($userId, $developmentId);
+
+            return DevelopmentService::getDetail(
+                $userId,
+                $developmentId
+            );
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            foreach ($storedPaths as $storedPath) {
+                self::removeStoredFile($storedPath);
+            }
+
             throw $e;
         }
     }

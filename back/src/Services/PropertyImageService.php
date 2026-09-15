@@ -250,6 +250,48 @@ class PropertyImageService
         return 'properties/' . $filename;
     }
 
+    private static function removeStoredFile(
+        string $relativePath
+    ): void {
+        if (
+            !str_starts_with(
+                $relativePath,
+                'properties/'
+            )
+        ) {
+            return;
+        }
+
+        $filename = basename($relativePath);
+
+        if ($filename === '') {
+            return;
+        }
+
+        $baseDir = self::getUploadBaseDir();
+        $baseRealPath = realpath($baseDir);
+
+        $filePath = $baseDir . '/' . $filename;
+        $fileRealPath = realpath($filePath);
+
+        if (
+            $baseRealPath === false ||
+            $fileRealPath === false ||
+            dirname($fileRealPath) !== $baseRealPath ||
+            !is_file($fileRealPath)
+        ) {
+            return;
+        }
+
+        if (!unlink($fileRealPath)) {
+            error_log(
+                '[PROPERTY IMAGE CLEANUP] ' .
+                    'No se pudo eliminar el archivo: ' .
+                    $fileRealPath
+            );
+        }
+    }
+
     private static function ensureSingleCover(int $propertyId): void
     {
         $pdo = self::db();
@@ -294,58 +336,109 @@ class PropertyImageService
         ")->execute(['id' => $firstId]);
     }
 
-    public static function upload(int $userId, int $propertyId, array $files): array
-    {
-        [, $property] = self::getOwnedPropertyRow($userId, $propertyId);
+    public static function upload(
+        int $userId,
+        int $propertyId,
+        array $files
+    ): array {
+        [, $property] =
+            self::getOwnedPropertyRow(
+                $userId,
+                $propertyId
+            );
 
-        if (!in_array($property['status'], ['draft', 'paused', 'archived', 'published'], true)) {
-            throw new Exception("No se pueden cargar imágenes en el estado actual de la propiedad");
+        if (
+            !in_array(
+                $property['status'],
+                [
+                    'draft',
+                    'paused',
+                    'archived',
+                    'published',
+                ],
+                true
+            )
+        ) {
+            throw new Exception(
+                'No se pueden cargar imágenes en el estado actual de la propiedad'
+            );
         }
 
-        $normalizedFiles = self::normalizeFilesArray($files);
+        $normalizedFiles =
+            self::normalizeFilesArray($files);
+
         if (!$normalizedFiles) {
-            throw new Exception("No se recibieron imágenes");
+            throw new Exception(
+                'No se recibieron imágenes'
+            );
         }
 
-        $currentCount = self::countActiveImages($propertyId);
-        if (($currentCount + count($normalizedFiles)) > self::MAX_IMAGES) {
-            throw new Exception("Podés tener hasta 5 imágenes por propiedad");
+        $currentCount =
+            self::countActiveImages($propertyId);
+
+        if (
+            ($currentCount + count($normalizedFiles))
+            > self::MAX_IMAGES
+        ) {
+            throw new Exception(
+                'Podés tener hasta 5 imágenes por propiedad'
+            );
         }
 
         $pdo = self::db();
+
+        /*
+     * Conservamos cada archivo movido para eliminarlo
+     * si cualquier parte de la operación falla.
+     */
+        $storedPaths = [];
+
         $pdo->beginTransaction();
 
         try {
-            $sortOrder = self::nextSortOrder($propertyId);
-            $isFirstImage = $currentCount === 0;
+            $sortOrder =
+                self::nextSortOrder($propertyId);
 
-            foreach ($normalizedFiles as $index => $file) {
-                $relativePath = self::storeUploadedFile($file, $propertyId);
+            $isFirstImage =
+                $currentCount === 0;
+
+            foreach (
+                $normalizedFiles as $index => $file
+            ) {
+                $relativePath =
+                    self::storeUploadedFile(
+                        $file,
+                        $propertyId
+                    );
+
+                $storedPaths[] = $relativePath;
 
                 $st = $pdo->prepare("
-                    INSERT INTO property_images (
-                        property_id,
-                        file_path,
-                        sort_order,
-                        is_cover
-                    ) VALUES (
-                        :property_id,
-                        :file_path,
-                        :sort_order,
-                        :is_cover
-                    )
-                ");
+                INSERT INTO property_images (
+                    property_id,
+                    file_path,
+                    sort_order,
+                    is_cover
+                ) VALUES (
+                    :property_id,
+                    :file_path,
+                    :sort_order,
+                    :is_cover
+                )
+            ");
+
                 $st->execute([
                     'property_id' => $propertyId,
                     'file_path' => $relativePath,
-                    'sort_order' => $sortOrder + $index,
-                    'is_cover' => ($isFirstImage && $index === 0) ? 1 : 0,
+                    'sort_order' =>
+                    $sortOrder + $index,
+                    'is_cover' => ($isFirstImage && $index === 0)
+                        ? 1
+                        : 0,
                 ]);
             }
 
-            self::ensureSingleCover(
-                $propertyId
-            );
+            self::ensureSingleCover($propertyId);
 
             $pdo->commit();
 
@@ -358,10 +451,18 @@ class PropertyImageService
                 $propertyId
             );
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            foreach ($storedPaths as $storedPath) {
+                self::removeStoredFile($storedPath);
+            }
+
             throw $e;
         }
     }
+
     public static function delete(int $userId, int $imageId): array
     {
         [, $image] = self::getOwnedImage($userId, $imageId);
