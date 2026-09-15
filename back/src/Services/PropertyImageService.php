@@ -109,49 +109,95 @@ class PropertyImageService
         return [$user, $property];
     }
 
-    private static function getOwnedImage(int $userId, int $imageId): array
-    {
+    private static function getOwnedImage(
+        int $userId,
+        int $imageId
+    ): array {
         $pdo = self::db();
 
         $stUser = $pdo->prepare("
-            SELECT id, role, real_estate_id, is_active
-            FROM users
-            WHERE id = :id
-              AND deleted_at IS NULL
-            LIMIT 1
-        ");
-        $stUser->execute(['id' => $userId]);
+        SELECT
+            id,
+            role,
+            real_estate_id,
+            is_active
+        FROM users
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $stUser->execute([
+            'id' => $userId,
+        ]);
+
         $user = $stUser->fetch();
 
         if (!$user) {
-            throw new Exception("Usuario no encontrado");
+            throw new Exception(
+                'Usuario no encontrado'
+            );
         }
 
-        if (!in_array((int)$user['role'], [2, 3], true)) {
-            throw new Exception("No tenés permisos para administrar imágenes");
+        if (
+            !in_array(
+                (int)$user['role'],
+                [2, 3],
+                true
+            )
+        ) {
+            throw new Exception(
+                'No tenés permisos para administrar imágenes'
+            );
+        }
+
+        if ((int)$user['is_active'] !== 1) {
+            throw new Exception(
+                'Tu cuenta está inactiva'
+            );
+        }
+
+        if (empty($user['real_estate_id'])) {
+            throw new Exception(
+                'El usuario no está vinculado a una inmobiliaria'
+            );
         }
 
         $st = $pdo->prepare("
-            SELECT pi.*, p.real_estate_id
-            FROM property_images pi
-            INNER JOIN properties p ON p.id = pi.property_id
-            WHERE pi.id = :id
-              AND pi.deleted_at IS NULL
-              AND p.deleted_at IS NULL
-              AND p.real_estate_id = :real_estate_id
-            LIMIT 1
-        ");
+        SELECT
+            pi.*,
+            p.real_estate_id
+        FROM property_images pi
+
+        INNER JOIN properties p
+            ON p.id = pi.property_id
+
+        WHERE pi.id = :id
+          AND pi.deleted_at IS NULL
+          AND p.deleted_at IS NULL
+          AND p.real_estate_id = :real_estate_id
+
+        LIMIT 1
+    ");
+
         $st->execute([
             'id' => $imageId,
-            'real_estate_id' => (int)$user['real_estate_id'],
+            'real_estate_id' =>
+            (int)$user['real_estate_id'],
         ]);
+
         $image = $st->fetch();
 
         if (!$image) {
-            throw new Exception("Imagen no encontrada");
+            throw new Exception(
+                'Imagen no encontrada'
+            );
         }
 
-        return [$user, $image];
+        return [
+            $user,
+            $image,
+        ];
     }
 
     private static function countActiveImages(int $propertyId): int
