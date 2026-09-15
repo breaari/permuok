@@ -132,10 +132,6 @@ class PropertyImageService
             'id' => $propertyId,
             'real_estate_id' => (int)$user['real_estate_id'],
         ]);
-
-        self::assertActiveMembership(
-            (int)$user['real_estate_id']
-        );
         $property = $stProperty->fetch();
 
         if (!$property) {
@@ -199,6 +195,10 @@ class PropertyImageService
             );
         }
 
+        self::assertActiveMembership(
+            (int)$user['real_estate_id']
+        );
+        
         $st = $pdo->prepare("
         SELECT
             pi.*,
