@@ -419,11 +419,12 @@ class PropertyImageService
             );
         }
 
-        $currentCount =
-            self::countActiveImages($propertyId);
-
+        /*
+     * Una sola solicitud nunca puede contener
+     * más imágenes que el máximo permitido.
+     */
         if (
-            ($currentCount + count($normalizedFiles))
+            count($normalizedFiles)
             > self::MAX_IMAGES
         ) {
             throw new Exception(
@@ -432,18 +433,76 @@ class PropertyImageService
         }
 
         $pdo = self::db();
-
-        /*
-     * Conservamos cada archivo movido para eliminarlo
-     * si cualquier parte de la operación falla.
-     */
         $storedPaths = [];
 
         $pdo->beginTransaction();
 
         try {
+            /*
+         * Bloqueamos la propiedad durante la carga.
+         * Otra carga simultánea deberá esperar y volver
+         * a contar las imágenes después de esta operación.
+         */
+            $lockStmt = $pdo->prepare("
+            SELECT id
+            FROM properties
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+        ");
+
+            $lockStmt->execute([
+                'id' => $propertyId,
+            ]);
+
+            if (!$lockStmt->fetchColumn()) {
+                throw new Exception(
+                    'Propiedad no encontrada'
+                );
+            }
+
+            $countStmt = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM property_images
+            WHERE property_id = :property_id
+              AND deleted_at IS NULL
+        ");
+
+            $countStmt->execute([
+                'property_id' => $propertyId,
+            ]);
+
+            $currentCount =
+                (int)$countStmt->fetchColumn();
+
+            if (
+                (
+                    $currentCount
+                    + count($normalizedFiles)
+                ) > self::MAX_IMAGES
+            ) {
+                throw new Exception(
+                    'Podés tener hasta 5 imágenes por propiedad'
+                );
+            }
+
+            $sortStmt = $pdo->prepare("
+            SELECT COALESCE(
+                MAX(sort_order),
+                -1
+            )
+            FROM property_images
+            WHERE property_id = :property_id
+              AND deleted_at IS NULL
+        ");
+
+            $sortStmt->execute([
+                'property_id' => $propertyId,
+            ]);
+
             $sortOrder =
-                self::nextSortOrder($propertyId);
+                ((int)$sortStmt->fetchColumn()) + 1;
 
             $isFirstImage =
                 $currentCount === 0;
@@ -478,13 +537,18 @@ class PropertyImageService
                     'file_path' => $relativePath,
                     'sort_order' =>
                     $sortOrder + $index,
-                    'is_cover' => ($isFirstImage && $index === 0)
+                    'is_cover' => (
+                        $isFirstImage
+                        && $index === 0
+                    )
                         ? 1
                         : 0,
                 ]);
             }
 
-            self::ensureSingleCover($propertyId);
+            self::ensureSingleCover(
+                $propertyId
+            );
 
             $pdo->commit();
 
@@ -502,7 +566,9 @@ class PropertyImageService
             }
 
             foreach ($storedPaths as $storedPath) {
-                self::removeStoredFile($storedPath);
+                self::removeStoredFile(
+                    $storedPath
+                );
             }
 
             throw $e;

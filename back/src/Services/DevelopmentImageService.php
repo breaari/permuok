@@ -402,13 +402,8 @@ class DevelopmentImageService
             );
         }
 
-        $currentCount =
-            self::countActiveImages(
-                $developmentId
-            );
-
         if (
-            ($currentCount + count($normalizedFiles))
+            count($normalizedFiles)
             > self::MAX_IMAGES
         ) {
             throw new Exception(
@@ -422,10 +417,72 @@ class DevelopmentImageService
         $pdo->beginTransaction();
 
         try {
-            $sortOrder =
-                self::nextSortOrder(
-                    $developmentId
+            /*
+         * Serializa las cargas pertenecientes
+         * al mismo desarrollo.
+         */
+            $lockStmt = $pdo->prepare("
+            SELECT id
+            FROM developments
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+        ");
+
+            $lockStmt->execute([
+                'id' => $developmentId,
+            ]);
+
+            if (!$lockStmt->fetchColumn()) {
+                throw new Exception(
+                    'Desarrollo no encontrado'
                 );
+            }
+
+            $countStmt = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM development_images
+            WHERE development_id = :development_id
+              AND deleted_at IS NULL
+        ");
+
+            $countStmt->execute([
+                'development_id' =>
+                $developmentId,
+            ]);
+
+            $currentCount =
+                (int)$countStmt->fetchColumn();
+
+            if (
+                (
+                    $currentCount
+                    + count($normalizedFiles)
+                ) > self::MAX_IMAGES
+            ) {
+                throw new Exception(
+                    'Podés tener hasta 5 imágenes por desarrollo'
+                );
+            }
+
+            $sortStmt = $pdo->prepare("
+            SELECT COALESCE(
+                MAX(sort_order),
+                -1
+            )
+            FROM development_images
+            WHERE development_id = :development_id
+              AND deleted_at IS NULL
+        ");
+
+            $sortStmt->execute([
+                'development_id' =>
+                $developmentId,
+            ]);
+
+            $sortOrder =
+                ((int)$sortStmt->fetchColumn()) + 1;
 
             $isFirstImage =
                 $currentCount === 0;
@@ -462,7 +519,10 @@ class DevelopmentImageService
                     $relativePath,
                     'sort_order' =>
                     $sortOrder + $index,
-                    'is_cover' => ($isFirstImage && $index === 0)
+                    'is_cover' => (
+                        $isFirstImage
+                        && $index === 0
+                    )
                         ? 1
                         : 0,
                 ]);
@@ -484,7 +544,9 @@ class DevelopmentImageService
             }
 
             foreach ($storedPaths as $storedPath) {
-                self::removeStoredFile($storedPath);
+                self::removeStoredFile(
+                    $storedPath
+                );
             }
 
             throw $e;
