@@ -2,8 +2,9 @@
 
 namespace App\Controllers;
 
-use App\Helpers\ResponseHelper;
 use App\Helpers\JwtHelper;
+use App\Helpers\RefreshTokenCookieHelper;
+use App\Helpers\ResponseHelper;
 use App\Services\RefreshTokenService;
 use PDO;
 
@@ -11,65 +12,106 @@ class RefreshController
 {
     private static function db(): PDO
     {
-        require_once __DIR__ . '/../../db.php';
+        require_once __DIR__ .
+            '/../../db.php';
+
         return pdo();
     }
 
     public static function handle(): void
     {
-        $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        $refreshToken =
+            RefreshTokenCookieHelper::read();
 
-        $refreshToken = $data['refresh_token'] ?? '';
-        if (!is_string($refreshToken) || trim($refreshToken) === '') {
-            ResponseHelper::fail('Refresh token requerido', 400);
+        if ($refreshToken === null) {
+            RefreshTokenCookieHelper::clear();
+
+            ResponseHelper::fail(
+                'Refresh token requerido',
+                401
+            );
         }
 
         /*
- * Validación y revocación atómicas.
- * El mismo token solo puede utilizarse una vez.
- */
+         * El token solo puede consumirse una vez.
+         */
         $stored =
             RefreshTokenService::consumeValid(
                 $refreshToken
             );
 
         if (!$stored) {
+            RefreshTokenCookieHelper::clear();
+
             ResponseHelper::fail(
                 'Refresh token inválido',
                 401
             );
         }
 
-        // 3) Confirmar usuario vigente (y rol actualizado)
         $pdo = self::db();
+
         $stmt = $pdo->prepare("
-            SELECT id, role, is_active
+            SELECT
+                id,
+                role,
+                is_active
             FROM users
             WHERE id = :id
               AND deleted_at IS NULL
             LIMIT 1
         ");
-        $stmt->execute(['id' => (int)$stored['user_id']]);
+
+        $stmt->execute([
+            'id' =>
+            (int)$stored['user_id'],
+        ]);
+
         $user = $stmt->fetch();
 
         if (!$user) {
-            ResponseHelper::fail('Usuario no encontrado', 404);
+            RefreshTokenCookieHelper::clear();
+
+            ResponseHelper::fail(
+                'Usuario no encontrado',
+                401
+            );
         }
+
         if ((int)$user['is_active'] !== 1) {
-            ResponseHelper::fail('Usuario inactivo', 403);
+            RefreshTokenService::revokeAllByUserId(
+                    (int)$user['id']
+                );
+
+            RefreshTokenCookieHelper::clear();
+
+            ResponseHelper::fail(
+                'Usuario inactivo',
+                403
+            );
         }
 
-        // 4) Emitir nuevos tokens
-        $newAccessToken = JwtHelper::generateAccessToken([
-            'id'   => (int)$user['id'],
-            'role' => (int)$user['role'],
-        ]);
+        $newAccessToken =
+            JwtHelper::generateAccessToken([
+                'id' =>
+                (int)$user['id'],
 
-        $newRefreshToken = RefreshTokenService::issue((int)$user['id']);
+                'role' =>
+                (int)$user['role'],
+            ]);
+
+        $newRefreshToken =
+            RefreshTokenService::issue(
+                (int)$user['id']
+            );
+
+        RefreshTokenCookieHelper::write(
+            $newRefreshToken
+        );
 
         ResponseHelper::ok([
-            'access_token'  => $newAccessToken,
-            'refresh_token' => $newRefreshToken,
+            'access_token' =>
+            $newAccessToken,
         ]);
     }
 }

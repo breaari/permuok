@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Helpers\ResponseHelper;
 use App\Services\AuthService;
 use App\Services\SecurityRateLimitService;
+use App\Helpers\RefreshTokenCookieHelper;
 
 class AuthController
 {
@@ -177,6 +178,21 @@ class AuthController
             'auth_login_account',
             $emailNormalized
         );
+
+        /*
+ * El refresh token se entrega únicamente
+ * mediante una cookie HttpOnly.
+ */
+        if (
+            is_array($result)
+            && !empty($result['refresh_token'])
+        ) {
+            RefreshTokenCookieHelper::write(
+                (string)$result['refresh_token']
+            );
+
+            unset($result['refresh_token']);
+        }
 
         ResponseHelper::ok($result);
     }
