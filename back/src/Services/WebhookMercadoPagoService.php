@@ -164,76 +164,39 @@ class WebhookMercadoPagoService
             $body['data']['id']
             ?? $body['id']
             ?? $query['data.id']
+            ?? $query['data_id']
             ?? $query['id']
             ?? null;
 
         if (!$authorizedPaymentId) {
             return [
                 'ok' => true,
-                'ignored' => 'no_authorized_payment_id',
+                'ignored' =>
+                'no_authorized_payment_id',
             ];
         }
 
+        /*
+     * Consultamos Mercado Pago antes de abrir
+     * la transacción para no mantener bloqueos
+     * durante una petición externa.
+     */
         $invoice =
             MercadoPagoClient::getAuthorizedPaymentById(
                 (string)$authorizedPaymentId
             );
 
-        $subscriptionId = (string)(
-            $invoice['preapproval_id']
-            ?? ''
+        $subscriptionId = trim(
+            (string)(
+                $invoice['preapproval_id']
+                ?? ''
+            )
         );
 
         if ($subscriptionId === '') {
             return [
                 'ok' => true,
                 'ignored' => 'no_preapproval_id',
-            ];
-        }
-
-        $pdo = self::db();
-
-        $st = $pdo->prepare("
-            SELECT *
-            FROM memberships
-            WHERE mp_preapproval_id = :subscription_id
-              AND deleted_at IS NULL
-            ORDER BY id DESC
-            LIMIT 1
-        ");
-
-        $st->execute([
-            'subscription_id' =>
-            $subscriptionId,
-        ]);
-
-        $membership = $st->fetch();
-
-        if (!$membership) {
-            return [
-                'ok' => true,
-                'ignored' => 'membership_not_found',
-                'subscription_id' =>
-                $subscriptionId,
-            ];
-        }
-
-        $effectivePlanId =
-            !empty($membership['scheduled_plan_id'])
-            ? (int)$membership['scheduled_plan_id']
-            : (int)$membership['plan_id'];
-
-        $billingUserId =
-            isset($membership['billing_user_id'])
-            ? (int)$membership['billing_user_id']
-            : 0;
-
-        if ($billingUserId <= 0) {
-            return [
-                'ok' => false,
-                'ignored' => 'missing_billing_user_id',
-                'membership_id' =>
-                (int)$membership['id'],
             ];
         }
 
@@ -277,35 +240,156 @@ class WebhookMercadoPagoService
         );
 
         $externalReference =
-            'subscription-'
-            . $subscriptionId
-            . '-invoice-'
-            . (string)$authorizedPaymentId;
+            'subscription-' .
+            $subscriptionId .
+            '-invoice-' .
+            (string)$authorizedPaymentId;
 
-        /*
-         * Si ya procesamos esta factura,
-         * actualizamos la misma fila.
+        $pdo = self::db();
+        $pdo->beginTransaction();
+
+        try {
+            /*
+         * Primera lectura para conocer
+         * la inmobiliaria involucrada.
          */
-        $st = $pdo->prepare("
+            $st = $pdo->prepare("
             SELECT *
-            FROM payments
-            WHERE external_reference = :external_reference
+            FROM memberships
+            WHERE mp_preapproval_id =
+                :subscription_id
+              AND deleted_at IS NULL
+            ORDER BY id DESC
             LIMIT 1
         ");
 
-        $st->execute([
-            'external_reference' =>
-            $externalReference,
-        ]);
+            $st->execute([
+                'subscription_id' =>
+                $subscriptionId,
+            ]);
 
-        $paymentRow = $st->fetch();
+            $initialMembership = $st->fetch();
 
-        $wasAlreadyApproved =
-            $paymentRow
-            && (string)($paymentRow['status'] ?? '') === 'approved';
+            if (!$initialMembership) {
+                $pdo->commit();
 
-        if (!$paymentRow) {
+                return [
+                    'ok' => true,
+                    'ignored' =>
+                    'membership_not_found',
+                    'subscription_id' =>
+                    $subscriptionId,
+                ];
+            }
+
+            $realEstateId =
+                (int)$initialMembership['real_estate_id'];
+
+            /*
+         * Serializamos todas las operaciones
+         * de facturación de la inmobiliaria.
+         */
+            $lockRealEstate = $pdo->prepare("
+            SELECT id
+            FROM real_estates
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+        ");
+
+            $lockRealEstate->execute([
+                'id' => $realEstateId,
+            ]);
+
+            if (!$lockRealEstate->fetchColumn()) {
+                throw new \RuntimeException(
+                    'Inmobiliaria de la membresía no encontrada'
+                );
+            }
+
+            /*
+         * Releemos y bloqueamos la membresía
+         * después de obtener el bloqueo principal.
+         */
             $st = $pdo->prepare("
+            SELECT *
+            FROM memberships
+            WHERE mp_preapproval_id =
+                :subscription_id
+              AND deleted_at IS NULL
+            ORDER BY id DESC
+            LIMIT 1
+            FOR UPDATE
+        ");
+
+            $st->execute([
+                'subscription_id' =>
+                $subscriptionId,
+            ]);
+
+            $membership = $st->fetch();
+
+            if (!$membership) {
+                throw new \RuntimeException(
+                    'Membresía no encontrada después del bloqueo'
+                );
+            }
+
+            $effectivePlanId =
+                !empty($membership['scheduled_plan_id'])
+                ? (int)$membership['scheduled_plan_id']
+                : (int)$membership['plan_id'];
+
+            $billingUserId =
+                isset(
+                    $membership['billing_user_id']
+                )
+                ? (int)$membership['billing_user_id']
+                : 0;
+
+            if ($billingUserId <= 0) {
+                $pdo->commit();
+
+                return [
+                    'ok' => false,
+                    'ignored' =>
+                    'missing_billing_user_id',
+                    'membership_id' =>
+                    (int)$membership['id'],
+                ];
+            }
+
+            /*
+         * El bloqueo de la inmobiliaria garantiza
+         * que otra notificación del mismo cliente
+         * no pueda avanzar simultáneamente.
+         */
+            $st = $pdo->prepare("
+            SELECT *
+            FROM payments
+            WHERE external_reference =
+                :external_reference
+            LIMIT 1
+            FOR UPDATE
+        ");
+
+            $st->execute([
+                'external_reference' =>
+                $externalReference,
+            ]);
+
+            $paymentRow = $st->fetch();
+
+            $wasAlreadyApproved =
+                $paymentRow
+                && (string)(
+                    $paymentRow['status']
+                    ?? ''
+                ) === 'approved';
+
+            if (!$paymentRow) {
+                $st = $pdo->prepare("
                 INSERT INTO payments
                 (
                     real_estate_id,
@@ -342,134 +426,160 @@ class WebhookMercadoPagoService
                 )
             ");
 
-            $st->execute([
-                'real_estate_id' =>
-                (int)$membership['real_estate_id'],
+                $st->execute([
+                    'real_estate_id' =>
+                    $realEstateId,
 
-                'user_id' =>
-                $billingUserId,
+                    'user_id' =>
+                    $billingUserId,
 
-                'plan_id' =>
-                $effectivePlanId,
+                    'plan_id' =>
+                    $effectivePlanId,
 
-                'external_reference' =>
-                $externalReference,
+                    'external_reference' =>
+                    $externalReference,
 
-                'mp_payment_id' =>
-                $mpPaymentId,
+                    'mp_payment_id' =>
+                    $mpPaymentId,
 
-                'mp_status' =>
-                $mpStatus,
+                    'mp_status' =>
+                    $mpStatus,
 
-                'mp_status_detail' =>
-                $mpStatusDetail,
+                    'mp_status_detail' =>
+                    $mpStatusDetail,
 
-                'amount_ars' =>
-                $amount,
+                    'amount_ars' =>
+                    $amount,
 
-                'currency' =>
-                $currency,
+                    'currency' =>
+                    $currency,
 
-                'status' =>
-                $localStatus,
+                    'status' =>
+                    $localStatus,
 
-                'paid_at' =>
-                $localStatus === 'approved'
-                    ? date('Y-m-d H:i:s')
-                    : null,
+                    'paid_at' =>
+                    $localStatus === 'approved'
+                        ? date('Y-m-d H:i:s')
+                        : null,
 
-                'approved_at' =>
-                $localStatus === 'approved'
-                    ? date('Y-m-d H:i:s')
-                    : null,
-            ]);
+                    'approved_at' =>
+                    $localStatus === 'approved'
+                        ? date('Y-m-d H:i:s')
+                        : null,
+                ]);
 
-            $paymentRowId =
-                (int)$pdo->lastInsertId();
-        } else {
-            $paymentRowId =
-                (int)$paymentRow['id'];
+                $paymentRowId =
+                    (int)$pdo->lastInsertId();
+            } else {
+                $paymentRowId =
+                    (int)$paymentRow['id'];
 
-            $st = $pdo->prepare("
+                $st = $pdo->prepare("
                 UPDATE payments
                 SET
-                    mp_payment_id = :mp_payment_id,
-                    mp_status = :mp_status,
-                    mp_status_detail = :mp_status_detail,
-                    amount_ars = :amount_ars,
-                    currency = :currency,
-                    status = :status,
+                    mp_payment_id =
+                        :mp_payment_id,
+                    mp_status =
+                        :mp_status,
+                    mp_status_detail =
+                        :mp_status_detail,
+                    amount_ars =
+                        :amount_ars,
+                    currency =
+                        :currency,
+                    status =
+                        :status,
+
                     paid_at = IF(
                         :status_paid = 'approved',
-                        COALESCE(paid_at, NOW()),
+                        COALESCE(
+                            paid_at,
+                            NOW()
+                        ),
                         paid_at
                     ),
+
                     approved_at = IF(
-                        :status_approved = 'approved',
-                        COALESCE(approved_at, NOW()),
+                        :status_approved =
+                            'approved',
+                        COALESCE(
+                            approved_at,
+                            NOW()
+                        ),
                         approved_at
                     )
+
                 WHERE id = :id
                 LIMIT 1
             ");
 
-            $st->execute([
-                'mp_payment_id' =>
+                $st->execute([
+                    'mp_payment_id' =>
+                    $mpPaymentId,
+
+                    'mp_status' =>
+                    $mpStatus,
+
+                    'mp_status_detail' =>
+                    $mpStatusDetail,
+
+                    'amount_ars' =>
+                    $amount,
+
+                    'currency' =>
+                    $currency,
+
+                    'status' =>
+                    $localStatus,
+
+                    'status_paid' =>
+                    $localStatus,
+
+                    'status_approved' =>
+                    $localStatus,
+
+                    'id' =>
+                    $paymentRowId,
+                ]);
+            }
+
+            if (
+                $localStatus === 'approved'
+                && !$wasAlreadyApproved
+            ) {
+                self::activateOrRenewSubscriptionMembership(
+                        $membership,
+                        $mpPaymentId
+                    );
+            }
+
+            $pdo->commit();
+
+            return [
+                'ok' => true,
+                'processed' => true,
+                'type' =>
+                'subscription_authorized_payment',
+                'authorized_payment_id' =>
+                (string)$authorizedPaymentId,
+                'subscription_id' =>
+                $subscriptionId,
+                'payment_id' =>
                 $mpPaymentId,
-
-                'mp_status' =>
-                $mpStatus,
-
-                'mp_status_detail' =>
-                $mpStatusDetail,
-
-                'amount_ars' =>
-                $amount,
-
-                'currency' =>
-                $currency,
-
+                'payment_row_id' =>
+                $paymentRowId,
                 'status' =>
                 $localStatus,
+                'membership_id' =>
+                (int)$membership['id'],
+            ];
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
 
-                'status_paid' =>
-                $localStatus,
-
-                'status_approved' =>
-                $localStatus,
-
-                'id' =>
-                $paymentRowId,
-            ]);
+            throw $e;
         }
-
-        if (
-            $localStatus === 'approved'
-            && !$wasAlreadyApproved
-        ) {
-            self::activateOrRenewSubscriptionMembership(
-                $membership,
-                $mpPaymentId
-            );
-        }
-
-        return [
-            'ok' => true,
-            'processed' => true,
-            'type' => 'subscription_authorized_payment',
-            'authorized_payment_id' =>
-            (string)$authorizedPaymentId,
-            'subscription_id' =>
-            $subscriptionId,
-            'payment_id' =>
-            $mpPaymentId,
-            'payment_row_id' =>
-            $paymentRowId,
-            'status' =>
-            $localStatus,
-            'membership_id' =>
-            (int)$membership['id'],
-        ];
     }
 
     private static function activateOrRenewSubscriptionMembership(
