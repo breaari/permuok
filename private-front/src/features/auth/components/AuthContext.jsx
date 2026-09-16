@@ -11,7 +11,6 @@ import {
   clearTokens,
   setTokens,
   getAccessToken,
-  getRefreshToken,
   tryRefresh,
   unwrap,
   getErrorMessage,
@@ -110,7 +109,7 @@ export function AuthProvider({ children }) {
         throw new Error("Respuesta inválida del servidor");
       }
 
-      if (!payload.access_token || !payload.refresh_token) {
+      if (!payload.access_token) {
         throw new Error(
           payload?.message || "El servidor no devolvió credenciales válidas",
         );
@@ -118,7 +117,6 @@ export function AuthProvider({ children }) {
 
       setTokens({
         access_token: payload.access_token,
-        refresh_token: payload.refresh_token,
       });
 
       const current = await loadMe({
@@ -186,26 +184,29 @@ export function AuthProvider({ children }) {
     (async () => {
       try {
         const accessToken = getAccessToken();
-        const refreshToken = getRefreshToken();
 
-        if (!accessToken && !refreshToken) {
-          setMe(null);
-          return;
-        }
-
-        if (refreshToken) {
+        /*
+         * Si no hay access token, intentamos
+         * recuperar la sesión mediante la cookie
+         * HttpOnly.
+         */
+        if (!accessToken) {
           const refreshed = await tryRefresh();
 
           if (!refreshed) {
             clearTokens();
             setMe(null);
+
             return;
           }
         }
 
-        if (getAccessToken()) {
-          await loadMe({ force: true });
-        }
+        await loadMe({
+          force: true,
+        });
+      } catch {
+        clearTokens();
+        setMe(null);
       } finally {
         setLoading(false);
       }

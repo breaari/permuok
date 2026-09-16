@@ -5,7 +5,7 @@ if (!API_BASE_URL) {
 }
 
 const ACCESS_KEY = "permuok_access_token";
-const REFRESH_KEY = "permuok_refresh_token";
+const LEGACY_REFRESH_KEY = "permuok_refresh_token";
 
 let refreshPromise = null;
 
@@ -25,25 +25,20 @@ export function getAccessToken() {
   return localStorage.getItem(ACCESS_KEY);
 }
 
-export function getRefreshToken() {
-  return localStorage.getItem(REFRESH_KEY);
-}
-
-export function setTokens({ access_token, refresh_token }) {
-
-
+export function setTokens({ access_token }) {
   if (access_token) {
     localStorage.setItem(ACCESS_KEY, access_token);
-  }
-
-  if (refresh_token) {
-    localStorage.setItem(REFRESH_KEY, refresh_token);
   }
 }
 
 export function clearTokens() {
   localStorage.removeItem(ACCESS_KEY);
-  localStorage.removeItem(REFRESH_KEY);
+
+  /*
+   * Limpia refresh tokens guardados por
+   * versiones anteriores del frontend.
+   */
+  localStorage.removeItem(LEGACY_REFRESH_KEY);
 }
 
 export function getErrorMessage(err, fallback = "Ocurrió un error") {
@@ -164,23 +159,17 @@ function handleBlockedAccountResponse(res, data) {
 }
 
 async function doRefresh() {
-  const refreshToken = getRefreshToken();
-
-
-  if (!refreshToken) {
-   
-    return false;
-  }
-
   try {
     const data = await request(
       "/refresh",
       {
         method: "POST",
-        body: { refresh_token: refreshToken },
+        body: {},
         skipAuth: true,
       },
-      { retry: false },
+      {
+        retry: false,
+      },
     );
 
     const payload = unwrap(data);
@@ -188,17 +177,17 @@ async function doRefresh() {
     if (payload?.access_token) {
       setTokens({
         access_token: payload.access_token,
-        refresh_token: payload.refresh_token || refreshToken,
       });
 
       return true;
     }
 
     clearTokens();
-    return false;
-  } catch (error) {
 
+    return false;
+  } catch {
     clearTokens();
+
     return false;
   }
 }
@@ -237,6 +226,7 @@ async function request(
   const res = await fetch(url, {
     method,
     headers: finalHeaders,
+    credentials: "include",
     body: hasBody
       ? body instanceof FormData
         ? body
@@ -245,8 +235,6 @@ async function request(
   });
 
   if (res.status === 401 && retry && path !== "/refresh") {
-    
-
     const refreshed = await tryRefresh();
 
     if (refreshed) {
