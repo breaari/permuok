@@ -388,6 +388,13 @@ class WebhookMercadoPagoService
                     ?? ''
                 ) === 'approved';
 
+            if (
+                $wasAlreadyApproved
+                && $localStatus !== 'approved'
+            ) {
+                $localStatus = 'approved';
+            }
+
             if (!$paymentRow) {
                 $st = $pdo->prepare("
                 INSERT INTO payments
@@ -548,9 +555,9 @@ class WebhookMercadoPagoService
                 && !$wasAlreadyApproved
             ) {
                 self::activateOrRenewSubscriptionMembership(
-                        $membership,
-                        $mpPaymentId
-                    );
+                    $membership,
+                    $mpPaymentId
+                );
             }
 
             $pdo->commit();
@@ -853,6 +860,20 @@ class WebhookMercadoPagoService
                 self::normalizePaymentStatus(
                     $status
                 );
+
+            /*
+ * Un pago aprobado no debe retroceder por
+ * notificaciones demoradas o desordenadas.
+ *
+ * Conservamos mp_status para auditoría, pero
+ * mantenemos el estado local aprobado.
+ */
+            if (
+                $wasAlreadyApproved
+                && $newStatus !== 'approved'
+            ) {
+                $newStatus = 'approved';
+            }
 
             $st = $pdo->prepare("
             UPDATE payments
