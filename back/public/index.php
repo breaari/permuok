@@ -102,6 +102,7 @@ use App\Controllers\RealtimeController;
 use App\Controllers\AdminDashboardController;
 use App\Controllers\CompatibilityController;
 use App\Controllers\AdminSystemController;
+use App\Controllers\PasswordResetController;
 
 $method = $_SERVER['REQUEST_METHOD'];
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/';
@@ -150,6 +151,15 @@ $uri = $uri === '' ? '/' : $uri;
 $routes = [
     'POST /auth/register' => [AuthController::class, 'register'],
     'POST /auth/login'    => [AuthController::class, 'login'],
+    'POST /auth/forgot-password' => [
+        PasswordResetController::class,
+        'request',
+    ],
+
+    'POST /auth/reset-password' => [
+        PasswordResetController::class,
+        'reset',
+    ],
     'GET /me'             => [MeController::class, 'handle'],
     'POST /refresh'       => [RefreshController::class, 'handle'],
     'POST /logout'        => [LogoutController::class, 'handle'],
