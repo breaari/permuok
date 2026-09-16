@@ -608,6 +608,7 @@ class WebhookMercadoPagoService
     ): array {
         $paymentId =
             $query['data.id']
+            ?? $query['data_id']
             ?? $query['id']
             ?? ($body['data']['id'] ?? null)
             ?? ($body['id'] ?? null);
@@ -619,6 +620,11 @@ class WebhookMercadoPagoService
             ];
         }
 
+        /*
+     * La consulta externa se realiza antes
+     * de abrir la transacción para no mantener
+     * bloqueos mientras esperamos a Mercado Pago.
+     */
         $mpPayment =
             MercadoPagoClient::getPaymentById(
                 (string)$paymentId
@@ -634,9 +640,11 @@ class WebhookMercadoPagoService
             ?? ''
         );
 
-        $externalRef = (string)(
-            $mpPayment['external_reference']
-            ?? ''
+        $externalRef = trim(
+            (string)(
+                $mpPayment['external_reference']
+                ?? ''
+            )
         );
 
         if ($externalRef === '') {
@@ -647,129 +655,197 @@ class WebhookMercadoPagoService
         }
 
         $pdo = self::db();
+        $pdo->beginTransaction();
 
-        $st = $pdo->prepare("
+        try {
+            /*
+         * Primero localizamos el pago para conocer
+         * la inmobiliaria involucrada.
+         */
+            $st = $pdo->prepare("
             SELECT *
             FROM payments
             WHERE external_reference = :ext
             LIMIT 1
         ");
 
-        $st->execute([
-            'ext' => $externalRef,
-        ]);
+            $st->execute([
+                'ext' => $externalRef,
+            ]);
 
-        $row = $st->fetch();
+            $initialRow = $st->fetch();
 
-        if (!$row) {
-            return [
-                'ok' => true,
-                'ignored' => 'payment_not_found',
-            ];
-        }
+            if (!$initialRow) {
+                $pdo->commit();
 
-        $wasAlreadyApproved =
-            (string)($row['status'] ?? '') === 'approved';
+                return [
+                    'ok' => true,
+                    'ignored' => 'payment_not_found',
+                ];
+            }
 
-        $newStatus =
-            self::normalizePaymentStatus(
-                $status
-            );
+            $realEstateId =
+                (int)$initialRow['real_estate_id'];
 
-        $st = $pdo->prepare("
+            /*
+         * Todos los pagos de una misma inmobiliaria
+         * se procesan uno por vez.
+         */
+            $lockRealEstate = $pdo->prepare("
+            SELECT id
+            FROM real_estates
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+        ");
+
+            $lockRealEstate->execute([
+                'id' => $realEstateId,
+            ]);
+
+            if (!$lockRealEstate->fetchColumn()) {
+                throw new \RuntimeException(
+                    'Inmobiliaria del pago no encontrada'
+                );
+            }
+
+            /*
+         * Volvemos a leer el pago después del bloqueo.
+         * Así obtenemos el estado más reciente si otra
+         * notificación terminó mientras esperábamos.
+         */
+            $st = $pdo->prepare("
+            SELECT *
+            FROM payments
+            WHERE external_reference = :ext
+            LIMIT 1
+            FOR UPDATE
+        ");
+
+            $st->execute([
+                'ext' => $externalRef,
+            ]);
+
+            $row = $st->fetch();
+
+            if (!$row) {
+                throw new \RuntimeException(
+                    'Pago no encontrado después del bloqueo'
+                );
+            }
+
+            $wasAlreadyApproved =
+                (string)($row['status'] ?? '')
+                === 'approved';
+
+            $newStatus =
+                self::normalizePaymentStatus(
+                    $status
+                );
+
+            $st = $pdo->prepare("
             UPDATE payments
             SET
                 mp_payment_id = :mpid,
-                mp_status = :st,
-                mp_status_detail = :std,
+                mp_status = :mp_status,
+                mp_status_detail = :status_detail,
                 status = :local_status,
+
                 approved_at = IF(
                     :approved_status = 'approved',
                     COALESCE(approved_at, NOW()),
                     approved_at
                 ),
+
                 paid_at = IF(
                     :paid_status = 'approved',
                     COALESCE(paid_at, NOW()),
                     paid_at
                 )
+
             WHERE id = :id
             LIMIT 1
         ");
 
-        $st->execute([
-            'mpid' =>
-            (int)$paymentId,
+            $st->execute([
+                'mpid' =>
+                (int)$paymentId,
 
-            'st' =>
-            $status,
+                'mp_status' =>
+                $status,
 
-            'std' =>
-            $statusDetail,
+                'status_detail' =>
+                $statusDetail,
 
-            'local_status' =>
-            $newStatus,
+                'local_status' =>
+                $newStatus,
 
-            'approved_status' =>
-            $newStatus,
+                'approved_status' =>
+                $newStatus,
 
-            'paid_status' =>
-            $newStatus,
+                'paid_status' =>
+                $newStatus,
 
-            'id' =>
-            (int)$row['id'],
-        ]);
+                'id' =>
+                (int)$row['id'],
+            ]);
 
-        if (
-            $newStatus === 'approved'
-            && !$wasAlreadyApproved
-        ) {
-            if (
-                str_contains(
-                    $externalRef,
-                    '-upgrade-'
-                )
-            ) {
-                self::applyUpgradeFromPayment(
-                    (int)$row['real_estate_id'],
-                    (int)$row['plan_id'],
-                    (int)$paymentId
-                );
-
-                return [
-                    'ok' => true,
-                    'processed' => true,
-                    'status' => $newStatus,
-                    'mode' => 'upgrade',
-                ];
-            }
+            $mode = null;
 
             if (
-                str_contains(
-                    $externalRef,
-                    '-new-'
-                )
+                $newStatus === 'approved'
+                && !$wasAlreadyApproved
             ) {
-                self::activateMembershipFromPayment(
-                    (int)$row['real_estate_id'],
-                    (int)$row['plan_id'],
-                    (int)$paymentId
-                );
+                if (
+                    str_contains(
+                        $externalRef,
+                        '-upgrade-'
+                    )
+                ) {
+                    self::applyUpgradeFromPayment(
+                        $realEstateId,
+                        (int)$row['plan_id'],
+                        (int)$paymentId
+                    );
 
-                return [
-                    'ok' => true,
-                    'processed' => true,
-                    'status' => $newStatus,
-                    'mode' => 'new_membership',
-                ];
+                    $mode = 'upgrade';
+                } elseif (
+                    str_contains(
+                        $externalRef,
+                        '-new-'
+                    )
+                ) {
+                    self::activateMembershipFromPayment(
+                        $realEstateId,
+                        (int)$row['plan_id'],
+                        (int)$paymentId
+                    );
+
+                    $mode = 'new_membership';
+                }
             }
+
+            $pdo->commit();
+
+            $result = [
+                'ok' => true,
+                'processed' => true,
+                'status' => $newStatus,
+            ];
+
+            if ($mode !== null) {
+                $result['mode'] = $mode;
+            }
+
+            return $result;
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $e;
         }
-
-        return [
-            'ok' => true,
-            'processed' => true,
-            'status' => $newStatus,
-        ];
     }
 
     private static function activateMembershipFromPayment(
