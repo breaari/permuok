@@ -52,6 +52,9 @@ import MultilateralCompatibilityDetail from "./features/compatibilities/pages/Mu
 import AdminCompatibilityJobs from "./features/admin/pages/AdminCompatibilityJobs";
 import AdminEmailJobs from "./features/admin/pages/AdminEmailJobs";
 
+import ForgotPassword from "./features/auth/pages/ForgotPassword";
+import ResetPassword from "./features/auth/pages/ResetPassword";
+
 export default function App() {
   return (
     <Routes>
@@ -61,7 +64,8 @@ export default function App() {
       {/* Auth público */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
-
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       {/* App privada */}
       <Route
         element={

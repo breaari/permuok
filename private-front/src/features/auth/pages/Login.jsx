@@ -1,6 +1,6 @@
 // src/pages/Login.jsx
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../components/AuthContext";
 import { getErrorMessage } from "../../../api/http.js";
 import { useToast } from "../../../ui/toast/ToastProvider";
@@ -38,6 +38,7 @@ function formatRemainingTime(totalSeconds) {
 export default function Login() {
   const { login } = useAuth();
   const nav = useNavigate();
+  const location = useLocation();
   const toast = useToast();
 
   const [email, setEmail] = useState("");
@@ -138,6 +139,14 @@ export default function Login() {
       title="Bienvenido de nuevo"
       subtitle="Ingresá tus credenciales para acceder"
     >
+      {location.state?.passwordReset && (
+        <div
+          className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
+          role="status"
+        >
+          Tu contraseña fue actualizada. Ya podés iniciar sesión.
+        </div>
+      )}
       <form onSubmit={onSubmit} className="space-y-6">
         <Input
           label="Email"
@@ -157,16 +166,12 @@ export default function Login() {
               Contraseña
             </label>
 
-            <button
-              type="button"
+            <Link
+              to="/forgot-password"
               className="text-xs font-semibold text-primary hover:underline"
-              onClick={() =>
-                toast.info("Función pendiente: recuperación de contraseña")
-              }
-              disabled={submitting}
             >
               ¿Olvidaste tu contraseña?
-            </button>
+            </Link>
           </div>
 
           <Input
