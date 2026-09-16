@@ -24,14 +24,21 @@ class RefreshController
             ResponseHelper::fail('Refresh token requerido', 400);
         }
 
-        // 1) Validar refresh token contra DB (hash + no revocado + no expirado)
-        $stored = RefreshTokenService::findValid($refreshToken);
-        if (!$stored) {
-            ResponseHelper::fail('Refresh token inválido', 401);
-        }
+        /*
+ * Validación y revocación atómicas.
+ * El mismo token solo puede utilizarse una vez.
+ */
+        $stored =
+            RefreshTokenService::consumeValid(
+                $refreshToken
+            );
 
-        // 2) Rotación: revocar el refresh token usado
-        RefreshTokenService::revokeById((int)$stored['id']);
+        if (!$stored) {
+            ResponseHelper::fail(
+                'Refresh token inválido',
+                401
+            );
+        }
 
         // 3) Confirmar usuario vigente (y rol actualizado)
         $pdo = self::db();

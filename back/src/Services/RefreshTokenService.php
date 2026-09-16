@@ -56,6 +56,82 @@ class RefreshTokenService
         return $row ?: null;
     }
 
+    public static function consumeValid(
+        string $refreshToken
+    ): ?array {
+        $pdo = self::db();
+        $hash = hash(
+            'sha256',
+            $refreshToken
+        );
+
+        $pdo->beginTransaction();
+
+        try {
+            /*
+         * Bloqueamos el token para que dos solicitudes
+         * simultáneas no puedan consumirlo juntas.
+         */
+            $stmt = $pdo->prepare("
+            SELECT
+                id,
+                user_id,
+                expires_at,
+                revoked_at
+            FROM refresh_tokens
+            WHERE token_hash = :token_hash
+            LIMIT 1
+            FOR UPDATE
+        ");
+
+            $stmt->execute([
+                'token_hash' => $hash,
+            ]);
+
+            $row = $stmt->fetch();
+
+            if (
+                !$row
+                || $row['revoked_at'] !== null
+                || strtotime(
+                    (string)$row['expires_at']
+                ) < time()
+            ) {
+                $pdo->commit();
+
+                return null;
+            }
+
+            $revoke = $pdo->prepare("
+            UPDATE refresh_tokens
+            SET revoked_at = NOW()
+            WHERE id = :id
+              AND revoked_at IS NULL
+            LIMIT 1
+        ");
+
+            $revoke->execute([
+                'id' => (int)$row['id'],
+            ]);
+
+            if ($revoke->rowCount() !== 1) {
+                $pdo->rollBack();
+
+                return null;
+            }
+
+            $pdo->commit();
+
+            return $row;
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $e;
+        }
+    }
+
     /** Revoca un refresh token por id (rotación) */
     public static function revokeById(int $id): void
     {
@@ -78,16 +154,15 @@ class RefreshTokenService
     }
 
     public static function revokeAllByUserId(int $userId): void
-{
-    $pdo = self::db();
+    {
+        $pdo = self::db();
 
-    $stmt = $pdo->prepare("
+        $stmt = $pdo->prepare("
         UPDATE refresh_tokens
         SET revoked_at = NOW()
         WHERE user_id = :user_id
           AND revoked_at IS NULL
     ");
-    $stmt->execute(['user_id' => $userId]);
+        $stmt->execute(['user_id' => $userId]);
+    }
 }
-}
-
