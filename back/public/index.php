@@ -5,6 +5,17 @@ require_once __DIR__ . '/../vendor/autoload.php';
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
 $dotenv->load();
 
+
+$appEnv =
+    strtolower(
+        trim(
+            (string)(
+                $_ENV['APP_ENV']
+                ?? 'production'
+            )
+        )
+    );
+
 /*
 |--------------------------------------------------------------------------
 | CORS
@@ -183,7 +194,6 @@ $routes = [
     'POST /billing/create-preference'   => [BillingController::class, 'createPreference'],
     'GET /billing/status'               => [BillingController::class, 'status'],
     'POST /webhooks/mercadopago'        => [WebhookMercadoPagoController::class, 'handle'],
-    'POST /dev/billing/approve'         => [DevBillingController::class, 'approve'],
     'POST /billing/change-plan/preview' => [BillingController::class, 'previewPlanChange'],
     'POST /billing/change-plan/confirm' => [BillingController::class, 'confirmPlanChange'],
     'POST /billing/cancel'              => [BillingController::class, 'cancelMembership'],
@@ -290,6 +300,20 @@ $routes = [
     'GET /compatibilities/multilateral' =>
     [CompatibilityController::class, 'multilateral'],
 ];
+
+/*
+ * Las herramientas de desarrollo nunca
+ * deben estar disponibles en producción.
+ *
+ * Si APP_ENV no está configurada,
+ * asumimos production por seguridad.
+ */
+if ($appEnv !== 'production') {
+    $routes['POST /dev/billing/approve'] = [
+        DevBillingController::class,
+        'approve',
+    ];
+}
 
 $key = $method . ' ' . $uri;
 
