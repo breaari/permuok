@@ -60,8 +60,8 @@ class PasswordResetController
             hash(
                 'sha256',
                 $email .
-                '|' .
-                SecurityRateLimitService::clientIp()
+                    '|' .
+                    SecurityRateLimitService::clientIp()
             ),
             3,
             15 * 60
@@ -74,7 +74,7 @@ class PasswordResetController
         } catch (Throwable $e) {
             error_log(
                 '[PASSWORD RESET REQUEST] ' .
-                $e->getMessage()
+                    $e->getMessage()
             );
 
             ResponseHelper::fail(
@@ -88,7 +88,7 @@ class PasswordResetController
          */
         ResponseHelper::ok([
             'message' =>
-                'Si el email corresponde a una cuenta activa, recibirás las instrucciones para restablecer tu contraseña.',
+            'Si existe una cuenta habilitada con ese email, te enviaremos un enlace para crear una nueva contraseña. Puede tardar algunos minutos. Revisá también la carpeta de correo no deseado. Por seguridad, no podemos confirmar si el email está registrado. Si no recibís el mensaje, verificá la dirección ingresada o contactá al administrador de tu inmobiliaria.',
         ]);
     }
 
@@ -129,7 +129,7 @@ class PasswordResetController
 
             ResponseHelper::ok([
                 'message' =>
-                    'La contraseña fue actualizada correctamente.',
+                'La contraseña fue actualizada correctamente.',
             ]);
         } catch (Throwable $e) {
             $status =
@@ -138,13 +138,13 @@ class PasswordResetController
                     [400, 422],
                     true
                 )
-                    ? (int)$e->getCode()
-                    : 500;
+                ? (int)$e->getCode()
+                : 500;
 
             if ($status === 500) {
                 error_log(
                     '[PASSWORD RESET] ' .
-                    $e->getMessage()
+                        $e->getMessage()
                 );
             }
 

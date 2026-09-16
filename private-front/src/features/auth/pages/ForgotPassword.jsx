@@ -5,20 +5,13 @@ import AuthLayout from "../../../layout/AuthLayout.jsx";
 import Input from "../../../ui/components/Input";
 import Button from "../../../ui/components/Button";
 import { Icon } from "../../../ui/icons/Index";
-import {
-  api,
-  getErrorMessage,
-  unwrap,
-} from "../../../api/http.js";
+import { api, getErrorMessage, unwrap } from "../../../api/http.js";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
-  const [submitting, setSubmitting] =
-    useState(false);
-  const [message, setMessage] =
-    useState("");
-  const [error, setError] =
-    useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   async function onSubmit(event) {
     event.preventDefault();
@@ -31,9 +24,7 @@ export default function ForgotPassword() {
       const response = await api.post(
         "/auth/forgot-password",
         {
-          email: email
-            .trim()
-            .toLowerCase(),
+          email: email.trim().toLowerCase(),
         },
         {
           skipAuth: true,
@@ -44,14 +35,11 @@ export default function ForgotPassword() {
 
       setMessage(
         data?.message ||
-          "Si el email corresponde a una cuenta activa, recibirás las instrucciones.",
+          "Si existe una cuenta habilitada con ese email, te enviaremos un enlace para crear una nueva contraseña. Puede tardar algunos minutos. Revisá también la carpeta de correo no deseado.",
       );
     } catch (requestError) {
       setError(
-        getErrorMessage(
-          requestError,
-          "No se pudo procesar la solicitud.",
-        ),
+        getErrorMessage(requestError, "No se pudo procesar la solicitud."),
       );
     } finally {
       setSubmitting(false);
@@ -70,14 +58,9 @@ export default function ForgotPassword() {
             role="status"
           >
             <div className="flex items-start gap-3">
-              <Icon
-                name="check"
-                className="mt-0.5 text-emerald-600"
-              />
+              <Icon name="check" className="mt-0.5 text-emerald-600" />
 
-              <p className="text-sm text-emerald-800">
-                {message}
-              </p>
+              <p className="text-sm text-emerald-800">{message}</p>
             </div>
           </div>
 
@@ -89,10 +72,7 @@ export default function ForgotPassword() {
           </Link>
         </div>
       ) : (
-        <form
-          onSubmit={onSubmit}
-          className="space-y-6"
-        >
+        <form onSubmit={onSubmit} className="space-y-6">
           <Input
             label="Email"
             value={email}
@@ -100,12 +80,7 @@ export default function ForgotPassword() {
             type="email"
             placeholder="ejemplo@correo.com"
             autoComplete="email"
-            iconLeft={
-              <Icon
-                name="mail"
-                className="opacity-80"
-              />
-            }
+            iconLeft={<Icon name="mail" className="opacity-80" />}
             required
             disabled={submitting}
           />
@@ -119,13 +94,8 @@ export default function ForgotPassword() {
             </div>
           )}
 
-          <Button
-            type="submit"
-            disabled={submitting}
-          >
-            {submitting
-              ? "ENVIANDO..."
-              : "ENVIAR INSTRUCCIONES"}
+          <Button type="submit" disabled={submitting}>
+            {submitting ? "ENVIANDO..." : "ENVIAR INSTRUCCIONES"}
           </Button>
 
           <Link

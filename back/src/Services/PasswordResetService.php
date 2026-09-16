@@ -75,17 +75,17 @@ class PasswordResetService
         $tokenHash =
             hash('sha256', $token);
 
-        $appUrl =
+        $frontendUrl =
             rtrim(
                 (string)(
-                    $_ENV['APP_URL']
+                    $_ENV['FRONTEND_URL']
                     ?? 'https://permuok.com'
                 ),
                 '/'
             );
 
         $resetUrl =
-            $appUrl .
+            $frontendUrl .
             '/reset-password?token=' .
             rawurlencode($token);
 
@@ -155,7 +155,7 @@ class PasswordResetService
 
             $invalidate->execute([
                 'user_id' =>
-                    (int)$user['id'],
+                (int)$user['id'],
             ]);
 
             $insert = $pdo->prepare("
@@ -175,10 +175,10 @@ class PasswordResetService
 
             $insert->execute([
                 'user_id' =>
-                    (int)$user['id'],
+                (int)$user['id'],
 
                 'token_hash' =>
-                    $tokenHash,
+                $tokenHash,
             ]);
 
             $resetTokenId =
@@ -273,7 +273,7 @@ class PasswordResetService
 
             $stmt->execute([
                 'token_hash' =>
-                    $tokenHash,
+                $tokenHash,
             ]);
 
             $resetToken =
@@ -321,10 +321,10 @@ class PasswordResetService
 
             $updateUser->execute([
                 'password_hash' =>
-                    $passwordHash,
+                $passwordHash,
 
                 'id' =>
-                    $userId,
+                $userId,
             ]);
 
             if ($updateUser->rowCount() !== 1) {
