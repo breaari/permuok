@@ -51,6 +51,7 @@ export function CreateUserModal({
         email: "",
         phone: "",
         password: "",
+        password_confirmation: "",
       });
       setLocalError("");
     }
@@ -72,6 +73,7 @@ export function CreateUserModal({
 
   async function handleSubmit(e) {
     e.preventDefault();
+
     setLocalError("");
 
     if (!passwordIsValid) {
@@ -93,17 +95,8 @@ export function CreateUserModal({
         ...payload,
         role: Number(payload.role),
       });
-    } catch (e2) {
-      setLocalError(e2.message || "No se pudo crear el usuario");
-    }
-
-    try {
-      await onSubmit({
-        ...form,
-        role: Number(form.role),
-      });
-    } catch (e2) {
-      setLocalError(e2.message || "No se pudo crear el usuario");
+    } catch (error) {
+      setLocalError(error?.message || "No se pudo crear el usuario");
     }
   }
 
@@ -229,7 +222,7 @@ export function CreateUserModal({
               value={form.password}
               onChange={(e) => updateField("password", e.target.value)}
               className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-primary"
-              disabled={!canSubmit}
+              disabled={busy}
             />
 
             <div>
@@ -270,7 +263,7 @@ export function CreateUserModal({
 
             <button
               type="submit"
-              disabled={busy}
+              disabled={!canSubmit}
               className="rounded-lg bg-primary px-4 py-3 text-sm font-bold text-white hover:bg-primary/90 disabled:opacity-60"
             >
               {busy ? "Creando..." : "Crear usuario"}
