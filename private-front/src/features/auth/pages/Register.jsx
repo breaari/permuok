@@ -4,7 +4,9 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../auth/components/AuthContext";
 import { getErrorMessage } from "../../../api/http.js";
 import { useToast } from "../../../ui/toast/ToastProvider";
-
+import PasswordRequirements, {
+  isPasswordValid,
+} from "../components/PasswordRequirements.jsx";
 import AuthLayout from "../../../layout/AuthLayout.jsx";
 import Input from "../../../ui/components/Input.jsx";
 import Button from "../../../ui/components/Button";
@@ -22,9 +24,17 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [terms, setTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const passwordIsValid = isPasswordValid(password);
+
+  const passwordsMatch =
+    passwordConfirmation.length > 0 && password === passwordConfirmation;
+
+  const canSubmit = passwordIsValid && passwordsMatch && terms && !submitting;
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -41,6 +51,17 @@ export default function Register() {
 
     if (!isValidPhoneNumber(phone)) {
       toast.error("El número de teléfono no es válido.");
+      return;
+    }
+    if (!passwordIsValid) {
+      toast.error("La contraseña no cumple todos los requisitos.");
+
+      return;
+    }
+
+    if (!passwordsMatch) {
+      toast.error("Las contraseñas no coinciden.");
+
       return;
     }
 
@@ -140,10 +161,29 @@ export default function Register() {
             </button>
           }
           required
-          minLength={6}
+          minLength={8}
+          maxLength={72}
+          disabled={submitting}
+        />
+        <Input
+          label="Repetir contraseña"
+          value={passwordConfirmation}
+          onChange={setPasswordConfirmation}
+          type={showPass ? "text" : "password"}
+          placeholder="••••••••"
+          autoComplete="new-password"
+          iconLeft={<Icon name="lock" className="opacity-80" />}
+          required
+          minLength={8}
+          maxLength={72}
           disabled={submitting}
         />
 
+        <PasswordRequirements
+          password={password}
+          confirmation={passwordConfirmation}
+          showMatch
+        />
         <label className="flex items-start gap-2 text-xs text-slate-600">
           <input
             type="checkbox"
@@ -178,7 +218,7 @@ export default function Register() {
           </span>
         </label>
 
-        <Button type="submit" disabled={submitting}>
+        <Button type="submit" disabled={!canSubmit}>
           {submitting ? "Creando..." : "REGISTRARSE"}
         </Button>
       </form>

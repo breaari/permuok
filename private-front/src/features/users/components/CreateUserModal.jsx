@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../../../ui/icons/Index";
+import PasswordRequirements, {
+  isPasswordValid,
+} from "../../auth/components/PasswordRequirements.jsx";
 
 const ROLE_AGENT = 3;
 const ROLE_INVESTOR = 4;
@@ -35,6 +38,7 @@ export function CreateUserModal({
     email: "",
     phone: "",
     password: "",
+    password_confirmation: "",
   });
   const [localError, setLocalError] = useState("");
 
@@ -56,11 +60,42 @@ export function CreateUserModal({
     return getAvailableMessage(form.role, summary);
   }, [form.role, summary]);
 
+  const passwordIsValid = isPasswordValid(form.password);
+
+  const passwordsMatch =
+    form.password_confirmation.length > 0 &&
+    form.password === form.password_confirmation;
+
+  const canSubmit = passwordIsValid && passwordsMatch && !busy;
+
   if (!open) return null;
 
   async function handleSubmit(e) {
     e.preventDefault();
     setLocalError("");
+
+    if (!passwordIsValid) {
+      setLocalError("La contraseña no cumple todos los requisitos.");
+
+      return;
+    }
+
+    if (!passwordsMatch) {
+      setLocalError("Las contraseñas no coinciden.");
+
+      return;
+    }
+
+    try {
+      const { password_confirmation, ...payload } = form;
+
+      await onSubmit({
+        ...payload,
+        role: Number(payload.role),
+      });
+    } catch (e2) {
+      setLocalError(e2.message || "No se pudo crear el usuario");
+    }
 
     try {
       await onSubmit({
@@ -188,10 +223,38 @@ export function CreateUserModal({
             </label>
             <input
               type="password"
+              minLength={8}
+              maxLength={72}
+              autoComplete="new-password"
               value={form.password}
               onChange={(e) => updateField("password", e.target.value)}
               className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-primary"
-              disabled={busy}
+              disabled={!canSubmit}
+            />
+
+            <div>
+              <label className="mb-2 block text-sm font-bold text-slate-700">
+                Repetir contraseña
+              </label>
+
+              <input
+                type="password"
+                value={form.password_confirmation}
+                onChange={(e) =>
+                  updateField("password_confirmation", e.target.value)
+                }
+                minLength={8}
+                maxLength={72}
+                autoComplete="new-password"
+                className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-primary"
+                disabled={busy}
+              />
+            </div>
+
+            <PasswordRequirements
+              password={form.password}
+              confirmation={form.password_confirmation}
+              showMatch
             />
           </div>
 
