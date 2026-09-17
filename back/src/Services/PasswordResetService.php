@@ -229,16 +229,36 @@ class PasswordResetService
             );
         }
 
-        if (strlen($password) < 8) {
+        $passwordLength =
+            strlen($password);
+
+        if (
+            $passwordLength < 8 ||
+            $passwordLength > 72
+        ) {
             throw new Exception(
-                'La contraseña debe tener al menos 8 caracteres.',
+                'La contraseña debe tener entre 8 y 72 caracteres.',
                 422
             );
         }
 
-        if (strlen($password) > 255) {
+        if (!preg_match('/[A-Z]/', $password)) {
             throw new Exception(
-                'La contraseña es demasiado extensa.',
+                'La contraseña debe incluir al menos una mayúscula.',
+                422
+            );
+        }
+
+        if (!preg_match('/[a-z]/', $password)) {
+            throw new Exception(
+                'La contraseña debe incluir al menos una minúscula.',
+                422
+            );
+        }
+
+        if (!preg_match('/[0-9]/', $password)) {
+            throw new Exception(
+                'La contraseña debe incluir al menos un número.',
                 422
             );
         }
