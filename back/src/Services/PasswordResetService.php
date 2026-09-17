@@ -257,7 +257,9 @@ class PasswordResetService
                     password_reset_tokens.user_id,
                     password_reset_tokens.expires_at,
                     password_reset_tokens.used_at,
-                    users.is_active
+                    users.is_active,
+users.email,
+users.first_name
                 FROM password_reset_tokens
 
                 INNER JOIN users
@@ -365,6 +367,68 @@ class PasswordResetService
             ]);
 
             $pdo->commit();
+            /*
+ * El cambio ya fue confirmado.
+ * Si el aviso por correo falla, no revertimos
+ * la contraseña ni mostramos un error falso.
+ */
+            try {
+                $recipientName =
+                    trim(
+                        (string)(
+                            $resetToken['first_name']
+                            ?? ''
+                        )
+                    );
+
+                $safeName =
+                    htmlspecialchars(
+                        $recipientName !== ''
+                            ? $recipientName
+                            : 'Hola',
+                        ENT_QUOTES,
+                        'UTF-8'
+                    );
+
+                $htmlBody = "
+        <div style=\"font-family:Arial,sans-serif;color:#0f172a;line-height:1.6\">
+            <h2>Tu contraseña fue actualizada</h2>
+
+            <p>{$safeName}, la contraseña de tu cuenta de PermuOK se cambió correctamente.</p>
+
+            <p>Por seguridad, cerramos todas las sesiones que estaban abiertas.</p>
+
+            <p>Si realizaste este cambio, no necesitás hacer nada más.</p>
+
+            <p><strong>Si no fuiste vos, solicitá inmediatamente un nuevo restablecimiento de contraseña y contactá al administrador de tu inmobiliaria.</strong></p>
+        </div>
+    ";
+
+                $textBody =
+                    "Tu contraseña de PermuOK fue actualizada correctamente.\n\n" .
+                    "Por seguridad, cerramos todas las sesiones abiertas.\n\n" .
+                    "Si no realizaste este cambio, solicitá inmediatamente un nuevo restablecimiento y contactá al administrador de tu inmobiliaria.";
+
+                EmailJobService::enqueue(
+                    (string)$resetToken['email'],
+                    'password_changed',
+                    'Tu contraseña de PermuOK fue actualizada',
+                    $htmlBody,
+                    $textBody,
+                    $userId,
+                    $recipientName !== ''
+                        ? $recipientName
+                        : null,
+                    'user',
+                    $userId,
+                    10
+                );
+            } catch (Throwable $emailError) {
+                error_log(
+                    '[PASSWORD CHANGED EMAIL] ' .
+                        $emailError->getMessage()
+                );
+            }
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
