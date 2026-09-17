@@ -31,14 +31,73 @@ $allowedOrigins = [
     'https://www.permuok.com',
 ];
 
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-if (in_array($origin, $allowedOrigins, true)) {
-    header("Access-Control-Allow-Origin: $origin");
+$origin =
+    trim(
+        (string)(
+            $_SERVER['HTTP_ORIGIN']
+            ?? ''
+        )
+    );
+
+/*
+ * Evita que una respuesta CORS almacenada
+ * para un origen sea reutilizada para otro.
+ */
+header('Vary: Origin');
+
+if ($origin !== '') {
+    if (
+        !in_array(
+            $origin,
+            $allowedOrigins,
+            true
+        )
+    ) {
+        http_response_code(403);
+
+        header(
+            'Content-Type: application/json; charset=utf-8'
+        );
+
+        echo json_encode([
+            'success' => false,
+            'status' => 403,
+            'message' =>
+            'Origen no autorizado.',
+        ]);
+
+        exit;
+    }
+
+    header(
+        'Access-Control-Allow-Origin: ' .
+            $origin
+    );
+
+    header(
+        'Access-Control-Allow-Credentials: true'
+    );
 }
 
-header('Access-Control-Allow-Credentials: true');
-header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header(
+    'Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS'
+);
+
+header(
+    'Access-Control-Allow-Headers: Content-Type, Authorization'
+);
+
+header(
+    'Access-Control-Max-Age: 600'
+);
+
+if (
+    $_SERVER['REQUEST_METHOD'] ===
+    'OPTIONS'
+) {
+    http_response_code(204);
+    exit;
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -65,13 +124,6 @@ if (
         'Strict-Transport-Security: max-age=31536000; includeSubDomains'
     );
 }
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
-
-
 
 use App\Controllers\AuthController;
 use App\Controllers\MeController;
