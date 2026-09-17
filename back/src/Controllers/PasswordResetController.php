@@ -88,7 +88,7 @@ class PasswordResetController
          */
         ResponseHelper::ok([
             'message' =>
-            'Si existe una cuenta habilitada con ese email, te enviaremos un enlace para crear una nueva contraseña. Puede tardar algunos minutos. Revisá también la carpeta de correo no deseado. Por seguridad, no podemos confirmar si el email está registrado. Si no recibís el mensaje, verificá la dirección ingresada o contactá al administrador de tu inmobiliaria.',
+            'Si hay una cuenta asociada a esa dirección, recibirás un enlace para restablecer tu contraseña.',
         ]);
     }
 

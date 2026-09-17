@@ -38,9 +38,18 @@ class AuthService
             return ['error' => 'Email requerido'];
         }
 
-        $password = (string)($data['password'] ?? '');
-        if (trim($password) === '' || strlen($password) < 6) {
-            return ['error' => 'Password inválida (mínimo 6 caracteres)'];
+        $password =
+            (string)($data['password'] ?? '');
+
+        $passwordError =
+            PasswordPolicyService::validationError(
+                $password
+            );
+
+        if ($passwordError !== null) {
+            return [
+                'error' => $passwordError,
+            ];
         }
 
         $first = trim((string)($data['first_name'] ?? ''));
@@ -72,7 +81,7 @@ class AuthService
             'last_name'  => $last,
             'email'      => $emailNorm,
             'phone'      => $phone,
-            'password'   => password_hash($password, PASSWORD_BCRYPT),
+            'password'   => password_hash($password, PASSWORD_DEFAULT),
         ]);
 
         return ['success' => true];

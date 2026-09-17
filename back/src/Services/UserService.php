@@ -145,8 +145,15 @@ class UserService
             throw new Exception("phone requerido");
         }
 
-        if (trim($password) === '' || strlen($password) < 6) {
-            throw new Exception("La contraseña debe tener al menos 6 caracteres");
+        $passwordError =
+            PasswordPolicyService::validationError(
+                $password
+            );
+
+        if ($passwordError !== null) {
+            throw new Exception(
+                $passwordError
+            );
         }
 
         return [
@@ -278,7 +285,11 @@ class UserService
             'first_name' => $payload['first_name'],
             'last_name' => $payload['last_name'],
             'email' => $payload['email'],
-            'password_hash' => password_hash($payload['password'], PASSWORD_BCRYPT),
+            'password_hash' =>
+            password_hash(
+                $payload['password'],
+                PASSWORD_DEFAULT
+            ),
             'phone' => $payload['phone'],
         ]);
 
