@@ -5,6 +5,8 @@ namespace App\Controllers;
 use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
 use App\Services\AI\CompatibilityEngine;
+use App\Services\MembershipGuard;
+use App\Services\SearchRequestService;
 use Throwable;
 
 class AiCompatibilityController
@@ -13,7 +15,7 @@ class AiCompatibilityController
         int $searchRequestId
     ): void {
         try {
-            AuthHelper::requireUser();
+            $user = AuthHelper::requireUser();
 
             if ($searchRequestId <= 0) {
                 throw new \Exception(
@@ -21,6 +23,25 @@ class AiCompatibilityController
                     422
                 );
             }
+
+            /*
+             * El recálculo consume recursos y modifica
+             * compatibilidades. Solo puede ejecutarlo
+             * una inmobiliaria con membresía activa.
+             */
+            MembershipGuard::requireActiveMembership(
+                (int)$user['id']
+            );
+
+            /*
+             * getDetail() verifica que la búsqueda
+             * pertenezca a la inmobiliaria del usuario.
+             * No alcanza con recibir un ID válido.
+             */
+            SearchRequestService::getDetail(
+                (int)$user['id'],
+                $searchRequestId
+            );
 
             $result =
                 CompatibilityEngine::calculateForSearchRequest(
@@ -38,8 +59,8 @@ class AiCompatibilityController
             }
 
             ResponseHelper::fail(
-                $e->getMessage() ?:
-                    'No se pudieron calcular las compatibilidades.',
+                $e->getMessage()
+                    ?: 'No se pudieron calcular las compatibilidades.',
                 $code
             );
         }
