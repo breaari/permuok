@@ -1690,6 +1690,12 @@ PROMPT;
             );
         }
 
+        if (($decoded['status'] ?? null) !== 'completed') {
+            throw new Exception(
+                'No se pudo completar el análisis de IA. Intentá nuevamente.'
+            );
+        }
+        
         $outputText = '';
 
         foreach (

@@ -729,7 +729,7 @@ class SearchRequestAIAnalysisService
             throw $e;
         }
     }
-    
+
     private static function callOpenAI(
         array $input
     ): array {
@@ -1598,6 +1598,12 @@ PROMPT;
                         $decoded['error']['message']
                         ?? 'Error desconocido.'
                     )
+            );
+        }
+
+        if (($decoded['status'] ?? null) !== 'completed') {
+            throw new Exception(
+                'No se pudo completar el análisis de IA. Intentá nuevamente.'
             );
         }
 

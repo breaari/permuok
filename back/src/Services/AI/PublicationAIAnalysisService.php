@@ -1950,6 +1950,12 @@ image_analysis_json,
             );
         }
 
+        if (($decoded['status'] ?? null) !== 'completed') {
+            throw new Exception(
+                'No se pudo completar el análisis de IA. Intentá nuevamente.'
+            );
+        }
+
         $outputText =
             self::extractOpenAIOutputText(
                 $decoded
