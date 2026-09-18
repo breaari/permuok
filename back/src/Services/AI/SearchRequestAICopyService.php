@@ -70,7 +70,20 @@ class SearchRequestAICopyService
                 'Tipo de contenido IA inválido.'
             );
         }
+        $draftJson = json_encode(
+            $draft,
+            JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
+        );
 
+        if (
+            $draftJson === false ||
+            strlen($draftJson) > 32768
+        ) {
+            throw new Exception(
+                'Los datos del formulario son demasiado extensos para generar contenido con IA.',
+                400
+            );
+        }
         $input =
             SearchRequestAIAnalysisService::prepareInput(
                 $searchRequestId
