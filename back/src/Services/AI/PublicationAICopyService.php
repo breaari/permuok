@@ -1228,11 +1228,10 @@ PROMPT;
             );
 
         $body = [
-            'model' =>
-            $model,
-
-            'input' =>
-            $prompt,
+            'model' => $model,
+            'input' => $prompt,
+            'max_output_tokens' =>
+            $copyType === 'title' ? 2048 : 4096,
         ];
 
         $jsonBody =
@@ -1338,6 +1337,12 @@ PROMPT;
                         $decoded['error']['message']
                         ?? 'Error desconocido.'
                     )
+            );
+        }
+
+        if (($decoded['status'] ?? null) !== 'completed') {
+            throw new Exception(
+                'No se pudo completar la generación. Intentá nuevamente.'
             );
         }
 

@@ -1497,21 +1497,20 @@ PROMPT;
             );
 
         $body = [
-            'model' =>
-            $model,
+            'model' => $model,
 
             'reasoning' => [
-                'effort' =>
-                'low',
+                'effort' => 'low',
             ],
 
-            'input' =>
-            $prompt,
+            'input' => $prompt,
 
             'text' => [
-                'verbosity' =>
-                'low',
+                'verbosity' => 'low',
             ],
+
+            'max_output_tokens' =>
+            $copyType === 'title' ? 2048 : 4096,
         ];
 
         $ch =
@@ -1600,6 +1599,12 @@ PROMPT;
                         $decoded['error']['message']
                         ?? 'Error desconocido.'
                     )
+            );
+        }
+
+        if (($decoded['status'] ?? null) !== 'completed') {
+            throw new Exception(
+                'No se pudo completar la generación. Intentá nuevamente.'
             );
         }
 
