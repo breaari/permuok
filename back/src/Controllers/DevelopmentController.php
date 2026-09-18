@@ -16,6 +16,10 @@ class DevelopmentController
 {
     private static function fail(Throwable $e, int $status = 400): void
     {
+        if ((int)$e->getCode() === 402) {
+            $status = 402;
+        }
+
         ResponseHelper::error($e->getMessage(), $status);
     }
 
@@ -248,7 +252,7 @@ class DevelopmentController
         } catch (\Throwable $e) {
             ResponseHelper::error(
                 $e->getMessage(),
-                400
+                (int)$e->getCode() === 402 ? 402 : 400
             );
         }
     }
@@ -306,7 +310,7 @@ class DevelopmentController
         } catch (\Throwable $e) {
             ResponseHelper::error(
                 $e->getMessage(),
-                400
+                (int)$e->getCode() === 402 ? 402 : 400
             );
         }
     }
@@ -364,7 +368,7 @@ class DevelopmentController
         } catch (\Throwable $e) {
             ResponseHelper::error(
                 $e->getMessage(),
-                400
+                (int)$e->getCode() === 402 ? 402 : 400
             );
         }
     }
