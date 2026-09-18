@@ -41,7 +41,6 @@ class MembershipGuard
                AND m.deleted_at IS NULL
                AND m.end_date >= CURDATE()
             WHERE u.id = :user_id
-              AND u.role = :real_estate_role
               AND u.role IN (:real_estate_role, :agent_role)
 AND u.is_active = 1
               AND u.real_estate_id IS NOT NULL
