@@ -93,6 +93,9 @@ class PropertyController
     {
         try {
             $auth = AuthHelper::requireUser();
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
             $id = (int)($_GET['id'] ?? 0);
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
 
@@ -107,6 +110,9 @@ class PropertyController
     {
         try {
             $auth = AuthHelper::requireUser();
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
             $id = (int)($_GET['id'] ?? 0);
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
 
@@ -192,6 +198,9 @@ class PropertyController
         try {
             $auth =
                 AuthHelper::requireUser();
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
 
             $id =
                 (int)($_GET['id'] ?? 0);
@@ -245,6 +254,9 @@ class PropertyController
         try {
             $auth =
                 AuthHelper::requireUser();
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
 
             $id =
                 (int)($_GET['id'] ?? 0);
@@ -281,7 +293,9 @@ class PropertyController
         try {
             $auth =
                 AuthHelper::requireUser();
-
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
             $id =
                 (int)($_GET['id'] ?? 0);
             $data =
