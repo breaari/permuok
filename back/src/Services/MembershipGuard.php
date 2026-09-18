@@ -8,6 +8,7 @@ use PDO;
 class MembershipGuard
 {
     private const ROLE_REAL_ESTATE = 2;
+    private const ROLE_AGENT = 3;
     private const MEMBERSHIP_STATUS_ACTIVE = 1;
 
     private static function db(): PDO
@@ -41,6 +42,8 @@ class MembershipGuard
                AND m.end_date >= CURDATE()
             WHERE u.id = :user_id
               AND u.role = :real_estate_role
+              AND u.role IN (:real_estate_role, :agent_role)
+AND u.is_active = 1
               AND u.real_estate_id IS NOT NULL
               AND u.deleted_at IS NULL
             ORDER BY m.end_date DESC, m.id DESC
@@ -51,6 +54,7 @@ class MembershipGuard
             ':user_id' => $userId,
             ':active_status' => self::MEMBERSHIP_STATUS_ACTIVE,
             ':real_estate_role' => self::ROLE_REAL_ESTATE,
+            ':agent_role' => self::ROLE_AGENT,
         ]);
 
         $membership = $stmt->fetch(PDO::FETCH_ASSOC);

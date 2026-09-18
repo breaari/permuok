@@ -15,6 +15,13 @@ class ConversationController
         try {
             $user = AuthHelper::requireUser();
 
+            if (!in_array((int)$user['role'], [2, 3], true)) {
+                throw new \Exception(
+                    'No tenés permisos para iniciar conversaciones.',
+                    403
+                );
+            }
+
             MembershipGuard::requireActiveMembership((int)$user['id']);
             $input = self::getJsonInput();
 
