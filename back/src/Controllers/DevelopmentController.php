@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use Throwable;
+use PDOException;
 use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
 use App\Services\DevelopmentService;
@@ -14,13 +15,36 @@ use App\Services\SecurityRateLimitService;
 
 class DevelopmentController
 {
-    private static function fail(Throwable $e, int $status = 400): void
-    {
-        if ((int)$e->getCode() === 402) {
-            $status = 402;
+    private static function fail(
+        Throwable $e,
+        int $status = 400
+    ): void {
+        if ($e instanceof PDOException) {
+            ResponseHelper::fromThrowable(
+                $e,
+                'No se pudo completar la operación.',
+                'DevelopmentController'
+            );
+
+            return;
         }
 
-        ResponseHelper::error($e->getMessage(), $status);
+        $exceptionStatus =
+            (int)$e->getCode();
+
+        if (
+            $exceptionStatus >= 400 &&
+            $exceptionStatus <= 499
+        ) {
+            $status =
+                $exceptionStatus;
+        }
+
+        ResponseHelper::fail(
+            $e->getMessage()
+                ?: 'No se pudo completar la operación.',
+            $status
+        );
     }
 
     public static function list(): void
@@ -200,11 +224,8 @@ class DevelopmentController
             ResponseHelper::ok(
                 $result
             );
-        } catch (\Throwable $e) {
-            ResponseHelper::error(
-                $e->getMessage(),
-                400
-            );
+        } catch (Throwable $e) {
+            self::fail($e);
         }
     }
 
@@ -249,11 +270,8 @@ class DevelopmentController
             ResponseHelper::ok(
                 $result
             );
-        } catch (\Throwable $e) {
-            ResponseHelper::error(
-                $e->getMessage(),
-                (int)$e->getCode() === 402 ? 402 : 400
-            );
+        } catch (Throwable $e) {
+            self::fail($e);
         }
     }
 
@@ -307,11 +325,8 @@ class DevelopmentController
             ResponseHelper::ok(
                 $result
             );
-        } catch (\Throwable $e) {
-            ResponseHelper::error(
-                $e->getMessage(),
-                (int)$e->getCode() === 402 ? 402 : 400
-            );
+        } catch (Throwable $e) {
+            self::fail($e);
         }
     }
 
@@ -365,11 +380,8 @@ class DevelopmentController
             ResponseHelper::ok(
                 $result
             );
-        } catch (\Throwable $e) {
-            ResponseHelper::error(
-                $e->getMessage(),
-                (int)$e->getCode() === 402 ? 402 : 400
-            );
+        } catch (Throwable $e) {
+            self::fail($e);
         }
     }
 
