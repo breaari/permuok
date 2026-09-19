@@ -4,7 +4,6 @@ namespace App\Controllers;
 
 use App\Helpers\RefreshTokenCookieHelper;
 use App\Helpers\ResponseHelper;
-use App\Middleware\AuthMiddleware;
 use App\Services\RefreshTokenService;
 
 class LogoutController
@@ -12,20 +11,34 @@ class LogoutController
     public static function handle(): void
     {
         /*
-         * La eliminamos antes de validar el access
-         * token. Incluso una sesión vencida debe
-         * poder borrar su cookie del navegador.
+         * Guardamos el token antes de borrar
+         * la cookie del navegador.
+         */
+        $refreshToken =
+            RefreshTokenCookieHelper::read();
+
+        /*
+         * La cookie debe eliminarse incluso
+         * si el token ya venció o fue revocado.
          */
         RefreshTokenCookieHelper::clear();
 
-        $user = AuthMiddleware::handle();
+        if ($refreshToken !== null) {
+            $stored =
+                RefreshTokenService::findValid(
+                    $refreshToken
+                );
 
-        RefreshTokenService::revokeAllByUserId(
-                (int)$user['id']
-            );
+            if ($stored) {
+                RefreshTokenService::revokeById(
+                    (int)$stored['id']
+                );
+            }
+        }
 
         ResponseHelper::ok([
-            'message' => 'Logout OK',
+            'message' =>
+                'Sesión cerrada correctamente.',
         ]);
     }
 }
