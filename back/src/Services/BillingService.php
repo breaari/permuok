@@ -872,8 +872,8 @@ NULL,
          */
                 $mpStatus = null;
             }
-
-            $st = $pdo->prepare("
+            try {
+                $st = $pdo->prepare("
         UPDATE memberships
         SET
             scheduled_plan_id = :scheduled_plan_id,
@@ -899,27 +899,57 @@ NULL,
         LIMIT 1
     ");
 
-            $st->execute([
-                'scheduled_plan_id' =>
-                (int)$targetPlan['id'],
+                $st->execute([
+                    'scheduled_plan_id' =>
+                    (int)$targetPlan['id'],
 
-                'scheduled_change_at' =>
-                $membership['end_date']
-                    . ' 00:00:00',
+                    'scheduled_change_at' =>
+                    $membership['end_date']
+                        . ' 00:00:00',
 
-                'mp_status' =>
-                $mpStatus,
+                    'mp_status' =>
+                    $mpStatus,
 
-                'mp_status_value' =>
-                $mpStatus,
+                    'mp_status_value' =>
+                    $mpStatus,
 
-                'mp_status_date' =>
-                $mpStatus,
+                    'mp_status_date' =>
+                    $mpStatus,
 
-                'id' =>
-                (int)$membership['id'],
-            ]);
+                    'id' =>
+                    (int)$membership['id'],
+                ]);
+            } catch (\Throwable $e) {
+                /*
+     * Mercado Pago ya recibió el nuevo importe,
+     * pero la programación local falló.
+     * Restauramos el importe del plan actual.
+     */
+                if ($subscriptionId !== '') {
+                    try {
+                        MercadoPagoClient::updateSubscription(
+                            $subscriptionId,
+                            [
+                                'auto_recurring' => [
+                                    'transaction_amount' =>
+                                    (float)$currentPlan['price_ars'],
 
+                                    'currency_id' =>
+                                    'ARS',
+                                ],
+                            ]
+                        );
+                    } catch (\Throwable $cleanupError) {
+                        error_log(
+                            'No se pudo restaurar el importe '
+                                . 'de una suscripción después de '
+                                . 'fallar la programación de downgrade.'
+                        );
+                    }
+                }
+
+                throw $e;
+            }
             return [
                 'scheduled' => true,
                 'change_type' => 'downgrade',
