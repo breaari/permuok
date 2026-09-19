@@ -297,7 +297,7 @@ class DevelopmentController
                 $result
             );
         } catch (Throwable $e) {
-            self::failAI($e)
+            self::failAI($e);
         }
     }
 
@@ -352,7 +352,7 @@ class DevelopmentController
                 $result
             );
         } catch (Throwable $e) {
-            self::failAI($e)
+            self::failAI($e);
         }
     }
 
@@ -407,7 +407,7 @@ class DevelopmentController
                 $result
             );
         } catch (Throwable $e) {
-            self::failAI($e)
+            self::failAI($e);
         }
     }
 

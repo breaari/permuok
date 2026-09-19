@@ -318,7 +318,7 @@ class SearchRequestController
                 $result
             );
         } catch (\Throwable $e) {
-            self::failAI($e)
+            self::failAI($e);
         }
     }
 
@@ -376,7 +376,7 @@ class SearchRequestController
                 $result
             );
         } catch (\Throwable $e) {
-           self::failAI($e)
+           self::failAI($e);
         }
     }
 
@@ -434,7 +434,7 @@ class SearchRequestController
                 $result
             );
         } catch (\Throwable $e) {
-            self::failAI($e)
+            self::failAI($e);
         }
     }
 
