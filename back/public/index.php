@@ -663,12 +663,6 @@ if ($method === 'POST' && preg_match('#^/search-requests/(\d+)/delete$#', $uri, 
     exit;
 }
 
-if ($method === 'GET' && preg_match('#^/explore/properties/(\d+)$#', $uri, $m)) {
-    $_GET['id'] = (int)$m[1];
-    PropertyController::exploreDetail();
-    exit;
-}
-
 if ($method === 'GET' && preg_match('#^/explore/search-requests/(\d+)$#', $uri, $m)) {
     $_GET['id'] = (int)$m[1];
     SearchRequestController::exploreDetail();
