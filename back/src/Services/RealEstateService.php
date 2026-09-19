@@ -444,7 +444,41 @@ class RealEstateService
 
         $licenseNumber = trim((string)($data['license_number'] ?? ''));
         $provinceId = (int)($data['province_id'] ?? 0);
-        $isPrimary = !empty($data['is_primary']) ? 1 : 0;
+        $rawIsPrimary =
+            $data['is_primary']
+            ?? false;
+
+        if (
+            !in_array(
+                $rawIsPrimary,
+                [
+                    0,
+                    1,
+                    false,
+                    true,
+                    '0',
+                    '1',
+                ],
+                true
+            )
+        ) {
+            throw new Exception(
+                'is_primary debe ser 0 o 1'
+            );
+        }
+
+        $isPrimary =
+            in_array(
+                $rawIsPrimary,
+                [
+                    1,
+                    true,
+                    '1',
+                ],
+                true
+            )
+            ? 1
+            : 0;
 
         if ($licenseNumber === '' || $provinceId <= 0) {
             throw new Exception("license_number y province_id son requeridos");
@@ -503,6 +537,30 @@ class RealEstateService
                     $current['profile_status']
                     ?? RealEstateProfileStatus::DRAFT
                 );
+
+            $licenseCountStmt =
+                $pdo->prepare("
+        SELECT COUNT(*)
+        FROM real_estate_licenses
+        WHERE real_estate_id = :real_estate_id
+          AND deleted_at IS NULL
+    ");
+
+            $licenseCountStmt->execute([
+                'real_estate_id' =>
+                (int)$u['real_estate_id'],
+            ]);
+
+            $licenseCount =
+                (int)$licenseCountStmt->fetchColumn();
+
+            /*
+ * La primera matrícula siempre debe
+ * convertirse en principal.
+ */
+            if ($licenseCount === 0) {
+                $isPrimary = 1;
+            }
 
             if ($isPrimary === 1) {
                 $pdo->prepare("
