@@ -30,10 +30,9 @@ class UserController
         Throwable $e
     ): void {
         /*
-         * Nunca mostramos errores de PDO,
-         * consultas SQL ni errores internos
-         * de generación de contraseñas.
-         */
+     * Los errores internos nunca deben
+     * enviarse directamente al cliente.
+     */
         if (
             $e instanceof PDOException ||
             $e->getMessage() ===
@@ -48,13 +47,58 @@ class UserController
             return;
         }
 
-        /*
-         * UserService utiliza excepciones comunes
-         * para sus validaciones funcionales.
-         */
+        $message =
+            trim(
+                $e->getMessage()
+            );
+
+        if (
+            $message === 'No autorizado' ||
+            $message ===
+            'No podés modificar usuarios de otra inmobiliaria' ||
+            $message ===
+            'Solo podés modificar agentes o inversores'
+        ) {
+            ResponseHelper::fail(
+                $message,
+                403
+            );
+
+            return;
+        }
+
+        if (
+            $message ===
+            'La inmobiliaria no está vinculada' ||
+            $message ===
+            'Inmobiliaria no encontrada' ||
+            $message ===
+            'Usuario no encontrado'
+        ) {
+            ResponseHelper::fail(
+                $message,
+                404
+            );
+
+            return;
+        }
+
+        if (
+            $message ===
+            'Necesitás una membresía activa para administrar usuarios'
+        ) {
+            ResponseHelper::fail(
+                $message,
+                402
+            );
+
+            return;
+        }
+
         ResponseHelper::fail(
-            $e->getMessage()
-                ?: 'No se pudo completar la operación.',
+            $message !== ''
+                ? $message
+                : 'No se pudo completar la operación.',
             422
         );
     }
