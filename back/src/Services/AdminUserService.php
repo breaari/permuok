@@ -609,158 +609,173 @@ re.facebook AS real_estate_facebook,
     ): array {
         $pdo = self::db();
 
-        if (!in_array($isActive, [0, 1], true)) {
-            throw new Exception(
-                "Estado inválido"
-            );
-        }
-
-        $st = $pdo->prepare("
-        SELECT
-            id,
-            role,
-            real_estate_id,
-            is_active
-        FROM users
-        WHERE id = :id
-          AND deleted_at IS NULL
-        LIMIT 1
-    ");
-
-        $st->execute([
-            'id' => $userId,
-        ]);
-
-        $target = $st->fetch();
-
-        if (!$target) {
-            throw new Exception(
-                "Usuario no encontrado"
-            );
-        }
-
         if (
-            (int)$target['role']
-            === self::ROLE_SUPER_ADMIN
+            !in_array(
+                $isActive,
+                [0, 1],
+                true
+            )
         ) {
             throw new Exception(
-                "No podés modificar un super admin"
-            );
-        }
-
-        if (
-            (int)$target['id']
-            === $adminUserId
-        ) {
-            throw new Exception(
-                "No podés modificar tu propio estado"
+                'Estado inválido',
+                422
             );
         }
 
         $reason =
-            trim(
-                (string)$reason
-            );
+            trim((string)$reason);
 
         if (
-            $isActive === 0
-            && $reason === ''
+            $isActive === 0 &&
+            $reason === ''
         ) {
             throw new Exception(
-                "El motivo de desactivación es requerido"
+                'El motivo de desactivación es requerido',
+                422
             );
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | Sin cambios
-    |--------------------------------------------------------------------------
-    */
+        $pdo->beginTransaction();
 
-        if (
-            (int)$target['is_active']
-            === $isActive
-        ) {
-            return [
-                'updated' => false,
-                'user_id' => $userId,
-                'is_active' => $isActive,
-                'reason' =>
-                $isActive === 0
-                    ? $reason
-                    : null,
-            ];
-        }
-
-        /*
-    |--------------------------------------------------------------------------
-    | Activar usuario
-    |--------------------------------------------------------------------------
-    */
-
-        if ($isActive === 1) {
+        try {
             $st = $pdo->prepare("
-            UPDATE users
-            SET
-                is_active = 1,
-                deactivation_reason = NULL,
-                deactivated_at = NULL,
-                deactivated_by = NULL
+            SELECT
+                id,
+                role,
+                real_estate_id,
+                is_active
+            FROM users
             WHERE id = :id
               AND deleted_at IS NULL
             LIMIT 1
+            FOR UPDATE
         ");
 
             $st->execute([
                 'id' => $userId,
             ]);
 
+            $target =
+                $st->fetch(PDO::FETCH_ASSOC);
+
+            if (!$target) {
+                throw new Exception(
+                    'Usuario no encontrado',
+                    404
+                );
+            }
+
+            if (
+                (int)$target['role']
+                === self::ROLE_SUPER_ADMIN
+            ) {
+                throw new Exception(
+                    'No podés modificar un super admin',
+                    403
+                );
+            }
+
+            if (
+                (int)$target['id']
+                === $adminUserId
+            ) {
+                throw new Exception(
+                    'No podés modificar tu propio estado',
+                    403
+                );
+            }
+
+            $changed =
+                (int)$target['is_active']
+                !== $isActive;
+
+            if ($changed) {
+                if ($isActive === 1) {
+                    $update = $pdo->prepare("
+                    UPDATE users
+                    SET
+                        is_active = 1,
+                        deactivation_reason = NULL,
+                        deactivated_at = NULL,
+                        deactivated_by = NULL
+                    WHERE id = :id
+                      AND deleted_at IS NULL
+                    LIMIT 1
+                ");
+
+                    $update->execute([
+                        'id' => $userId,
+                    ]);
+                } else {
+                    $update = $pdo->prepare("
+                    UPDATE users
+                    SET
+                        is_active = 0,
+                        deactivation_reason = :reason,
+                        deactivated_at = NOW(),
+                        deactivated_by = :admin_id
+                    WHERE id = :id
+                      AND deleted_at IS NULL
+                    LIMIT 1
+                ");
+
+                    $update->execute([
+                        'reason' =>
+                        $reason,
+
+                        'admin_id' =>
+                        $adminUserId,
+
+                        'id' =>
+                        $userId,
+                    ]);
+                }
+            }
+
+            /*
+         * Al desactivar la cuenta revocamos
+         * todas sus sesiones renovables.
+         *
+         * Se ejecuta incluso si ya estaba
+         * desactivada para limpiar cualquier
+         * token que pudiera seguir activo.
+         */
+            if ($isActive === 0) {
+                $revoke = $pdo->prepare("
+                UPDATE refresh_tokens
+                SET revoked_at = NOW()
+                WHERE user_id = :user_id
+                  AND revoked_at IS NULL
+            ");
+
+                $revoke->execute([
+                    'user_id' => $userId,
+                ]);
+            }
+
+            $pdo->commit();
+
             return [
-                'updated' => true,
-                'user_id' => $userId,
-                'is_active' => 1,
-                'reason' => null,
+                'updated' =>
+                $changed,
+
+                'user_id' =>
+                $userId,
+
+                'is_active' =>
+                $isActive,
+
+                'reason' =>
+                $isActive === 0
+                    ? $reason
+                    : null,
             ];
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $e;
         }
-
-        /*
-    |--------------------------------------------------------------------------
-    | Desactivar usuario
-    |--------------------------------------------------------------------------
-    |
-    | Importante:
-    | esto afecta únicamente a esta cuenta.
-    |
-    | Para bloquear una inmobiliaria completa debe utilizarse
-    | la suspensión administrativa de la inmobiliaria.
-    |--------------------------------------------------------------------------
-    */
-
-        $st = $pdo->prepare("
-        UPDATE users
-        SET
-            is_active = 0,
-            deactivation_reason = :reason,
-            deactivated_at = NOW(),
-            deactivated_by = :admin_id
-        WHERE id = :id
-          AND deleted_at IS NULL
-        LIMIT 1
-    ");
-
-        $st->execute([
-            'reason' => $reason,
-            'admin_id' => $adminUserId,
-            'id' => $userId,
-        ]);
-
-        return [
-            'updated' => true,
-            'user_id' => $userId,
-            'is_active' => 0,
-            'reason' => $reason,
-        ];
     }
-
-   
 }
