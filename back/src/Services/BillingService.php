@@ -466,8 +466,26 @@ NULL,
     public static function previewPlanChange(int $userId, string $targetPlanCode): array
     {
         $user = self::getValidRealEstateUser($userId);
-        $membership = self::getRequiredActiveMembership((int)$user['real_estate_id']);
-        $currentPlan = self::getPlanById((int)$membership['plan_id']);
+        $membership =
+            self::getRequiredActiveMembership(
+                (int)$user['real_estate_id']
+            );
+
+        if (
+            (int)(
+                $membership['cancel_at_period_end']
+                ?? 0
+            ) === 1
+        ) {
+            throw new \Exception(
+                'La renovación de la membresía está cancelada. No se puede cambiar de plan.'
+            );
+        }
+
+        $currentPlan =
+            self::getPlanById(
+                (int)$membership['plan_id']
+            );
         $targetPlan = self::getPlanByCode($targetPlanCode);
 
         if (!$targetPlan) {
@@ -522,8 +540,26 @@ NULL,
         $pdo = self::db();
 
         $user = self::getValidRealEstateUser($userId);
-        $membership = self::getRequiredActiveMembership((int)$user['real_estate_id']);
-        $currentPlan = self::getPlanById((int)$membership['plan_id']);
+        $membership =
+            self::getRequiredActiveMembership(
+                (int)$user['real_estate_id']
+            );
+
+        if (
+            (int)(
+                $membership['cancel_at_period_end']
+                ?? 0
+            ) === 1
+        ) {
+            throw new \Exception(
+                'La renovación de la membresía está cancelada. No se puede cambiar de plan.'
+            );
+        }
+
+        $currentPlan =
+            self::getPlanById(
+                (int)$membership['plan_id']
+            );
         $targetPlan = self::getPlanByCode($targetPlanCode);
 
         if (!$targetPlan) {
