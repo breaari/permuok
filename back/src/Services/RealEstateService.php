@@ -465,25 +465,45 @@ class RealEstateService
             throw new Exception("Provincia inválida o inactiva");
         }
 
-        $stCurrent = $pdo->prepare("
-            SELECT profile_status
+        $pdo->beginTransaction();
+
+        try {
+            /*
+     * Serializa todas las modificaciones
+     * de matrículas de esta inmobiliaria.
+     */
+            $lockRealEstate =
+                $pdo->prepare("
+            SELECT
+                id,
+                profile_status
             FROM real_estates
             WHERE id = :id
               AND deleted_at IS NULL
             LIMIT 1
+            FOR UPDATE
         ");
-        $stCurrent->execute(['id' => (int)$u['real_estate_id']]);
-        $current = $stCurrent->fetch();
 
-        if (!$current) {
-            throw new Exception("Inmobiliaria no encontrada");
-        }
+            $lockRealEstate->execute([
+                'id' =>
+                (int)$u['real_estate_id'],
+            ]);
 
-        $currentProfileStatus = (int)($current['profile_status'] ?? RealEstateProfileStatus::DRAFT);
+            $current =
+                $lockRealEstate->fetch();
 
-        $pdo->beginTransaction();
+            if (!$current) {
+                throw new Exception(
+                    'Inmobiliaria no encontrada'
+                );
+            }
 
-        try {
+            $currentProfileStatus =
+                (int)(
+                    $current['profile_status']
+                    ?? RealEstateProfileStatus::DRAFT
+                );
+
             if ($isPrimary === 1) {
                 $pdo->prepare("
                     UPDATE real_estate_licenses
