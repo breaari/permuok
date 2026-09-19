@@ -155,6 +155,19 @@ use App\Controllers\AdminDashboardController;
 use App\Controllers\CompatibilityController;
 use App\Controllers\AdminSystemController;
 use App\Controllers\PasswordResetController;
+use App\Helpers\ResponseHelper;
+
+set_exception_handler(
+    static function (
+        \Throwable $e
+    ): void {
+        ResponseHelper::fromThrowable(
+            $e,
+            'No se pudo completar la operación.',
+            'Unhandled exception'
+        );
+    }
+);
 
 $method = $_SERVER['REQUEST_METHOD'];
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/';
