@@ -4,6 +4,7 @@ namespace App\Services;
 
 use PDO;
 use Exception;
+use PDOException;
 
 class UserService
 {
@@ -375,6 +376,24 @@ class UserService
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
+            }
+
+            /*
+     * El índice único puede detectar un email
+     * duplicado entre solicitudes simultáneas.
+     */
+            if (
+                $e instanceof PDOException &&
+                $e->getCode() === '23000' &&
+                str_contains(
+                    $e->getMessage(),
+                    'uq_users_email'
+                )
+            ) {
+                throw new Exception(
+                    'El email ya está registrado',
+                    422
+                );
             }
 
             throw $e;
