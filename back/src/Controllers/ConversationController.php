@@ -115,6 +115,9 @@ class ConversationController
     {
         try {
             $user = AuthHelper::requireUser();
+            MembershipGuard::requireActiveMembership(
+                (int)$user['id']
+            );
             $input = self::getJsonInput();
 
             if ($conversationId <= 0) {
