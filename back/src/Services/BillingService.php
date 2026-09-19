@@ -12,6 +12,58 @@ class BillingService
         return pdo();
     }
 
+    private static function runWithMembershipLock(
+        int $userId,
+        callable $callback
+    ): array {
+        $pdo = self::db();
+
+        $user =
+            self::getValidRealEstateUser(
+                $userId
+            );
+
+        $realEstateId =
+            (int)$user['real_estate_id'];
+
+        $lockName =
+            'billing:membership:' .
+            $realEstateId;
+
+        $lockStmt = $pdo->prepare("
+        SELECT GET_LOCK(
+            :lock_name,
+            15
+        )
+    ");
+
+        $lockStmt->execute([
+            'lock_name' => $lockName,
+        ]);
+
+        if (
+            (int)$lockStmt->fetchColumn() !== 1
+        ) {
+            throw new \Exception(
+                'Ya se está procesando otra operación sobre la membresía. Intentá nuevamente en unos segundos.'
+            );
+        }
+
+        try {
+            return $callback();
+        } finally {
+            $releaseStmt = $pdo->prepare("
+            SELECT RELEASE_LOCK(
+                :lock_name
+            )
+        ");
+
+            $releaseStmt->execute([
+                'lock_name' => $lockName,
+            ]);
+        }
+    }
+
     public static function listPlans(): array
     {
         $pdo = self::db();
@@ -535,7 +587,28 @@ NULL,
         ];
     }
 
-    public static function confirmPlanChange(int $userId, string $targetPlanCode, string $mode): array
+    public static function confirmPlanChange(
+        int $userId,
+        string $targetPlanCode,
+        string $mode
+    ): array {
+        return self::runWithMembershipLock(
+            $userId,
+            static function () use (
+                $userId,
+                $targetPlanCode,
+                $mode
+            ): array {
+                return self::confirmPlanChangeLocked(
+                    $userId,
+                    $targetPlanCode,
+                    $mode
+                );
+            }
+        );
+    }
+
+    private static function confirmPlanChangeLocked(int $userId, string $targetPlanCode, string $mode): array
     {
         $pdo = self::db();
 
@@ -764,7 +837,22 @@ NULL,
         ];
     }
 
-    public static function cancelMembership(int $userId): array
+    public static function cancelMembership(
+        int $userId
+    ): array {
+        return self::runWithMembershipLock(
+            $userId,
+            static function () use (
+                $userId
+            ): array {
+                return self::cancelMembershipLocked(
+                    $userId
+                );
+            }
+        );
+    }
+    
+    private static function cancelMembershipLocked(int $userId): array
     {
         $pdo = self::db();
 
