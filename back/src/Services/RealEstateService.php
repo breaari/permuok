@@ -691,12 +691,28 @@ class RealEstateService
             true
         );
 
+        $latitude =
+            $re['address_lat']
+            ?? null;
+
+        $longitude =
+            $re['address_lng']
+            ?? null;
+
         if (
             empty($re['address_place_id']) ||
-            $re['address_lat'] === null ||
-            $re['address_lng'] === null
+            !is_numeric($latitude) ||
+            !is_numeric($longitude) ||
+            !is_finite((float)$latitude) ||
+            !is_finite((float)$longitude) ||
+            (float)$latitude < -90 ||
+            (float)$latitude > 90 ||
+            (float)$longitude < -180 ||
+            (float)$longitude > 180
         ) {
-            throw new Exception("Seleccioná una dirección válida desde Google Maps");
+            throw new Exception(
+                'Seleccioná una dirección válida desde Google Maps'
+            );
         }
 
         // Validar que tenga al menos una matrícula/licencia
@@ -798,25 +814,84 @@ class RealEstateService
         return false;
     }
 
-    private static function normalizeAddressMapFields(array &$data): void
-    {
-        if (array_key_exists('address_place_id', $data)) {
-            $data['address_place_id'] = trim((string)$data['address_place_id']);
-            if ($data['address_place_id'] === '') {
-                $data['address_place_id'] = null;
+    private static function normalizeAddressMapFields(
+        array &$data
+    ): void {
+        if (
+            array_key_exists(
+                'address_place_id',
+                $data
+            )
+        ) {
+            $data['address_place_id'] =
+                trim(
+                    (string)$data['address_place_id']
+                );
+
+            if (
+                $data['address_place_id']
+                === ''
+            ) {
+                $data['address_place_id'] =
+                    null;
             }
         }
 
-        if (array_key_exists('address_lat', $data)) {
-            $data['address_lat'] = $data['address_lat'] === '' || $data['address_lat'] === null
-                ? null
-                : (float)$data['address_lat'];
-        }
+        $coordinateFields = [
+            'address_lat' => [
+                'min' => -90,
+                'max' => 90,
+            ],
+            'address_lng' => [
+                'min' => -180,
+                'max' => 180,
+            ],
+        ];
 
-        if (array_key_exists('address_lng', $data)) {
-            $data['address_lng'] = $data['address_lng'] === '' || $data['address_lng'] === null
-                ? null
-                : (float)$data['address_lng'];
+        foreach (
+            $coordinateFields
+            as $field => $range
+        ) {
+            if (
+                !array_key_exists(
+                    $field,
+                    $data
+                )
+            ) {
+                continue;
+            }
+
+            $value = $data[$field];
+
+            if (
+                $value === '' ||
+                $value === null
+            ) {
+                $data[$field] = null;
+                continue;
+            }
+
+            if (!is_numeric($value)) {
+                throw new Exception(
+                    'Seleccioná una dirección válida desde Google Maps'
+                );
+            }
+
+            $coordinate =
+                (float)$value;
+
+            if (
+                !is_finite($coordinate) ||
+                $coordinate < $range['min'] ||
+                $coordinate > $range['max']
+            ) {
+                throw new Exception(
+                    'Seleccioná una dirección válida desde Google Maps'
+                );
+            }
+
+            $data[$field] =
+                $coordinate;
         }
 
         foreach (
@@ -826,11 +901,22 @@ class RealEstateService
                 'address_postal_code',
             ] as $field
         ) {
-            if (array_key_exists($field, $data)) {
-                $data[$field] = trim((string)$data[$field]);
-                if ($data[$field] === '') {
-                    $data[$field] = null;
-                }
+            if (
+                !array_key_exists(
+                    $field,
+                    $data
+                )
+            ) {
+                continue;
+            }
+
+            $data[$field] =
+                trim(
+                    (string)$data[$field]
+                );
+
+            if ($data[$field] === '') {
+                $data[$field] = null;
             }
         }
     }
