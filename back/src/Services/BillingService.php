@@ -32,6 +32,71 @@ class BillingService
     ): array {
         $pdo = self::db();
 
+        $user =
+            self::getValidRealEstateUser(
+                $userId
+            );
+
+        $realEstateId =
+            (int)$user['real_estate_id'];
+
+        /*
+     * El bloqueo pertenece a la conexión MySQL.
+     * Evita que dos solicitudes simultáneas creen
+     * dos suscripciones para la misma inmobiliaria.
+     */
+        $lockName =
+            'billing:create:' .
+            $realEstateId;
+
+        $lockStmt = $pdo->prepare("
+        SELECT GET_LOCK(
+            :lock_name,
+            15
+        )
+    ");
+
+        $lockStmt->execute([
+            'lock_name' => $lockName,
+        ]);
+
+        $lockAcquired =
+            (int)$lockStmt->fetchColumn() === 1;
+
+        if (!$lockAcquired) {
+            throw new \Exception(
+                'Ya se está generando una suscripción. Intentá nuevamente en unos segundos.'
+            );
+        }
+
+        try {
+            return self::createPreferenceLocked(
+                $userId,
+                $planCode
+            );
+        } finally {
+            /*
+         * Se libera incluso si Mercado Pago
+         * o la base de datos producen un error.
+         */
+            $releaseStmt = $pdo->prepare("
+            SELECT RELEASE_LOCK(
+                :lock_name
+            )
+        ");
+
+            $releaseStmt->execute([
+                'lock_name' => $lockName,
+            ]);
+        }
+    }
+
+    private static function createPreferenceLocked(
+        int $userId,
+        string $planCode
+    ): array {
+        $pdo = self::db();
+
         $frontUrl = trim(
             (string)($_ENV['FRONT_URL'] ?? '')
         );
