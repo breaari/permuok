@@ -471,9 +471,22 @@ class UserService
         ");
 
         $st->execute([
-            'is_active' => $isActive,
-            'id' => $userId,
+            'is_active' =>
+            $isActive,
+
+            'id' =>
+            $userId,
         ]);
+
+        /*
+ * Al desactivar un usuario, cerramos
+ * todas sus sesiones renovables.
+ */
+        if ($isActive === 0) {
+            RefreshTokenService::revokeAllByUserId(
+                $userId
+            );
+        }
 
         return [
             'updated' => true,
