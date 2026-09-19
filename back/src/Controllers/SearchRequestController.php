@@ -13,6 +13,39 @@ use App\Services\SecurityRateLimitService;
 
 class SearchRequestController
 {
+
+    private static function fail(
+        \Throwable $e,
+        int $status = 400
+    ): void {
+        if ($e instanceof \PDOException) {
+            ResponseHelper::fromThrowable(
+                $e,
+                'No se pudo completar la operación.',
+                'SearchRequestController'
+            );
+
+            return;
+        }
+
+        $exceptionStatus =
+            (int)$e->getCode();
+
+        if (
+            $exceptionStatus >= 400 &&
+            $exceptionStatus <= 499
+        ) {
+            $status =
+                $exceptionStatus;
+        }
+
+        ResponseHelper::fail(
+            $e->getMessage()
+                ?: 'No se pudo completar la operación.',
+            $status
+        );
+    }
+
     public static function list(): void
     {
         try {
@@ -28,7 +61,7 @@ class SearchRequestController
             $result = SearchRequestService::listMySearchRequests((int)$auth['id'], $filters);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -47,7 +80,7 @@ class SearchRequestController
             $result = SearchRequestService::listExploreSearchRequests((int)$auth['id'], $filters);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -64,7 +97,7 @@ class SearchRequestController
 
             ResponseHelper::ok($result, 201);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -77,7 +110,10 @@ class SearchRequestController
             $result = SearchRequestService::getDetail((int)$auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 404);
+            self::fail(
+                $e,
+                404
+            );
         }
     }
 
@@ -90,7 +126,10 @@ class SearchRequestController
             $result = SearchRequestService::getExploreDetail((int)$auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 404);
+            self::fail(
+                $e,
+                404
+            );
         }
     }
 
@@ -105,7 +144,7 @@ class SearchRequestController
             $result = SearchRequestService::updateDraft((int)$auth['id'], $id, $data);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -120,7 +159,7 @@ class SearchRequestController
             $result = SearchRequestService::publish((int)$auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -133,7 +172,7 @@ class SearchRequestController
             $result = SearchRequestService::pause((int)$auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -146,7 +185,7 @@ class SearchRequestController
             $result = SearchRequestService::archive((int)$auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -159,7 +198,7 @@ class SearchRequestController
             $result = SearchRequestService::delete((int)$auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -206,10 +245,7 @@ class SearchRequestController
                 $result
             );
         } catch (\Throwable $e) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                (int)$e->getCode() === 402 ? 402 : 400
-            );
+            self::fail($e);
         }
     }
 
@@ -256,10 +292,7 @@ class SearchRequestController
                 $result
             );
         } catch (\Throwable $e) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                (int)$e->getCode() === 402 ? 402 : 400
-            );
+            self::fail($e);
         }
     }
 
@@ -317,10 +350,7 @@ class SearchRequestController
                 $result
             );
         } catch (\Throwable $e) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                (int)$e->getCode() === 402 ? 402 : 400
-            );
+            self::fail($e);
         }
     }
 
@@ -378,10 +408,7 @@ class SearchRequestController
                 $result
             );
         } catch (\Throwable $e) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                (int)$e->getCode() === 402 ? 402 : 400
-            );
+            self::fail($e);
         }
     }
 
