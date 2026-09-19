@@ -9,6 +9,39 @@ use App\Services\MembershipGuard;
 
 class PropertyController
 {
+
+    private static function fail(
+        \Throwable $e,
+        int $status = 400
+    ): void {
+        if ($e instanceof \PDOException) {
+            ResponseHelper::fromThrowable(
+                $e,
+                'No se pudo completar la operación.',
+                'PropertyController'
+            );
+
+            return;
+        }
+
+        $exceptionStatus =
+            (int)$e->getCode();
+
+        if (
+            $exceptionStatus >= 400 &&
+            $exceptionStatus <= 499
+        ) {
+            $status =
+                $exceptionStatus;
+        }
+
+        ResponseHelper::fail(
+            $e->getMessage()
+                ?: 'No se pudo completar la operación.',
+            $status
+        );
+    }
+
     public static function list(): void
     {
         try {
@@ -24,7 +57,7 @@ class PropertyController
             $result = PropertyService::listMyProperties((int)$auth['id'], $filters);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 400);
+            self::fail($e);
         }
     }
 
@@ -43,7 +76,7 @@ class PropertyController
             $result = PropertyService::listExploreProperties((int)$auth['id'], $filters);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -59,7 +92,7 @@ class PropertyController
             $result = PropertyService::createDraft((int)$auth['id'], $data);
             ResponseHelper::ok($result, 201);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -72,7 +105,10 @@ class PropertyController
             $result = PropertyService::getDetail((int)$auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 404);
+            self::fail(
+                $e,
+                404
+            );
         }
     }
 
@@ -85,7 +121,10 @@ class PropertyController
             $result = PropertyService::getExploreDetail((int)$auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 404);
+            self::fail(
+                $e,
+                404
+            );
         }
     }
 
@@ -102,7 +141,7 @@ class PropertyController
             $result = PropertyService::updateDraft((int)$auth['id'], $id, $data);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -119,7 +158,7 @@ class PropertyController
             $result = PropertyService::replaceRequirements((int)$auth['id'], $id, $data);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -135,7 +174,7 @@ class PropertyController
             $result = PropertyService::publish((int)$auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -148,7 +187,7 @@ class PropertyController
             $result = PropertyService::pause((int)$auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -161,7 +200,7 @@ class PropertyController
             $result = PropertyService::archive((int)$auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -176,7 +215,7 @@ class PropertyController
             $result = PropertyService::close((int)$auth['id'], $id, $closingType);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -189,7 +228,7 @@ class PropertyController
             $result = PropertyService::delete((int)$auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), (int)$e->getCode() === 402 ? 402 : 400);
+            self::fail($e);
         }
     }
 
@@ -216,10 +255,7 @@ class PropertyController
                 202
             );
         } catch (\Throwable $e) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                (int)$e->getCode() === 402 ? 402 : 400
-            );
+            self::fail($e);
         }
     }
 
@@ -242,10 +278,7 @@ class PropertyController
                 'analysis' => $result,
             ]);
         } catch (\Throwable $e) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                (int)$e->getCode() === 402 ? 402 : 400
-            );
+            self::fail($e);
         }
     }
 
@@ -281,10 +314,7 @@ class PropertyController
                 $result
             );
         } catch (\Throwable $e) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                (int)$e->getCode() === 402 ? 402 : 400
-            );
+            self::fail($e);
         }
     }
 
@@ -319,10 +349,7 @@ class PropertyController
                 $result
             );
         } catch (\Throwable $e) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                (int)$e->getCode() === 402 ? 402 : 400
-            );
+            self::fail($e);
         }
     }
 }
