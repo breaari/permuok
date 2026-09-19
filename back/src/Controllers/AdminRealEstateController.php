@@ -17,6 +17,29 @@ class AdminRealEstateController
         return $ctx;
     }
 
+    private static function handleError(
+        \Throwable $e
+    ): void {
+        $code = (int)$e->getCode();
+
+        if (
+            !($e instanceof \PDOException) &&
+            $code >= 400 &&
+            $code <= 499
+        ) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                $code
+            );
+        }
+
+        ResponseHelper::fromThrowable(
+            $e,
+            'No se pudo completar la operación.',
+            'AdminRealEstateController'
+        );
+    }
+
     public static function counts(): void
     {
         try {
@@ -27,9 +50,7 @@ class AdminRealEstateController
             $counts = AdminRealEstateService::counts($q);
             ResponseHelper::ok(['counts' => $counts]);
         } catch (\Throwable $e) {
-            ResponseHelper::fromThrowable(
-                $e
-            );
+            self::handleError($e);
         }
     }
 
@@ -46,7 +67,7 @@ class AdminRealEstateController
             $data = AdminRealEstateService::list($status, $page, $perPage, $q);
             ResponseHelper::ok($data);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 422);
+            self::handleError($e);
         }
     }
 
@@ -84,7 +105,7 @@ class AdminRealEstateController
 
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 422);
+            self::handleError($e);
         }
     }
 
@@ -95,9 +116,7 @@ class AdminRealEstateController
             $data = AdminRealEstateService::list('pending', 1, 200, null);
             ResponseHelper::ok(['items' => $data['items']]);
         } catch (\Throwable $e) {
-            ResponseHelper::fromThrowable(
-                $e
-            );
+            self::handleError($e);
         }
     }
 
@@ -108,9 +127,7 @@ class AdminRealEstateController
             $data = AdminRealEstateService::list('approved', 1, 200, null);
             ResponseHelper::ok(['items' => $data['items']]);
         } catch (\Throwable $e) {
-            ResponseHelper::fromThrowable(
-                $e
-            );
+            self::handleError($e);
         }
     }
 
@@ -121,9 +138,7 @@ class AdminRealEstateController
             $data = AdminRealEstateService::list('rejected', 1, 200, null);
             ResponseHelper::ok(['items' => $data['items']]);
         } catch (\Throwable $e) {
-            ResponseHelper::fromThrowable(
-                $e
-            );
+            self::handleError($e);
         }
     }
 
@@ -145,7 +160,7 @@ class AdminRealEstateController
             $data = AdminRealEstateService::getDetail($id);
             ResponseHelper::ok($data);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 422);
+            self::handleError($e);
         }
     }
 
@@ -209,10 +224,7 @@ class AdminRealEstateController
                 $result
             );
         } catch (\Throwable $e) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                422
-            );
+            self::handleError($e);
         }
     }
 
@@ -236,10 +248,7 @@ class AdminRealEstateController
                 $counts,
             ]);
         } catch (\Throwable $e) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                500
-            );
+            self::handleError($e);
         }
     }
 
@@ -283,10 +292,7 @@ class AdminRealEstateController
                 $data
             );
         } catch (\Throwable $e) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                422
-            );
+            self::handleError($e);
         }
     }
 }
