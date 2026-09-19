@@ -355,6 +355,21 @@ class RealEstateService
             throw new Exception("Inmobiliaria no encontrada");
         }
 
+        $currentProfileStatus =
+            (int)(
+                $current['profile_status']
+                ?? RealEstateProfileStatus::DRAFT
+            );
+
+        if (
+            $currentProfileStatus ===
+            RealEstateProfileStatus::INITIAL_REVIEW
+        ) {
+            throw new Exception(
+                'No podés modificar el perfil mientras está en revisión',
+                409
+            );
+        }
         $merged = array_merge($current ?: [], $updates);
         self::validateProfilePayload($merged, true);
 
@@ -375,7 +390,6 @@ class RealEstateService
         ];
 
         $hasSensitiveChanges = self::hasSensitiveChanges($current, $updates, $sensitiveFields);
-        $currentProfileStatus = (int)($current['profile_status'] ?? RealEstateProfileStatus::DRAFT);
 
         $sets = [];
         $params = ['id' => $realEstateId];
@@ -537,6 +551,16 @@ class RealEstateService
                     $current['profile_status']
                     ?? RealEstateProfileStatus::DRAFT
                 );
+
+            if (
+                $currentProfileStatus ===
+                RealEstateProfileStatus::INITIAL_REVIEW
+            ) {
+                throw new Exception(
+                    'No podés modificar las matrículas mientras el perfil está en revisión',
+                    409
+                );
+            }
 
             $licenseCountStmt =
                 $pdo->prepare("
