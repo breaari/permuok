@@ -228,34 +228,96 @@ class UserService
         ];
     }
 
-    public static function createForRealEstate(int $ownerUserId, array $data): array
-    {
-        $owner = self::getRealEstateUser($ownerUserId);
-        $membership = self::getActiveMembership((int)$owner['real_estate_id']);
-        $payload = self::validateCreatePayload($data);
+    public static function createForRealEstate(
+        int $ownerUserId,
+        array $data
+    ): array {
+        $owner =
+            self::getRealEstateUser(
+                $ownerUserId
+            );
+
+        $payload =
+            self::validateCreatePayload(
+                $data
+            );
+
+        $realEstateId =
+            (int)$owner['real_estate_id'];
+
         $pdo = self::db();
+        $pdo->beginTransaction();
 
-        self::requireAvailableSlot(
-            (int)$owner['real_estate_id'],
-            (int)$payload['role'],
-            $membership
-        );
+        try {
+            /*
+         * Serializa la creación de usuarios
+         * pertenecientes a la misma inmobiliaria.
+         */
+            $lockStmt = $pdo->prepare("
+            SELECT id
+            FROM real_estates
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+        ");
 
-        $stCheck = $pdo->prepare("
+            $lockStmt->execute([
+                'id' => $realEstateId,
+            ]);
+
+            if (!$lockStmt->fetchColumn()) {
+                throw new Exception(
+                    'Inmobiliaria no encontrada'
+                );
+            }
+
+            /*
+         * La membresía se vuelve a comprobar
+         * después de obtener el bloqueo.
+         */
+            $membership =
+                self::getActiveMembership(
+                    $realEstateId
+                );
+
+            self::requireAvailableSlot(
+                $realEstateId,
+                (int)$payload['role'],
+                $membership
+            );
+
+            $stCheck = $pdo->prepare("
             SELECT id
             FROM users
             WHERE email = :email
             LIMIT 1
         ");
-        $stCheck->execute(['email' => $payload['email']]);
 
-        if ($stCheck->fetch()) {
-            throw new Exception("El email ya está registrado");
-        }
+            $stCheck->execute([
+                'email' => $payload['email'],
+            ]);
 
-        $st = $pdo->prepare("
-            INSERT INTO users
-            (
+            if ($stCheck->fetchColumn()) {
+                throw new Exception(
+                    'El email ya está registrado'
+                );
+            }
+
+            $passwordHash =
+                password_hash(
+                    $payload['password'],
+                    PASSWORD_DEFAULT
+                );
+
+            if (!is_string($passwordHash)) {
+                throw new Exception(
+                    'No se pudo generar la contraseña'
+                );
+            }
+
+            $st = $pdo->prepare("
+            INSERT INTO users (
                 real_estate_id,
                 role,
                 first_name,
@@ -265,9 +327,7 @@ class UserService
                 phone,
                 is_active,
                 created_at
-            )
-            VALUES
-            (
+            ) VALUES (
                 :real_estate_id,
                 :role,
                 :first_name,
@@ -279,84 +339,45 @@ class UserService
                 NOW()
             )
         ");
-        $st->execute([
-            'real_estate_id' => (int)$owner['real_estate_id'],
-            'role' => (int)$payload['role'],
-            'first_name' => $payload['first_name'],
-            'last_name' => $payload['last_name'],
-            'email' => $payload['email'],
-            'password_hash' =>
-            password_hash(
-                $payload['password'],
-                PASSWORD_DEFAULT
-            ),
-            'phone' => $payload['phone'],
-        ]);
 
-        return [
-            'created' => true,
-            'user_id' => (int)$pdo->lastInsertId(),
-        ];
-    }
+            $st->execute([
+                'real_estate_id' =>
+                $realEstateId,
 
-    public static function updateStatusForRealEstate(int $ownerUserId, array $data): array
-    {
-        $owner = self::getRealEstateUser($ownerUserId);
+                'role' =>
+                (int)$payload['role'],
 
-        self::getActiveMembership(
-            (int)$owner['real_estate_id']
-        );
+                'first_name' =>
+                $payload['first_name'],
 
-        $pdo = self::db();
+                'last_name' =>
+                $payload['last_name'],
 
-        $userId = (int)($data['user_id'] ?? 0);
-        $isActive = isset($data['is_active']) ? (int)!!$data['is_active'] : null;
+                'email' =>
+                $payload['email'],
 
-        if ($userId <= 0) {
-            throw new Exception("user_id requerido");
+                'password_hash' =>
+                $passwordHash,
+
+                'phone' =>
+                $payload['phone'],
+            ]);
+
+            $userId =
+                (int)$pdo->lastInsertId();
+
+            $pdo->commit();
+
+            return [
+                'created' => true,
+                'user_id' => $userId,
+            ];
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $e;
         }
-
-        if ($isActive === null) {
-            throw new Exception("is_active requerido");
-        }
-
-        $st = $pdo->prepare("
-            SELECT id, role, real_estate_id
-            FROM users
-            WHERE id = :id
-              AND deleted_at IS NULL
-            LIMIT 1
-        ");
-        $st->execute(['id' => $userId]);
-        $target = $st->fetch();
-
-        if (!$target) {
-            throw new Exception("Usuario no encontrado");
-        }
-
-        if ((int)$target['real_estate_id'] !== (int)$owner['real_estate_id']) {
-            throw new Exception("No podés modificar usuarios de otra inmobiliaria");
-        }
-
-        if (!in_array((int)$target['role'], [self::ROLE_AGENT, self::ROLE_INVESTOR], true)) {
-            throw new Exception("Solo podés modificar agentes o inversores");
-        }
-
-        $st = $pdo->prepare("
-            UPDATE users
-            SET is_active = :is_active
-            WHERE id = :id
-            LIMIT 1
-        ");
-        $st->execute([
-            'is_active' => $isActive,
-            'id' => $userId,
-        ]);
-
-        return [
-            'updated' => true,
-            'user_id' => $userId,
-            'is_active' => $isActive,
-        ];
     }
 }
