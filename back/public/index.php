@@ -314,9 +314,6 @@ $routes = [
     'GET /explore/developments' => [DevelopmentController::class, 'explore'],
 
     // Conversations
-    'GET /conversations'        => [ConversationController::class, 'index'],
-    'GET /conversations/inbox'  => [ConversationController::class, 'inbox'],
-    'POST /conversations/start' => [ConversationController::class, 'start'],
     'GET /conversations/unread-count' => [ConversationController::class, 'unreadCount'],
     'GET /conversations' => [
         ConversationController::class,
