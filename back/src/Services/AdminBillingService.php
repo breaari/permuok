@@ -29,7 +29,7 @@ class AdminBillingService
             'pending' => 'pending',
             'expired' => 'expired',
             'cancelled' => 'cancelled',
-            
+
             default => 'active',
         };
     }
@@ -89,7 +89,7 @@ class AdminBillingService
         return !empty($row['membership_id']) && !empty($row['scheduled_plan_id']);
     }
 
-   
+
 
     private static function buildStatusFilter(string $normalizedStatus, array $rows): array
     {
@@ -321,7 +321,7 @@ class AdminBillingService
             'pending' => 0,
             'expired' => 0,
             'cancelled' => 0,
-           
+
         ];
 
         foreach ($rows as $row) {
@@ -338,7 +338,6 @@ class AdminBillingService
             if ($status === 'active' && self::hasScheduledChange($row)) {
                 $counts['scheduled_change']++;
             }
-           
         }
 
         return $counts;
@@ -387,11 +386,12 @@ class AdminBillingService
                 break;
             }
         }
-
         if (!$row) {
-            throw new \Exception("Inmobiliaria no encontrada");
+            throw new \Exception(
+                'Inmobiliaria no encontrada',
+                404
+            );
         }
-
         $pdo = self::db();
 
         $st = $pdo->prepare("

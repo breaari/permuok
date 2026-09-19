@@ -19,6 +19,30 @@ class AdminBillingController
         return $ctx;
     }
 
+    private static function handleError(
+        \Throwable $e
+    ): void {
+        $code =
+            (int)$e->getCode();
+
+        if (
+            !($e instanceof \PDOException) &&
+            $code >= 400 &&
+            $code <= 499
+        ) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                $code
+            );
+        }
+
+        ResponseHelper::fromThrowable(
+            $e,
+            'No se pudo completar la operación.',
+            'AdminBillingController'
+        );
+    }
+
     public static function counts(): void
     {
         try {
@@ -31,9 +55,7 @@ class AdminBillingController
                 'counts' => $counts,
             ]);
         } catch (\Throwable $e) {
-            ResponseHelper::fromThrowable(
-                $e
-            );
+            self::handleError($e);
         }
     }
 
@@ -50,7 +72,7 @@ class AdminBillingController
             $data = AdminBillingService::list($status, $page, $perPage, $q);
             ResponseHelper::ok($data);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 422);
+            self::handleError($e);
         }
     }
 
@@ -68,7 +90,7 @@ class AdminBillingController
             $data = AdminBillingService::detail($realEstateId);
             ResponseHelper::ok($data);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 422);
+            self::handleError($e);
         }
     }
 }
