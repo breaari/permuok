@@ -196,13 +196,11 @@ class ConversationController
 
     private static function error(Throwable $e): void
     {
-        $status = (int) ($e->getCode() ?: 400);
-
-        if ($status < 100 || $status > 599) {
-            $status = 400;
-        }
-
-        ResponseHelper::fail($e->getMessage(), $status);
+        ResponseHelper::fromThrowable(
+            $e,
+            'No se pudo completar la operación con la conversación.',
+            'ConversationController'
+        );
     }
 
     public static function archive(int $conversationId): void
