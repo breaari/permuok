@@ -966,38 +966,109 @@ NULL,
 
         $paymentRowId = (int)$pdo->lastInsertId();
 
-        $pref = self::buildMercadoPagoPreference(
-            title: 'Upgrade de plan - ' . (string)$targetPlan['name'],
-            amount: $amountNow,
-            externalRef: $externalRef
-        );
+        try {
+            $pref =
+                self::buildMercadoPagoPreference(
+                    title: 'Upgrade de plan - ' .
+                        (string)$targetPlan['name'],
 
-        $resp = MercadoPagoClient::createPreference($pref);
+                    amount: $amountNow,
 
-        if (empty($resp['id'])) {
-            throw new \Exception("No se pudo crear la preferencia");
-        }
+                    externalRef: $externalRef
+                );
 
-        $mpToken = trim((string)($_ENV['MP_ACCESS_TOKEN'] ?? ''));
-        $isTest = str_starts_with($mpToken, 'TEST-');
-        $initPoint = $isTest
-            ? ($resp['sandbox_init_point'] ?? null)
-            : ($resp['init_point'] ?? null);
+            $resp =
+                MercadoPagoClient::createPreference(
+                    $pref
+                );
 
-        if (!$initPoint) {
-            throw new \Exception("No se pudo obtener el link de pago");
-        }
+            if (empty($resp['id'])) {
+                throw new \Exception(
+                    'No se pudo crear la preferencia'
+                );
+            }
 
-        $st = $pdo->prepare("
+            $mpToken =
+                trim(
+                    (string)(
+                        $_ENV['MP_ACCESS_TOKEN']
+                        ?? ''
+                    )
+                );
+
+            $isTest =
+                str_starts_with(
+                    $mpToken,
+                    'TEST-'
+                );
+
+            $initPoint =
+                $isTest
+                ? (
+                    $resp['sandbox_init_point']
+                    ?? null
+                )
+                : (
+                    $resp['init_point']
+                    ?? null
+                );
+
+            if (!$initPoint) {
+                throw new \Exception(
+                    'No se pudo obtener el link de pago'
+                );
+            }
+
+            $st = $pdo->prepare("
+        UPDATE payments
+        SET
+            preference_id = :preference_id,
+            status = 'pending',
+            mp_status_detail = NULL
+        WHERE id = :id
+        LIMIT 1
+    ");
+
+            $st->execute([
+                'preference_id' =>
+                (string)$resp['id'],
+
+                'id' =>
+                $paymentRowId,
+            ]);
+        } catch (\Throwable $e) {
+            /*
+     * El pago local ya existe, pero no se pudo
+     * generar o registrar la preferencia externa.
+     * Lo cerramos para que no permanezca
+     * indefinidamente como pendiente.
+     */
+            try {
+                $failed = $pdo->prepare("
             UPDATE payments
-            SET preference_id=:pid, status='pending'
-            WHERE id=:id
+            SET
+                status = 'cancelled',
+                mp_status_detail =
+                    'preference_creation_failed'
+            WHERE id = :id
+              AND status = 'created'
             LIMIT 1
         ");
-        $st->execute([
-            'pid' => (string)$resp['id'],
-            'id'  => $paymentRowId
-        ]);
+
+                $failed->execute([
+                    'id' =>
+                    $paymentRowId,
+                ]);
+            } catch (\Throwable $cleanupError) {
+                error_log(
+                    'No se pudo cerrar un pago local '
+                        . 'después de fallar la creación '
+                        . 'de su preferencia.'
+                );
+            }
+
+            throw $e;
+        }
 
         return [
             'payment_id' => $paymentRowId,
