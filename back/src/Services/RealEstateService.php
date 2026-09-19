@@ -686,17 +686,10 @@ class RealEstateService
             }
         }
 
-        if (!self::validateCuit((string)$re['cuit'])) {
-            throw new Exception("Ingresá un CUIT válido de 11 dígitos");
-        }
-
-        if (!self::validatePhone((string)$re['phone'])) {
-            throw new Exception("Ingresá un teléfono válido");
-        }
-
-        if (!self::validateWebsite((string)$re['website'])) {
-            throw new Exception("Ingresá un sitio web válido");
-        }
+        self::validateProfilePayload(
+            $re,
+            true
+        );
 
         if (
             empty($re['address_place_id']) ||
@@ -899,6 +892,29 @@ class RealEstateService
 
         if (!self::validatePhone((string)($data['phone'] ?? ''))) {
             throw new Exception("Ingresá un teléfono válido");
+        }
+
+        $email =
+            strtolower(
+                trim(
+                    (string)(
+                        $data['email']
+                        ?? ''
+                    )
+                )
+            );
+
+        if (
+            $email === '' ||
+            strlen($email) > 254 ||
+            !filter_var(
+                $email,
+                FILTER_VALIDATE_EMAIL
+            )
+        ) {
+            throw new Exception(
+                'Ingresá un email válido'
+            );
         }
 
         if ($requireWebsite && !self::validateWebsite((string)($data['website'] ?? ''))) {
