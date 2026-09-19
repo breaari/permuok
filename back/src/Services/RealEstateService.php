@@ -152,6 +152,63 @@ class RealEstateService
             $pdo->beginTransaction();
 
             try {
+
+                /*
+ * Bloqueamos el usuario antes de crear
+ * su primera inmobiliaria.
+ */
+                $lockUser = $pdo->prepare("
+    SELECT
+        id,
+        role,
+        real_estate_id
+    FROM users
+    WHERE id = :id
+      AND deleted_at IS NULL
+    LIMIT 1
+    FOR UPDATE
+");
+
+                $lockUser->execute([
+                    'id' => $userId,
+                ]);
+
+                $lockedUser =
+                    $lockUser->fetch();
+
+                if (
+                    !$lockedUser ||
+                    (int)$lockedUser['role'] !== 2
+                ) {
+                    throw new Exception(
+                        'No autorizado'
+                    );
+                }
+
+                /*
+ * Otra solicitud pudo haber creado
+ * el perfil mientras esta esperaba.
+ */
+                if (
+                    $lockedUser['real_estate_id']
+                    !== null
+                ) {
+                    $existingRealEstateId =
+                        (int)$lockedUser['real_estate_id'];
+
+                    $pdo->commit();
+
+                    return [
+                        'real_estate_id' =>
+                        $existingRealEstateId,
+
+                        'created' =>
+                        false,
+
+                        'message' =>
+                        'El perfil ya fue creado.',
+                    ];
+                }
                 $st = $pdo->prepare("
                     INSERT INTO real_estates
                     (
