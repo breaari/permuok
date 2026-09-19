@@ -5,7 +5,6 @@ namespace App\Controllers;
 use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
 use App\Services\ExploreService;
-use Exception;
 
 class ExploreController
 {
@@ -49,8 +48,12 @@ class ExploreController
             $result = ExploreService::search((int)$auth['id'], $filters);
 
             ResponseHelper::ok($result);
-        } catch (Exception $e) {
-            ResponseHelper::fail($e->getMessage(), 400);
+        } catch (\Throwable $e) {
+            ResponseHelper::fromThrowable(
+                $e,
+                'No se pudo cargar la exploración.',
+                'ExploreController::index'
+            );
         }
     }
 }
