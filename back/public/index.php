@@ -358,11 +358,6 @@ $routes = [
         'compatibilityJobs'
     ],
 
-    'GET /admin/system/compatibility-jobs' => [
-        AdminSystemController::class,
-        'compatibilityJobs'
-    ],
-
     'GET /admin/system/email-jobs' => [
         AdminSystemController::class,
         'emailJobs'
@@ -381,7 +376,17 @@ $routes = [
  * Si APP_ENV no está configurada,
  * asumimos production por seguridad.
  */
-if ($appEnv !== 'production') {
+if (
+    in_array(
+        $appEnv,
+        [
+            'local',
+            'development',
+            'testing',
+        ],
+        true
+    )
+) {
     $routes['POST /dev/billing/approve'] = [
         DevBillingController::class,
         'approve',
