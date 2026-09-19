@@ -12,85 +12,263 @@ class RealtimeController
 {
     public static function stream(): void
     {
+        $lockPdo = null;
+        $lockName = null;
+        $lockAcquired = false;
+
         try {
             $user = AuthHelper::requireUser();
             $userId = (int)$user['id'];
 
-            @ini_set('output_buffering', 'off');
-            @ini_set('zlib.output_compression', '0');
-            @ini_set('implicit_flush', '1');
-            @set_time_limit(0);
+            /*
+         * Permite una sola conexión de tiempo real
+         * simultánea por usuario.
+         */
+            $lockPdo = self::db();
+
+            $lockName =
+                'realtime:user:' . $userId;
+
+            $lockStmt = $lockPdo->prepare("
+            SELECT GET_LOCK(
+                :lock_name,
+                0
+            )
+        ");
+
+            $lockStmt->execute([
+                ':lock_name' => $lockName,
+            ]);
+
+            $lockAcquired =
+                (int)$lockStmt->fetchColumn() === 1;
+
+            if (!$lockAcquired) {
+                http_response_code(409);
+
+                header(
+                    'Content-Type: application/json; charset=utf-8'
+                );
+
+                echo json_encode([
+                    'success' => false,
+                    'status' => 409,
+                    'message' =>
+                    'Ya existe una conexión activa.',
+                ]);
+
+                return;
+            }
+
+            @ini_set(
+                'output_buffering',
+                'off'
+            );
+
+            @ini_set(
+                'zlib.output_compression',
+                '0'
+            );
+
+            @ini_set(
+                'implicit_flush',
+                '1'
+            );
+
+            @set_time_limit(60);
 
             while (ob_get_level() > 0) {
                 @ob_end_flush();
             }
 
-            header('Content-Type: text/event-stream; charset=utf-8');
-            header('Cache-Control: no-cache, no-transform');
-            header('Connection: keep-alive');
-            header('X-Accel-Buffering: no');
+            header(
+                'Content-Type: text/event-stream; charset=utf-8'
+            );
 
-            $lastNotificationId = self::getLastVisibleNotificationId($userId);
+            header(
+                'Cache-Control: no-cache, no-transform'
+            );
+
+            header(
+                'Connection: keep-alive'
+            );
+
+            header(
+                'X-Accel-Buffering: no'
+            );
+
+            $lastNotificationId =
+                self::getLastVisibleNotificationId(
+                    $userId
+                );
+
             $lastUnreadCount = null;
-            $lastMessageId = self::getLastVisibleMessageId($userId);
+
+            $lastMessageId =
+                self::getLastVisibleMessageId(
+                    $userId
+                );
 
             $startedAt = time();
 
             while (!connection_aborted()) {
-                $notificationPayload = NotificationService::list($userId, [
-                    'page' => 1,
-                    'limit' => 5,
-                    'unread' => 1,
-                ]);
+                $notificationPayload =
+                    NotificationService::list(
+                        $userId,
+                        [
+                            'page' => 1,
+                            'limit' => 5,
+                            'unread' => 1,
+                        ]
+                    );
 
-                $notifications = $notificationPayload['items'] ?? [];
+                $notifications =
+                    $notificationPayload['items']
+                    ?? [];
 
-                foreach (array_reverse($notifications) as $notification) {
-                    $notificationId = (int)($notification['id'] ?? 0);
+                foreach (
+                    array_reverse($notifications)
+                    as $notification
+                ) {
+                    $notificationId =
+                        (int)(
+                            $notification['id']
+                            ?? 0
+                        );
 
-                    if ($notificationId > $lastNotificationId) {
-                        self::sendEvent('notification.created', $notification);
-                        $lastNotificationId = $notificationId;
+                    if (
+                        $notificationId
+                        > $lastNotificationId
+                    ) {
+                        self::sendEvent(
+                            'notification.created',
+                            $notification
+                        );
+
+                        $lastNotificationId =
+                            $notificationId;
                     }
                 }
 
-                $newMessages = self::getNewMessages($userId, $lastMessageId);
+                $newMessages =
+                    self::getNewMessages(
+                        $userId,
+                        $lastMessageId
+                    );
 
-                foreach ($newMessages as $message) {
-                    self::sendEvent('message.created', $message);
-                    $lastMessageId = max($lastMessageId, (int)$message['id']);
+                foreach (
+                    $newMessages as $message
+                ) {
+                    self::sendEvent(
+                        'message.created',
+                        $message
+                    );
+
+                    $lastMessageId = max(
+                        $lastMessageId,
+                        (int)$message['id']
+                    );
                 }
 
-                $unreadPayload = ConversationService::unreadCount($userId);
-                $unreadCount = (int)($unreadPayload['count'] ?? 0);
+                $unreadPayload =
+                    ConversationService::unreadCount(
+                        $userId
+                    );
 
-                if ($lastUnreadCount === null || $unreadCount !== $lastUnreadCount) {
-                    self::sendEvent('conversation.unread_count', [
-                        'count' => $unreadCount,
-                    ]);
+                $unreadCount =
+                    (int)(
+                        $unreadPayload['count']
+                        ?? 0
+                    );
 
-                    $lastUnreadCount = $unreadCount;
+                if (
+                    $lastUnreadCount === null ||
+                    $unreadCount !==
+                    $lastUnreadCount
+                ) {
+                    self::sendEvent(
+                        'conversation.unread_count',
+                        [
+                            'count' =>
+                            $unreadCount,
+                        ]
+                    );
+
+                    $lastUnreadCount =
+                        $unreadCount;
                 }
 
-                self::sendEvent('ping', [
-                    'time' => time(),
-                ]);
+                self::sendEvent(
+                    'ping',
+                    [
+                        'time' => time(),
+                    ]
+                );
 
                 @ob_flush();
                 @flush();
 
-                if (time() - $startedAt > 55) {
+                if (
+                    time() - $startedAt >= 55
+                ) {
                     break;
                 }
 
                 sleep(3);
             }
         } catch (Throwable $e) {
-            http_response_code(401);
-            echo json_encode([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ]);
+            error_log(
+                'Realtime stream error: ' .
+                    $e->getMessage()
+            );
+
+            if (!headers_sent()) {
+                http_response_code(500);
+
+                header(
+                    'Content-Type: application/json; charset=utf-8'
+                );
+
+                echo json_encode([
+                    'success' => false,
+                    'status' => 500,
+                    'message' =>
+                    'No se pudo iniciar la conexión en tiempo real.',
+                ]);
+            } else {
+                self::sendEvent(
+                    'stream.error',
+                    [
+                        'message' =>
+                        'La conexión se interrumpió.',
+                    ]
+                );
+            }
+        } finally {
+            if (
+                $lockAcquired &&
+                $lockPdo instanceof PDO &&
+                is_string($lockName)
+            ) {
+                try {
+                    $releaseStmt =
+                        $lockPdo->prepare("
+                        SELECT RELEASE_LOCK(
+                            :lock_name
+                        )
+                    ");
+
+                    $releaseStmt->execute([
+                        ':lock_name' =>
+                        $lockName,
+                    ]);
+                } catch (Throwable $releaseError) {
+                    error_log(
+                        'Realtime lock release error: ' .
+                            $releaseError->getMessage()
+                    );
+                }
+            }
         }
     }
 
