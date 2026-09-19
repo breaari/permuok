@@ -1162,7 +1162,10 @@ class WebhookMercadoPagoService
      * actualizamos también el importe
      * de las próximas renovaciones.
      */
-        if ($subscriptionId !== '') {
+        if (
+            $subscriptionId !== '' &&
+            (int)($membership['cancel_at_period_end'] ?? 0) !== 1
+        ) {
             $subscription =
                 MercadoPagoClient::updateSubscription(
                     $subscriptionId,
@@ -1200,9 +1203,6 @@ class WebhookMercadoPagoService
 
             scheduled_plan_id = NULL,
             scheduled_change_at = NULL,
-
-            cancel_at_period_end = 0,
-            cancelled_at = NULL,
 
             max_users = :max_users,
             max_agents = :max_agents,
