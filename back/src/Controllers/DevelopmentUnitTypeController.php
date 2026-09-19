@@ -8,41 +8,133 @@ use App\Services\DevelopmentUnitTypeService;
 
 class DevelopmentUnitTypeController
 {
+    private static function error(
+        \Throwable $e
+    ): void {
+        if (
+            $e instanceof \PDOException ||
+            !$e instanceof \Exception
+        ) {
+            ResponseHelper::fromThrowable(
+                $e,
+                'No se pudo completar la operación con las tipologías.',
+                'DevelopmentUnitTypeController'
+            );
+
+            return;
+        }
+
+        ResponseHelper::fail(
+            $e->getMessage()
+                ?: 'No se pudo completar la operación con las tipologías.',
+            422
+        );
+    }
+
     public static function list(): void
     {
-        $auth = AuthHelper::requireUser();
-        $developmentId = (int)($_GET['id'] ?? 0);
+        try {
+            $auth =
+                AuthHelper::requireUser();
 
-        $result = DevelopmentUnitTypeService::listByDevelopment((int)$auth['id'], $developmentId);
-        ResponseHelper::ok($result);
+            $developmentId =
+                (int)($_GET['id'] ?? 0);
+
+            $result =
+                DevelopmentUnitTypeService::listByDevelopment(
+                    (int)$auth['id'],
+                    $developmentId
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
+        } catch (\Throwable $e) {
+            self::error($e);
+        }
     }
 
     public static function create(): void
     {
-        $auth = AuthHelper::requireUser();
-        $developmentId = (int)($_GET['id'] ?? 0);
-        $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        try {
+            $auth =
+                AuthHelper::requireUser();
 
-        $result = DevelopmentUnitTypeService::create((int)$auth['id'], $developmentId, $data);
-        ResponseHelper::ok($result, 201);
+            $developmentId =
+                (int)($_GET['id'] ?? 0);
+
+            $data =
+                json_decode(
+                    file_get_contents('php://input'),
+                    true
+                ) ?? [];
+
+            $result =
+                DevelopmentUnitTypeService::create(
+                    (int)$auth['id'],
+                    $developmentId,
+                    $data
+                );
+
+            ResponseHelper::ok(
+                $result,
+                201
+            );
+        } catch (\Throwable $e) {
+            self::error($e);
+        }
     }
 
     public static function update(): void
     {
-        $auth = AuthHelper::requireUser();
-        $unitTypeId = (int)($_GET['unit_type_id'] ?? 0);
-        $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        try {
+            $auth =
+                AuthHelper::requireUser();
 
-        $result = DevelopmentUnitTypeService::update((int)$auth['id'], $unitTypeId, $data);
-        ResponseHelper::ok($result);
+            $unitTypeId =
+                (int)($_GET['unit_type_id'] ?? 0);
+
+            $data =
+                json_decode(
+                    file_get_contents('php://input'),
+                    true
+                ) ?? [];
+
+            $result =
+                DevelopmentUnitTypeService::update(
+                    (int)$auth['id'],
+                    $unitTypeId,
+                    $data
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
+        } catch (\Throwable $e) {
+            self::error($e);
+        }
     }
 
     public static function delete(): void
     {
-        $auth = AuthHelper::requireUser();
-        $unitTypeId = (int)($_GET['unit_type_id'] ?? 0);
+        try {
+            $auth =
+                AuthHelper::requireUser();
 
-        $result = DevelopmentUnitTypeService::delete((int)$auth['id'], $unitTypeId);
-        ResponseHelper::ok($result);
+            $unitTypeId =
+                (int)($_GET['unit_type_id'] ?? 0);
+
+            $result =
+                DevelopmentUnitTypeService::delete(
+                    (int)$auth['id'],
+                    $unitTypeId
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
+        } catch (\Throwable $e) {
+            self::error($e);
+        }
     }
 }
