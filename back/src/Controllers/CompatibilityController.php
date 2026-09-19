@@ -196,13 +196,23 @@ class CompatibilityController
     ): void {
         $status = (int)$e->getCode();
 
-        if ($status < 400 || $status > 599) {
-            $status = 500;
+        if ($status < 400 || $status > 499) {
+            error_log(
+                '[CompatibilityController] ' .
+                    $e->getMessage()
+            );
+
+            ResponseHelper::fail(
+                'No se pudo procesar la solicitud.',
+                500
+            );
+
+            return;
         }
 
         ResponseHelper::fail(
             $e->getMessage()
-                ?: 'No se pudieron obtener las recomendaciones.',
+                ?: 'No se pudo procesar la solicitud.',
             $status
         );
     }
