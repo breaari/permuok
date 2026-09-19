@@ -380,4 +380,105 @@ class UserService
             throw $e;
         }
     }
+
+    public static function updateStatusForRealEstate(
+        int $ownerUserId,
+        array $data
+    ): array {
+        $owner =
+            self::getRealEstateUser(
+                $ownerUserId
+            );
+
+        self::getActiveMembership(
+            (int)$owner['real_estate_id']
+        );
+
+        $pdo = self::db();
+
+        $userId =
+            (int)($data['user_id'] ?? 0);
+
+        $isActive =
+            isset($data['is_active'])
+            ? (int)!!$data['is_active']
+            : null;
+
+        if ($userId <= 0) {
+            throw new Exception(
+                'user_id requerido'
+            );
+        }
+
+        if ($isActive === null) {
+            throw new Exception(
+                'is_active requerido'
+            );
+        }
+
+        $st = $pdo->prepare("
+            SELECT
+                id,
+                role,
+                real_estate_id
+            FROM users
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+        ");
+
+        $st->execute([
+            'id' => $userId,
+        ]);
+
+        $target = $st->fetch();
+
+        if (!$target) {
+            throw new Exception(
+                'Usuario no encontrado'
+            );
+        }
+
+        if (
+            (int)$target['real_estate_id'] !==
+            (int)$owner['real_estate_id']
+        ) {
+            throw new Exception(
+                'No podés modificar usuarios de otra inmobiliaria'
+            );
+        }
+
+        if (
+            !in_array(
+                (int)$target['role'],
+                [
+                    self::ROLE_AGENT,
+                    self::ROLE_INVESTOR,
+                ],
+                true
+            )
+        ) {
+            throw new Exception(
+                'Solo podés modificar agentes o inversores'
+            );
+        }
+
+        $st = $pdo->prepare("
+            UPDATE users
+            SET is_active = :is_active
+            WHERE id = :id
+            LIMIT 1
+        ");
+
+        $st->execute([
+            'is_active' => $isActive,
+            'id' => $userId,
+        ]);
+
+        return [
+            'updated' => true,
+            'user_id' => $userId,
+            'is_active' => $isActive,
+        ];
+    }
 }
