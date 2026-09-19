@@ -77,6 +77,17 @@ export default function useRealtimeStream({
           return;
         }
 
+        /*
+         * El backend permite una sola conexión SSE
+         * simultánea por usuario. Si existe otra,
+         * dejamos funcionar el polling de respaldo.
+         */
+        if (res.status === 409) {
+          reconnectRef.current = window.setTimeout(connect, 60000);
+
+          return;
+        }
+
         if (!res.ok || !res.body) {
           throw new Error(`Stream error ${res.status}`);
         }
