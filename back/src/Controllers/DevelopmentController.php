@@ -50,6 +50,29 @@ class DevelopmentController
         );
     }
 
+    private static function failAI(
+        Throwable $e
+    ): void {
+        $status =
+            (int)$e->getCode();
+
+        if (
+            $status >= 400 &&
+            $status <= 499
+        ) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                $status
+            );
+        }
+
+        ResponseHelper::fromThrowable(
+            $e,
+            'No se pudo completar la operación con IA. Intentá nuevamente.',
+            'DevelopmentController::AI'
+        );
+    }
+
     public static function list(): void
     {
         try {
@@ -274,7 +297,7 @@ class DevelopmentController
                 $result
             );
         } catch (Throwable $e) {
-            self::fail($e);
+            self::failAI($e)
         }
     }
 
@@ -329,7 +352,7 @@ class DevelopmentController
                 $result
             );
         } catch (Throwable $e) {
-            self::fail($e);
+            self::failAI($e)
         }
     }
 
@@ -384,7 +407,7 @@ class DevelopmentController
                 $result
             );
         } catch (Throwable $e) {
-            self::fail($e);
+            self::failAI($e)
         }
     }
 

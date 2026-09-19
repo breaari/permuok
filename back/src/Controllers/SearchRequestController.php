@@ -49,6 +49,29 @@ class SearchRequestController
         );
     }
 
+    private static function failAI(
+        \Throwable $e
+    ): void {
+        $status =
+            (int)$e->getCode();
+
+        if (
+            $status >= 400 &&
+            $status <= 499
+        ) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                $status
+            );
+        }
+
+        ResponseHelper::fromThrowable(
+            $e,
+            'No se pudo completar la operación con IA. Intentá nuevamente.',
+            'SearchRequestController::AI'
+        );
+    }
+
     public static function list(): void
     {
         try {
@@ -295,7 +318,7 @@ class SearchRequestController
                 $result
             );
         } catch (\Throwable $e) {
-            self::fail($e);
+            self::failAI($e)
         }
     }
 
@@ -353,7 +376,7 @@ class SearchRequestController
                 $result
             );
         } catch (\Throwable $e) {
-            self::fail($e);
+           self::failAI($e)
         }
     }
 
@@ -411,7 +434,7 @@ class SearchRequestController
                 $result
             );
         } catch (\Throwable $e) {
-            self::fail($e);
+            self::failAI($e)
         }
     }
 
