@@ -107,18 +107,23 @@ class AuthService
         $stmt->execute(['email' => $email]);
         $user = $stmt->fetch();
 
-        if (!$user) {
+        if (
+            !$user ||
+            !password_verify(
+                $password,
+                (string)$user['password_hash']
+            )
+        ) {
             return false;
         }
 
         if ((int)$user['is_active'] !== 1) {
-            return ['error' => 'Usuario inactivo'];
+            return [
+                'error' =>
+                'Tu cuenta está inactiva. Contactá al administrador para solicitar asistencia.',
+            ];
         }
-
-        if (!password_verify($password, $user['password_hash'])) {
-            return false;
-        }
-
+        
         $upd = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = :id LIMIT 1");
         $upd->execute(['id' => (int)$user['id']]);
 
