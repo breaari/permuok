@@ -8,6 +8,65 @@ use App\Services\BillingService;
 
 class BillingController
 {
+
+    private static function error(
+        \Throwable $e
+    ): void {
+        $message = trim(
+            $e->getMessage()
+        );
+
+        $conflictMessages = [
+            'Ya se está procesando otra operación',
+            'Ya se está generando una suscripción',
+            'Ya tenés una membresía activa',
+            'La suscripción ya fue autorizada',
+            'Ese plan ya es el plan actual',
+            'La renovación de la membresía está cancelada',
+        ];
+
+        foreach ($conflictMessages as $fragment) {
+            if (str_contains($message, $fragment)) {
+                ResponseHelper::fail(
+                    $message,
+                    409
+                );
+
+                return;
+            }
+        }
+
+        $validationMessages = [
+            'Plan no encontrado',
+            'Plan destino no encontrado',
+            'Tu perfil todavía no está habilitado',
+            'Los upgrades deben aplicarse de inmediato',
+            'Los downgrades deben programarse',
+            'Falta preference_id o external_reference',
+            'Inmobiliaria no vinculada',
+            'La inmobiliaria debe estar aprobada',
+            'No hay una membresía activa para operar este cambio',
+        ];
+
+        foreach ($validationMessages as $fragment) {
+            if (str_contains($message, $fragment)) {
+                ResponseHelper::fail(
+                    $message,
+                    422
+                );
+
+                return;
+            }
+        }
+
+        ResponseHelper::fromThrowable(
+            $e,
+            'No se pudo completar la operación de facturación.',
+            'BillingController'
+        );
+    }
+
+
     public static function listPlans(): void
     {
         try {
@@ -40,20 +99,7 @@ class BillingController
             $result = BillingService::createPreference((int)$ctx['id'], $planCode);
             ResponseHelper::ok($result, 201);
         } catch (\Throwable $e) {
-            $msg = $e->getMessage() ?: 'Error';
-
-            // ⛔ Doble pago (membresía activa vigente)
-            if (str_contains($msg, 'membresía activa')) {
-                ResponseHelper::fail($msg, 409);
-            }
-
-            // Config faltante (backend mal configurado)
-            if (str_contains($msg, 'no configurado')) {
-                ResponseHelper::fail($msg, 500);
-            }
-
-            // Validaciones / reglas de negocio
-            ResponseHelper::fail($msg, 422);
+            self::error($e);
         }
     }
 
@@ -72,7 +118,7 @@ class BillingController
             $data = BillingService::getPaymentStatus((int)$ctx['id'], $preferenceId, $externalRef);
             ResponseHelper::ok($data);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 422);
+            self::error($e);
         }
     }
 
@@ -95,7 +141,7 @@ class BillingController
             $result = BillingService::previewPlanChange((int)$ctx['id'], $planCode);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 422);
+            self::error($e);
         }
     }
 
@@ -123,13 +169,7 @@ class BillingController
             $result = BillingService::confirmPlanChange((int)$ctx['id'], $planCode, $mode);
             ResponseHelper::ok($result, 201);
         } catch (\Throwable $e) {
-            $msg = $e->getMessage() ?: 'Error';
-
-            if (str_contains($msg, 'no configurado')) {
-                ResponseHelper::fail($msg, 500);
-            }
-
-            ResponseHelper::fail($msg, 422);
+            self::error($e);
         }
     }
 
@@ -145,7 +185,7 @@ class BillingController
             $result = BillingService::cancelMembership((int)$ctx['id']);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 422);
+            self::error($e);
         }
     }
 }
