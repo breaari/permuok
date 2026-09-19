@@ -140,19 +140,6 @@ class RefreshTokenService
         $stmt->execute(['id' => $id]);
     }
 
-    /** Revoca todos los refresh tokens activos de un usuario (logout total) */
-    public static function revokeAllForUser(int $userId): void
-    {
-        $pdo = self::db();
-        $stmt = $pdo->prepare("
-            UPDATE refresh_tokens
-            SET revoked_at = NOW()
-            WHERE user_id = :user_id
-              AND revoked_at IS NULL
-        ");
-        $stmt->execute(['user_id' => $userId]);
-    }
-
     public static function revokeAllByUserId(int $userId): void
     {
         $pdo = self::db();
