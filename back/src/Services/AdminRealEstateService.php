@@ -883,7 +883,7 @@ class AdminRealEstateService
             throw $e;
         }
     }
-    
+
     private static function getMembershipSummary(
         int $realEstateId
     ): array {
@@ -1041,62 +1041,106 @@ class AdminRealEstateService
     ): array {
         $pdo = self::db();
 
-        $st = $pdo->prepare("
-        SELECT
-            id,
-            status,
-            profile_status
-        FROM real_estates
-        WHERE id = :id
-          AND deleted_at IS NULL
-        LIMIT 1
-    ");
+        $pdo->beginTransaction();
 
-        $st->execute([
-            'id' => $realEstateId,
-        ]);
+        try {
+            $st = $pdo->prepare("
+            SELECT
+                id,
+                status,
+                profile_status
+            FROM real_estates
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+        ");
 
-        $realEstate =
-            $st->fetch(PDO::FETCH_ASSOC);
+            $st->execute([
+                'id' => $realEstateId,
+            ]);
 
-        if (!$realEstate) {
-            throw new \Exception(
-                "Inmobiliaria no encontrada"
-            );
-        }
+            $realEstate =
+                $st->fetch(PDO::FETCH_ASSOC);
 
-        $profileStatus =
-            (int)(
-                $realEstate['profile_status']
-                ?? 0
-            );
+            if (!$realEstate) {
+                throw new \Exception(
+                    'Inmobiliaria no encontrada',
+                    404
+                );
+            }
 
-        $allowedProfileStatuses = [
-            RealEstateProfileStatus::APPROVED,
-            RealEstateProfileStatus::CHANGES_PENDING,
-        ];
+            $profileStatus =
+                (int)($realEstate['profile_status'] ?? 0);
 
-        if (
-            !in_array(
-                $profileStatus,
-                $allowedProfileStatuses,
-                true
-            )
-        ) {
-            throw new \Exception(
-                "Sólo se puede suspender o reactivar una inmobiliaria previamente aprobada"
-            );
-        }
+            if (
+                !in_array(
+                    $profileStatus,
+                    [
+                        RealEstateProfileStatus::APPROVED,
+                        RealEstateProfileStatus::CHANGES_PENDING,
+                    ],
+                    true
+                )
+            ) {
+                throw new \Exception(
+                    'Sólo se puede suspender o reactivar una inmobiliaria previamente aprobada',
+                    409
+                );
+            }
 
-        $newStatus =
-            $isActive
-            ? 1
-            : 0;
+            $newStatus = $isActive ? 1 : 0;
 
-        if (
-            (int)$realEstate['status']
-            === $newStatus
-        ) {
+            $changed =
+                (int)$realEstate['status']
+                !== $newStatus;
+
+            if ($changed) {
+                $update = $pdo->prepare("
+                UPDATE real_estates
+                SET status = :status
+                WHERE id = :id
+                  AND deleted_at IS NULL
+                LIMIT 1
+            ");
+
+                $update->execute([
+                    'status' => $newStatus,
+                    'id' => $realEstateId,
+                ]);
+            }
+
+            /*
+         * Al suspender la inmobiliaria,
+         * cerramos las sesiones renovables
+         * de todos sus usuarios.
+         *
+         * También se ejecuta si ya estaba
+         * suspendida para garantizar el cierre.
+         */
+            if (!$isActive) {
+                $revoke = $pdo->prepare("
+                UPDATE refresh_tokens rt
+
+                INNER JOIN users u
+                    ON u.id = rt.user_id
+
+                SET rt.revoked_at = NOW()
+
+                WHERE u.real_estate_id =
+                    :real_estate_id
+
+                  AND rt.revoked_at IS NULL
+            ");
+
+                $revoke->execute([
+                    'real_estate_id' =>
+                    $realEstateId,
+                ]);
+            }
+
+            $pdo->commit();
+
             return [
                 'real_estate_id' =>
                 $realEstateId,
@@ -1105,36 +1149,15 @@ class AdminRealEstateService
                 $newStatus,
 
                 'changed' =>
-                false,
+                $changed,
             ];
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $e;
         }
-
-        $st = $pdo->prepare("
-        UPDATE real_estates
-        SET status = :status
-        WHERE id = :id
-          AND deleted_at IS NULL
-        LIMIT 1
-    ");
-
-        $st->execute([
-            'status' =>
-            $newStatus,
-
-            'id' =>
-            $realEstateId,
-        ]);
-
-        return [
-            'real_estate_id' =>
-            $realEstateId,
-
-            'status' =>
-            $newStatus,
-
-            'changed' =>
-            true,
-        ];
     }
 
     public static function getDetail(
