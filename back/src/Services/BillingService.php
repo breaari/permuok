@@ -505,9 +505,9 @@ class BillingService
                     . "una suscripción válida"
             );
         }
+        try {
 
-
-        $st = $pdo->prepare("
+            $st = $pdo->prepare("
        INSERT INTO memberships
 (
     real_estate_id,
@@ -558,50 +558,73 @@ NULL,
         )
     ");
 
-        $st->execute([
-            'real_estate_id' =>
-            $realEstateId,
-            'billing_user_id' => $userId,
-            'plan_id' =>
-            (int)$plan['id'],
+            $st->execute([
+                'real_estate_id' =>
+                $realEstateId,
+                'billing_user_id' => $userId,
+                'plan_id' =>
+                (int)$plan['id'],
 
-            'max_users' =>
-            (int)(
-                $plan['max_users']
-                ?? 1
-            ),
+                'max_users' =>
+                (int)(
+                    $plan['max_users']
+                    ?? 1
+                ),
 
-            'max_agents' =>
-            (int)(
-                $plan['max_agents']
-                ?? 0
-            ),
+                'max_agents' =>
+                (int)(
+                    $plan['max_agents']
+                    ?? 0
+                ),
 
-            'max_investors' =>
-            (int)(
-                $plan['max_investors']
-                ?? 0
-            ),
+                'max_investors' =>
+                (int)(
+                    $plan['max_investors']
+                    ?? 0
+                ),
 
-            'can_publish_projects' =>
-            (int)(
-                $plan['can_publish_projects']
-                ?? 0
-            ),
+                'can_publish_projects' =>
+                (int)(
+                    $plan['can_publish_projects']
+                    ?? 0
+                ),
 
-            'can_view_projects' =>
-            (int)(
-                $plan['can_view_projects']
-                ?? 0
-            ),
+                'can_view_projects' =>
+                (int)(
+                    $plan['can_view_projects']
+                    ?? 0
+                ),
 
-            'mp_preapproval_id' =>
-            $subscriptionId,
+                'mp_preapproval_id' =>
+                $subscriptionId,
 
-            'mp_subscription_status' =>
-            $mpStatus,
-        ]);
+                'mp_subscription_status' =>
+                $mpStatus,
+            ]);
+        } catch (\Throwable $e) {
+            /*
+     * Mercado Pago ya creó la suscripción,
+     * pero no pudimos registrarla localmente.
+     * Intentamos cancelarla para evitar
+     * cobros sin membresía asociada.
+     */
+            try {
+                MercadoPagoClient::updateSubscription(
+                    $subscriptionId,
+                    [
+                        'status' => 'cancelled',
+                    ]
+                );
+            } catch (\Throwable $cleanupError) {
+                error_log(
+                    'No se pudo cancelar una suscripción '
+                        . 'de Mercado Pago después de fallar '
+                        . 'su registro local.'
+                );
+            }
 
+            throw $e;
+        }
         return [
             'subscription_id' =>
             $subscriptionId,
