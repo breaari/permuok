@@ -173,23 +173,6 @@ class UserService
         $membership = self::getActiveMembership((int)$owner['real_estate_id']);
         $pdo = self::db();
 
-        $st = $pdo->prepare("
-            SELECT
-                id,
-                role,
-                first_name,
-                last_name,
-                email,
-                phone,
-                is_active,
-                created_at
-            FROM users
-            WHERE real_estate_id = :re
-              AND role IN (:agent_role, :investor_role)
-              AND deleted_at IS NULL
-            ORDER BY created_at DESC, id DESC
-        ");
-
         // PDO no permite bind array directo, así que se pasan individuales:
         $sql = "
             SELECT
@@ -418,10 +401,9 @@ class UserService
         $userId =
             (int)($data['user_id'] ?? 0);
 
-        $isActive =
-            isset($data['is_active'])
-            ? (int)!!$data['is_active']
-            : null;
+        $rawIsActive =
+            $data['is_active']
+            ?? null;
 
         if ($userId <= 0) {
             throw new Exception(
@@ -429,11 +411,37 @@ class UserService
             );
         }
 
-        if ($isActive === null) {
+        if (
+            !in_array(
+                $rawIsActive,
+                [
+                    0,
+                    1,
+                    false,
+                    true,
+                    '0',
+                    '1',
+                ],
+                true
+            )
+        ) {
             throw new Exception(
-                'is_active requerido'
+                'is_active debe ser 0 o 1'
             );
         }
+
+        $isActive =
+            in_array(
+                $rawIsActive,
+                [
+                    1,
+                    true,
+                    '1',
+                ],
+                true
+            )
+            ? 1
+            : 0;
 
         $st = $pdo->prepare("
             SELECT
