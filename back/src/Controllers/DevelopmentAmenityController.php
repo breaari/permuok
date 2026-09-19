@@ -11,23 +11,31 @@ class DevelopmentAmenityController
     private static function error(
         \Throwable $e
     ): void {
-        if (
-            $e instanceof \PDOException ||
-            !$e instanceof \Exception
-        ) {
+        if ($e instanceof \PDOException) {
             ResponseHelper::fromThrowable(
                 $e,
                 'No se pudo completar la operación con las amenities.',
                 'DevelopmentAmenityController'
             );
-
-            return;
         }
 
-        ResponseHelper::fail(
-            $e->getMessage()
-                ?: 'No se pudo completar la operación con las amenities.',
-            422
+        $code =
+            (int)$e->getCode();
+
+        if (
+            $code >= 400 &&
+            $code <= 499
+        ) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                $code
+            );
+        }
+
+        ResponseHelper::fromThrowable(
+            $e,
+            'No se pudo completar la operación con las amenities.',
+            'DevelopmentAmenityController'
         );
     }
 
