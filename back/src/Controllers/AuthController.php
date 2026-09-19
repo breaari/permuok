@@ -6,6 +6,7 @@ use App\Helpers\ResponseHelper;
 use App\Services\AuthService;
 use App\Services\SecurityRateLimitService;
 use App\Helpers\RefreshTokenCookieHelper;
+use App\Services\RefreshTokenService;
 
 class AuthController
 {
@@ -184,12 +185,44 @@ class AuthController
  * mediante una cookie HttpOnly.
  */
         if (
-            is_array($result)
-            && !empty($result['refresh_token'])
+            is_array($result) &&
+            !empty($result['refresh_token'])
         ) {
-            RefreshTokenCookieHelper::write(
-                (string)$result['refresh_token']
-            );
+            $refreshToken =
+                (string)$result['refresh_token'];
+
+            try {
+                RefreshTokenCookieHelper::write(
+                    $refreshToken
+                );
+            } catch (\Throwable $e) {
+                /*
+         * Si la cookie no pudo entregarse,
+         * revocamos el token creado.
+         */
+                try {
+                    $stored =
+                        RefreshTokenService::findValid(
+                            $refreshToken
+                        );
+
+                    if ($stored) {
+                        RefreshTokenService::revokeById(
+                            (int)$stored['id']
+                        );
+                    }
+                } catch (\Throwable $cleanupError) {
+                    error_log(
+                        'No se pudo limpiar el refresh token ' .
+                            'después de un login fallido: ' .
+                            $cleanupError->getMessage()
+                    );
+                }
+
+                RefreshTokenCookieHelper::clear();
+
+                throw $e;
+            }
 
             unset($result['refresh_token']);
         }

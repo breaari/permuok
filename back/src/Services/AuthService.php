@@ -123,17 +123,33 @@ class AuthService
                 'Tu cuenta está inactiva. Contactá al administrador para solicitar asistencia.',
             ];
         }
-        
+
         $upd = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = :id LIMIT 1");
         $upd->execute(['id' => (int)$user['id']]);
 
-        $accessToken = JwtHelper::generateAccessToken([
-            'id'   => (int)$user['id'],
-            'role' => (int)$user['role'],
-        ]);
+        $access =
+            self::buildAccessFromMiddleware(
+                (int)$user['id'],
+                (int)$user['role']
+            );
 
-        $refreshToken = RefreshTokenService::issue((int)$user['id']);
-        $access = self::buildAccessFromMiddleware((int)$user['id'], (int)$user['role']);
+        $accessToken =
+            JwtHelper::generateAccessToken([
+                'id' =>
+                (int)$user['id'],
+
+                'role' =>
+                (int)$user['role'],
+            ]);
+
+        /*
+ * El refresh token se crea al final,
+ * cuando la respuesta ya está preparada.
+ */
+        $refreshToken =
+            RefreshTokenService::issue(
+                (int)$user['id']
+            );
 
         return [
             'access_token'  => $accessToken,
