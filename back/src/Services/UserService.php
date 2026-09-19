@@ -302,6 +302,11 @@ class UserService
     public static function updateStatusForRealEstate(int $ownerUserId, array $data): array
     {
         $owner = self::getRealEstateUser($ownerUserId);
+
+        self::getActiveMembership(
+            (int)$owner['real_estate_id']
+        );
+
         $pdo = self::db();
 
         $userId = (int)($data['user_id'] ?? 0);
