@@ -8,7 +8,7 @@ use App\Services\CompatibilityService;
 use Throwable;
 use App\Services\MultilateralOperationReadService;
 use App\Services\MultilateralOperationResponseService;
-use App\Middleware\MembershipGuard;
+use App\Services\MembershipGuard;
 
 class CompatibilityController
 {
