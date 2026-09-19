@@ -1211,7 +1211,8 @@ class AdminRealEstateService
 
         if (!$re) {
             throw new \Exception(
-                "Inmobiliaria no encontrada"
+                'Inmobiliaria no encontrada',
+                404
             );
         }
 
