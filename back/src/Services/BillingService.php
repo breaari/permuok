@@ -206,7 +206,6 @@ class BillingService
     SELECT *
     FROM memberships
     WHERE real_estate_id = :re
-      AND plan_id = :plan_id
       AND status = 0
       AND mp_preapproval_id IS NOT NULL
       AND deleted_at IS NULL
@@ -216,11 +215,64 @@ class BillingService
 
         $st->execute([
             're' => $realEstateId,
-            'plan_id' => (int)$plan['id'],
         ]);
 
         $pendingMembership =
             $st->fetch();
+
+        /*
+ * Si había un checkout pendiente de otro plan,
+ * primero cancelamos esa suscripción antes de
+ * permitir la creación de una nueva.
+ */
+        if (
+            $pendingMembership &&
+            (int)$pendingMembership['plan_id'] !==
+            (int)$plan['id']
+        ) {
+            $oldSubscriptionId =
+                trim(
+                    (string)
+                    $pendingMembership['mp_preapproval_id']
+                );
+
+            $cancelledSubscription =
+                MercadoPagoClient::updateSubscription(
+                    $oldSubscriptionId,
+                    [
+                        'status' => 'cancelled',
+                    ]
+                );
+
+            $cancelledStatus =
+                (string)(
+                    $cancelledSubscription['status']
+                    ?? 'cancelled'
+                );
+
+            $cancelStmt = $pdo->prepare("
+        UPDATE memberships
+        SET
+            status = 3,
+            cancel_at_period_end = 1,
+            cancelled_at = NOW(),
+            mp_subscription_status = :mp_status,
+            mp_subscription_updated_at = NOW()
+        WHERE id = :id
+          AND status = 0
+        LIMIT 1
+    ");
+
+            $cancelStmt->execute([
+                'mp_status' =>
+                $cancelledStatus,
+
+                'id' =>
+                (int)$pendingMembership['id'],
+            ]);
+
+            $pendingMembership = false;
+        }
 
         if ($pendingMembership) {
             try {
@@ -851,7 +903,7 @@ NULL,
             }
         );
     }
-    
+
     private static function cancelMembershipLocked(int $userId): array
     {
         $pdo = self::db();
