@@ -99,6 +99,91 @@ class ConversationService
         int $userId,
         array $input
     ): array {
+        $pdo = self::db();
+
+        $type =
+            trim(
+                (string)(
+                    $input['opportunity_type']
+                    ?? ''
+                )
+            );
+
+        $opportunityId =
+            (int)(
+                $input['opportunity_id']
+                ?? 0
+            );
+
+        /*
+     * Una misma persona y oportunidad solamente
+     * pueden iniciar una conversación a la vez.
+     */
+        $lockHash =
+            substr(
+                hash(
+                    'sha256',
+                    $userId .
+                        '|' .
+                        $type .
+                        '|' .
+                        $opportunityId
+                ),
+                0,
+                32
+            );
+
+        $lockName =
+            'conversation:start:' .
+            $lockHash;
+
+        $lockStmt = $pdo->prepare("
+        SELECT GET_LOCK(
+            :lock_name,
+            10
+        )
+    ");
+
+        $lockStmt->execute([
+            'lock_name' => $lockName,
+        ]);
+
+        if (
+            (int)$lockStmt->fetchColumn() !== 1
+        ) {
+            throw new Exception(
+                'Ya se está iniciando esta conversación. Intentá nuevamente en unos segundos.',
+                409
+            );
+        }
+
+        try {
+            /*
+         * El método interno vuelve a buscar
+         * la conversación existente después
+         * de obtener el bloqueo.
+         */
+            return self::startConversationLocked(
+                $userId,
+                $input
+            );
+        } finally {
+            $releaseStmt = $pdo->prepare("
+            SELECT RELEASE_LOCK(
+                :lock_name
+            )
+        ");
+
+            $releaseStmt->execute([
+                'lock_name' => $lockName,
+            ]);
+        }
+    }
+
+    private static function startConversationLocked(
+        int $userId,
+        array $input
+    ): array {
         $type =
             trim(
                 (string)(
