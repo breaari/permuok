@@ -275,47 +275,145 @@ class BillingService
         }
 
         if ($pendingMembership) {
+            $subscription = null;
+            $subscriptionNotFound = false;
+
             try {
                 $subscription =
                     MercadoPagoClient::getSubscriptionById(
                         (string)
                         $pendingMembership['mp_preapproval_id']
                     );
+            } catch (\Throwable $e) {
+                /*
+         * Solamente consideramos obsoleto el registro
+         * cuando Mercado Pago confirma que no existe.
+         * Un timeout o error temporal no debe generar
+         * una segunda suscripción.
+         */
+                if (
+                    str_starts_with(
+                        $e->getMessage(),
+                        'MP HTTP 404:'
+                    )
+                ) {
+                    $subscriptionNotFound = true;
+                } else {
+                    throw $e;
+                }
+            }
 
+            if (!$subscriptionNotFound) {
                 $initPoint =
                     $subscription['init_point']
                     ?? null;
 
                 $mpStatus =
-                    $subscription['status']
-                    ?? 'pending';
+                    (string)(
+                        $subscription['status']
+                        ?? ''
+                    );
 
-                if ($initPoint) {
+                if (
+                    $mpStatus === 'pending' &&
+                    is_string($initPoint) &&
+                    $initPoint !== ''
+                ) {
                     return [
                         'subscription_id' =>
                         (string)
                         $pendingMembership['mp_preapproval_id'],
 
+                        'preference_id' =>
+                        (string)
+                        $pendingMembership['mp_preapproval_id'],
+
                         'init_point' =>
-                        (string)$initPoint,
+                        $initPoint,
 
                         'status' =>
-                        (string)$mpStatus,
+                        $mpStatus,
 
                         'membership_id' =>
                         (int)
                         $pendingMembership['id'],
                     ];
                 }
-            } catch (\Throwable) {
-                /*
-             * Si Mercado Pago ya no reconoce
-             * esa suscripción, seguimos y
-             * generamos una nueva.
-             */
-            }
-        }
 
+                /*
+         * Si ya fue autorizada, no creamos
+         * otra mientras llega o se procesa
+         * la notificación de Mercado Pago.
+         */
+                if ($mpStatus === 'authorized') {
+                    throw new \Exception(
+                        'La suscripción ya fue autorizada y se está procesando.'
+                    );
+                }
+
+                /*
+         * Un estado desconocido o temporal tampoco
+         * habilita la creación de otro checkout.
+         */
+                if (
+                    !in_array(
+                        $mpStatus,
+                        [
+                            'cancelled',
+                            'paused',
+                        ],
+                        true
+                    )
+                ) {
+                    throw new \Exception(
+                        'No se pudo reutilizar la suscripción pendiente.'
+                    );
+                }
+
+                /*
+         * Una suscripción pausada se cancela antes
+         * de reemplazarla por otra.
+         */
+                if ($mpStatus === 'paused') {
+                    MercadoPagoClient::updateSubscription(
+                        (string)
+                        $pendingMembership['mp_preapproval_id'],
+                        [
+                            'status' => 'cancelled',
+                        ]
+                    );
+
+                    $mpStatus = 'cancelled';
+                }
+            } else {
+                $mpStatus = 'not_found';
+            }
+
+            /*
+     * Cerramos el registro local obsoleto antes
+     * de generar una suscripción nueva.
+     */
+            $closePendingStmt = $pdo->prepare("
+        UPDATE memberships
+        SET
+            status = 3,
+            cancel_at_period_end = 1,
+            cancelled_at = NOW(),
+            mp_subscription_status = :mp_status,
+            mp_subscription_updated_at = NOW()
+        WHERE id = :id
+          AND status = 0
+        LIMIT 1
+    ");
+
+            $closePendingStmt->execute([
+                'mp_status' => $mpStatus,
+                'id' =>
+                (int)$pendingMembership['id'],
+            ]);
+
+            $pendingMembership = false;
+        }
         $externalRef =
             "re{$realEstateId}"
             . "-u{$userId}"
