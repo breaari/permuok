@@ -19,6 +19,50 @@ class AdminUserController
         return $ctx;
     }
 
+    private static function handleError(
+        \Throwable $e
+    ): void {
+        if ($e instanceof \PDOException) {
+            ResponseHelper::fromThrowable(
+                $e,
+                'No se pudo completar la operación.',
+                'AdminUserController'
+            );
+        }
+
+        $message =
+            trim($e->getMessage());
+
+        $status = match ($message) {
+            'Usuario no encontrado' =>
+            404,
+
+            'No podés modificar un super admin',
+            'No podés modificar tu propio estado' =>
+            403,
+
+            'Estado inválido',
+            'El motivo de desactivación es requerido' =>
+            422,
+
+            default =>
+            500,
+        };
+
+        if ($status !== 500) {
+            ResponseHelper::fail(
+                $message,
+                $status
+            );
+        }
+
+        ResponseHelper::fromThrowable(
+            $e,
+            'No se pudo completar la operación.',
+            'AdminUserController'
+        );
+    }
+
     public static function counts(): void
     {
         try {
@@ -31,9 +75,7 @@ class AdminUserController
             $counts = AdminUserService::counts($q, $status, $membership);
             ResponseHelper::ok(['counts' => $counts]);
         } catch (\Throwable $e) {
-            ResponseHelper::fromThrowable(
-                $e
-            );
+            self::handleError($e);
         }
     }
 
@@ -60,7 +102,7 @@ class AdminUserController
 
             ResponseHelper::ok($data);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 422);
+            self::handleError($e);
         }
     }
 
@@ -77,7 +119,7 @@ class AdminUserController
             $data = AdminUserService::getDetail($id);
             ResponseHelper::ok($data);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 422);
+            self::handleError($e);
         }
     }
 
@@ -89,7 +131,31 @@ class AdminUserController
             $payload = json_decode(file_get_contents('php://input'), true) ?? [];
 
             $userId = (int)($payload['user_id'] ?? 0);
-            $isActive = isset($payload['is_active']) ? (int)!!$payload['is_active'] : null;
+            $isActive = null;
+
+            if (
+                array_key_exists(
+                    'is_active',
+                    $payload
+                )
+            ) {
+                $rawIsActive =
+                    $payload['is_active'];
+
+                if (
+                    $rawIsActive === true ||
+                    $rawIsActive === 1 ||
+                    $rawIsActive === '1'
+                ) {
+                    $isActive = 1;
+                } elseif (
+                    $rawIsActive === false ||
+                    $rawIsActive === 0 ||
+                    $rawIsActive === '0'
+                ) {
+                    $isActive = 0;
+                }
+            }
             $reason = isset($payload['reason']) ? trim((string)$payload['reason']) : null;
 
             if ($userId <= 0) {
@@ -113,7 +179,7 @@ class AdminUserController
 
             ResponseHelper::ok($data);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 422);
+            self::handleError($e);
         }
     }
 }
