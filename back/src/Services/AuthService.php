@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Helpers\JwtHelper;
 use PDO;
+use PDOException;
 
 class AuthService
 {
@@ -60,9 +61,36 @@ class AuthService
         if ($last === '')  return ['error' => 'last_name requerido'];
         if ($phone === '') return ['error' => 'phone requerido'];
 
-        $emailNorm = strtolower(trim($email));
+        $emailNorm =
+            strtolower(
+                trim($email)
+            );
 
-        $check = $pdo->prepare("SELECT id FROM users WHERE email = :email LIMIT 1");
+        if (
+            !filter_var(
+                $emailNorm,
+                FILTER_VALIDATE_EMAIL
+            )
+        ) {
+            return [
+                'error' =>
+                'Ingresá un email válido.',
+            ];
+        }
+
+        if (strlen($emailNorm) > 254) {
+            return [
+                'error' =>
+                'El email es demasiado extenso.',
+            ];
+        }
+
+        $check = $pdo->prepare("
+    SELECT id
+    FROM users
+    WHERE email = :email
+    LIMIT 1
+");
         $check->execute(['email' => $emailNorm]);
         if ($check->fetch()) {
             return ['error' => 'El email ya está registrado'];
@@ -75,16 +103,47 @@ class AuthService
             (:role, :first_name, :last_name, :email, :phone, :password, 1, NOW())
         ");
 
-        $stmt->execute([
-            'role'       => self::ROLE_REAL_ESTATE,
-            'first_name' => $first,
-            'last_name'  => $last,
-            'email'      => $emailNorm,
-            'phone'      => $phone,
-            'password'   => password_hash($password, PASSWORD_DEFAULT),
-        ]);
+        try {
+            $stmt->execute([
+                'role' =>
+                self::ROLE_REAL_ESTATE,
 
-        return ['success' => true];
+                'first_name' =>
+                $first,
+
+                'last_name' =>
+                $last,
+
+                'email' =>
+                $emailNorm,
+
+                'phone' =>
+                $phone,
+
+                'password' =>
+                password_hash(
+                    $password,
+                    PASSWORD_DEFAULT
+                ),
+            ]);
+        } catch (PDOException $e) {
+            /*
+     * El índice único protege también
+     * dos registros simultáneos.
+     */
+            if ($e->getCode() === '23000') {
+                return [
+                    'error' =>
+                    'El email ya está registrado',
+                ];
+            }
+
+            throw $e;
+        }
+
+        return [
+            'success' => true,
+        ];
     }
 
     /*
