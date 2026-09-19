@@ -14,7 +14,10 @@ class PropertyController
         \Throwable $e,
         int $status = 400
     ): void {
-        if ($e instanceof \PDOException) {
+        if (
+            $e instanceof \PDOException ||
+            !($e instanceof \Exception)
+        ) {
             ResponseHelper::fromThrowable(
                 $e,
                 'No se pudo completar la operación.',
