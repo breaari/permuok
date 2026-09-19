@@ -28,7 +28,9 @@ class AdminDashboardController
                 'stats' => $stats,
             ]);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 500);
+            ResponseHelper::fromThrowable(
+                $e
+            );
         }
     }
 }

@@ -13,7 +13,9 @@ class ProvinceController
             $items = ProvinceService::listActive();
             ResponseHelper::ok(['items' => $items]);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 500);
+            ResponseHelper::fromThrowable(
+                $e
+            );
         }
     }
 }

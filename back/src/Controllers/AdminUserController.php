@@ -31,7 +31,9 @@ class AdminUserController
             $counts = AdminUserService::counts($q, $status, $membership);
             ResponseHelper::ok(['counts' => $counts]);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 500);
+            ResponseHelper::fromThrowable(
+                $e
+            );
         }
     }
 

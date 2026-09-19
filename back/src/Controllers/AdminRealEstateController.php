@@ -27,7 +27,9 @@ class AdminRealEstateController
             $counts = AdminRealEstateService::counts($q);
             ResponseHelper::ok(['counts' => $counts]);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 500);
+            ResponseHelper::fromThrowable(
+                $e
+            );
         }
     }
 
@@ -93,7 +95,9 @@ class AdminRealEstateController
             $data = AdminRealEstateService::list('pending', 1, 200, null);
             ResponseHelper::ok(['items' => $data['items']]);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 500);
+            ResponseHelper::fromThrowable(
+                $e
+            );
         }
     }
 
@@ -104,7 +108,9 @@ class AdminRealEstateController
             $data = AdminRealEstateService::list('approved', 1, 200, null);
             ResponseHelper::ok(['items' => $data['items']]);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 500);
+            ResponseHelper::fromThrowable(
+                $e
+            );
         }
     }
 
@@ -115,7 +121,9 @@ class AdminRealEstateController
             $data = AdminRealEstateService::list('rejected', 1, 200, null);
             ResponseHelper::ok(['items' => $data['items']]);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 500);
+            ResponseHelper::fromThrowable(
+                $e
+            );
         }
     }
 

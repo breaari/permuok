@@ -14,7 +14,9 @@ class BillingController
             $plans = BillingService::listPlans();
             ResponseHelper::ok(['plans' => $plans]);
         } catch (\Throwable $e) {
-            ResponseHelper::fail($e->getMessage(), 500);
+            ResponseHelper::fromThrowable(
+                $e
+            );
         }
     }
 
