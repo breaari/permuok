@@ -25,10 +25,13 @@ class RealEstateController
 
         return $ctx;
     }
-
     private static function handleError(
         Throwable $e
     ): void {
+        /*
+     * Nunca exponemos consultas ni detalles
+     * internos de la base de datos.
+     */
         if ($e instanceof PDOException) {
             ResponseHelper::fromThrowable(
                 $e,
@@ -39,10 +42,116 @@ class RealEstateController
             return;
         }
 
-        ResponseHelper::fail(
-            $e->getMessage()
-                ?: 'No se pudo completar la operación.',
-            422
+        $message =
+            trim(
+                $e->getMessage()
+            );
+
+        $code =
+            (int)$e->getCode();
+
+        /*
+     * Conserva los códigos funcionales
+     * definidos explícitamente en el servicio.
+     */
+        if (
+            $code >= 400 &&
+            $code <= 499
+        ) {
+            ResponseHelper::fail(
+                $message,
+                $code
+            );
+
+            return;
+        }
+
+        if ($message === 'No autorizado') {
+            ResponseHelper::fail(
+                $message,
+                403
+            );
+
+            return;
+        }
+
+        if (
+            $message ===
+            'Usuario no encontrado' ||
+            $message ===
+            'Inmobiliaria no encontrada'
+        ) {
+            ResponseHelper::fail(
+                $message,
+                404
+            );
+
+            return;
+        }
+
+        if (
+            str_starts_with(
+                $message,
+                'Ya existe una inmobiliaria'
+            ) ||
+            str_starts_with(
+                $message,
+                'Esa matrícula ya existe'
+            )
+        ) {
+            ResponseHelper::fail(
+                $message,
+                409
+            );
+
+            return;
+        }
+
+        $validationPrefixes = [
+            'Falta ',
+            'Ingresá ',
+            'Seleccioná ',
+            'Primero completá ',
+            'Tenés que ',
+            'license_number ',
+            'is_primary ',
+        ];
+
+        foreach (
+            $validationPrefixes
+            as $prefix
+        ) {
+            if (
+                str_starts_with(
+                    $message,
+                    $prefix
+                )
+            ) {
+                ResponseHelper::fail(
+                    $message,
+                    422
+                );
+
+                return;
+            }
+        }
+
+        if (
+            $message ===
+            'Provincia inválida o inactiva'
+        ) {
+            ResponseHelper::fail(
+                $message,
+                422
+            );
+
+            return;
+        }
+
+        ResponseHelper::fromThrowable(
+            $e,
+            'No se pudo completar la operación.',
+            'RealEstateController'
         );
     }
 
