@@ -60,18 +60,16 @@ class RefreshTokenService
         string $refreshToken
     ): ?array {
         $pdo = self::db();
-        $hash = hash(
-            'sha256',
-            $refreshToken
-        );
+
+        $hash =
+            hash(
+                'sha256',
+                $refreshToken
+            );
 
         $pdo->beginTransaction();
 
         try {
-            /*
-         * Bloqueamos el token para que dos solicitudes
-         * simultáneas no puedan consumirlo juntas.
-         */
             $stmt = $pdo->prepare("
             SELECT
                 id,
@@ -91,9 +89,9 @@ class RefreshTokenService
             $row = $stmt->fetch();
 
             if (
-                !$row
-                || $row['revoked_at'] !== null
-                || strtotime(
+                !$row ||
+                $row['revoked_at'] !== null ||
+                strtotime(
                     (string)$row['expires_at']
                 ) < time()
             ) {
@@ -101,6 +99,53 @@ class RefreshTokenService
 
                 return null;
             }
+
+            /*
+         * Creamos el reemplazo dentro de
+         * la misma transacción.
+         */
+            $newToken =
+                bin2hex(
+                    random_bytes(64)
+                );
+
+            $newHash =
+                hash(
+                    'sha256',
+                    $newToken
+                );
+
+            $insert = $pdo->prepare("
+            INSERT INTO refresh_tokens (
+                user_id,
+                token_hash,
+                expires_at,
+                created_at
+            ) VALUES (
+                :user_id,
+                :token_hash,
+                :expires_at,
+                NOW()
+            )
+        ");
+
+            $insert->execute([
+                'user_id' =>
+                (int)$row['user_id'],
+
+                'token_hash' =>
+                $newHash,
+
+                'expires_at' =>
+                date(
+                    'Y-m-d H:i:s',
+                    time() +
+                        self::REFRESH_TTL_SECONDS
+                ),
+            ]);
+
+            $newTokenId =
+                (int)$pdo->lastInsertId();
 
             $revoke = $pdo->prepare("
             UPDATE refresh_tokens
@@ -111,7 +156,8 @@ class RefreshTokenService
         ");
 
             $revoke->execute([
-                'id' => (int)$row['id'],
+                'id' =>
+                (int)$row['id'],
             ]);
 
             if ($revoke->rowCount() !== 1) {
@@ -121,6 +167,12 @@ class RefreshTokenService
             }
 
             $pdo->commit();
+
+            $row['new_refresh_token'] =
+                $newToken;
+
+            $row['new_refresh_token_id'] =
+                $newTokenId;
 
             return $row;
         } catch (\Throwable $e) {

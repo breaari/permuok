@@ -33,7 +33,8 @@ class RefreshController
         }
 
         /*
-         * El token solo puede consumirse una vez.
+         * Consume el token anterior y crea
+         * su reemplazo en una transacción.
          */
         $stored =
             RefreshTokenService::consumeValid(
@@ -49,69 +50,93 @@ class RefreshController
             );
         }
 
-        $pdo = self::db();
+        $newTokenId =
+            (int)$stored['new_refresh_token_id'];
 
-        $stmt = $pdo->prepare("
-            SELECT
-                id,
-                role,
-                is_active
-            FROM users
-            WHERE id = :id
-              AND deleted_at IS NULL
-            LIMIT 1
-        ");
+        try {
+            $pdo = self::db();
 
-        $stmt->execute([
-            'id' =>
-            (int)$stored['user_id'],
-        ]);
+            $stmt = $pdo->prepare("
+                SELECT
+                    id,
+                    role,
+                    is_active
+                FROM users
+                WHERE id = :id
+                  AND deleted_at IS NULL
+                LIMIT 1
+            ");
 
-        $user = $stmt->fetch();
+            $stmt->execute([
+                'id' =>
+                (int)$stored['user_id'],
+            ]);
 
-        if (!$user) {
-            RefreshTokenCookieHelper::clear();
+            $user = $stmt->fetch();
 
-            ResponseHelper::fail(
-                'Usuario no encontrado',
-                401
-            );
-        }
+            if (!$user) {
+                RefreshTokenService::revokeAllByUserId(
+                    (int)$stored['user_id']
+                );
 
-        if ((int)$user['is_active'] !== 1) {
-            RefreshTokenService::revokeAllByUserId(
+                RefreshTokenCookieHelper::clear();
+
+                ResponseHelper::fail(
+                    'Usuario no encontrado',
+                    401
+                );
+            }
+
+            if ((int)$user['is_active'] !== 1) {
+                RefreshTokenService::revokeAllByUserId(
                     (int)$user['id']
                 );
 
+                RefreshTokenCookieHelper::clear();
+
+                ResponseHelper::fail(
+                    'Usuario inactivo',
+                    403
+                );
+            }
+
+            $newAccessToken =
+                JwtHelper::generateAccessToken([
+                    'id' =>
+                    (int)$user['id'],
+
+                    'role' =>
+                    (int)$user['role'],
+                ]);
+
+            RefreshTokenCookieHelper::write(
+                (string)$stored['new_refresh_token']
+            );
+
+            ResponseHelper::ok([
+                'access_token' =>
+                $newAccessToken,
+            ]);
+        } catch (\Throwable $e) {
+            /*
+             * Si no pudimos entregar el token
+             * nuevo, evitamos dejarlo activo.
+             */
+            try {
+                RefreshTokenService::revokeById(
+                    $newTokenId
+                );
+            } catch (\Throwable $cleanupError) {
+                error_log(
+                    'No se pudo revocar el refresh token ' .
+                        'después de una rotación fallida: ' .
+                        $cleanupError->getMessage()
+                );
+            }
+
             RefreshTokenCookieHelper::clear();
 
-            ResponseHelper::fail(
-                'Usuario inactivo',
-                403
-            );
+            throw $e;
         }
-
-        $newAccessToken =
-            JwtHelper::generateAccessToken([
-                'id' =>
-                (int)$user['id'],
-
-                'role' =>
-                (int)$user['role'],
-            ]);
-
-        $newRefreshToken =
-            RefreshTokenService::issue(
-                (int)$user['id']
-            );
-
-        RefreshTokenCookieHelper::write(
-            $newRefreshToken
-        );
-
-        ResponseHelper::ok([
-            'access_token' =>
-            $newAccessToken,
-        ]);
     }
 }
