@@ -68,6 +68,7 @@ export default function MessageInput({ onSend, disabled = false }) {
     >
       <div className="flex items-end gap-2 sm:gap-3">
         <textarea
+          maxLength={2000}
           value={body}
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={handleKeyDown}

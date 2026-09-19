@@ -7,10 +7,20 @@ use PDO;
 
 class ConversationService
 {
+    private const MAX_MESSAGE_LENGTH = 2000;
+
     private static function db(): PDO
     {
         require_once __DIR__ . '/../../db.php';
         return pdo();
+    }
+
+    private static function textLength(
+        string $text
+    ): int {
+        return function_exists('mb_strlen')
+            ? mb_strlen($text, 'UTF-8')
+            : strlen($text);
     }
 
     public static function findExistingForOpportunity(
@@ -125,6 +135,16 @@ class ConversationService
         if ($message === '') {
             throw new Exception(
                 'El mensaje inicial es obligatorio.',
+                422
+            );
+        }
+
+        if (
+            self::textLength($message) >
+            self::MAX_MESSAGE_LENGTH
+        ) {
+            throw new Exception(
+                'El mensaje no puede superar los 2000 caracteres.',
                 422
             );
         }
@@ -2193,6 +2213,16 @@ THEN 1
 
         if ($body === '') {
             throw new Exception('El mensaje no puede estar vacío.', 422);
+        }
+
+        if (
+            self::textLength($body) >
+            self::MAX_MESSAGE_LENGTH
+        ) {
+            throw new Exception(
+                'El mensaje no puede superar los 2000 caracteres.',
+                422
+            );
         }
 
         $pdo = self::db();
