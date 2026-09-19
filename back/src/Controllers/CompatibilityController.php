@@ -8,6 +8,7 @@ use App\Services\CompatibilityService;
 use Throwable;
 use App\Services\MultilateralOperationReadService;
 use App\Services\MultilateralOperationResponseService;
+use App\Middleware\MembershipGuard;
 
 class CompatibilityController
 {
@@ -49,6 +50,10 @@ class CompatibilityController
     ): void {
         try {
             $user = AuthHelper::requireUser();
+
+            MembershipGuard::requireActiveMembership(
+                (int)$user['id']
+            );
 
             $body = json_decode(
                 file_get_contents('php://input'),
@@ -158,6 +163,10 @@ class CompatibilityController
             $user =
                 AuthHelper::requireUser();
 
+            MembershipGuard::requireActiveMembership(
+                (int)$user['id']
+            );
+
             $body =
                 json_decode(
                     file_get_contents('php://input'),
@@ -181,7 +190,7 @@ class CompatibilityController
             self::error($e);
         }
     }
-    
+
     private static function error(
         Throwable $e
     ): void {
