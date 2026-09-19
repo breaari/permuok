@@ -62,9 +62,10 @@ class AdminSystemController
                 $result
             );
         } catch (\Throwable $e) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                500
+            ResponseHelper::fromThrowable(
+                $e,
+                'No se pudieron cargar los trabajos de compatibilidad.',
+                'AdminSystemController::compatibilityJobs'
             );
         }
     }
@@ -105,9 +106,10 @@ class AdminSystemController
                 $result
             );
         } catch (\Throwable $e) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                500
+            ResponseHelper::fromThrowable(
+                $e,
+                'No se pudieron cargar los trabajos de correo.',
+                'AdminSystemController::emailJobs'
             );
         }
     }
