@@ -551,7 +551,19 @@ export function useSearchRequestForm() {
   }
 
   function handlePreview() {
-    console.log("Vista previa búsqueda", form);
+    const requestId = Number(id);
+
+    if (!isEditMode || !Number.isInteger(requestId) || requestId <= 0) {
+      toast.warning("Primero guardá la búsqueda para poder visualizarla.");
+
+      return;
+    }
+
+    window.open(
+      `/explore/search-requests/${requestId}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
   }
 
   useEffect(() => {
