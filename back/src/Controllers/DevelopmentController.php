@@ -163,14 +163,26 @@ class DevelopmentController
     public static function create(): void
     {
         try {
-            $auth = AuthHelper::requireUser();
-            MembershipGuard::requireActiveMembership((int)$auth['id']);
+            $auth =
+                AuthHelper::requireUser();
+
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
 
             $data =
                 self::readJsonBody();
 
-            $result = DevelopmentService::createDraft((int)$auth['id'], $data);
-            ResponseHelper::ok($result, 201);
+            $result =
+                DevelopmentService::createDraft(
+                    (int)$auth['id'],
+                    $data
+                );
+
+            ResponseHelper::ok(
+                $result,
+                201
+            );
         } catch (Throwable $e) {
             self::fail($e);
         }
@@ -192,14 +204,36 @@ class DevelopmentController
     public static function update(): void
     {
         try {
-            $auth = AuthHelper::requireUser();
-            MembershipGuard::requireActiveMembership((int)$auth['id']);
-            $id = (int)($_GET['id'] ?? 0);
+            $auth =
+                AuthHelper::requireUser();
+
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
+
+            $id =
+                (int)($_GET['id'] ?? 0);
+
+            if ($id <= 0) {
+                throw new \Exception(
+                    'El ID del desarrollo no es válido.',
+                    422
+                );
+            }
+
             $data =
                 self::readJsonBody();
 
-            $result = DevelopmentService::updateDraft((int)$auth['id'], $id, $data);
-            ResponseHelper::ok($result);
+            $result =
+                DevelopmentService::updateDraft(
+                    (int)$auth['id'],
+                    $id,
+                    $data
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
         } catch (Throwable $e) {
             self::fail($e);
         }
@@ -367,15 +401,24 @@ class DevelopmentController
 
             if ($id <= 0) {
                 throw new \Exception(
-                    'El ID del desarrollo no es válido.'
+                    'El ID del desarrollo no es válido.',
+                    422
                 );
             }
 
+            /*
+         * Primero verificamos pertenencia.
+         * Un desarrollo ajeno no consume cupo.
+         */
             DevelopmentService::assertOwnedDevelopment(
                 (int)$auth['id'],
                 $id
             );
 
+            /*
+         * Después validamos la solicitud.
+         * Un JSON roto tampoco consume cupo.
+         */
             $data =
                 self::readJsonBody(
                     true
@@ -433,20 +476,24 @@ class DevelopmentController
 
             if ($id <= 0) {
                 throw new \Exception(
-                    'El ID del desarrollo no es válido.'
+                    'El ID del desarrollo no es válido.',
+                    422
                 );
             }
 
+            /*
+         * Primero verificamos pertenencia.
+         * Un desarrollo ajeno no consume cupo.
+         */
             DevelopmentService::assertOwnedDevelopment(
                 (int)$auth['id'],
                 $id
             );
 
-            self::consumeAICopyLimits(
-                (int)$auth['id'],
-                (int)$auth['real_estate_id']
-            );
-
+            /*
+         * Después validamos la solicitud.
+         * Un JSON roto tampoco consume cupo.
+         */
             $data =
                 self::readJsonBody(
                     true
