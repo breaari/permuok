@@ -716,23 +716,32 @@ class DevelopmentService
         }
     }
 
-    public static function updateDraft(int $userId, int $developmentId, array $data): array
-    {
-        [$user, $development] = self::getOwnedDevelopment($userId, $developmentId);
-        self::assertMembershipAllowsPublishing((int)$user['real_estate_id']);
+    public static function updateDraft(
+        int $userId,
+        int $developmentId,
+        array $data
+    ): array {
+        [$user, $development] =
+            self::getOwnedDevelopment(
+                $userId,
+                $developmentId
+            );
 
-        if (in_array($development['status'], ['closed'], true)) {
-            throw new Exception("El desarrollo no puede editarse en su estado actual");
+        self::assertMembershipAllowsPublishing(
+            (int)$user['real_estate_id']
+        );
+
+        if (
+            in_array(
+                $development['status'],
+                ['closed'],
+                true
+            )
+        ) {
+            throw new Exception(
+                'El desarrollo no puede editarse en su estado actual'
+            );
         }
-
-        $payload = self::validatePayload($data, true);
-        $pdo = self::db();
-
-        $fields = [];
-        $params = [
-            'id' => $developmentId,
-            'updated_by_user_id' => (int)$user['id'],
-        ];
 
         $map = [
             'title',
@@ -763,45 +772,131 @@ class DevelopmentService
             'video_url',
         ];
 
+        /*
+     * Combinamos lo recibido con lo guardado.
+     * Así una edición parcial no puede dejar precios,
+     * cantidades o coordenadas inconsistentes.
+     */
+        $mergedData = [];
+
         foreach ($map as $field) {
-            if (array_key_exists($field, $data)) {
-                $fields[] = "{$field} = :{$field}";
-                $value = $payload[$field];
-                $params[$field] = $value === '' ? null : $value;
-            }
+            $mergedData[$field] =
+                array_key_exists(
+                    $field,
+                    $data
+                )
+                ? $data[$field]
+                : ($development[$field] ?? null);
         }
-        if (array_key_exists('description', $data)) {
-            $fields[] = "short_description = :short_description";
+
+        $mergedData['amenities'] =
+            array_key_exists(
+                'amenities',
+                $data
+            )
+            ? $data['amenities']
+            : [];
+
+        $payload =
+            self::validatePayload(
+                $mergedData,
+                false
+            );
+
+        $fields = [];
+
+        $params = [
+            'id' =>
+            $developmentId,
+
+            'updated_by_user_id' =>
+            (int)$user['id'],
+        ];
+
+        foreach ($map as $field) {
+            if (
+                !array_key_exists(
+                    $field,
+                    $data
+                )
+            ) {
+                continue;
+            }
+
+            $fields[] =
+                "{$field} = :{$field}";
+
+            $value =
+                $payload[$field];
+
+            $params[$field] =
+                $value === ''
+                ? null
+                : $value;
+        }
+
+        if (
+            array_key_exists(
+                'description',
+                $data
+            )
+        ) {
+            $fields[] =
+                'short_description = :short_description';
 
             $params['short_description'] =
-                self::buildShortDescription(
-                    $payload['description']
-                );
+                $payload['short_description'] !== ''
+                ? $payload['short_description']
+                : null;
         }
-        $fields[] = "updated_by_user_id = :updated_by_user_id";
+
+        $fields[] =
+            'updated_by_user_id = :updated_by_user_id';
 
         $sql = "
-            UPDATE developments
-            SET " . implode(", ", $fields) . "
-            WHERE id = :id
-            LIMIT 1
-        ";
+        UPDATE developments
+        SET " . implode(', ', $fields) . "
+        WHERE id = :id
+        LIMIT 1
+    ";
 
+        $pdo = self::db();
         $pdo->beginTransaction();
 
         try {
-            $st = $pdo->prepare($sql);
-            $st->execute($params);
+            $st =
+                $pdo->prepare(
+                    $sql
+                );
 
-            if (array_key_exists('amenities', $data)) {
-                self::syncAmenities($pdo, $developmentId, $payload['amenities']);
+            $st->execute(
+                $params
+            );
+
+            if (
+                array_key_exists(
+                    'amenities',
+                    $data
+                )
+            ) {
+                self::syncAmenities(
+                    $pdo,
+                    $developmentId,
+                    $payload['amenities']
+                );
             }
 
             $pdo->commit();
 
-            return self::getDetail($userId, $developmentId);
+            return self::getDetail(
+                $userId,
+                $developmentId
+            );
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
@@ -1321,6 +1416,28 @@ class DevelopmentService
             throw new Exception("El desarrollo no puede publicarse en su estado actual");
         }
 
+        /*
+ * No confiamos solamente en la validación del frontend.
+ * Verificamos nuevamente todos los datos guardados.
+ */
+        self::validatePayload(
+            $development,
+            false
+        );
+
+        if (
+            empty($development['formatted_address']) ||
+            empty($development['place_id']) ||
+            $development['latitude'] === null ||
+            $development['latitude'] === '' ||
+            $development['longitude'] === null ||
+            $development['longitude'] === ''
+        ) {
+            throw new Exception(
+                'Seleccioná una ubicación válida desde Google Maps antes de publicar'
+            );
+        }
+
         if (empty($development['title']) || empty($development['description']) || empty($development['development_stage']) || empty($development['country']) || empty($development['province']) || empty($development['city'])) {
             throw new Exception("Faltan datos obligatorios para publicar");
         }
@@ -1349,6 +1466,30 @@ class DevelopmentService
 
         if ($unitTypesCount < 1) {
             throw new Exception("Debés cargar al menos una tipología para publicar");
+        }
+
+        $stAmenities =
+            $pdo->prepare("
+        SELECT COUNT(*) AS total
+        FROM development_amenities
+        WHERE development_id = :development_id
+    ");
+
+        $stAmenities->execute([
+            'development_id' =>
+            $developmentId,
+        ]);
+
+        $amenitiesCount =
+            (int)(
+                $stAmenities->fetch()['total']
+                ?? 0
+            );
+
+        if ($amenitiesCount < 1) {
+            throw new Exception(
+                'Debés seleccionar al menos una amenity para publicar'
+            );
         }
 
         $pdo->beginTransaction();
@@ -1403,7 +1544,10 @@ class DevelopmentService
             $pdo->commit();
             return self::getDetail($userId, $developmentId);
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
