@@ -31,6 +31,45 @@ class DevelopmentUnitTypeController
         );
     }
 
+    private static function readJsonBody(): array
+    {
+        $rawBody =
+            file_get_contents(
+                'php://input'
+            );
+
+        if (
+            $rawBody === false ||
+            trim($rawBody) === ''
+        ) {
+            throw new \Exception(
+                'El cuerpo de la solicitud está vacío'
+            );
+        }
+
+        try {
+            $data =
+                json_decode(
+                    $rawBody,
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+        } catch (\JsonException $e) {
+            throw new \Exception(
+                'El cuerpo de la solicitud no contiene un JSON válido'
+            );
+        }
+
+        if (!is_array($data)) {
+            throw new \Exception(
+                'El cuerpo de la solicitud debe ser un objeto JSON'
+            );
+        }
+
+        return $data;
+    }
+
     public static function list(): void
     {
         try {
@@ -62,12 +101,8 @@ class DevelopmentUnitTypeController
 
             $developmentId =
                 (int)($_GET['id'] ?? 0);
-
             $data =
-                json_decode(
-                    file_get_contents('php://input'),
-                    true
-                ) ?? [];
+                self::readJsonBody();
 
             $result =
                 DevelopmentUnitTypeService::create(
@@ -95,10 +130,7 @@ class DevelopmentUnitTypeController
                 (int)($_GET['unit_type_id'] ?? 0);
 
             $data =
-                json_decode(
-                    file_get_contents('php://input'),
-                    true
-                ) ?? [];
+                self::readJsonBody();
 
             $result =
                 DevelopmentUnitTypeService::update(

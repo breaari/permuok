@@ -142,20 +142,63 @@ class DevelopmentUnitTypeService
         return [$user, $unitType];
     }
 
-    private static function normalizeNullableNumber($value, string $label, bool $integer = false): mixed
-    {
-        if ($value === null || $value === '') {
+    private static function normalizeNullableNumber(
+        mixed $value,
+        string $label,
+        bool $integer = false
+    ): mixed {
+        if (
+            $value === null ||
+            $value === ''
+        ) {
             return null;
         }
 
-        if (!is_numeric($value)) {
-            throw new Exception("{$label} debe ser un número válido");
+        if ($integer) {
+            if (is_int($value)) {
+                $number = $value;
+            } elseif (
+                is_string($value) &&
+                preg_match(
+                    '/^[0-9]+$/',
+                    trim($value)
+                ) === 1
+            ) {
+                $number =
+                    (int)trim($value);
+            } else {
+                throw new Exception(
+                    "{$label} debe ser un número entero válido"
+                );
+            }
+        } else {
+            if (
+                !is_int($value) &&
+                !is_float($value) &&
+                !(
+                    is_string($value) &&
+                    is_numeric(trim($value))
+                )
+            ) {
+                throw new Exception(
+                    "{$label} debe ser un número válido"
+                );
+            }
+
+            $number =
+                (float)$value;
+
+            if (!is_finite($number)) {
+                throw new Exception(
+                    "{$label} debe ser un número válido"
+                );
+            }
         }
 
-        $number = $integer ? (int)$value : (float)$value;
-
         if ($number < 0) {
-            throw new Exception("{$label} no puede ser negativo");
+            throw new Exception(
+                "{$label} no puede ser negativo"
+            );
         }
 
         return $number;
@@ -163,23 +206,106 @@ class DevelopmentUnitTypeService
 
     private static function validatePayload(array $data, bool $partial = false): array
     {
+        $unitTypeValue =
+            $data['unit_type']
+            ?? '';
+
+        $labelValue =
+            $data['label']
+            ?? '';
+
+        $currencyValue =
+            $data['currency']
+            ?? 'USD';
+
+        if (!is_string($unitTypeValue)) {
+            throw new Exception(
+                'El tipo de unidad tiene un formato inválido'
+            );
+        }
+
+        if (
+            $labelValue !== null &&
+            !is_string($labelValue)
+        ) {
+            throw new Exception(
+                'El nombre comercial tiene un formato inválido'
+            );
+        }
+
+        if (!is_string($currencyValue)) {
+            throw new Exception(
+                'La moneda tiene un formato inválido'
+            );
+        }
+
         $payload = [
-            'unit_type' => trim((string)($data['unit_type'] ?? '')),
-            'label' => trim((string)($data['label'] ?? '')),
+            'unit_type' =>
+            trim($unitTypeValue),
 
-            'rooms' => self::normalizeNullableNumber($data['rooms'] ?? null, 'Ambientes'),
-            'bedrooms' => self::normalizeNullableNumber($data['bedrooms'] ?? null, 'Dormitorios', true),
-            'bathrooms' => self::normalizeNullableNumber($data['bathrooms'] ?? null, 'Baños', true),
-            'garages' => self::normalizeNullableNumber($data['garages'] ?? null, 'Cocheras', true),
+            'label' =>
+            trim($labelValue ?? ''),
 
-            'area_from' => self::normalizeNullableNumber($data['area_from'] ?? null, 'Superficie desde'),
-            'area_to' => self::normalizeNullableNumber($data['area_to'] ?? null, 'Superficie hasta'),
+            'rooms' =>
+            self::normalizeNullableNumber(
+                $data['rooms'] ?? null,
+                'Ambientes'
+            ),
 
-            'price_from' => self::normalizeNullableNumber($data['price_from'] ?? null, 'Precio desde'),
-            'price_to' => self::normalizeNullableNumber($data['price_to'] ?? null, 'Precio hasta'),
+            'bedrooms' =>
+            self::normalizeNullableNumber(
+                $data['bedrooms'] ?? null,
+                'Dormitorios',
+                true
+            ),
 
-            'currency' => trim((string)($data['currency'] ?? 'USD')),
-            'available_units' => self::normalizeNullableNumber($data['available_units'] ?? null, 'Unidades disponibles', true),
+            'bathrooms' =>
+            self::normalizeNullableNumber(
+                $data['bathrooms'] ?? null,
+                'Baños',
+                true
+            ),
+
+            'garages' =>
+            self::normalizeNullableNumber(
+                $data['garages'] ?? null,
+                'Cocheras',
+                true
+            ),
+
+            'area_from' =>
+            self::normalizeNullableNumber(
+                $data['area_from'] ?? null,
+                'Superficie desde'
+            ),
+
+            'area_to' =>
+            self::normalizeNullableNumber(
+                $data['area_to'] ?? null,
+                'Superficie hasta'
+            ),
+
+            'price_from' =>
+            self::normalizeNullableNumber(
+                $data['price_from'] ?? null,
+                'Precio desde'
+            ),
+
+            'price_to' =>
+            self::normalizeNullableNumber(
+                $data['price_to'] ?? null,
+                'Precio hasta'
+            ),
+
+            'currency' =>
+            trim($currencyValue),
+
+            'available_units' =>
+            self::normalizeNullableNumber(
+                $data['available_units'] ?? null,
+                'Unidades disponibles',
+                true
+            ),
         ];
 
         $validTypes = [
