@@ -575,9 +575,28 @@ ml.cash_difference_direction
             $leg['is_my_leg'] =
                 (int)$leg['source_real_estate_id'] === $realEstateId;
 
+            $identitiesEnabled =
+                ($operation['commercial_status'] ?? null)
+                === 'confirmed';
+
+            if (!$identitiesEnabled) {
+                if (
+                    (int)$leg['source_real_estate_id']
+                    !== $realEstateId
+                ) {
+                    $leg['source_real_estate_name'] = null;
+                }
+
+                if (
+                    (int)$leg['target_real_estate_id']
+                    !== $realEstateId
+                ) {
+                    $leg['target_real_estate_name'] = null;
+                }
+            }
+
             $leg['score'] =
                 (float)$leg['score'];
-
             $leg['offered_value'] =
                 self::nullableFloat(
                     $leg['offered_value']
