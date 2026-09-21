@@ -445,68 +445,339 @@ class PropertyService
             );
         }
     }
-    private static function validatePropertyPayload(array $data, bool $partial = false): array
-    {
-        $payload = [
-            'title' => trim((string)($data['title'] ?? '')),
-            'description' => trim((string)($data['description'] ?? '')),
-            'property_type' => trim((string)($data['property_type'] ?? '')),
-            'price' => $data['price'] ?? null,
-            'currency' => trim((string)($data['currency'] ?? 'USD')),
 
-            'country_code' => trim((string)($data['country_code'] ?? '')),
-            'country' => trim((string)($data['country'] ?? '')),
-            'province' => trim((string)($data['province'] ?? '')),
-            'city' => trim((string)($data['city'] ?? '')),
-            'zone' => trim((string)($data['zone'] ?? '')),
-
-            'address' => trim((string)($data['address'] ?? '')),
-            'formatted_address' => trim((string)($data['formatted_address'] ?? '')),
-            'postal_code' => trim((string)($data['postal_code'] ?? '')),
-            'place_id' => trim((string)($data['place_id'] ?? '')),
-
-            'latitude' => $data['latitude'] ?? null,
-            'longitude' => $data['longitude'] ?? null,
-
-            'total_area' => $data['total_area'] ?? null,
-            'covered_area' => $data['covered_area'] ?? null,
-            'bedrooms' => $data['bedrooms'] ?? null,
-            'bathrooms' => $data['bathrooms'] ?? null,
-            'garages' => $data['garages'] ?? null,
-            'antiquity' => $data['antiquity'] ?? null,
-        ];
-
-        $validTypes = ['house', 'apartment', 'land', 'commercial', 'office', 'warehouse', 'other'];
-        if ($payload['property_type'] !== '' && !in_array($payload['property_type'], $validTypes, true)) {
-            throw new Exception("Tipo de propiedad inválido");
+    private static function normalizeStringField(
+        mixed $value,
+        string $fieldName
+    ): string {
+        if ($value === null) {
+            return '';
         }
 
-        if ($payload['currency'] !== '' && !in_array($payload['currency'], ['ARS', 'USD'], true)) {
-            throw new Exception("Moneda inválida");
+        if (!is_string($value)) {
+            throw new Exception(
+                "{$fieldName} tiene un formato inválido",
+                422
+            );
+        }
+
+        return trim($value);
+    }
+
+    private static function normalizeNullableNumber(
+        mixed $value,
+        string $fieldName,
+        ?float $minimum = null,
+        ?float $maximum = null
+    ): ?float {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (
+            (!is_int($value) &&
+                !is_float($value) &&
+                !is_string($value)) ||
+            !is_numeric($value)
+        ) {
+            throw new Exception(
+                "{$fieldName} debe ser un número válido",
+                422
+            );
+        }
+
+        $number = (float)$value;
+
+        if (!is_finite($number)) {
+            throw new Exception(
+                "{$fieldName} debe ser un número válido",
+                422
+            );
+        }
+
+        if (
+            $minimum !== null &&
+            $number < $minimum
+        ) {
+            throw new Exception(
+                "{$fieldName} no puede ser menor que {$minimum}",
+                422
+            );
+        }
+
+        if (
+            $maximum !== null &&
+            $number > $maximum
+        ) {
+            throw new Exception(
+                "{$fieldName} no puede ser mayor que {$maximum}",
+                422
+            );
+        }
+
+        return $number;
+    }
+
+    private static function normalizeNullableInteger(
+        mixed $value,
+        string $fieldName,
+        int $minimum = 0
+    ): ?int {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (
+            (!is_int($value) &&
+                !is_float($value) &&
+                !is_string($value)) ||
+            !is_numeric($value)
+        ) {
+            throw new Exception(
+                "{$fieldName} debe ser un número entero válido",
+                422
+            );
+        }
+
+        $number = (float)$value;
+
+        if (
+            !is_finite($number) ||
+            floor($number) !== $number
+        ) {
+            throw new Exception(
+                "{$fieldName} debe ser un número entero válido",
+                422
+            );
+        }
+
+        if ($number < $minimum) {
+            throw new Exception(
+                "{$fieldName} no puede ser menor que {$minimum}",
+                422
+            );
+        }
+
+        return (int)$number;
+    }
+
+    private static function validatePropertyPayload(
+        array $data,
+        bool $partial = false
+    ): array {
+        $payload = [
+            'title' => self::normalizeStringField(
+                $data['title'] ?? null,
+                'El título'
+            ),
+            'description' => self::normalizeStringField(
+                $data['description'] ?? null,
+                'La descripción'
+            ),
+            'property_type' => self::normalizeStringField(
+                $data['property_type'] ?? null,
+                'El tipo de propiedad'
+            ),
+            'price' => self::normalizeNullableNumber(
+                $data['price'] ?? null,
+                'El precio',
+                0
+            ),
+            'currency' => self::normalizeStringField(
+                $data['currency'] ?? 'USD',
+                'La moneda'
+            ),
+
+            'country_code' => self::normalizeStringField(
+                $data['country_code'] ?? null,
+                'El código de país'
+            ),
+            'country' => self::normalizeStringField(
+                $data['country'] ?? null,
+                'El país'
+            ),
+            'province' => self::normalizeStringField(
+                $data['province'] ?? null,
+                'La provincia'
+            ),
+            'city' => self::normalizeStringField(
+                $data['city'] ?? null,
+                'La ciudad'
+            ),
+            'zone' => self::normalizeStringField(
+                $data['zone'] ?? null,
+                'La zona'
+            ),
+
+            'address' => self::normalizeStringField(
+                $data['address'] ?? null,
+                'La dirección'
+            ),
+            'formatted_address' => self::normalizeStringField(
+                $data['formatted_address'] ?? null,
+                'La dirección formateada'
+            ),
+            'postal_code' => self::normalizeStringField(
+                $data['postal_code'] ?? null,
+                'El código postal'
+            ),
+            'place_id' => self::normalizeStringField(
+                $data['place_id'] ?? null,
+                'El identificador de ubicación'
+            ),
+
+            'latitude' => self::normalizeNullableNumber(
+                $data['latitude'] ?? null,
+                'La latitud',
+                -90,
+                90
+            ),
+            'longitude' => self::normalizeNullableNumber(
+                $data['longitude'] ?? null,
+                'La longitud',
+                -180,
+                180
+            ),
+
+            'total_area' => self::normalizeNullableNumber(
+                $data['total_area'] ?? null,
+                'La superficie total',
+                0
+            ),
+            'covered_area' => self::normalizeNullableNumber(
+                $data['covered_area'] ?? null,
+                'La superficie cubierta',
+                0
+            ),
+            'bedrooms' => self::normalizeNullableInteger(
+                $data['bedrooms'] ?? null,
+                'La cantidad de dormitorios'
+            ),
+            'bathrooms' => self::normalizeNullableInteger(
+                $data['bathrooms'] ?? null,
+                'La cantidad de baños'
+            ),
+            'garages' => self::normalizeNullableInteger(
+                $data['garages'] ?? null,
+                'La cantidad de cocheras'
+            ),
+            'antiquity' => self::normalizeNullableInteger(
+                $data['antiquity'] ?? null,
+                'La antigüedad'
+            ),
+        ];
+
+        $validTypes = [
+            'house',
+            'apartment',
+            'land',
+            'commercial',
+            'office',
+            'warehouse',
+            'other',
+        ];
+
+        if (
+            $payload['property_type'] !== '' &&
+            !in_array(
+                $payload['property_type'],
+                $validTypes,
+                true
+            )
+        ) {
+            throw new Exception(
+                'Tipo de propiedad inválido',
+                422
+            );
+        }
+
+        if (
+            $payload['currency'] !== '' &&
+            !in_array(
+                $payload['currency'],
+                ['ARS', 'USD'],
+                true
+            )
+        ) {
+            throw new Exception(
+                'Moneda inválida',
+                422
+            );
+        }
+
+        if (
+            $payload['price'] !== null &&
+            $payload['price'] <= 0
+        ) {
+            throw new Exception(
+                'El precio debe ser mayor que cero',
+                422
+            );
+        }
+
+        if (
+            $payload['total_area'] !== null &&
+            $payload['total_area'] <= 0
+        ) {
+            throw new Exception(
+                'La superficie total debe ser mayor que cero',
+                422
+            );
+        }
+
+        if (
+            $payload['covered_area'] !== null &&
+            $payload['total_area'] !== null &&
+            $payload['covered_area'] >
+            $payload['total_area']
+        ) {
+            throw new Exception(
+                'La superficie cubierta no puede ser mayor que la superficie total',
+                422
+            );
+        }
+
+        $hasLatitude =
+            $payload['latitude'] !== null;
+        $hasLongitude =
+            $payload['longitude'] !== null;
+
+        if ($hasLatitude !== $hasLongitude) {
+            throw new Exception(
+                'La latitud y la longitud deben enviarse juntas',
+                422
+            );
         }
 
         if (!$partial) {
             $required = [
-                'title' => 'El título es obligatorio',
-                'description' => 'La descripción es obligatoria',
-                'property_type' => 'El tipo de propiedad es obligatorio',
-                'price' => 'El precio es obligatorio',
-                'country_code' => 'El país es obligatorio',
-                'country' => 'El país es obligatorio',
-                'province' => 'La provincia es obligatoria',
-                'city' => 'La ciudad es obligatoria',
+                'title' =>
+                'El título es obligatorio',
+                'description' =>
+                'La descripción es obligatoria',
+                'property_type' =>
+                'El tipo de propiedad es obligatorio',
+                'price' =>
+                'El precio es obligatorio',
+                'country_code' =>
+                'El país es obligatorio',
+                'country' =>
+                'El país es obligatorio',
+                'province' =>
+                'La provincia es obligatoria',
+                'city' =>
+                'La ciudad es obligatoria',
             ];
 
             foreach ($required as $field => $message) {
-                if ($field === 'price') {
-                    if ($payload['price'] === null || $payload['price'] === '' || !is_numeric($payload['price'])) {
-                        throw new Exception($message);
-                    }
-                    continue;
-                }
-
-                if ($payload[$field] === '') {
-                    throw new Exception($message);
+                if (
+                    $payload[$field] === null ||
+                    $payload[$field] === ''
+                ) {
+                    throw new Exception(
+                        $message,
+                        422
+                    );
                 }
             }
         }
@@ -738,10 +1009,14 @@ class PropertyService
                 "La propiedad no puede editarse en su estado actual"
             );
         }
+        $completeData = array_merge(
+            $property,
+            $data
+        );
 
         $payload = self::validatePropertyPayload(
-            $data,
-            true
+            $completeData,
+            false
         );
 
         $pdo = self::db();
