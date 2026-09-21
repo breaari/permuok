@@ -218,8 +218,229 @@ class DevelopmentService
 
         return rtrim($cut, " \t\n\r\0\x0B.,;:-") . '…';
     }
+
+    private static function normalizeNullableNumber(
+        mixed $value,
+        string $label,
+        ?float $minimum = null,
+        ?float $maximum = null
+    ): ?float {
+        if (
+            $value === null ||
+            $value === ''
+        ) {
+            return null;
+        }
+
+        if (
+            !is_int($value) &&
+            !is_float($value) &&
+            !(
+                is_string($value) &&
+                is_numeric(trim($value))
+            )
+        ) {
+            throw new Exception(
+                "{$label} debe ser un número válido"
+            );
+        }
+
+        $number =
+            (float)$value;
+
+        if (!is_finite($number)) {
+            throw new Exception(
+                "{$label} debe ser un número válido"
+            );
+        }
+
+        if (
+            $minimum !== null &&
+            $number < $minimum
+        ) {
+            throw new Exception(
+                "{$label} no puede ser menor que {$minimum}"
+            );
+        }
+
+        if (
+            $maximum !== null &&
+            $number > $maximum
+        ) {
+            throw new Exception(
+                "{$label} no puede ser mayor que {$maximum}"
+            );
+        }
+
+        return $number;
+    }
+
+    private static function normalizeNullableInteger(
+        mixed $value,
+        string $label,
+        int $minimum = 0
+    ): ?int {
+        if (
+            $value === null ||
+            $value === ''
+        ) {
+            return null;
+        }
+
+        if (is_int($value)) {
+            $number = $value;
+        } elseif (
+            is_string($value) &&
+            preg_match(
+                '/^[0-9]+$/',
+                trim($value)
+            ) === 1
+        ) {
+            $number =
+                (int)trim($value);
+        } else {
+            throw new Exception(
+                "{$label} debe ser un número entero válido"
+            );
+        }
+
+        if ($number < $minimum) {
+            throw new Exception(
+                "{$label} no puede ser menor que {$minimum}"
+            );
+        }
+
+        return $number;
+    }
+
+    private static function normalizeNullableDate(
+        mixed $value,
+        string $label
+    ): ?string {
+        if (
+            $value === null ||
+            $value === ''
+        ) {
+            return null;
+        }
+
+        if (!is_string($value)) {
+            throw new Exception(
+                "{$label} tiene un formato inválido"
+            );
+        }
+
+        $value =
+            trim($value);
+
+        $date =
+            \DateTimeImmutable::createFromFormat(
+                '!Y-m-d',
+                $value
+            );
+
+        if (
+            !$date ||
+            $date->format('Y-m-d') !== $value
+        ) {
+            throw new Exception(
+                "{$label} debe tener el formato AAAA-MM-DD"
+            );
+        }
+
+        return $value;
+    }
+
+    private static function normalizeNullableUrl(
+        mixed $value,
+        string $label
+    ): string {
+        if (
+            $value === null ||
+            $value === ''
+        ) {
+            return '';
+        }
+
+        if (!is_string($value)) {
+            throw new Exception(
+                "{$label} tiene un formato inválido"
+            );
+        }
+
+        $value =
+            trim($value);
+
+        if (
+            !filter_var(
+                $value,
+                FILTER_VALIDATE_URL
+            )
+        ) {
+            throw new Exception(
+                "{$label} debe ser una URL válida"
+            );
+        }
+
+        $scheme =
+            strtolower(
+                (string)parse_url(
+                    $value,
+                    PHP_URL_SCHEME
+                )
+            );
+
+        if (
+            !in_array(
+                $scheme,
+                ['http', 'https'],
+                true
+            )
+        ) {
+            throw new Exception(
+                "{$label} debe utilizar HTTP o HTTPS"
+            );
+        }
+
+        return $value;
+    }
+
     private static function validatePayload(array $data, bool $partial = false): array
     {
+        $stringFields = [
+            'title',
+            'slug',
+            'description',
+            'developer_name',
+            'construction_company',
+            'development_stage',
+            'country_code',
+            'country',
+            'province',
+            'city',
+            'zone',
+            'address',
+            'formatted_address',
+            'postal_code',
+            'place_id',
+            'currency',
+        ];
+
+        foreach ($stringFields as $field) {
+            if (
+                array_key_exists(
+                    $field,
+                    $data
+                ) &&
+                $data[$field] !== null &&
+                !is_string($data[$field])
+            ) {
+                throw new Exception(
+                    "El campo {$field} tiene un formato inválido"
+                );
+            }
+        }
+
         $payload = [
             'title' => trim((string)($data['title'] ?? '')),
             'slug' => trim((string)($data['slug'] ?? '')),
@@ -233,7 +454,11 @@ class DevelopmentService
             'construction_company' => trim((string)($data['construction_company'] ?? '')),
 
             'development_stage' => trim((string)($data['development_stage'] ?? '')),
-            'delivery_date_estimated' => $data['delivery_date_estimated'] ?? null,
+            'delivery_date_estimated' =>
+            self::normalizeNullableDate(
+                $data['delivery_date_estimated'] ?? null,
+                'La fecha estimada de entrega'
+            ),
 
             'country_code' => trim((string)($data['country_code'] ?? '')),
             'country' => trim((string)($data['country'] ?? '')),
@@ -245,24 +470,93 @@ class DevelopmentService
             'formatted_address' => trim((string)($data['formatted_address'] ?? '')),
             'postal_code' => trim((string)($data['postal_code'] ?? '')),
             'place_id' => trim((string)($data['place_id'] ?? '')),
-            'latitude' => $data['latitude'] ?? null,
-            'longitude' => $data['longitude'] ?? null,
+            'latitude' =>
+            self::normalizeNullableNumber(
+                $data['latitude'] ?? null,
+                'La latitud',
+                -90,
+                90
+            ),
 
-            'price_from' => $data['price_from'] ?? null,
-            'price_to' => $data['price_to'] ?? null,
+            'longitude' =>
+            self::normalizeNullableNumber(
+                $data['longitude'] ?? null,
+                'La longitud',
+                -180,
+                180
+            ),
+
+            'price_from' =>
+            self::normalizeNullableNumber(
+                $data['price_from'] ?? null,
+                'El precio mínimo',
+                0
+            ),
+
+            'price_to' =>
+            self::normalizeNullableNumber(
+                $data['price_to'] ?? null,
+                'El precio máximo',
+                0
+            ),
             'currency' => trim((string)($data['currency'] ?? 'USD')),
 
-            'total_units' => $data['total_units'] ?? null,
-            'available_units' => $data['available_units'] ?? null,
+            'total_units' =>
+            self::normalizeNullableInteger(
+                $data['total_units'] ?? null,
+                'La cantidad total de unidades'
+            ),
 
-            'whatsapp_url' => trim((string)($data['whatsapp_url'] ?? '')),
-            'brochure_url' => trim((string)($data['brochure_url'] ?? '')),
-            'video_url' => trim((string)($data['video_url'] ?? '')),
+            'available_units' =>
+            self::normalizeNullableInteger(
+                $data['available_units'] ?? null,
+                'La cantidad de unidades disponibles'
+            ),
+
+            'whatsapp_url' =>
+            self::normalizeNullableUrl(
+                $data['whatsapp_url'] ?? null,
+                'El enlace de WhatsApp'
+            ),
+
+            'brochure_url' =>
+            self::normalizeNullableUrl(
+                $data['brochure_url'] ?? null,
+                'El enlace del brochure'
+            ),
+
+            'video_url' =>
+            self::normalizeNullableUrl(
+                $data['video_url'] ?? null,
+                'El enlace del video'
+            ),
             'amenities' => $data['amenities'] ?? [],
         ];
 
         $validStages = ['land', 'prelaunch', 'launch', 'presale', 'under_construction', 'finished'];
         $validCurrencies = ['ARS', 'USD'];
+
+        if (
+            $payload['price_from'] !== null &&
+            $payload['price_to'] !== null &&
+            $payload['price_from'] >
+            $payload['price_to']
+        ) {
+            throw new Exception(
+                'El precio mínimo no puede ser mayor al precio máximo'
+            );
+        }
+
+        if (
+            $payload['total_units'] !== null &&
+            $payload['available_units'] !== null &&
+            $payload['available_units'] >
+            $payload['total_units']
+        ) {
+            throw new Exception(
+                'Las unidades disponibles no pueden superar el total de unidades'
+            );
+        }
 
         if ($payload['development_stage'] !== '' && !in_array($payload['development_stage'], $validStages, true)) {
             throw new Exception("Etapa del desarrollo inválida");
