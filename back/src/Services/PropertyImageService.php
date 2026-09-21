@@ -198,7 +198,7 @@ class PropertyImageService
         self::assertActiveMembership(
             (int)$user['real_estate_id']
         );
-        
+
         $st = $pdo->prepare("
         SELECT
             pi.*,
@@ -611,10 +611,23 @@ class PropertyImageService
         }
     }
 
-    public static function delete(int $userId, int $imageId): array
-    {
-        [, $image] = self::getOwnedImage($userId, $imageId);
+    public static function delete(
+        int $userId,
+        int $imageId
+    ): array {
+        [, $image] =
+            self::getOwnedImage(
+                $userId,
+                $imageId
+            );
+
         $pdo = self::db();
+
+        $propertyId =
+            (int)$image['property_id'];
+
+        $filePath =
+            (string)($image['file_path'] ?? '');
 
         $stProperty = $pdo->prepare("
         SELECT status
@@ -623,15 +636,34 @@ class PropertyImageService
           AND deleted_at IS NULL
         LIMIT 1
     ");
-        $stProperty->execute(['id' => (int)$image['property_id']]);
+
+        $stProperty->execute([
+            'id' => $propertyId,
+        ]);
+
         $property = $stProperty->fetch();
 
         if (!$property) {
-            throw new Exception("Propiedad no encontrada");
+            throw new Exception(
+                'Propiedad no encontrada'
+            );
         }
 
-        if (!in_array($property['status'], ['draft', 'paused', 'archived', 'published'], true)) {
-            throw new Exception("No se pueden eliminar imágenes en el estado actual de la propiedad");
+        if (
+            !in_array(
+                $property['status'],
+                [
+                    'draft',
+                    'paused',
+                    'archived',
+                    'published',
+                ],
+                true
+            )
+        ) {
+            throw new Exception(
+                'No se pueden eliminar imágenes en el estado actual de la propiedad'
+            );
         }
 
         $pdo->beginTransaction();
@@ -641,25 +673,45 @@ class PropertyImageService
             UPDATE property_images
             SET deleted_at = NOW()
             WHERE id = :id
+              AND deleted_at IS NULL
             LIMIT 1
         ");
-            $st->execute(['id' => $imageId]);
 
-            self::ensureSingleCover((int)$image['property_id']);
+            $st->execute([
+                'id' => $imageId,
+            ]);
+
+            self::ensureSingleCover(
+                $propertyId
+            );
 
             $pdo->commit();
-            self::queueQualityRecalculation(
-                (int)$image['property_id']
-            );
-
-            return PropertyService::getDetail(
-                $userId,
-                (int)$image['property_id']
-            );
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
+
+        /*
+     * El archivo se elimina solamente después
+     * de confirmar la eliminación en la base.
+     */
+        if ($filePath !== '') {
+            self::removeStoredFile(
+                $filePath
+            );
+        }
+
+        self::queueQualityRecalculation(
+            $propertyId
+        );
+
+        return PropertyService::getDetail(
+            $userId,
+            $propertyId
+        );
     }
 
     public static function reorder(int $userId, int $propertyId, array $images): array

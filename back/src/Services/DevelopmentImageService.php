@@ -553,48 +553,104 @@ class DevelopmentImageService
         }
     }
 
-    public static function delete(int $userId, int $imageId): array
-    {
-        [, $image] = self::getOwnedImage($userId, $imageId);
+    public static function delete(
+        int $userId,
+        int $imageId
+    ): array {
+        [, $image] =
+            self::getOwnedImage(
+                $userId,
+                $imageId
+            );
+
         $pdo = self::db();
 
+        $developmentId =
+            (int)$image['development_id'];
+
+        $filePath =
+            (string)($image['file_path'] ?? '');
+
         $stDevelopment = $pdo->prepare("
-            SELECT status
-            FROM developments
-            WHERE id = :id
-              AND deleted_at IS NULL
-            LIMIT 1
-        ");
-        $stDevelopment->execute(['id' => (int)$image['development_id']]);
-        $development = $stDevelopment->fetch();
+        SELECT status
+        FROM developments
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $stDevelopment->execute([
+            'id' => $developmentId,
+        ]);
+
+        $development =
+            $stDevelopment->fetch();
 
         if (!$development) {
-            throw new Exception("Desarrollo no encontrado");
+            throw new Exception(
+                'Desarrollo no encontrado'
+            );
         }
 
-        if (!in_array($development['status'], ['draft', 'paused', 'archived', 'published'], true)) {
-            throw new Exception("No se pueden eliminar imágenes en el estado actual del desarrollo");
+        if (
+            !in_array(
+                $development['status'],
+                [
+                    'draft',
+                    'paused',
+                    'archived',
+                    'published',
+                ],
+                true
+            )
+        ) {
+            throw new Exception(
+                'No se pueden eliminar imágenes en el estado actual del desarrollo'
+            );
         }
 
         $pdo->beginTransaction();
 
         try {
             $st = $pdo->prepare("
-                UPDATE development_images
-                SET deleted_at = NOW()
-                WHERE id = :id
-                LIMIT 1
-            ");
-            $st->execute(['id' => $imageId]);
+            UPDATE development_images
+            SET deleted_at = NOW()
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+        ");
 
-            self::ensureSingleCover((int)$image['development_id']);
+            $st->execute([
+                'id' => $imageId,
+            ]);
+
+            self::ensureSingleCover(
+                $developmentId
+            );
 
             $pdo->commit();
-            return DevelopmentService::getDetail($userId, (int)$image['development_id']);
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
+
+        /*
+     * El archivo se elimina solamente después
+     * de confirmar la eliminación en la base.
+     */
+        if ($filePath !== '') {
+            self::removeStoredFile(
+                $filePath
+            );
+        }
+
+        return DevelopmentService::getDetail(
+            $userId,
+            $developmentId
+        );
     }
 
     public static function reorder(int $userId, int $developmentId, array $images): array
