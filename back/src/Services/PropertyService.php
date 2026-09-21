@@ -2370,7 +2370,12 @@ FROM property_requirements
             $requirementPropertyTypes = $stTypes->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
             $stLocations = $pdo->prepare("
-            SELECT id, country_code, country, province, city, zone
+            SELECT
+    country_code,
+    country,
+    province,
+    city,
+    zone
             FROM property_requirement_locations
             WHERE property_requirement_id = :property_requirement_id
             ORDER BY id ASC

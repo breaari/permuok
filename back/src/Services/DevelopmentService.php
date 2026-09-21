@@ -144,27 +144,41 @@ class DevelopmentService
         return $development;
     }
 
-    private static function getVisibleDevelopment(int $userId, int $developmentId): array
-    {
+    private static function getVisibleDevelopment(
+        int $userId,
+        int $developmentId
+    ): array {
         self::getValidUser($userId);
+
         $pdo = self::db();
 
         $st = $pdo->prepare("
-            SELECT *
-            FROM developments
-            WHERE id = :id
-              AND deleted_at IS NULL
-            LIMIT 1
-        ");
-        $st->execute(['id' => $developmentId]);
+        SELECT *
+        FROM developments
+        WHERE id = :id
+          AND status = 'published'
+          AND is_visible = 1
+          AND visibility = 'public_network'
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'id' => $developmentId,
+        ]);
+
         $development = $st->fetch();
 
         if (!$development) {
-            throw new Exception("Desarrollo no encontrado");
+            throw new Exception(
+                'Desarrollo no encontrado',
+                404
+            );
         }
 
         return $development;
     }
+
     private static function buildShortDescription(
         ?string $description,
         int $maxLength = 240
@@ -1050,13 +1064,17 @@ class DevelopmentService
 
             $st = $pdo->prepare("
                 UPDATE developments
-                SET
-                    status = 'published',
-                    published_at = CASE
-                        WHEN published_at IS NULL THEN NOW()
-                        ELSE published_at
-                    END,
-                    updated_by_user_id = :updated_by_user_id
+               SET
+    status = 'published',
+    is_visible = 1,
+    visibility = 'public_network',
+    paused_at = NULL,
+    billing_paused_at = NULL,
+    published_at = CASE
+        WHEN published_at IS NULL THEN NOW()
+        ELSE published_at
+    END,
+    updated_by_user_id = :updated_by_user_id
                 WHERE id = :id
                 LIMIT 1
             ");
@@ -1110,10 +1128,11 @@ class DevelopmentService
         try {
             $st = $pdo->prepare("
                 UPDATE developments
-                SET
-                    status = 'paused',
-                    paused_at = NOW(),
-                    updated_by_user_id = :updated_by_user_id
+              SET
+    status = 'paused',
+    is_visible = 0,
+    paused_at = NOW(),
+    updated_by_user_id = :updated_by_user_id
                 WHERE id = :id
                 LIMIT 1
             ");
@@ -1168,10 +1187,11 @@ class DevelopmentService
 
             $st = $pdo->prepare("
                 UPDATE developments
-                SET
-                    status = 'archived',
-                    archived_at = NOW(),
-                    updated_by_user_id = :updated_by_user_id
+              SET
+    status = 'archived',
+    is_visible = 0,
+    archived_at = NOW(),
+    updated_by_user_id = :updated_by_user_id
                 WHERE id = :id
                 LIMIT 1
             ");
@@ -1225,10 +1245,11 @@ class DevelopmentService
         try {
             $st = $pdo->prepare("
             UPDATE developments
-            SET
-                status = 'closed',
-                closed_at = NOW(),
-                updated_by_user_id = :updated_by_user_id
+           SET
+    status = 'closed',
+    is_visible = 0,
+    closed_at = NOW(),
+    updated_by_user_id = :updated_by_user_id
             WHERE id = :id
             LIMIT 1
         ");

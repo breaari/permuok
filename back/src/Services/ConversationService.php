@@ -3038,7 +3038,7 @@ THEN 1
             ],
             'development' => [
                 'table' => 'developments',
-                'requires_visibility' => false,
+                'requires_visibility' => true,
             ],
         };
 

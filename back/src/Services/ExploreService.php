@@ -407,6 +407,8 @@ class ExploreService
         $where = [
             "d.deleted_at IS NULL",
             "d.status = 'published'",
+            "d.is_visible = 1",
+            "d.visibility = 'public_network'",
         ];
 
         $params = [];
