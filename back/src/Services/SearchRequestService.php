@@ -1234,50 +1234,184 @@ class SearchRequestService
         }
     }
 
-    private static function syncPropertyTypes(PDO $pdo, int $id, array $types): void
-    {
-        $pdo->prepare("
-            DELETE FROM search_request_property_types
-            WHERE search_request_id = :id
-        ")->execute(['id' => $id]);
-
-        $clean = [];
-        foreach ($types as $type) {
-            $type = trim((string)$type);
-            if ($type === '') continue;
-            $clean[$type] = true;
+    private static function syncPropertyTypes(
+        PDO $pdo,
+        int $id,
+        mixed $types
+    ): void {
+        if (!is_array($types)) {
+            throw new Exception(
+                'Los tipos de propiedad deben enviarse como una lista',
+                422
+            );
         }
 
-        foreach (array_keys($clean) as $type) {
-            $pdo->prepare("
-                INSERT INTO search_request_property_types (search_request_id, property_type)
-                VALUES (:search_request_id, :property_type)
-            ")->execute([
+        $allowedTypes = [
+            'house',
+            'apartment',
+            'land',
+            'commercial',
+            'office',
+            'warehouse',
+            'country_house',
+            'farm',
+            'garage',
+            'other',
+        ];
+
+        $cleanTypes = [];
+
+        foreach ($types as $type) {
+            if (!is_string($type)) {
+                throw new Exception(
+                    'Uno de los tipos de propiedad tiene un formato inválido',
+                    422
+                );
+            }
+
+            $type = trim($type);
+
+            if ($type === '') {
+                continue;
+            }
+
+            if (
+                !in_array(
+                    $type,
+                    $allowedTypes,
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'El tipo de propiedad seleccionado no es válido',
+                    422
+                );
+            }
+
+            $cleanTypes[$type] = true;
+        }
+
+        $pdo->prepare("
+        DELETE FROM search_request_property_types
+        WHERE search_request_id = :id
+    ")->execute([
+            'id' => $id,
+        ]);
+
+        if (!$cleanTypes) {
+            return;
+        }
+
+        $stInsert = $pdo->prepare("
+        INSERT INTO search_request_property_types (
+            search_request_id,
+            property_type
+        )
+        VALUES (
+            :search_request_id,
+            :property_type
+        )
+    ");
+
+        foreach (array_keys($cleanTypes) as $type) {
+            $stInsert->execute([
                 'search_request_id' => $id,
                 'property_type' => $type,
             ]);
         }
     }
-
-    private static function syncAmenities(PDO $pdo, int $id, array $items): void
-    {
-        $pdo->prepare("
-            DELETE FROM search_request_amenities
-            WHERE search_request_id = :id
-        ")->execute(['id' => $id]);
-
-        $clean = [];
-        foreach ($items as $item) {
-            $item = trim((string)$item);
-            if ($item === '') continue;
-            $clean[$item] = true;
+    private static function syncAmenities(
+        PDO $pdo,
+        int $id,
+        mixed $items
+    ): void {
+        if (!is_array($items)) {
+            throw new Exception(
+                'Los amenities deben enviarse como una lista',
+                422
+            );
         }
 
-        foreach (array_keys($clean) as $item) {
-            $pdo->prepare("
-                INSERT INTO search_request_amenities (search_request_id, amenity_code)
-                VALUES (:search_request_id, :amenity_code)
-            ")->execute([
+        $allowedAmenities = [
+            'balcony',
+            'patio',
+            'terrace',
+            'pool',
+            'quincho',
+            'garden',
+            'barbecue',
+            'sum',
+            'gym',
+            'security',
+            'doorman',
+            'laundry',
+            'elevator',
+            'garage',
+            'storage',
+            'green_area',
+            'cowork',
+            'kids_area',
+            'pet_friendly',
+            'rooftop',
+            'jacuzzi',
+        ];
+
+        $cleanItems = [];
+
+        foreach ($items as $item) {
+            if (!is_string($item)) {
+                throw new Exception(
+                    'Uno de los amenities tiene un formato inválido',
+                    422
+                );
+            }
+
+            $item = trim($item);
+
+            if ($item === '') {
+                continue;
+            }
+
+            if (
+                !in_array(
+                    $item,
+                    $allowedAmenities,
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'El amenity seleccionado no es válido',
+                    422
+                );
+            }
+
+            $cleanItems[$item] = true;
+        }
+
+        $pdo->prepare("
+        DELETE FROM search_request_amenities
+        WHERE search_request_id = :id
+    ")->execute([
+            'id' => $id,
+        ]);
+
+        if (!$cleanItems) {
+            return;
+        }
+
+        $stInsert = $pdo->prepare("
+        INSERT INTO search_request_amenities (
+            search_request_id,
+            amenity_code
+        )
+        VALUES (
+            :search_request_id,
+            :amenity_code
+        )
+    ");
+
+        foreach (array_keys($cleanItems) as $item) {
+            $stInsert->execute([
                 'search_request_id' => $id,
                 'amenity_code' => $item,
             ]);

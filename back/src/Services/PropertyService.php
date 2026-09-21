@@ -201,8 +201,71 @@ class PropertyService
 
     private static function replacePropertyAmenities(
         int $propertyId,
-        array $amenities
+        mixed $amenities
     ): void {
+        if (!is_array($amenities)) {
+            throw new Exception(
+                'Los amenities deben enviarse como una lista',
+                422
+            );
+        }
+
+        $allowedAmenities = [
+            'balcony',
+            'patio',
+            'terrace',
+            'pool',
+            'quincho',
+            'garden',
+            'barbecue',
+            'sum',
+            'gym',
+            'security',
+            'doorman',
+            'laundry',
+            'elevator',
+            'garage',
+            'storage',
+            'green_area',
+            'cowork',
+            'kids_area',
+            'pet_friendly',
+            'rooftop',
+            'jacuzzi',
+        ];
+
+        $cleanAmenities = [];
+
+        foreach ($amenities as $amenity) {
+            if (!is_string($amenity)) {
+                throw new Exception(
+                    'Uno de los amenities tiene un formato inválido',
+                    422
+                );
+            }
+
+            $amenity = trim($amenity);
+
+            if ($amenity === '') {
+                continue;
+            }
+
+            if (
+                !in_array(
+                    $amenity,
+                    $allowedAmenities,
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'El amenity seleccionado no es válido',
+                    422
+                );
+            }
+
+            $cleanAmenities[$amenity] = true;
+        }
+
         $pdo = self::db();
 
         $stDelete = $pdo->prepare("
@@ -216,14 +279,7 @@ class PropertyService
             'property_id' => $propertyId,
         ]);
 
-        $amenities = array_values(array_unique(array_filter(
-            array_map(
-                fn($item) => trim((string)$item),
-                $amenities
-            )
-        )));
-
-        if (!$amenities) {
+        if (!$cleanAmenities) {
             return;
         }
 
@@ -238,7 +294,7 @@ class PropertyService
         )
     ");
 
-        foreach ($amenities as $amenity) {
+        foreach (array_keys($cleanAmenities) as $amenity) {
             $stInsert->execute([
                 'property_id' => $propertyId,
                 'amenity_code' => $amenity,
