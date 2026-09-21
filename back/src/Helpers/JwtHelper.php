@@ -10,13 +10,33 @@ class JwtHelper
 {
     private static function getSecret(): string
     {
-        $secret = $_ENV['JWT_SECRET'] ?? '';
+        $secret =
+            trim(
+                (string)(
+                    $_ENV['JWT_SECRET']
+                    ?? getenv('JWT_SECRET')
+                    ?: ''
+                )
+            );
+
         if ($secret === '') {
-            throw new Exception('JWT_SECRET no configurado en .env');
+            throw new Exception(
+                'JWT_SECRET no configurado en .env'
+            );
         }
+
+        /*
+     * Para HS256 exigimos al menos 32 bytes
+     * de entropía configurable.
+     */
+        if (strlen($secret) < 32) {
+            throw new Exception(
+                'JWT_SECRET debe tener al menos 32 caracteres'
+            );
+        }
+
         return $secret;
     }
-
     /* =========================
        ACCESS TOKEN (corto)
     ==========================*/
