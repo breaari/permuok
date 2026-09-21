@@ -52,8 +52,7 @@ class SearchRequestController
     private static function failAI(
         \Throwable $e
     ): void {
-        $status =
-            (int)$e->getCode();
+        $status = (int)$e->getCode();
 
         if (
             $status >= 400 &&
@@ -63,6 +62,8 @@ class SearchRequestController
                 $e->getMessage(),
                 $status
             );
+
+            return;
         }
 
         ResponseHelper::fromThrowable(
@@ -70,6 +71,49 @@ class SearchRequestController
             'No se pudo completar la operación con IA. Intentá nuevamente.',
             'SearchRequestController::AI'
         );
+    }
+
+    private static function readJsonBody(
+        bool $allowEmpty = false
+    ): array {
+        $rawBody = file_get_contents('php://input');
+
+        if (
+            $rawBody === false ||
+            trim($rawBody) === ''
+        ) {
+            if ($allowEmpty) {
+                return [];
+            }
+
+            throw new \Exception(
+                'El cuerpo de la solicitud está vacío',
+                422
+            );
+        }
+
+        try {
+            $data = json_decode(
+                $rawBody,
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (\JsonException $e) {
+            throw new \Exception(
+                'El cuerpo de la solicitud no contiene un JSON válido',
+                422
+            );
+        }
+
+        if (!is_array($data)) {
+            throw new \Exception(
+                'El cuerpo de la solicitud debe ser un objeto JSON',
+                422
+            );
+        }
+
+        return $data;
     }
 
     public static function list(): void
@@ -109,17 +153,21 @@ class SearchRequestController
             self::fail($e);
         }
     }
-
     public static function create(): void
     {
         try {
             $auth = AuthHelper::requireUser();
 
-            MembershipGuard::requireActiveMembership((int)$auth['id']);
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
 
-            $data = json_decode(file_get_contents('php://input'), true) ?? [];
+            $data = self::readJsonBody();
 
-            $result = SearchRequestService::createDraft((int)$auth['id'], $data);
+            $result = SearchRequestService::createDraft(
+                (int)$auth['id'],
+                $data
+            );
 
             ResponseHelper::ok($result, 201);
         } catch (\Throwable $e) {
@@ -163,11 +211,20 @@ class SearchRequestController
     {
         try {
             $auth = AuthHelper::requireUser();
-            MembershipGuard::requireActiveMembership((int)$auth['id']);
-            $id = (int)($_GET['id'] ?? 0);
-            $data = json_decode(file_get_contents('php://input'), true) ?? [];
 
-            $result = SearchRequestService::updateDraft((int)$auth['id'], $id, $data);
+            MembershipGuard::requireActiveMembership(
+                (int)$auth['id']
+            );
+
+            $id = (int)($_GET['id'] ?? 0);
+            $data = self::readJsonBody();
+
+            $result = SearchRequestService::updateDraft(
+                (int)$auth['id'],
+                $id,
+                $data
+            );
+
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail($e);
@@ -325,45 +382,44 @@ class SearchRequestController
     public static function generateAITitle(): void
     {
         try {
-            $auth =
-                AuthHelper::requireUser();
+            $auth = AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
                 (int)$auth['id']
             );
 
-            $id =
-                (int)($_GET['id'] ?? 0);
+            $id = (int)($_GET['id'] ?? 0);
 
             if ($id <= 0) {
                 throw new \Exception(
-                    'El ID de la búsqueda no es válido.'
+                    'El ID de la búsqueda no es válido.',
+                    422
                 );
             }
 
-            /*
-         * Primero verificamos pertenencia.
-         */
             SearchRequestService::getDetail(
                 (int)$auth['id'],
                 $id
             );
 
+            $data = self::readJsonBody(true);
+
+            if (
+                array_key_exists('draft', $data) &&
+                !is_array($data['draft'])
+            ) {
+                throw new \Exception(
+                    'El borrador de IA tiene un formato inválido',
+                    422
+                );
+            }
+
+            $draft = $data['draft'] ?? [];
+
             self::consumeAICopyLimits(
                 (int)$auth['id'],
                 (int)$auth['real_estate_id']
             );
-
-            $data =
-                json_decode(
-                    file_get_contents('php://input'),
-                    true
-                ) ?? [];
-
-            $draft =
-                is_array($data['draft'] ?? null)
-                ? $data['draft']
-                : [];
 
             $result =
                 SearchRequestAICopyService::generateTitle(
@@ -372,56 +428,52 @@ class SearchRequestController
                     $draft
                 );
 
-            ResponseHelper::ok(
-                $result
-            );
+            ResponseHelper::ok($result);
         } catch (\Throwable $e) {
-           self::failAI($e);
+            self::failAI($e);
         }
     }
-
     public static function generateAIDescription(): void
     {
         try {
-            $auth =
-                AuthHelper::requireUser();
+            $auth = AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
                 (int)$auth['id']
             );
 
-            $id =
-                (int)($_GET['id'] ?? 0);
+            $id = (int)($_GET['id'] ?? 0);
 
             if ($id <= 0) {
                 throw new \Exception(
-                    'El ID de la búsqueda no es válido.'
+                    'El ID de la búsqueda no es válido.',
+                    422
                 );
             }
 
-            /*
-         * Primero verificamos pertenencia.
-         */
             SearchRequestService::getDetail(
                 (int)$auth['id'],
                 $id
             );
 
+            $data = self::readJsonBody(true);
+
+            if (
+                array_key_exists('draft', $data) &&
+                !is_array($data['draft'])
+            ) {
+                throw new \Exception(
+                    'El borrador de IA tiene un formato inválido',
+                    422
+                );
+            }
+
+            $draft = $data['draft'] ?? [];
+
             self::consumeAICopyLimits(
                 (int)$auth['id'],
                 (int)$auth['real_estate_id']
             );
-
-            $data =
-                json_decode(
-                    file_get_contents('php://input'),
-                    true
-                ) ?? [];
-
-            $draft =
-                is_array($data['draft'] ?? null)
-                ? $data['draft']
-                : [];
 
             $result =
                 SearchRequestAICopyService::generateDescription(
@@ -430,9 +482,7 @@ class SearchRequestController
                     $draft
                 );
 
-            ResponseHelper::ok(
-                $result
-            );
+            ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::failAI($e);
         }
