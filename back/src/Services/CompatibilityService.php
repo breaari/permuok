@@ -99,13 +99,31 @@ class CompatibilityService
      */
         if ($view === 'active') {
             $where[] = "
-            c.status IN (
-                'detected',
-                'one_side_interested',
-                'mutual_interest',
-                'chat_enabled'
-            )
-        ";
+        c.status IN (
+            'detected',
+            'one_side_interested',
+            'mutual_interest',
+            'chat_enabled'
+        )
+
+        AND EXISTS (
+            SELECT 1
+            FROM properties active_property
+            WHERE active_property.id = c.property_id
+              AND active_property.status = 'published'
+              AND active_property.is_visible = 1
+              AND active_property.deleted_at IS NULL
+        )
+
+        AND EXISTS (
+            SELECT 1
+            FROM search_requests active_search
+            WHERE active_search.id = c.search_request_id
+              AND active_search.status = 'published'
+              AND active_search.is_visible = 1
+              AND active_search.deleted_at IS NULL
+        )
+    ";
         }
 
         /*
@@ -925,13 +943,17 @@ c.target_seen_at,
 
     FROM compatibilities c
 
-    INNER JOIN search_requests sr
-        ON sr.id = c.search_request_id
-       AND sr.deleted_at IS NULL
+  INNER JOIN search_requests sr
+    ON sr.id = c.search_request_id
+   AND sr.status = 'published'
+   AND sr.is_visible = 1
+   AND sr.deleted_at IS NULL
 
-    INNER JOIN properties p
-        ON p.id = c.property_id
-       AND p.deleted_at IS NULL
+INNER JOIN properties p
+    ON p.id = c.property_id
+   AND p.status = 'published'
+   AND p.is_visible = 1
+   AND p.deleted_at IS NULL
 
     WHERE c.id = :id
       AND c.deleted_at IS NULL
