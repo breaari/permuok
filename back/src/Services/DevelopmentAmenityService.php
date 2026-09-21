@@ -138,19 +138,64 @@ class DevelopmentAmenityService
             throw new Exception("No se pueden guardar amenities en el estado actual del desarrollo");
         }
 
-        if (!is_array($amenities)) {
-            throw new Exception("Amenities inválidas");
-        }
+        $allowedAmenities = [
+            'balcony',
+            'patio',
+            'terrace',
+            'pool',
+            'quincho',
+            'garden',
+            'barbecue',
+            'sum',
+            'gym',
+            'security',
+            'doorman',
+            'laundry',
+            'elevator',
+            'garage',
+            'storage',
+            'green_area',
+            'cowork',
+            'kids_area',
+            'pet_friendly',
+            'rooftop',
+            'jacuzzi',
+        ];
 
         $normalized = [];
+
         foreach ($amenities as $amenity) {
-            $value = trim((string)$amenity);
-            if ($value !== '') {
-                $normalized[] = $value;
+            if (!is_string($amenity)) {
+                throw new Exception(
+                    'Cada amenity debe tener un formato válido'
+                );
             }
+
+            $value = trim($amenity);
+
+            if ($value === '') {
+                continue;
+            }
+
+            if (
+                !in_array(
+                    $value,
+                    $allowedAmenities,
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'Se recibió una amenity inválida'
+                );
+            }
+
+            $normalized[] = $value;
         }
 
-        $normalized = array_values(array_unique($normalized));
+        $normalized =
+            array_values(
+                array_unique($normalized)
+            );
 
         $pdo = self::db();
         $pdo->beginTransaction();
