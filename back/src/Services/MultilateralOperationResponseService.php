@@ -46,14 +46,15 @@ class MultilateralOperationResponseService
 
         try {
             $stUser = $pdo->prepare("
-                SELECT
-                    id,
-                    real_estate_id
-                FROM users
-                WHERE id = :id
-                  AND deleted_at IS NULL
-                  AND is_active = 1
-                LIMIT 1
+              SELECT
+    id,
+    role,
+    real_estate_id
+FROM users
+WHERE id = :id
+  AND deleted_at IS NULL
+  AND is_active = 1
+LIMIT 1
             ");
 
             $stUser->execute([
@@ -68,6 +69,19 @@ class MultilateralOperationResponseService
                 throw new Exception(
                     'Usuario no encontrado.',
                     404
+                );
+            }
+
+            if (
+                !in_array(
+                    (int)$user['role'],
+                    [2, 3],
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'No tenés permisos para responder operaciones multilaterales.',
+                    403
                 );
             }
 
@@ -145,10 +159,10 @@ class MultilateralOperationResponseService
 
             $stParticipant->execute([
                 'operation_id' =>
-                    $operationId,
+                $operationId,
 
                 'real_estate_id' =>
-                    $realEstateId,
+                $realEstateId,
             ]);
 
             if (!$stParticipant->fetchColumn()) {
@@ -186,16 +200,16 @@ class MultilateralOperationResponseService
 
             $stResponse->execute([
                 'operation_id' =>
-                    $operationId,
+                $operationId,
 
                 'real_estate_id' =>
-                    $realEstateId,
+                $realEstateId,
 
                 'response' =>
-                    $response,
+                $response,
 
                 'user_id' =>
-                    $userId,
+                $userId,
             ]);
 
             /*
@@ -211,7 +225,7 @@ class MultilateralOperationResponseService
 
             $stDeclined->execute([
                 'operation_id' =>
-                    $operationId,
+                $operationId,
             ]);
 
             $declinedCount =
@@ -244,7 +258,7 @@ class MultilateralOperationResponseService
 
                 $stInterested->execute([
                     'operation_id' =>
-                        $operationId,
+                    $operationId,
                 ]);
 
                 $interestedCount =
@@ -293,22 +307,22 @@ class MultilateralOperationResponseService
 
             return [
                 'operation_id' =>
-                    $operationId,
+                $operationId,
 
                 'response' =>
-                    $response,
+                $response,
 
                 'commercial_status' =>
-                    $final['commercial_status']
-                        ?? 'open',
+                $final['commercial_status']
+                    ?? 'open',
 
                 'confirmed_at' =>
-                    $final['confirmed_at']
-                        ?? null,
+                $final['confirmed_at']
+                    ?? null,
 
                 'declined_at' =>
-                    $final['declined_at']
-                        ?? null,
+                $final['declined_at']
+                    ?? null,
             ];
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {

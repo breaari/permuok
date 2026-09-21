@@ -798,23 +798,24 @@ ml.cash_difference_direction
         int $userId
     ): int {
         $st = $pdo->prepare("
-            SELECT
-                id,
-                real_estate_id
-            FROM users
-            WHERE id = :id
-              AND deleted_at IS NULL
-            LIMIT 1
-        ");
+        SELECT
+            id,
+            role,
+            real_estate_id,
+            is_active
+        FROM users
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
 
         $st->execute([
             'id' => $userId,
         ]);
 
-        $user =
-            $st->fetch(
-                PDO::FETCH_ASSOC
-            );
+        $user = $st->fetch(
+            PDO::FETCH_ASSOC
+        );
 
         if (!$user) {
             throw new Exception(
@@ -823,11 +824,28 @@ ml.cash_difference_direction
             );
         }
 
-        $realEstateId =
-            (int)(
-                $user['real_estate_id']
-                ?? 0
+        if ((int)$user['is_active'] !== 1) {
+            throw new Exception(
+                'El usuario está inactivo.',
+                403
             );
+        }
+
+        if (
+            !in_array(
+                (int)$user['role'],
+                [2, 3],
+                true
+            )
+        ) {
+            throw new Exception(
+                'No tenés permisos para consultar operaciones multilaterales.',
+                403
+            );
+        }
+
+        $realEstateId =
+            (int)($user['real_estate_id'] ?? 0);
 
         if ($realEstateId <= 0) {
             throw new Exception(
