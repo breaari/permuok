@@ -1,0 +1,22 @@
+Options -Indexes
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+</IfModule>
+
+RewriteEngine On
+RewriteBase /
+
+# No interceptar las carpetas reales del backend.
+RewriteRule ^(?:back|back_nuevo|prueba|api)(?:/|$) - [L,NC]
+
+# Servir normalmente archivos y carpetas existentes.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# El resto pertenece al router de React.
+RewriteRule ^ index.html [L]
