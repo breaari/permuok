@@ -5,6 +5,13 @@ require_once __DIR__ . '/../vendor/autoload.php';
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
 $dotenv->load();
 
+/*
+|--------------------------------------------------------------------------
+| Ocultar información del entorno
+|--------------------------------------------------------------------------
+*/
+
+header_remove('X-Powered-By');
 
 $appEnv =
     strtolower(
