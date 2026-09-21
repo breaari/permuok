@@ -389,8 +389,52 @@ class SearchRequestService
         PDO $pdo,
         int $searchRequestId,
         int $realEstateId,
-        array $offers
+        mixed $offers
     ): void {
+        if (!is_array($offers)) {
+            throw new Exception(
+                'Los bienes ofrecidos deben enviarse como una lista',
+                422
+            );
+        }
+
+        $allowedOfferTypes = [
+            'property',
+            'vehicle',
+            'cash',
+            'other',
+        ];
+
+        $allowedPropertyTypes = [
+            'house',
+            'apartment',
+            'land',
+            'commercial',
+            'office',
+            'warehouse',
+            'country_house',
+            'farm',
+            'garage',
+            'other',
+        ];
+
+        $allowedVehicleTypes = [
+            'car',
+            'motorcycle',
+            'other',
+        ];
+
+        $allowedCurrencies = [
+            'ARS',
+            'USD',
+        ];
+
+        $allowedCountryCodes = [
+            'AR',
+            'US',
+            'IT',
+        ];
+
         $stDelete = $pdo->prepare("
         DELETE FROM search_request_exchange_offers
         WHERE search_request_id = :search_request_id
@@ -400,68 +444,147 @@ class SearchRequestService
             'search_request_id' => $searchRequestId,
         ]);
 
+        $stProperty = $pdo->prepare("
+        SELECT
+            id,
+            title,
+            description,
+            property_type,
+            price,
+            currency,
+            country_code,
+            country,
+            province,
+            city,
+            zone,
+            total_area,
+            covered_area,
+            bedrooms,
+            bathrooms,
+            garages,
+            antiquity
+        FROM properties
+        WHERE id = :id
+          AND real_estate_id = :real_estate_id
+          AND deleted_at IS NULL
+          AND status = 'published'
+          AND is_visible = 1
+        LIMIT 1
+    ");
+
+        $stInsert = $pdo->prepare("
+        INSERT INTO search_request_exchange_offers (
+            search_request_id,
+            offer_type,
+            property_id,
+            title,
+            description,
+            property_type,
+            vehicle_type,
+            vehicle_brand,
+            vehicle_model,
+            vehicle_year,
+            estimated_price,
+            currency,
+            country_code,
+            country,
+            province,
+            city,
+            zone,
+            total_area,
+            covered_area,
+            bedrooms,
+            bathrooms,
+            garages,
+            antiquity
+        ) VALUES (
+            :search_request_id,
+            :offer_type,
+            :property_id,
+            :title,
+            :description,
+            :property_type,
+            :vehicle_type,
+            :vehicle_brand,
+            :vehicle_model,
+            :vehicle_year,
+            :estimated_price,
+            :currency,
+            :country_code,
+            :country,
+            :province,
+            :city,
+            :zone,
+            :total_area,
+            :covered_area,
+            :bedrooms,
+            :bathrooms,
+            :garages,
+            :antiquity
+        )
+    ");
+
         foreach ($offers as $offer) {
             if (!is_array($offer)) {
-                continue;
+                throw new Exception(
+                    'Uno de los bienes ofrecidos tiene un formato inválido',
+                    422
+                );
             }
 
-            $offerType = trim(
-                (string)($offer['offer_type'] ?? '')
-            );
+            $offerTypeValue =
+                $offer['offer_type'] ?? null;
 
-            if (!in_array(
-                $offerType,
-                ['property', 'vehicle', 'cash', 'other'],
-                true
-            )) {
+            if (!is_string($offerTypeValue)) {
                 throw new Exception(
-                    'El tipo de bien ofrecido no es válido.'
+                    'El tipo de bien ofrecido tiene un formato inválido',
+                    422
+                );
+            }
+
+            $offerType = trim($offerTypeValue);
+
+            if (
+                !in_array(
+                    $offerType,
+                    $allowedOfferTypes,
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'El tipo de bien ofrecido no es válido',
+                    422
                 );
             }
 
             $propertyId = null;
             $property = null;
 
-            /*
-         * Una propiedad puede estar vinculada a una
-         * publicación existente, pero ya no es obligatorio.
-         */
             if (
                 $offerType === 'property' &&
-                !empty($offer['property_id'])
+                array_key_exists('property_id', $offer) &&
+                $offer['property_id'] !== null &&
+                $offer['property_id'] !== ''
             ) {
-                $propertyId = (int)$offer['property_id'];
+                $validatedPropertyId = filter_var(
+                    $offer['property_id'],
+                    FILTER_VALIDATE_INT,
+                    [
+                        'options' => [
+                            'min_range' => 1,
+                        ],
+                    ]
+                );
 
-                $stProperty = $pdo->prepare("
-                SELECT
-                    id,
-                    title,
-                    description,
-                    property_type,
-                    price,
-                    currency,
-                    country_code,
-                    country,
-                    province,
-                    city,
-                    zone,
-                    total_area,
-                    covered_area,
-                    bedrooms,
-                    bathrooms,
-                    garages,
-                    antiquity
+                if ($validatedPropertyId === false) {
+                    throw new Exception(
+                        'La propiedad ofrecida tiene un identificador inválido',
+                        422
+                    );
+                }
 
-                FROM properties
-
-                WHERE id = :id
-                  AND real_estate_id = :real_estate_id
-                  AND deleted_at IS NULL
-                  AND status = 'published'
-                  AND is_visible = 1
-
-                LIMIT 1
-            ");
+                $propertyId =
+                    (int)$validatedPropertyId;
 
                 $stProperty->execute([
                     'id' => $propertyId,
@@ -469,11 +592,14 @@ class SearchRequestService
                 ]);
 
                 $property =
-                    $stProperty->fetch(PDO::FETCH_ASSOC);
+                    $stProperty->fetch(
+                        PDO::FETCH_ASSOC
+                    );
 
                 if (!$property) {
                     throw new Exception(
-                        'La propiedad ofrecida en permuta no es válida.'
+                        'La propiedad ofrecida en permuta no es válida',
+                        422
                     );
                 }
             }
@@ -481,35 +607,68 @@ class SearchRequestService
             $title =
                 $property['title']
                 ?? self::nullableString(
-                    $offer['title'] ?? null
+                    $offer['title'] ?? null,
+                    'El título del bien ofrecido'
                 );
 
             $description =
                 $property['description']
                 ?? self::nullableString(
-                    $offer['description'] ?? null
+                    $offer['description'] ?? null,
+                    'La descripción del bien ofrecido'
                 );
 
             $propertyType =
                 $property['property_type']
                 ?? self::nullableString(
-                    $offer['property_type'] ?? null
+                    $offer['property_type'] ?? null,
+                    'El tipo de propiedad ofrecida'
                 );
 
+            if (
+                $propertyType !== null &&
+                !in_array(
+                    $propertyType,
+                    $allowedPropertyTypes,
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'El tipo de propiedad ofrecida no es válido',
+                    422
+                );
+            }
+
             $estimatedPrice =
-                $property['price']
-                ?? self::nullableNumber(
-                    $offer['estimated_price'] ?? null
+                self::nullableNumber(
+                    $property['price']
+                        ?? ($offer['estimated_price'] ?? null),
+                    'El valor estimado del bien ofrecido'
                 );
 
             $currency =
                 $property['currency']
                 ?? ($offer['currency'] ?? 'USD');
 
+            if (
+                !is_string($currency) ||
+                !in_array(
+                    $currency,
+                    $allowedCurrencies,
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'La moneda del bien ofrecido no es válida',
+                    422
+                );
+            }
+
             $vehicleType =
                 $offerType === 'vehicle'
                 ? self::nullableString(
-                    $offer['vehicle_type'] ?? null
+                    $offer['vehicle_type'] ?? null,
+                    'El tipo de vehículo'
                 )
                 : null;
 
@@ -517,33 +676,52 @@ class SearchRequestService
                 $offerType === 'vehicle' &&
                 !in_array(
                     $vehicleType,
-                    ['car', 'motorcycle', 'other'],
+                    $allowedVehicleTypes,
                     true
                 )
             ) {
                 throw new Exception(
-                    'El tipo de vehículo no es válido.'
+                    'El tipo de vehículo no es válido',
+                    422
                 );
             }
 
+            $vehicleBrand =
+                $offerType === 'vehicle'
+                ? self::nullableString(
+                    $offer['vehicle_brand'] ?? null,
+                    'La marca del vehículo'
+                )
+                : null;
+
+            $vehicleModel =
+                $offerType === 'vehicle'
+                ? self::nullableString(
+                    $offer['vehicle_model'] ?? null,
+                    'El modelo del vehículo'
+                )
+                : null;
+
             $vehicleYear =
-                self::nullableInt(
-                    $offer['vehicle_year'] ?? null
-                );
+                $offerType === 'vehicle'
+                ? self::nullableInt(
+                    $offer['vehicle_year'] ?? null,
+                    'El año del vehículo',
+                    1900
+                )
+                : null;
 
             if (
                 $vehicleYear !== null &&
-                ($vehicleYear < 1900 ||
-                    $vehicleYear > ((int)date('Y') + 1))
+                $vehicleYear >
+                ((int)date('Y') + 1)
             ) {
                 throw new Exception(
-                    'El año del vehículo no es válido.'
+                    'El año del vehículo no es válido',
+                    422
                 );
             }
 
-            /*
-         * Validaciones mínimas según el tipo.
-         */
             if (
                 in_array(
                     $offerType,
@@ -552,11 +730,12 @@ class SearchRequestService
                 ) &&
                 (
                     $estimatedPrice === null ||
-                    (float)$estimatedPrice <= 0
+                    $estimatedPrice <= 0
                 )
             ) {
                 throw new Exception(
-                    'Indicá un valor estimado válido para la oferta.'
+                    'Indicá un valor estimado válido para la oferta',
+                    422
                 );
             }
 
@@ -564,79 +743,132 @@ class SearchRequestService
                 $offerType === 'property' &&
                 $propertyId === null
             ) {
-                if (!$propertyType) {
+                if ($propertyType === null) {
                     throw new Exception(
-                        'Indicá el tipo de propiedad ofrecida.'
+                        'Indicá el tipo de propiedad ofrecida',
+                        422
                     );
                 }
 
-                if (!$description) {
+                if ($description === null) {
                     throw new Exception(
-                        'Indicá una descripción para la propiedad ofrecida.'
+                        'Indicá una descripción para la propiedad ofrecida',
+                        422
                     );
                 }
 
                 if (
                     $estimatedPrice === null ||
-                    (float)$estimatedPrice <= 0
+                    $estimatedPrice <= 0
                 ) {
                     throw new Exception(
-                        'Indicá un valor estimado válido para la propiedad ofrecida.'
+                        'Indicá un valor estimado válido para la propiedad ofrecida',
+                        422
                     );
                 }
             }
 
-            $stInsert = $pdo->prepare("
-            INSERT INTO search_request_exchange_offers (
-                search_request_id,
-                offer_type,
-                property_id,
-                title,
-                description,
-                property_type,
-                vehicle_type,
-                vehicle_brand,
-                vehicle_model,
-                vehicle_year,
-                estimated_price,
-                currency,
-                country_code,
-                country,
-                province,
-                city,
-                zone,
-                total_area,
-                covered_area,
-                bedrooms,
-                bathrooms,
-                garages,
-                antiquity
-            ) VALUES (
-                :search_request_id,
-                :offer_type,
-                :property_id,
-                :title,
-                :description,
-                :property_type,
-                :vehicle_type,
-                :vehicle_brand,
-                :vehicle_model,
-                :vehicle_year,
-                :estimated_price,
-                :currency,
-                :country_code,
-                :country,
-                :province,
-                :city,
-                :zone,
-                :total_area,
-                :covered_area,
-                :bedrooms,
-                :bathrooms,
-                :garages,
-                :antiquity
-            )
-        ");
+            $countryCode =
+                $property['country_code']
+                ?? self::nullableString(
+                    $offer['country_code'] ?? null,
+                    'El código de país del bien ofrecido'
+                );
+
+            if (
+                $countryCode !== null &&
+                !in_array(
+                    $countryCode,
+                    $allowedCountryCodes,
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'El país del bien ofrecido no es válido',
+                    422
+                );
+            }
+
+            $country =
+                $property['country']
+                ?? self::nullableString(
+                    $offer['country'] ?? null,
+                    'El país del bien ofrecido'
+                );
+
+            $province =
+                $property['province']
+                ?? self::nullableString(
+                    $offer['province'] ?? null,
+                    'La provincia del bien ofrecido'
+                );
+
+            $city =
+                $property['city']
+                ?? self::nullableString(
+                    $offer['city'] ?? null,
+                    'La ciudad del bien ofrecido'
+                );
+
+            $zone =
+                $property['zone']
+                ?? self::nullableString(
+                    $offer['zone'] ?? null,
+                    'La zona del bien ofrecido'
+                );
+
+            $totalArea =
+                self::nullableNumber(
+                    $property['total_area']
+                        ?? ($offer['total_area'] ?? null),
+                    'La superficie total del bien ofrecido'
+                );
+
+            $coveredArea =
+                self::nullableNumber(
+                    $property['covered_area']
+                        ?? ($offer['covered_area'] ?? null),
+                    'La superficie cubierta del bien ofrecido'
+                );
+
+            if (
+                $totalArea !== null &&
+                $coveredArea !== null &&
+                $coveredArea > $totalArea
+            ) {
+                throw new Exception(
+                    'La superficie cubierta del bien ofrecido no puede superar la superficie total',
+                    422
+                );
+            }
+
+            $bedrooms =
+                self::nullableInt(
+                    $property['bedrooms']
+                        ?? ($offer['bedrooms'] ?? null),
+                    'La cantidad de dormitorios del bien ofrecido'
+                );
+
+            $bathrooms =
+                self::nullableInt(
+                    $property['bathrooms']
+                        ?? ($offer['bathrooms'] ?? null),
+                    'La cantidad de baños del bien ofrecido'
+                );
+
+            $garages =
+                self::nullableInt(
+                    $property['garages']
+                        ?? ($offer['garages'] ?? null),
+                    'La cantidad de cocheras del bien ofrecido'
+                );
+
+            $antiquity =
+                self::nullableInt(
+                    $property['antiquity']
+                        ?? ($offer['antiquity'] ?? null),
+                    'La antigüedad del bien ofrecido'
+                );
 
             $stInsert->execute([
                 'search_request_id' =>
@@ -661,23 +893,13 @@ class SearchRequestService
                 $vehicleType,
 
                 'vehicle_brand' =>
-                $offerType === 'vehicle'
-                    ? self::nullableString(
-                        $offer['vehicle_brand'] ?? null
-                    )
-                    : null,
+                $vehicleBrand,
 
                 'vehicle_model' =>
-                $offerType === 'vehicle'
-                    ? self::nullableString(
-                        $offer['vehicle_model'] ?? null
-                    )
-                    : null,
+                $vehicleModel,
 
                 'vehicle_year' =>
-                $offerType === 'vehicle'
-                    ? $vehicleYear
-                    : null,
+                $vehicleYear,
 
                 'estimated_price' =>
                 $estimatedPrice,
@@ -686,70 +908,37 @@ class SearchRequestService
                 $currency,
 
                 'country_code' =>
-                $property['country_code']
-                    ?? self::nullableString(
-                        $offer['country_code'] ?? null
-                    ),
+                $countryCode,
 
                 'country' =>
-                $property['country']
-                    ?? self::nullableString(
-                        $offer['country'] ?? null
-                    ),
+                $country,
 
                 'province' =>
-                $property['province']
-                    ?? self::nullableString(
-                        $offer['province'] ?? null
-                    ),
+                $province,
 
                 'city' =>
-                $property['city']
-                    ?? self::nullableString(
-                        $offer['city'] ?? null
-                    ),
+                $city,
 
                 'zone' =>
-                $property['zone']
-                    ?? self::nullableString(
-                        $offer['zone'] ?? null
-                    ),
+                $zone,
 
                 'total_area' =>
-                $property['total_area']
-                    ?? self::nullableNumber(
-                        $offer['total_area'] ?? null
-                    ),
+                $totalArea,
 
                 'covered_area' =>
-                $property['covered_area']
-                    ?? self::nullableNumber(
-                        $offer['covered_area'] ?? null
-                    ),
+                $coveredArea,
 
                 'bedrooms' =>
-                $property['bedrooms']
-                    ?? self::nullableInt(
-                        $offer['bedrooms'] ?? null
-                    ),
+                $bedrooms,
 
                 'bathrooms' =>
-                $property['bathrooms']
-                    ?? self::nullableInt(
-                        $offer['bathrooms'] ?? null
-                    ),
+                $bathrooms,
 
                 'garages' =>
-                $property['garages']
-                    ?? self::nullableInt(
-                        $offer['garages'] ?? null
-                    ),
+                $garages,
 
                 'antiquity' =>
-                $property['antiquity']
-                    ?? self::nullableInt(
-                        $offer['antiquity'] ?? null
-                    ),
+                $antiquity,
             ]);
         }
     }
