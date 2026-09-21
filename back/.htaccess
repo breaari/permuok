@@ -1,0 +1,21 @@
+Options -Indexes
+
+RewriteEngine On
+
+# Bloquear el acceso web a carpetas internas.
+RewriteRule ^(?:bin|src|vendor)(?:/|$) - [F,L,NC]
+
+# Bloquear configuración, credenciales y archivos internos.
+<FilesMatch "(^\.|^(?:config\.php|db\.php|composer\.(?:json|lock)|package(?:-lock)?\.json)$)">
+    Require all denied
+</FilesMatch>
+
+# Conservar el encabezado Authorization para la API.
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+RewriteBase /back_nuevo/public/
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
