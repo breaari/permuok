@@ -260,14 +260,19 @@ pr.cash_difference_currency
 
     AND seo.property_id IS NOT NULL
 
-            INNER JOIN properties offered_property
-                ON offered_property.id =
-                    seo.property_id
+       INNER JOIN properties offered_property
+    ON offered_property.id =
+        seo.property_id
 
-                AND offered_property.real_estate_id =
-                    c.source_real_estate_id
+    AND offered_property.real_estate_id =
+        c.source_real_estate_id
 
-                AND offered_property.deleted_at IS NULL
+    AND offered_property.deleted_at IS NULL
+
+    AND offered_property.status =
+        'published'
+
+    AND offered_property.is_visible = 1
 
             INNER JOIN properties target_property
                 ON target_property.id =
