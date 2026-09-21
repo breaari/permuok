@@ -67,6 +67,24 @@ class PasswordResetController
             15 * 60
         );
 
+        /*
+ * Protección global de la dirección.
+ *
+ * Evita que distintas IP puedan bombardear
+ * una misma cuenta con correos de recuperación.
+ * Se aplica también a emails inexistentes para
+ * no revelar si están registrados.
+ */
+        SecurityRateLimitService::hit(
+            'password_reset_email',
+            hash(
+                'sha256',
+                $email
+            ),
+            5,
+            60 * 60
+        );
+
         try {
             PasswordResetService::request(
                 $email
