@@ -115,35 +115,181 @@ class UserService
 
     private static function validateCreatePayload(array $data): array
     {
-        $role = (int)($data['role'] ?? 0);
-        $firstName = trim((string)($data['first_name'] ?? ''));
-        $lastName = trim((string)($data['last_name'] ?? ''));
-        $email = strtolower(trim((string)($data['email'] ?? '')));
-        $phone = trim((string)($data['phone'] ?? ''));
-        $password = (string)($data['password'] ?? '');
+        $roleValue = $data['role'] ?? null;
+        $firstNameValue = $data['first_name'] ?? null;
+        $lastNameValue = $data['last_name'] ?? null;
+        $emailValue = $data['email'] ?? null;
+        $phoneValue = $data['phone'] ?? null;
+        $passwordValue = $data['password'] ?? null;
 
-        if (!in_array($role, [self::ROLE_AGENT, self::ROLE_INVESTOR], true)) {
-            throw new Exception("Solo podés crear agentes o inversores");
+        if (
+            !is_int($roleValue) &&
+            !(
+                is_string($roleValue) &&
+                preg_match('/^[0-9]+$/', $roleValue) === 1
+            )
+        ) {
+            throw new Exception(
+                'Solo podés crear agentes o inversores'
+            );
         }
 
+        $role = (int)$roleValue;
+
+        if (
+            !in_array(
+                $role,
+                [
+                    self::ROLE_AGENT,
+                    self::ROLE_INVESTOR,
+                ],
+                true
+            )
+        ) {
+            throw new Exception(
+                'Solo podés crear agentes o inversores'
+            );
+        }
+
+        if (!is_string($firstNameValue)) {
+            throw new Exception(
+                'Ingresá un nombre válido.'
+            );
+        }
+
+        if (!is_string($lastNameValue)) {
+            throw new Exception(
+                'Ingresá un apellido válido.'
+            );
+        }
+
+        if (!is_string($emailValue)) {
+            throw new Exception(
+                'Ingresá un email válido.'
+            );
+        }
+
+        if (!is_string($phoneValue)) {
+            throw new Exception(
+                'Ingresá un teléfono válido.'
+            );
+        }
+
+        if (!is_string($passwordValue)) {
+            throw new Exception(
+                'La contraseña no tiene un formato válido.'
+            );
+        }
+
+        $firstName = trim($firstNameValue);
+        $lastName = trim($lastNameValue);
+        $email = strtolower(trim($emailValue));
+        $phone = trim($phoneValue);
+        $password = $passwordValue;
+
         if ($firstName === '') {
-            throw new Exception("first_name requerido");
+            throw new Exception(
+                'El nombre es requerido.'
+            );
         }
 
         if ($lastName === '') {
-            throw new Exception("last_name requerido");
+            throw new Exception(
+                'El apellido es requerido.'
+            );
         }
 
         if ($email === '') {
-            throw new Exception("email requerido");
-        }
-
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new Exception("Email inválido");
+            throw new Exception(
+                'El email es requerido.'
+            );
         }
 
         if ($phone === '') {
-            throw new Exception("phone requerido");
+            throw new Exception(
+                'El teléfono es requerido.'
+            );
+        }
+
+        $firstNameLength =
+            function_exists('mb_strlen')
+            ? mb_strlen($firstName, 'UTF-8')
+            : strlen($firstName);
+
+        $lastNameLength =
+            function_exists('mb_strlen')
+            ? mb_strlen($lastName, 'UTF-8')
+            : strlen($lastName);
+
+        if (
+            $firstNameLength < 1 ||
+            $firstNameLength > 80
+        ) {
+            throw new Exception(
+                'El nombre debe tener hasta 80 caracteres.'
+            );
+        }
+
+        if (
+            $lastNameLength < 1 ||
+            $lastNameLength > 80
+        ) {
+            throw new Exception(
+                'El apellido debe tener hasta 80 caracteres.'
+            );
+        }
+
+        $namePattern =
+            "/^[\p{L}\p{M}][\p{L}\p{M}\s.'’\-]*$/u";
+
+        if (
+            preg_match(
+                $namePattern,
+                $firstName
+            ) !== 1
+        ) {
+            throw new Exception(
+                'Ingresá un nombre válido.'
+            );
+        }
+
+        if (
+            preg_match(
+                $namePattern,
+                $lastName
+            ) !== 1
+        ) {
+            throw new Exception(
+                'Ingresá un apellido válido.'
+            );
+        }
+
+        if (
+            !filter_var(
+                $email,
+                FILTER_VALIDATE_EMAIL
+            )
+        ) {
+            throw new Exception(
+                'Ingresá un email válido.'
+            );
+        }
+
+        if (strlen($email) > 254) {
+            throw new Exception(
+                'El email es demasiado extenso.'
+            );
+        }
+
+        if (
+            preg_match(
+                '/^\+[1-9][0-9]{7,14}$/',
+                $phone
+            ) !== 1
+        ) {
+            throw new Exception(
+                'Ingresá un teléfono válido con código de país.'
+            );
         }
 
         $passwordError =

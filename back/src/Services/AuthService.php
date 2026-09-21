@@ -213,10 +213,6 @@ class AuthService
             ];
         }
 
-        if ($first === '') return ['error' => 'first_name requerido'];
-        if ($last === '')  return ['error' => 'last_name requerido'];
-        if ($phone === '') return ['error' => 'phone requerido'];
-
         $emailNorm =
             strtolower(
                 trim($email)
