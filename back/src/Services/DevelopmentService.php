@@ -1304,7 +1304,7 @@ class DevelopmentService
 
             $st = $pdo->prepare("
                 UPDATE developments
-    SET
+             SET
     is_visible = 0,
     deleted_at = NOW(),
     updated_by_user_id = :updated_by_user_id
@@ -1352,28 +1352,79 @@ class DevelopmentService
         }
     }
 
-    private static function syncAmenities(PDO $pdo, int $developmentId, array $items): void
-    {
-        $pdo->prepare("
-        DELETE FROM development_amenities
-        WHERE development_id = :development_id
-    ")->execute([
-            'development_id' => $developmentId,
-        ]);
+    private static function syncAmenities(
+        PDO $pdo,
+        int $developmentId,
+        array $items
+    ): void {
+        $allowedAmenities = [
+            'balcony',
+            'patio',
+            'terrace',
+            'pool',
+            'quincho',
+            'garden',
+            'barbecue',
+            'sum',
+            'gym',
+            'security',
+            'doorman',
+            'laundry',
+            'elevator',
+            'garage',
+            'storage',
+            'green_area',
+            'cowork',
+            'kids_area',
+            'pet_friendly',
+            'rooftop',
+            'jacuzzi',
+        ];
 
         $clean = [];
 
         foreach ($items as $item) {
-            $item = trim((string)$item);
+            if (!is_string($item)) {
+                throw new Exception(
+                    'Cada amenity debe tener un formato válido'
+                );
+            }
+
+            $item =
+                trim($item);
 
             if ($item === '') {
                 continue;
             }
 
+            if (
+                !in_array(
+                    $item,
+                    $allowedAmenities,
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'Se recibió una amenity inválida'
+                );
+            }
+
             $clean[$item] = true;
         }
 
-        foreach (array_keys($clean) as $item) {
+        $pdo->prepare("
+        DELETE FROM development_amenities
+        WHERE development_id = :development_id
+    ")->execute([
+            'development_id' =>
+            $developmentId,
+        ]);
+
+        if (!$clean) {
+            return;
+        }
+
+        $insert =
             $pdo->prepare("
             INSERT INTO development_amenities (
                 development_id,
@@ -1382,9 +1433,18 @@ class DevelopmentService
                 :development_id,
                 :amenity_code
             )
-        ")->execute([
-                'development_id' => $developmentId,
-                'amenity_code' => $item,
+        ");
+
+        foreach (
+            array_keys($clean)
+            as $item
+        ) {
+            $insert->execute([
+                'development_id' =>
+                $developmentId,
+
+                'amenity_code' =>
+                $item,
             ]);
         }
     }

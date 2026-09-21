@@ -245,11 +245,11 @@ class DevelopmentUnitTypeService
 
             'label' =>
             trim($labelValue ?? ''),
-
             'rooms' =>
             self::normalizeNullableNumber(
                 $data['rooms'] ?? null,
-                'Ambientes'
+                'Ambientes',
+                true
             ),
 
             'bedrooms' =>
@@ -473,19 +473,33 @@ class DevelopmentUnitTypeService
         return self::listByDevelopment($userId, $developmentId);
     }
 
-    public static function update(int $userId, int $unitTypeId, array $data): array
-    {
-        [, $unitType] = self::getOwnedUnitType($userId, $unitTypeId);
+    public static function update(
+        int $userId,
+        int $unitTypeId,
+        array $data
+    ): array {
+        [, $unitType] =
+            self::getOwnedUnitType(
+                $userId,
+                $unitTypeId
+            );
 
-        if (!in_array($unitType['development_status'], ['draft', 'paused', 'archived', 'published'], true)) {
-            throw new Exception("No se puede editar la tipología en el estado actual del desarrollo");
+        if (
+            !in_array(
+                $unitType['development_status'],
+                [
+                    'draft',
+                    'paused',
+                    'archived',
+                    'published',
+                ],
+                true
+            )
+        ) {
+            throw new Exception(
+                'No se puede editar la tipología en el estado actual del desarrollo'
+            );
         }
-
-        $payload = self::validatePayload($data, true);
-        $pdo = self::db();
-
-        $fields = [];
-        $params = ['id' => $unitTypeId];
 
         $map = [
             'unit_type',
@@ -502,29 +516,85 @@ class DevelopmentUnitTypeService
             'available_units',
         ];
 
+        /*
+     * Combinamos los valores recibidos con los existentes.
+     * De esta manera una edición parcial también valida
+     * las relaciones entre mínimos, máximos y ambientes.
+     */
+        $mergedData = [];
+
         foreach ($map as $field) {
-            if (array_key_exists($field, $data)) {
-                $fields[] = "{$field} = :{$field}";
-                $value = $payload[$field];
-                $params[$field] = $value === '' ? null : $value;
+            $mergedData[$field] =
+                array_key_exists(
+                    $field,
+                    $data
+                )
+                ? $data[$field]
+                : ($unitType[$field] ?? null);
+        }
+
+        $payload =
+            self::validatePayload(
+                $mergedData,
+                false
+            );
+
+        $fields = [];
+        $params = [
+            'id' => $unitTypeId,
+        ];
+
+        foreach ($map as $field) {
+            if (
+                !array_key_exists(
+                    $field,
+                    $data
+                )
+            ) {
+                continue;
             }
+
+            $fields[] =
+                "{$field} = :{$field}";
+
+            $value =
+                $payload[$field];
+
+            $params[$field] =
+                $value === ''
+                ? null
+                : $value;
         }
 
         if (!$fields) {
-            return self::listByDevelopment($userId, (int)$unitType['development_id']);
+            return self::listByDevelopment(
+                $userId,
+                (int)$unitType['development_id']
+            );
         }
 
         $sql = "
-            UPDATE development_unit_types
-            SET " . implode(", ", $fields) . "
-            WHERE id = :id
-            LIMIT 1
-        ";
+        UPDATE development_unit_types
+        SET " . implode(', ', $fields) . "
+        WHERE id = :id
+        LIMIT 1
+    ";
 
-        $st = $pdo->prepare($sql);
-        $st->execute($params);
+        $pdo = self::db();
 
-        return self::listByDevelopment($userId, (int)$unitType['development_id']);
+        $st =
+            $pdo->prepare(
+                $sql
+            );
+
+        $st->execute(
+            $params
+        );
+
+        return self::listByDevelopment(
+            $userId,
+            (int)$unitType['development_id']
+        );
     }
 
     public static function delete(int $userId, int $unitTypeId): array
