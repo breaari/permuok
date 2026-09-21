@@ -891,7 +891,15 @@ class SearchRequestService
             throw new Exception("No se puede editar la búsqueda en el estado actual");
         }
 
-        self::validate($data, false);
+        $completeData = array_merge(
+            $current,
+            $data
+        );
+
+        self::validate(
+            $completeData,
+            false
+        );
 
         $pdo->beginTransaction();
 
@@ -1007,8 +1015,29 @@ class SearchRequestService
         }
     }
 
-    public static function publish(int $userId, int $id): array
-    {
+    public static function publish(
+        int $userId,
+        int $id
+    ): array {
+        $pdo = self::db();
+
+        [, $current] =
+            self::getOwnedSearchRequestRow(
+                $userId,
+                $id
+            );
+
+        $current['property_types'] =
+            self::getPropertyTypes(
+                $pdo,
+                $id
+            );
+
+        self::validate(
+            $current,
+            true
+        );
+
         $result = self::changeStatus(
             $userId,
             $id,
@@ -1016,7 +1045,9 @@ class SearchRequestService
             true
         );
 
-        self::queueCompatibilityRecalculation($id);
+        self::queueCompatibilityRecalculation(
+            $id
+        );
 
         return $result;
     }
@@ -1181,56 +1212,264 @@ class SearchRequestService
         }
     }
 
-    private static function validate(array $data, bool $strict = true): void
-    {
-        if ($strict) {
-            if (empty(trim((string)($data['title'] ?? '')))) {
-                throw new Exception("Título requerido");
-            }
+    private static function validate(
+        array $data,
+        bool $strict = true
+    ): void {
+        $requiredStrings = [
+            'title' => 'El título',
+            'description' => 'La descripción',
+            'country_code' => 'El código de país',
+            'country' => 'El país',
+            'province' => 'La provincia',
+        ];
 
-            if (empty(trim((string)($data['description'] ?? '')))) {
-                throw new Exception("Descripción requerida");
-            }
+        foreach ($requiredStrings as $field => $label) {
+            if (
+                $strict ||
+                array_key_exists($field, $data)
+            ) {
+                $value = self::nullableString(
+                    $data[$field] ?? null,
+                    $label
+                );
 
-            if (empty(trim((string)($data['country_code'] ?? ''))) || empty(trim((string)($data['province'] ?? '')))) {
-                throw new Exception("Ubicación requerida");
+                if ($strict && $value === null) {
+                    throw new Exception(
+                        "{$label} es obligatorio",
+                        422
+                    );
+                }
             }
         }
 
-        if (array_key_exists('payment_mode_cash', $data) || array_key_exists('payment_mode_swap', $data) || $strict) {
-            $cash = !empty($data['payment_mode_cash']) ? 1 : 0;
-            $swap = !empty($data['payment_mode_swap']) ? 1 : 0;
+        $optionalStrings = [
+            'city' => 'La ciudad',
+            'zone' => 'La zona',
+            'notes' => 'Las notas',
+        ];
 
-            if ($cash !== 1 && $swap !== 1) {
-                throw new Exception("Debe elegir al menos una forma de pago");
-            }
-        }
-
-        if ($strict) {
-            $types = $data['property_types'] ?? [];
-            if (!is_array($types) || count($types) === 0) {
-                throw new Exception("Debés indicar al menos un tipo de propiedad buscada");
+        foreach ($optionalStrings as $field => $label) {
+            if (array_key_exists($field, $data)) {
+                self::nullableString(
+                    $data[$field],
+                    $label
+                );
             }
         }
 
         if (
-            isset($data['min_value'], $data['max_value']) &&
-            $data['min_value'] !== null &&
-            $data['max_value'] !== null &&
-            $data['min_value'] !== '' &&
-            $data['max_value'] !== '' &&
-            (float)$data['min_value'] > (float)$data['max_value']
+            $strict ||
+            array_key_exists('country_code', $data)
         ) {
-            throw new Exception("El valor mínimo no puede ser mayor al valor máximo");
+            $countryCode =
+                $data['country_code'] ?? null;
+
+            if (
+                !is_string($countryCode) ||
+                !in_array(
+                    trim($countryCode),
+                    ['AR', 'US', 'IT'],
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'El país seleccionado no es válido',
+                    422
+                );
+            }
         }
 
         if (
-            isset($data['cash_difference_max']) &&
-            $data['cash_difference_max'] !== null &&
-            $data['cash_difference_max'] !== '' &&
-            (float)$data['cash_difference_max'] < 0
+            $strict ||
+            array_key_exists('property_condition', $data)
         ) {
-            throw new Exception("La diferencia máxima en efectivo no puede ser negativa");
+            $condition =
+                $data['property_condition'] ?? 'any';
+
+            if (
+                !is_string($condition) ||
+                !in_array(
+                    $condition,
+                    [
+                        'any',
+                        'new',
+                        'used',
+                        'to_renovate',
+                    ],
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'El estado de la propiedad no es válido',
+                    422
+                );
+            }
+        }
+
+        foreach (
+            ['currency', 'cash_difference_currency']
+            as $currencyField
+        ) {
+            if (
+                $strict ||
+                array_key_exists($currencyField, $data)
+            ) {
+                $currency =
+                    $data[$currencyField] ?? 'USD';
+
+                if (
+                    !is_string($currency) ||
+                    !in_array(
+                        $currency,
+                        ['ARS', 'USD'],
+                        true
+                    )
+                ) {
+                    throw new Exception(
+                        'La moneda seleccionada no es válida',
+                        422
+                    );
+                }
+            }
+        }
+
+        if (
+            $strict ||
+            array_key_exists('urgency', $data)
+        ) {
+            $urgency =
+                $data['urgency'] ?? 'medium';
+
+            if (
+                !is_string($urgency) ||
+                !in_array(
+                    $urgency,
+                    ['low', 'medium', 'high'],
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'La urgencia seleccionada no es válida',
+                    422
+                );
+            }
+        }
+
+        $numericFields = [
+            'min_value' => 'El valor mínimo',
+            'max_value' => 'El valor máximo',
+            'min_total_area' =>
+            'La superficie total mínima',
+            'min_covered_area' =>
+            'La superficie cubierta mínima',
+            'cash_difference_max' =>
+            'La diferencia máxima en efectivo',
+        ];
+
+        foreach ($numericFields as $field => $label) {
+            if (array_key_exists($field, $data)) {
+                self::nullableNumber(
+                    $data[$field],
+                    $label
+                );
+            }
+        }
+
+        $integerFields = [
+            'min_bedrooms' =>
+            'La cantidad mínima de dormitorios',
+            'min_bathrooms' =>
+            'La cantidad mínima de baños',
+            'min_garages' =>
+            'La cantidad mínima de cocheras',
+            'max_antiquity' =>
+            'La antigüedad máxima',
+        ];
+
+        foreach ($integerFields as $field => $label) {
+            if (array_key_exists($field, $data)) {
+                self::nullableInt(
+                    $data[$field],
+                    $label
+                );
+            }
+        }
+
+        $booleanFields = [
+            'payment_mode_cash',
+            'payment_mode_swap',
+            'open_to_other_zones',
+        ];
+
+        foreach ($booleanFields as $field) {
+            if (
+                array_key_exists($field, $data) &&
+                !in_array(
+                    $data[$field],
+                    [true, false, 0, 1, '0', '1'],
+                    true
+                )
+            ) {
+                throw new Exception(
+                    "El campo {$field} tiene un formato inválido",
+                    422
+                );
+            }
+        }
+
+        if (
+            $strict ||
+            array_key_exists('payment_mode_cash', $data) ||
+            array_key_exists('payment_mode_swap', $data)
+        ) {
+            $cash =
+                !empty($data['payment_mode_cash']);
+            $swap =
+                !empty($data['payment_mode_swap']);
+
+            if (!$cash && !$swap) {
+                throw new Exception(
+                    'Debe elegir al menos una forma de pago',
+                    422
+                );
+            }
+        }
+
+        if ($strict) {
+            $types =
+                $data['property_types'] ?? [];
+
+            if (
+                !is_array($types) ||
+                count($types) === 0
+            ) {
+                throw new Exception(
+                    'Debés indicar al menos un tipo de propiedad buscada',
+                    422
+                );
+            }
+        }
+
+        $minValue = self::nullableNumber(
+            $data['min_value'] ?? null,
+            'El valor mínimo'
+        );
+
+        $maxValue = self::nullableNumber(
+            $data['max_value'] ?? null,
+            'El valor máximo'
+        );
+
+        if (
+            $minValue !== null &&
+            $maxValue !== null &&
+            $minValue > $maxValue
+        ) {
+            throw new Exception(
+                'El valor mínimo no puede ser mayor al valor máximo',
+                422
+            );
         }
     }
 
@@ -1468,23 +1707,112 @@ class SearchRequestService
         ]);
     }
 
-    private static function nullableString(mixed $value): ?string
-    {
-        if ($value === null) return null;
-        $value = trim((string)$value);
-        return $value === '' ? null : $value;
+    private static function nullableString(
+        mixed $value,
+        string $fieldName = 'El valor'
+    ): ?string {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (!is_string($value)) {
+            throw new Exception(
+                "{$fieldName} tiene un formato inválido",
+                422
+            );
+        }
+
+        $value = trim($value);
+
+        return $value === ''
+            ? null
+            : $value;
     }
 
-    private static function nullableNumber(mixed $value): string|int|float|null
-    {
-        if ($value === null || $value === '') return null;
-        return $value;
+    private static function nullableNumber(
+        mixed $value,
+        string $fieldName = 'El valor',
+        ?float $minimum = 0
+    ): ?float {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (
+            (!is_int($value) &&
+                !is_float($value) &&
+                !is_string($value)) ||
+            !is_numeric($value)
+        ) {
+            throw new Exception(
+                "{$fieldName} debe ser un número válido",
+                422
+            );
+        }
+
+        $number = (float)$value;
+
+        if (!is_finite($number)) {
+            throw new Exception(
+                "{$fieldName} debe ser un número válido",
+                422
+            );
+        }
+
+        if (
+            $minimum !== null &&
+            $number < $minimum
+        ) {
+            throw new Exception(
+                "{$fieldName} no puede ser negativo",
+                422
+            );
+        }
+
+        return $number;
     }
 
-    private static function nullableInt(mixed $value): ?int
-    {
-        if ($value === null || $value === '') return null;
-        return (int)$value;
+    private static function nullableInt(
+        mixed $value,
+        string $fieldName = 'El valor',
+        int $minimum = 0
+    ): ?int {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (
+            (!is_int($value) &&
+                !is_float($value) &&
+                !is_string($value)) ||
+            !is_numeric($value)
+        ) {
+            throw new Exception(
+                "{$fieldName} debe ser un número entero válido",
+                422
+            );
+        }
+
+        $number = (float)$value;
+
+        if (
+            !is_finite($number) ||
+            floor($number) !== $number
+        ) {
+            throw new Exception(
+                "{$fieldName} debe ser un número entero válido",
+                422
+            );
+        }
+
+        if ($number < $minimum) {
+            throw new Exception(
+                "{$fieldName} no puede ser negativo",
+                422
+            );
+        }
+
+        return (int)$number;
     }
 
     public static function listExploreSearchRequests(int $userId, array $filters = []): array
