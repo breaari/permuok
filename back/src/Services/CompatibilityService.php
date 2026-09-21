@@ -988,7 +988,15 @@ INNER JOIN properties p
                     403
                 );
             }
-
+            if (
+                $compatibility['status']
+                === 'archived'
+            ) {
+                throw new Exception(
+                    'Esta compatibilidad ya no se encuentra disponible.',
+                    409
+                );
+            }
             if (
                 $compatibility['status']
                 === 'chat_enabled'
