@@ -34,13 +34,172 @@ class AuthService
     {
         $pdo = self::db();
 
-        $email = $data['email'] ?? '';
-        if (!is_string($email) || trim($email) === '') {
-            return ['error' => 'Email requerido'];
+        $emailValue =
+            $data['email'] ?? null;
+
+        $passwordValue =
+            $data['password'] ?? null;
+
+        $firstNameValue =
+            $data['first_name'] ?? null;
+
+        $lastNameValue =
+            $data['last_name'] ?? null;
+
+        $phoneValue =
+            $data['phone'] ?? null;
+
+        /*
+ * No convertimos arrays u objetos silenciosamente
+ * a texto. Todos estos campos deben ser strings.
+ */
+        if (!is_string($emailValue)) {
+            return [
+                'error' =>
+                'Ingresá un email válido.',
+            ];
         }
 
+        if (!is_string($passwordValue)) {
+            return [
+                'error' =>
+                'La contraseña no tiene un formato válido.',
+            ];
+        }
+
+        if (!is_string($firstNameValue)) {
+            return [
+                'error' =>
+                'Ingresá un nombre válido.',
+            ];
+        }
+
+        if (!is_string($lastNameValue)) {
+            return [
+                'error' =>
+                'Ingresá un apellido válido.',
+            ];
+        }
+
+        if (!is_string($phoneValue)) {
+            return [
+                'error' =>
+                'Ingresá un teléfono válido.',
+            ];
+        }
+
+        $email =
+            trim($emailValue);
+
         $password =
-            (string)($data['password'] ?? '');
+            $passwordValue;
+
+        $first =
+            trim($firstNameValue);
+
+        $last =
+            trim($lastNameValue);
+
+        $phone =
+            trim($phoneValue);
+
+        if ($first === '') {
+            return [
+                'error' =>
+                'El nombre es requerido.',
+            ];
+        }
+
+        if ($last === '') {
+            return [
+                'error' =>
+                'El apellido es requerido.',
+            ];
+        }
+
+        if ($phone === '') {
+            return [
+                'error' =>
+                'El teléfono es requerido.',
+            ];
+        }
+
+        $firstLength =
+            function_exists('mb_strlen')
+            ? mb_strlen($first, 'UTF-8')
+            : strlen($first);
+
+        $lastLength =
+            function_exists('mb_strlen')
+            ? mb_strlen($last, 'UTF-8')
+            : strlen($last);
+
+        if (
+            $firstLength < 1 ||
+            $firstLength > 80
+        ) {
+            return [
+                'error' =>
+                'El nombre debe tener hasta 80 caracteres.',
+            ];
+        }
+
+        if (
+            $lastLength < 1 ||
+            $lastLength > 80
+        ) {
+            return [
+                'error' =>
+                'El apellido debe tener hasta 80 caracteres.',
+            ];
+        }
+
+        /*
+ * Permite letras Unicode, espacios, apóstrofes,
+ * puntos y guiones habituales en nombres.
+ */
+        $namePattern =
+            "/^[\p{L}\p{M}][\p{L}\p{M}\s.'’\-]*$/u";
+
+        if (
+            preg_match(
+                $namePattern,
+                $first
+            ) !== 1
+        ) {
+            return [
+                'error' =>
+                'Ingresá un nombre válido.',
+            ];
+        }
+
+        if (
+            preg_match(
+                $namePattern,
+                $last
+            ) !== 1
+        ) {
+            return [
+                'error' =>
+                'Ingresá un apellido válido.',
+            ];
+        }
+
+        /*
+ * PhoneField envía el número normalizado
+ * internacionalmente, por ejemplo +549223...
+ */
+        if (
+            preg_match(
+                '/^\+[1-9][0-9]{7,14}$/',
+                $phone
+            ) !== 1
+        ) {
+            return [
+                'error' =>
+                'Ingresá un teléfono válido con código de país.',
+            ];
+        }
 
         $passwordError =
             PasswordPolicyService::validationError(
@@ -49,13 +208,10 @@ class AuthService
 
         if ($passwordError !== null) {
             return [
-                'error' => $passwordError,
+                'error' =>
+                $passwordError,
             ];
         }
-
-        $first = trim((string)($data['first_name'] ?? ''));
-        $last  = trim((string)($data['last_name'] ?? ''));
-        $phone = trim((string)($data['phone'] ?? ''));
 
         if ($first === '') return ['error' => 'first_name requerido'];
         if ($last === '')  return ['error' => 'last_name requerido'];
