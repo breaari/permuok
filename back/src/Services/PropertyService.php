@@ -623,7 +623,12 @@ class PropertyService
             $requirementPropertyTypes = $stTypes->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
             $stLocations = $pdo->prepare("
-            SELECT id, country_code, country, province, city, zone
+            SELECT
+    country_code,
+    country,
+    province,
+    city,
+    zone
             FROM property_requirement_locations
             WHERE property_requirement_id = :property_requirement_id
             ORDER BY id ASC
@@ -2260,8 +2265,29 @@ class PropertyService
         }
 
         $st = $pdo->prepare("
-    SELECT *
-    FROM properties
+   SELECT
+    id,
+    title,
+    description,
+    property_type,
+    price,
+    currency,
+    country_code,
+    country,
+    province,
+    city,
+    zone,
+    total_area,
+    covered_area,
+    bedrooms,
+    bathrooms,
+    garages,
+    antiquity,
+    status,
+    published_at,
+    created_at,
+    updated_at
+FROM properties
     WHERE " . implode(" AND ", $where) . "
     LIMIT 1
 ");
@@ -2274,7 +2300,11 @@ class PropertyService
         }
 
         $stImages = $pdo->prepare("
-        SELECT id, property_id, file_path, sort_order, is_cover, created_at
+       SELECT
+    id,
+    sort_order,
+    is_cover,
+    created_at
         FROM property_images
         WHERE property_id = :property_id
           AND deleted_at IS NULL
@@ -2289,8 +2319,33 @@ class PropertyService
         }, $images);
 
         $stReq = $pdo->prepare("
-        SELECT *
-        FROM property_requirements
+      SELECT
+    id,
+    criteria_mode,
+    accepts_total_swap,
+    accepts_swap_plus_cash,
+    accepts_multiple_swap,
+    accepts_open_proposals,
+    accepts_cash_only,
+    cash_difference_direction,
+    cash_difference_min,
+    cash_difference_max,
+    cash_difference_currency,
+    price_min,
+    price_max,
+    price_currency,
+    min_total_area,
+    max_total_area,
+    min_covered_area,
+    max_covered_area,
+    min_bedrooms,
+    min_bathrooms,
+    min_garages,
+    max_antiquity,
+    open_to_other_zones,
+    notes,
+    property_condition
+FROM property_requirements
         WHERE property_id = :property_id
           AND deleted_at IS NULL
         LIMIT 1
@@ -2322,6 +2377,7 @@ class PropertyService
         ");
             $stLocations->execute(['property_requirement_id' => $requirementId]);
             $requirementLocations = $stLocations->fetchAll() ?: [];
+            unset($requirements['id']);
         }
 
         return [

@@ -1523,8 +1523,36 @@ class SearchRequestService
         }
 
         $st = $pdo->prepare("
-    SELECT *
-    FROM search_requests
+   SELECT
+    id,
+    title,
+    description,
+    country_code,
+    country,
+    province,
+    city,
+    zone,
+    property_condition,
+    currency,
+    min_value,
+    max_value,
+    min_total_area,
+    min_covered_area,
+    min_bedrooms,
+    min_bathrooms,
+    min_garages,
+    max_antiquity,
+    urgency,
+    payment_mode_cash,
+    payment_mode_swap,
+    cash_difference_max,
+    cash_difference_currency,
+    open_to_other_zones,
+    status,
+    published_at,
+    created_at,
+    updated_at
+FROM search_requests
     WHERE " . implode(" AND ", $where) . "
     LIMIT 1
 ");

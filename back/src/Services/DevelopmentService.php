@@ -505,9 +505,12 @@ class DevelopmentService
 
         $isPublisherRole = in_array((int)$user['role'], [self::ROLE_REAL_ESTATE, self::ROLE_AGENT], true);
 
+        $isOwner = false;
+
         if ($isPublisherRole) {
             try {
                 [, $development] = self::getOwnedDevelopment($userId, $developmentId);
+                $isOwner = true;
             } catch (\Throwable $e) {
                 $development = self::getVisibleDevelopment($userId, $developmentId);
 
@@ -556,6 +559,47 @@ class DevelopmentService
         ");
         $stAmenities->execute(['development_id' => $developmentId]);
         $amenities = $stAmenities->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+        if (!$isOwner) {
+            unset(
+                $development['real_estate_id'],
+                $development['created_by_user_id'],
+                $development['updated_by_user_id'],
+                $development['address'],
+                $development['formatted_address'],
+                $development['postal_code'],
+                $development['place_id'],
+                $development['latitude'],
+                $development['longitude'],
+                $development['whatsapp_url'],
+                $development['billing_paused_at'],
+                $development['deleted_at']
+            );
+
+            $images = array_map(
+                static function (array $image): array {
+                    unset(
+                        $image['development_id'],
+                        $image['file_path']
+                    );
+
+                    return $image;
+                },
+                $images
+            );
+
+            $unitTypes = array_map(
+                static function (array $unitType): array {
+                    unset(
+                        $unitType['development_id'],
+                        $unitType['deleted_at']
+                    );
+
+                    return $unitType;
+                },
+                $unitTypes
+            );
+        }
 
         return [
             'development' => $development,
