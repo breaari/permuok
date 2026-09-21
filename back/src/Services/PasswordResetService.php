@@ -143,9 +143,36 @@ class PasswordResetService
 
         try {
             /*
-             * Invalidamos enlaces anteriores que todavía
-             * no hayan sido utilizados.
-             */
+     * Serializamos las solicitudes de recuperación
+     * de una misma cuenta.
+     *
+     * Esto evita que dos solicitudes simultáneas
+     * puedan crear dos enlaces válidos.
+     */
+            $lockUser = $pdo->prepare("
+        SELECT id
+        FROM users
+        WHERE id = :user_id
+          AND deleted_at IS NULL
+        LIMIT 1
+        FOR UPDATE
+    ");
+
+            $lockUser->execute([
+                'user_id' =>
+                (int)$user['id'],
+            ]);
+
+            if (!$lockUser->fetchColumn()) {
+                $pdo->rollBack();
+
+                return;
+            }
+
+            /*
+     * Invalidamos enlaces anteriores que todavía
+     * no hayan sido utilizados.
+     */
             $invalidate = $pdo->prepare("
                 UPDATE password_reset_tokens
                 SET used_at = NOW()
