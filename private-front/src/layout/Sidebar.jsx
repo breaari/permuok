@@ -72,18 +72,6 @@ export default function Sidebar({ mobile = false, onNavigate }) {
 
   const canPublishDevelopments = resolveDevelopmentPublishAccess(user, access);
 
-  console.log("SIDEBAR AUTH DEBUG", {
-    role: Number(user?.role || 0),
-    user,
-    access,
-    permissions,
-    featuresRaw: access?.features,
-    membershipRaw: access?.membership,
-    final: {
-      canPublishDevelopments,
-    },
-  });
-
   return (
     <aside
       className={
