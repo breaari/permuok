@@ -11,7 +11,7 @@ class ExploreService
         require_once __DIR__ . '/../../db.php';
         return pdo();
     }
-    
+
     private static function imageViewUrl(
         ?int $imageId
     ): ?string {
@@ -182,23 +182,63 @@ class ExploreService
 
         $sql = "
     SELECT
-        p.*,
+        p.id,
+        p.title,
+        p.description,
+        p.property_type,
+        p.price,
+        p.currency,
+        p.country_code,
+        p.country,
+        p.province,
+        p.city,
+        p.zone,
+        p.total_area,
+        p.covered_area,
+        p.bedrooms,
+        p.bathrooms,
+        p.garages,
+        p.antiquity,
+        p.status,
+        p.created_at,
+
+        pr.criteria_mode,
+        pr.accepts_total_swap,
+        pr.accepts_swap_plus_cash,
+        pr.accepts_multiple_swap,
+        pr.accepts_open_proposals,
+        pr.accepts_cash_only,
+        pr.notes AS requirement_notes,
+
         pi.id AS cover_image_id,
         'property' AS opportunity_type,
         p.price AS sort_value
+
     FROM properties p
+
+    LEFT JOIN property_requirements pr
+        ON pr.property_id = p.id
+       AND pr.deleted_at IS NULL
+
     LEFT JOIN property_images pi
-      ON pi.id = (
-        SELECT pi2.id
-        FROM property_images pi2
-        WHERE pi2.property_id = p.id
-          AND pi2.deleted_at IS NULL
-        ORDER BY pi2.is_cover DESC, pi2.sort_order ASC, pi2.id ASC
-        LIMIT 1
-      )
+        ON pi.id = (
+            SELECT pi2.id
+            FROM property_images pi2
+            WHERE pi2.property_id = p.id
+              AND pi2.deleted_at IS NULL
+            ORDER BY
+                pi2.is_cover DESC,
+                pi2.sort_order ASC,
+                pi2.id ASC
+            LIMIT 1
+        )
+
     WHERE " . implode(" AND ", $where) . "
+
     ORDER BY p.created_at DESC
-    LIMIT {$limit} OFFSET {$offset}
+
+    LIMIT {$limit}
+    OFFSET {$offset}
 ";
 
         $st = $pdo->prepare($sql);
@@ -290,15 +330,61 @@ class ExploreService
         self::applyAmenitiesForSearchRequests($where, $params, $filters);
 
         $sql = "
-            SELECT
-                sr.*,
-                'search_request' AS opportunity_type,
-                COALESCE(sr.max_value, sr.min_value, 0) AS sort_value
-            FROM search_requests sr
-            WHERE " . implode(" AND ", $where) . "
-            ORDER BY sr.created_at DESC
-            LIMIT {$limit} OFFSET {$offset}
-        ";
+    SELECT
+        sr.id,
+        sr.title,
+        sr.description,
+        sr.country_code,
+        sr.country,
+        sr.province,
+        sr.city,
+        sr.zone,
+        sr.property_condition,
+        sr.currency,
+        sr.min_value,
+        sr.max_value,
+        sr.min_total_area,
+        sr.min_covered_area,
+        sr.min_bedrooms,
+        sr.min_bathrooms,
+        sr.min_garages,
+        sr.max_antiquity,
+        sr.urgency,
+        sr.payment_mode_cash,
+        sr.payment_mode_swap,
+        sr.cash_difference_max,
+        sr.cash_difference_currency,
+        sr.open_to_other_zones,
+        sr.status,
+        sr.created_at,
+
+        (
+            SELECT GROUP_CONCAT(
+                srpt.property_type
+                ORDER BY srpt.property_type ASC
+                SEPARATOR ','
+            )
+            FROM search_request_property_types srpt
+            WHERE srpt.search_request_id = sr.id
+        ) AS property_types,
+
+        'search_request' AS opportunity_type,
+
+        COALESCE(
+            sr.max_value,
+            sr.min_value,
+            0
+        ) AS sort_value
+
+    FROM search_requests sr
+
+    WHERE " . implode(" AND ", $where) . "
+
+    ORDER BY sr.created_at DESC
+
+    LIMIT {$limit}
+    OFFSET {$offset}
+";
 
         $st = $pdo->prepare($sql);
         $st->execute($params);
@@ -375,23 +461,63 @@ class ExploreService
 
         $sql = "
     SELECT
-        d.*,
+        d.id,
+        d.title,
+        d.short_description,
+        d.developer_name,
+        d.construction_company,
+        d.development_stage,
+        d.delivery_date_estimated,
+        d.country_code,
+        d.country,
+        d.province,
+        d.city,
+        d.zone,
+        d.price_from,
+        d.price_to,
+        d.currency,
+        d.total_units,
+        d.available_units,
+        d.status,
+        d.created_at,
+
+        (
+            SELECT COUNT(*)
+            FROM development_unit_types dut
+            WHERE dut.development_id = d.id
+              AND dut.deleted_at IS NULL
+        ) AS unit_types_count,
+
         di.id AS cover_image_id,
         'development' AS opportunity_type,
-        COALESCE(d.price_from, d.price_to, 0) AS sort_value
+
+        COALESCE(
+            d.price_from,
+            d.price_to,
+            0
+        ) AS sort_value
+
     FROM developments d
+
     LEFT JOIN development_images di
-      ON di.id = (
-        SELECT di2.id
-        FROM development_images di2
-        WHERE di2.development_id = d.id
-          AND di2.deleted_at IS NULL
-        ORDER BY di2.is_cover DESC, di2.sort_order ASC, di2.id ASC
-        LIMIT 1
-      )
+        ON di.id = (
+            SELECT di2.id
+            FROM development_images di2
+            WHERE di2.development_id = d.id
+              AND di2.deleted_at IS NULL
+            ORDER BY
+                di2.is_cover DESC,
+                di2.sort_order ASC,
+                di2.id ASC
+            LIMIT 1
+        )
+
     WHERE " . implode(" AND ", $where) . "
+
     ORDER BY d.created_at DESC
-    LIMIT {$limit} OFFSET {$offset}
+
+    LIMIT {$limit}
+    OFFSET {$offset}
 ";
 
         $st = $pdo->prepare($sql);
