@@ -1304,9 +1304,10 @@ class DevelopmentService
 
             $st = $pdo->prepare("
                 UPDATE developments
-                SET
-                    deleted_at = NOW(),
-                    updated_by_user_id = :updated_by_user_id
+    SET
+    is_visible = 0,
+    deleted_at = NOW(),
+    updated_by_user_id = :updated_by_user_id
                 WHERE id = :id
                 LIMIT 1
             ");
