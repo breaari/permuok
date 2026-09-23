@@ -17,6 +17,30 @@ class AdminRealEstateController
         return $ctx;
     }
 
+    private static function handleError(
+        \Throwable $e
+    ): void {
+        $code = (int)$e->getCode();
+
+        if (
+            !($e instanceof \PDOException) &&
+            $code >= 400 &&
+            $code <= 499
+        ) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                $code
+            );
+        }
+
+        ResponseHelper::fromThrowable(
+            $e,
+            'No se pudo completar la operación.',
+            'AdminRealEstateController'
+        );
+    }
+
+
     private static function readJsonObject(): array
     {
         $raw =
@@ -98,28 +122,7 @@ class AdminRealEstateController
         }
     }
 
-    private static function handleError(
-        \Throwable $e
-    ): void {
-        $code = (int)$e->getCode();
 
-        if (
-            !($e instanceof \PDOException) &&
-            $code >= 400 &&
-            $code <= 499
-        ) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                $code
-            );
-        }
-
-        ResponseHelper::fromThrowable(
-            $e,
-            'No se pudo completar la operación.',
-            'AdminRealEstateController'
-        );
-    }
 
     public static function validate(): void
     {
