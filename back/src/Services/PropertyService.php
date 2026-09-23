@@ -2107,12 +2107,11 @@ class PropertyService
         int $userId,
         int $propertyId
     ): array {
-        [$user, $property] = self::getOwnedProperty(
-            $userId,
-            $propertyId
-        );
-
-        $pdo = self::db();
+        [$user, $property] =
+            self::getOwnedProperty(
+                $userId,
+                $propertyId
+            );
 
         if (
             !in_array(
@@ -2122,34 +2121,25 @@ class PropertyService
             )
         ) {
             throw new Exception(
-                "La propiedad no puede publicarse en su estado actual"
+                'La propiedad no puede publicarse en su estado actual',
+                409
             );
         }
 
-        $requiredFields = [
-            'title',
-            'description',
-            'property_type',
-            'price',
-            'country_code',
-            'country',
-            'province',
-            'city',
-        ];
+        /*
+     * Revalida toda la propiedad almacenada.
+     * Esto también controla precio, superficies,
+     * coordenadas y cantidades enteras.
+     */
+        self::validatePropertyPayload(
+            $property,
+            false
+        );
 
-        foreach ($requiredFields as $field) {
-            if (
-                empty($property[$field]) &&
-                $property[$field] !== '0'
-            ) {
-                throw new Exception(
-                    "Faltan datos obligatorios para publicar"
-                );
-            }
-        }
+        $pdo = self::db();
 
         $stImages = $pdo->prepare("
-        SELECT COUNT(*) AS total
+        SELECT COUNT(*)
         FROM property_images
         WHERE property_id = :property_id
           AND deleted_at IS NULL
@@ -2159,13 +2149,13 @@ class PropertyService
             'property_id' => $propertyId,
         ]);
 
-        $imageCount = (int)(
-            $stImages->fetchColumn() ?: 0
-        );
+        $imageCount =
+            (int)$stImages->fetchColumn();
 
         if ($imageCount < 1) {
             throw new Exception(
-                "Debés subir al menos una imagen para publicar"
+                'Debés subir al menos una imagen para publicar',
+                422
             );
         }
 
@@ -2181,33 +2171,119 @@ class PropertyService
             'property_id' => $propertyId,
         ]);
 
-        $requirements = $stRequirements->fetch(
-            PDO::FETCH_ASSOC
-        );
+        $requirements =
+            $stRequirements->fetch(
+                PDO::FETCH_ASSOC
+            );
 
         if (!$requirements) {
             throw new Exception(
-                "Debés completar los criterios de intercambio"
+                'Debés completar los criterios de intercambio',
+                422
             );
         }
 
+        $requirementId =
+            (int)$requirements['id'];
+
+        $stTypes = $pdo->prepare("
+        SELECT property_type
+        FROM property_requirement_property_types
+        WHERE property_requirement_id =
+            :property_requirement_id
+        ORDER BY id ASC
+    ");
+
+        $stTypes->execute([
+            'property_requirement_id' =>
+            $requirementId,
+        ]);
+
+        $propertyTypes =
+            $stTypes->fetchAll(
+                PDO::FETCH_COLUMN
+            ) ?: [];
+
+        $stLocations = $pdo->prepare("
+        SELECT
+            country_code,
+            country,
+            province,
+            city,
+            zone
+        FROM property_requirement_locations
+        WHERE property_requirement_id =
+            :property_requirement_id
+        ORDER BY id ASC
+    ");
+
+        $stLocations->execute([
+            'property_requirement_id' =>
+            $requirementId,
+        ]);
+
+        $locations =
+            $stLocations->fetchAll(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        $requirementsToValidate =
+            array_merge(
+                $requirements,
+                [
+                    'property_types' =>
+                    $propertyTypes,
+                    'locations' =>
+                    $locations,
+                ]
+            );
+
+        $validatedRequirements =
+            self::normalizeRequirementsPayload(
+                $requirementsToValidate
+            );
+
         $hasAnyMode =
-            (int)$requirements['accepts_total_swap'] === 1 ||
-            (int)$requirements['accepts_swap_plus_cash'] === 1 ||
-            (int)$requirements['accepts_multiple_swap'] === 1 ||
-            (int)$requirements['accepts_open_proposals'] === 1 ||
-            (int)$requirements['accepts_cash_only'] === 1;
+            !empty($validatedRequirements['accepts_total_swap']) ||
+            !empty($validatedRequirements['accepts_swap_plus_cash']) ||
+            !empty($validatedRequirements['accepts_multiple_swap']) ||
+            !empty($validatedRequirements['accepts_open_proposals']) ||
+            !empty($validatedRequirements['accepts_cash_only']);
 
         if (!$hasAnyMode) {
             throw new Exception(
-                "Debés definir al menos una modalidad de intercambio"
+                'Debés definir al menos una modalidad de intercambio',
+                422
             );
+        }
+
+        if (
+            $validatedRequirements['criteria_mode'] === 'criteria'
+        ) {
+            if (
+                empty($validatedRequirements['property_types'])
+            ) {
+                throw new Exception(
+                    'Debés seleccionar al menos un tipo de propiedad buscada',
+                    422
+                );
+            }
+
+            if (
+                empty($validatedRequirements['locations'])
+            ) {
+                throw new Exception(
+                    'Debés seleccionar al menos una ubicación buscada',
+                    422
+                );
+            }
         }
 
         $pdo->beginTransaction();
 
         try {
-            $oldStatus = $property['status'];
+            $oldStatus =
+                $property['status'];
 
             $st = $pdo->prepare("
             UPDATE properties
@@ -2224,7 +2300,8 @@ class PropertyService
                 updated_by_user_id =
                     :updated_by_user_id
             WHERE id = :id
-              AND real_estate_id = :real_estate_id
+              AND real_estate_id =
+                    :real_estate_id
               AND deleted_at IS NULL
             LIMIT 1
         ");
@@ -2232,10 +2309,18 @@ class PropertyService
             $st->execute([
                 'updated_by_user_id' =>
                 (int)$user['id'],
-                'id' => $propertyId,
+                'id' =>
+                $propertyId,
                 'real_estate_id' =>
                 (int)$user['real_estate_id'],
             ]);
+
+            if ($st->rowCount() !== 1) {
+                throw new Exception(
+                    'No se pudo publicar la propiedad',
+                    409
+                );
+            }
 
             $hist = $pdo->prepare("
             INSERT INTO property_status_history (
@@ -2256,13 +2341,16 @@ class PropertyService
         ");
 
             $hist->execute([
-                'property_id' => $propertyId,
-                'old_status' => $oldStatus,
+                'property_id' =>
+                $propertyId,
+                'old_status' =>
+                $oldStatus,
                 'changed_by_user_id' =>
                 (int)$user['id'],
             ]);
 
             $pdo->commit();
+
             self::queueQualityRecalculation(
                 $propertyId
             );
@@ -2283,6 +2371,7 @@ class PropertyService
             throw $e;
         }
     }
+
     public static function pause(
         int $userId,
         int $propertyId
