@@ -179,14 +179,38 @@ class DevelopmentImageController
             $auth =
                 AuthHelper::requireUser();
 
-            $developmentId =
-                (int)($_GET['id'] ?? 0);
+            $developmentId = filter_var(
+                $_GET['id'] ?? null,
+                FILTER_VALIDATE_INT,
+                [
+                    'options' => [
+                        'min_range' => 1,
+                    ],
+                ]
+            );
+
+            if ($developmentId === false) {
+                throw new \Exception(
+                    'Identificador de desarrollo inválido',
+                    422
+                );
+            }
+
+            $files =
+                $_FILES['images'] ?? [];
+
+            if (!is_array($files)) {
+                throw new \Exception(
+                    'El contenido de las imágenes es inválido',
+                    422
+                );
+            }
 
             $result =
                 DevelopmentImageService::upload(
                     (int)$auth['id'],
-                    $developmentId,
-                    $_FILES['images'] ?? []
+                    (int)$developmentId,
+                    $files
                 );
 
             ResponseHelper::ok(
@@ -204,13 +228,27 @@ class DevelopmentImageController
             $auth =
                 AuthHelper::requireUser();
 
-            $imageId =
-                (int)($_GET['image_id'] ?? 0);
+            $imageId = filter_var(
+                $_GET['image_id'] ?? null,
+                FILTER_VALIDATE_INT,
+                [
+                    'options' => [
+                        'min_range' => 1,
+                    ],
+                ]
+            );
+
+            if ($imageId === false) {
+                throw new \Exception(
+                    'Identificador de imagen inválido',
+                    422
+                );
+            }
 
             $result =
                 DevelopmentImageService::delete(
                     (int)$auth['id'],
-                    $imageId
+                    (int)$imageId
                 );
 
             ResponseHelper::ok(

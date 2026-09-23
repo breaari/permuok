@@ -50,11 +50,23 @@ class DevelopmentImageViewController
 
         exit;
     }
-
     public static function show(): void
     {
-        $imageId =
-            (int)($_GET['id'] ?? 0);
+        $imageId = filter_var(
+            $_GET['id'] ?? null,
+            FILTER_VALIDATE_INT,
+            [
+                'options' => [
+                    'min_range' => 1,
+                ],
+            ]
+        );
+
+        if ($imageId === false) {
+            self::notFound();
+        }
+
+        $imageId = (int)$imageId;
 
         $expires =
             $_GET['expires'] ?? null;
@@ -76,22 +88,21 @@ class DevelopmentImageViewController
         $pdo = self::db();
 
         $stmt = $pdo->prepare("
-            SELECT
-                di.id,
-                di.file_path
+        SELECT
+            di.id,
+            di.file_path
+        FROM development_images di
 
-            FROM development_images di
+        INNER JOIN developments development
+            ON development.id =
+                di.development_id
+           AND development.deleted_at IS NULL
 
-            INNER JOIN developments development
-                ON development.id =
-                    di.development_id
-               AND development.deleted_at IS NULL
+        WHERE di.id = :id
+          AND di.deleted_at IS NULL
 
-            WHERE di.id = :id
-              AND di.deleted_at IS NULL
-
-            LIMIT 1
-        ");
+        LIMIT 1
+    ");
 
         $stmt->execute([
             ':id' => $imageId,
@@ -107,15 +118,14 @@ class DevelopmentImageViewController
             self::notFound();
         }
 
-        $relativePath =
-            ltrim(
-                str_replace(
-                    '\\',
-                    '/',
-                    (string)$image['file_path']
-                ),
-                '/'
-            );
+        $relativePath = ltrim(
+            str_replace(
+                '\\',
+                '/',
+                (string)$image['file_path']
+            ),
+            '/'
+        );
 
         if (
             !str_starts_with(
@@ -126,25 +136,24 @@ class DevelopmentImageViewController
             self::notFound();
         }
 
-        $uploadsDir =
-            realpath(
-                self::getUploadsDir()
-            );
+        $uploadsDir = realpath(
+            self::getUploadsDir()
+        );
 
         if ($uploadsDir === false) {
             self::notFound();
         }
 
-        $fullPath =
-            realpath(
-                $uploadsDir .
-                    DIRECTORY_SEPARATOR .
-                    $relativePath
-            );
+        $fullPath = realpath(
+            $uploadsDir .
+                DIRECTORY_SEPARATOR .
+                $relativePath
+        );
 
         if (
             $fullPath === false ||
-            !is_file($fullPath)
+            !is_file($fullPath) ||
+            !is_readable($fullPath)
         ) {
             self::notFound();
         }
@@ -165,8 +174,12 @@ class DevelopmentImageViewController
             self::notFound();
         }
 
+        $finfo = new \finfo(
+            FILEINFO_MIME_TYPE
+        );
+
         $mime =
-            mime_content_type($fullPath);
+            $finfo->file($fullPath);
 
         if (
             !is_string($mime) ||
@@ -175,6 +188,26 @@ class DevelopmentImageViewController
                 self::ALLOWED_MIME_TYPES,
                 true
             )
+        ) {
+            self::notFound();
+        }
+
+        $imageInfo =
+            @getimagesize($fullPath);
+
+        if (
+            $imageInfo === false ||
+            ($imageInfo['mime'] ?? '') !== $mime
+        ) {
+            self::notFound();
+        }
+
+        $fileSize =
+            filesize($fullPath);
+
+        if (
+            $fileSize === false ||
+            $fileSize <= 0
         ) {
             self::notFound();
         }
@@ -195,8 +228,11 @@ class DevelopmentImageViewController
         );
 
         header(
-            'Content-Length: ' .
-                filesize($fullPath)
+            'Content-Length: ' . $fileSize
+        );
+
+        header(
+            'Content-Disposition: inline'
         );
 
         header(
@@ -209,7 +245,7 @@ class DevelopmentImageViewController
         );
 
         header(
-            "Content-Security-Policy: default-src 'none'"
+            "Content-Security-Policy: default-src 'none'; sandbox"
         );
 
         readfile($fullPath);

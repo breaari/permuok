@@ -53,8 +53,21 @@ class PropertyImageViewController
 
     public static function show(): void
     {
-        $imageId =
-            (int)($_GET['id'] ?? 0);
+        $imageId = filter_var(
+            $_GET['id'] ?? null,
+            FILTER_VALIDATE_INT,
+            [
+                'options' => [
+                    'min_range' => 1,
+                ],
+            ]
+        );
+
+        if ($imageId === false) {
+            self::notFound();
+        }
+
+        $imageId = (int)$imageId;
 
         $expires =
             $_GET['expires'] ?? null;
@@ -76,21 +89,20 @@ class PropertyImageViewController
         $pdo = self::db();
 
         $stmt = $pdo->prepare("
-            SELECT
-                pi.id,
-                pi.file_path
+        SELECT
+            pi.id,
+            pi.file_path
+        FROM property_images pi
 
-            FROM property_images pi
+        INNER JOIN properties property
+            ON property.id = pi.property_id
+           AND property.deleted_at IS NULL
 
-            INNER JOIN properties property
-                ON property.id = pi.property_id
-               AND property.deleted_at IS NULL
+        WHERE pi.id = :id
+          AND pi.deleted_at IS NULL
 
-            WHERE pi.id = :id
-              AND pi.deleted_at IS NULL
-
-            LIMIT 1
-        ");
+        LIMIT 1
+    ");
 
         $stmt->execute([
             ':id' => $imageId,
@@ -106,20 +118,15 @@ class PropertyImageViewController
             self::notFound();
         }
 
-        $relativePath =
-            ltrim(
-                str_replace(
-                    '\\',
-                    '/',
-                    (string)$image['file_path']
-                ),
-                '/'
-            );
+        $relativePath = ltrim(
+            str_replace(
+                '\\',
+                '/',
+                (string)$image['file_path']
+            ),
+            '/'
+        );
 
-        /*
-         * Una imagen de propiedad solamente puede
-         * apuntar a su carpeta correspondiente.
-         */
         if (
             !str_starts_with(
                 $relativePath,
@@ -129,33 +136,28 @@ class PropertyImageViewController
             self::notFound();
         }
 
-        $uploadsDir =
-            realpath(
-                self::getUploadsDir()
-            );
+        $uploadsDir = realpath(
+            self::getUploadsDir()
+        );
 
         if ($uploadsDir === false) {
             self::notFound();
         }
 
-        $fullPath =
-            realpath(
-                $uploadsDir .
-                    DIRECTORY_SEPARATOR .
-                    $relativePath
-            );
+        $fullPath = realpath(
+            $uploadsDir .
+                DIRECTORY_SEPARATOR .
+                $relativePath
+        );
 
         if (
             $fullPath === false ||
-            !is_file($fullPath)
+            !is_file($fullPath) ||
+            !is_readable($fullPath)
         ) {
             self::notFound();
         }
 
-        /*
-         * Evita que una ruta almacenada pueda
-         * salir del directorio uploads.
-         */
         $allowedPrefix =
             rtrim(
                 $uploadsDir,
@@ -172,8 +174,16 @@ class PropertyImageViewController
             self::notFound();
         }
 
+        /*
+     * Se comprueba nuevamente el contenido real
+     * antes de entregarlo al navegador.
+     */
+        $finfo = new \finfo(
+            FILEINFO_MIME_TYPE
+        );
+
         $mime =
-            mime_content_type($fullPath);
+            $finfo->file($fullPath);
 
         if (
             !is_string($mime) ||
@@ -182,6 +192,26 @@ class PropertyImageViewController
                 self::ALLOWED_MIME_TYPES,
                 true
             )
+        ) {
+            self::notFound();
+        }
+
+        $imageInfo =
+            @getimagesize($fullPath);
+
+        if (
+            $imageInfo === false ||
+            ($imageInfo['mime'] ?? '') !== $mime
+        ) {
+            self::notFound();
+        }
+
+        $fileSize =
+            filesize($fullPath);
+
+        if (
+            $fileSize === false ||
+            $fileSize <= 0
         ) {
             self::notFound();
         }
@@ -202,8 +232,11 @@ class PropertyImageViewController
         );
 
         header(
-            'Content-Length: ' .
-                filesize($fullPath)
+            'Content-Length: ' . $fileSize
+        );
+
+        header(
+            'Content-Disposition: inline'
         );
 
         header(
@@ -216,7 +249,7 @@ class PropertyImageViewController
         );
 
         header(
-            "Content-Security-Policy: default-src 'none'"
+            "Content-Security-Policy: default-src 'none'; sandbox"
         );
 
         readfile($fullPath);

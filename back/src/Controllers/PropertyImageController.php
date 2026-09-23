@@ -161,14 +161,38 @@ class PropertyImageController
             $auth =
                 AuthHelper::requireUser();
 
-            $propertyId =
-                (int)($_GET['id'] ?? 0);
+            $propertyId = filter_var(
+                $_GET['id'] ?? null,
+                FILTER_VALIDATE_INT,
+                [
+                    'options' => [
+                        'min_range' => 1,
+                    ],
+                ]
+            );
+
+            if ($propertyId === false) {
+                throw new \Exception(
+                    'Identificador de propiedad inválido',
+                    422
+                );
+            }
+
+            $files =
+                $_FILES['images'] ?? [];
+
+            if (!is_array($files)) {
+                throw new \Exception(
+                    'El contenido de las imágenes es inválido',
+                    422
+                );
+            }
 
             $result =
                 PropertyImageService::upload(
                     (int)$auth['id'],
-                    $propertyId,
-                    $_FILES['images'] ?? []
+                    (int)$propertyId,
+                    $files
                 );
 
             ResponseHelper::ok(
@@ -179,20 +203,33 @@ class PropertyImageController
             self::error($e);
         }
     }
-
     public static function delete(): void
     {
         try {
             $auth =
                 AuthHelper::requireUser();
 
-            $imageId =
-                (int)($_GET['image_id'] ?? 0);
+            $imageId = filter_var(
+                $_GET['image_id'] ?? null,
+                FILTER_VALIDATE_INT,
+                [
+                    'options' => [
+                        'min_range' => 1,
+                    ],
+                ]
+            );
+
+            if ($imageId === false) {
+                throw new \Exception(
+                    'Identificador de imagen inválido',
+                    422
+                );
+            }
 
             $result =
                 PropertyImageService::delete(
                     (int)$auth['id'],
-                    $imageId
+                    (int)$imageId
                 );
 
             ResponseHelper::ok(
