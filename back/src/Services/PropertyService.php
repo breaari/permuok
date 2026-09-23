@@ -2376,18 +2376,20 @@ class PropertyService
         int $userId,
         int $propertyId
     ): array {
-        [$user, $property] = self::getOwnedProperty(
-            $userId,
-            $propertyId
-        );
-
-        $pdo = self::db();
+        [$user, $property] =
+            self::getOwnedProperty(
+                $userId,
+                $propertyId
+            );
 
         if ($property['status'] !== 'published') {
             throw new Exception(
-                "Solo se pueden pausar propiedades publicadas"
+                'Solo se pueden pausar propiedades publicadas',
+                409
             );
         }
+
+        $pdo = self::db();
 
         $pdo->beginTransaction();
 
@@ -2401,7 +2403,9 @@ class PropertyService
                 updated_by_user_id =
                     :updated_by_user_id
             WHERE id = :id
-              AND real_estate_id = :real_estate_id
+              AND real_estate_id =
+                    :real_estate_id
+              AND status = 'published'
               AND deleted_at IS NULL
             LIMIT 1
         ");
@@ -2409,10 +2413,18 @@ class PropertyService
             $st->execute([
                 'updated_by_user_id' =>
                 (int)$user['id'],
-                'id' => $propertyId,
+                'id' =>
+                $propertyId,
                 'real_estate_id' =>
                 (int)$user['real_estate_id'],
             ]);
+
+            if ($st->rowCount() !== 1) {
+                throw new Exception(
+                    'La propiedad cambió de estado mientras se procesaba la solicitud. Actualizá la página e intentá nuevamente.',
+                    409
+                );
+            }
 
             $hist = $pdo->prepare("
             INSERT INTO property_status_history (
@@ -2433,7 +2445,8 @@ class PropertyService
         ");
 
             $hist->execute([
-                'property_id' => $propertyId,
+                'property_id' =>
+                $propertyId,
                 'changed_by_user_id' =>
                 (int)$user['id'],
             ]);
@@ -2461,30 +2474,39 @@ class PropertyService
         int $userId,
         int $propertyId
     ): array {
-        [$user, $property] = self::getOwnedProperty(
-            $userId,
-            $propertyId
-        );
+        [$user, $property] =
+            self::getOwnedProperty(
+                $userId,
+                $propertyId
+            );
 
-        $pdo = self::db();
+        $allowedStatuses = [
+            'draft',
+            'paused',
+            'published',
+        ];
 
         if (
             !in_array(
                 $property['status'],
-                ['draft', 'paused', 'published'],
+                $allowedStatuses,
                 true
             )
         ) {
             throw new Exception(
-                "La propiedad no puede archivarse en su estado actual"
+                'La propiedad no puede archivarse en su estado actual',
+                409
             );
         }
+
+        $oldStatus =
+            (string)$property['status'];
+
+        $pdo = self::db();
 
         $pdo->beginTransaction();
 
         try {
-            $oldStatus = $property['status'];
-
             $st = $pdo->prepare("
             UPDATE properties
             SET
@@ -2494,7 +2516,9 @@ class PropertyService
                 updated_by_user_id =
                     :updated_by_user_id
             WHERE id = :id
-              AND real_estate_id = :real_estate_id
+              AND real_estate_id =
+                    :real_estate_id
+              AND status = :old_status
               AND deleted_at IS NULL
             LIMIT 1
         ");
@@ -2502,10 +2526,20 @@ class PropertyService
             $st->execute([
                 'updated_by_user_id' =>
                 (int)$user['id'],
-                'id' => $propertyId,
+                'id' =>
+                $propertyId,
                 'real_estate_id' =>
                 (int)$user['real_estate_id'],
+                'old_status' =>
+                $oldStatus,
             ]);
+
+            if ($st->rowCount() !== 1) {
+                throw new Exception(
+                    'La propiedad cambió de estado mientras se procesaba la solicitud. Actualizá la página e intentá nuevamente.',
+                    409
+                );
+            }
 
             $hist = $pdo->prepare("
             INSERT INTO property_status_history (
@@ -2526,8 +2560,10 @@ class PropertyService
         ");
 
             $hist->execute([
-                'property_id' => $propertyId,
-                'old_status' => $oldStatus,
+                'property_id' =>
+                $propertyId,
+                'old_status' =>
+                $oldStatus,
                 'changed_by_user_id' =>
                 (int)$user['id'],
             ]);

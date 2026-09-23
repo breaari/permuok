@@ -1269,35 +1269,67 @@ class SearchRequestService
         return $result;
     }
 
-    public static function delete(int $userId, int $id): array
-    {
+    public static function delete(
+        int $userId,
+        int $id
+    ): array {
         $pdo = self::db();
-        [, $current] = self::getOwnedSearchRequestRow($userId, $id);
+
+        [, $current] =
+            self::getOwnedSearchRequestRow(
+                $userId,
+                $id
+            );
+
+        $oldStatus =
+            (string)$current['status'];
 
         $pdo->beginTransaction();
 
         try {
             $st = $pdo->prepare("
-                UPDATE search_requests
-                SET
-                    status = 'deleted',
-                    is_visible = 0,
-                    deleted_at = NOW()
-                WHERE id = :id
-                  AND real_estate_id = :real_estate_id
-                  AND deleted_at IS NULL
-                LIMIT 1
-            ");
+            UPDATE search_requests
+            SET
+                status = 'deleted',
+                is_visible = 0,
+                deleted_at = NOW()
+            WHERE id = :id
+              AND real_estate_id =
+                    :real_estate_id
+              AND status = :old_status
+              AND deleted_at IS NULL
+            LIMIT 1
+        ");
+
             $st->execute([
-                'id' => $id,
-                'real_estate_id' => (int)$current['real_estate_id'],
+                'id' =>
+                $id,
+                'real_estate_id' =>
+                (int)$current['real_estate_id'],
+                'old_status' =>
+                $oldStatus,
             ]);
 
-            self::logStatus($pdo, $id, $current['status'], 'deleted', $userId);
+            if ($st->rowCount() !== 1) {
+                throw new Exception(
+                    'La búsqueda cambió mientras se procesaba la eliminación. Actualizá la página e intentá nuevamente.',
+                    409
+                );
+            }
+
+            self::logStatus(
+                $pdo,
+                $id,
+                $oldStatus,
+                'deleted',
+                $userId
+            );
 
             $pdo->commit();
 
-            self::queueCompatibilityArchive($id);
+            self::queueCompatibilityArchive(
+                $id
+            );
 
             return [
                 'deleted' => true,
@@ -1305,57 +1337,140 @@ class SearchRequestService
                 'status' => 'deleted',
             ];
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
 
-    private static function changeStatus(int $userId, int $id, string $newStatus, bool $visible): array
-    {
+    private static function changeStatus(
+        int $userId,
+        int $id,
+        string $newStatus,
+        bool $visible
+    ): array {
         $pdo = self::db();
-        [, $current] = self::getOwnedSearchRequestRow($userId, $id);
 
-        $allowed = match ($newStatus) {
-            'published' => ['draft', 'paused', 'archived'],
-            'paused' => ['published'],
-            'archived' => ['draft', 'paused', 'published'],
+        [, $current] =
+            self::getOwnedSearchRequestRow(
+                $userId,
+                $id
+            );
+
+        $allowedPreviousStatuses = match ($newStatus) {
+            'published' => [
+                'draft',
+                'paused',
+                'archived',
+            ],
+            'paused' => [
+                'published',
+            ],
+            'archived' => [
+                'draft',
+                'paused',
+                'published',
+            ],
             default => [],
         };
 
-        if (!in_array($current['status'], $allowed, true)) {
-            throw new Exception("No se puede cambiar el estado desde '{$current['status']}' a '{$newStatus}'");
+        if (
+            !in_array(
+                $current['status'],
+                $allowedPreviousStatuses,
+                true
+            )
+        ) {
+            throw new Exception(
+                "No se puede cambiar el estado desde '{$current['status']}' a '{$newStatus}'",
+                409
+            );
         }
+
+        $oldStatus =
+            (string)$current['status'];
 
         $pdo->beginTransaction();
 
         try {
             $st = $pdo->prepare("
-                UPDATE search_requests
-                SET
-                    status = :status,
-                    is_visible = :is_visible,
-                    published_at = CASE WHEN :status = 'published' THEN NOW() ELSE published_at END,
-                    paused_at = CASE WHEN :status = 'paused' THEN NOW() ELSE paused_at END,
-                    archived_at = CASE WHEN :status = 'archived' THEN NOW() ELSE archived_at END
-                WHERE id = :id
-                  AND real_estate_id = :real_estate_id
-                  AND deleted_at IS NULL
-                LIMIT 1
-            ");
+            UPDATE search_requests
+            SET
+                status = :new_status,
+                is_visible = :is_visible,
+                published_at = CASE
+                    WHEN :published_status = 'published'
+                        THEN COALESCE(
+                            published_at,
+                            NOW()
+                        )
+                    ELSE published_at
+                END,
+                paused_at = CASE
+                    WHEN :paused_status = 'paused'
+                        THEN NOW()
+                    ELSE paused_at
+                END,
+                archived_at = CASE
+                    WHEN :archived_status = 'archived'
+                        THEN NOW()
+                    ELSE archived_at
+                END
+            WHERE id = :id
+              AND real_estate_id =
+                    :real_estate_id
+              AND status = :old_status
+              AND deleted_at IS NULL
+            LIMIT 1
+        ");
+
             $st->execute([
-                'status' => $newStatus,
-                'is_visible' => $visible ? 1 : 0,
-                'id' => $id,
-                'real_estate_id' => (int)$current['real_estate_id'],
+                'new_status' =>
+                $newStatus,
+                'is_visible' =>
+                $visible ? 1 : 0,
+                'published_status' =>
+                $newStatus,
+                'paused_status' =>
+                $newStatus,
+                'archived_status' =>
+                $newStatus,
+                'id' =>
+                $id,
+                'real_estate_id' =>
+                (int)$current['real_estate_id'],
+                'old_status' =>
+                $oldStatus,
             ]);
 
-            self::logStatus($pdo, $id, $current['status'], $newStatus, $userId);
+            if ($st->rowCount() !== 1) {
+                throw new Exception(
+                    'La búsqueda cambió de estado mientras se procesaba la solicitud. Actualizá la página e intentá nuevamente.',
+                    409
+                );
+            }
+
+            self::logStatus(
+                $pdo,
+                $id,
+                $oldStatus,
+                $newStatus,
+                $userId
+            );
 
             $pdo->commit();
 
-            return self::getDetail($userId, $id);
+            return self::getDetail(
+                $userId,
+                $id
+            );
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
