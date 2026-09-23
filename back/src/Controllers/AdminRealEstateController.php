@@ -17,27 +17,54 @@ class AdminRealEstateController
         return $ctx;
     }
 
-    private static function handleError(
-        \Throwable $e
-    ): void {
-        $code = (int)$e->getCode();
+    private static function readJsonObject(): array
+    {
+        $raw =
+            file_get_contents(
+                'php://input'
+            );
 
         if (
-            !($e instanceof \PDOException) &&
-            $code >= 400 &&
-            $code <= 499
+            $raw === false ||
+            trim($raw) === ''
         ) {
-            ResponseHelper::fail(
-                $e->getMessage(),
-                $code
+            throw new \Exception(
+                'El cuerpo de la solicitud está vacío',
+                422
             );
         }
 
-        ResponseHelper::fromThrowable(
-            $e,
-            'No se pudo completar la operación.',
-            'AdminRealEstateController'
-        );
+        $raw = trim($raw);
+
+        if ($raw[0] !== '{') {
+            throw new \Exception(
+                'El cuerpo JSON debe ser un objeto',
+                422
+            );
+        }
+
+        try {
+            $payload = json_decode(
+                $raw,
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (\JsonException $e) {
+            throw new \Exception(
+                'El cuerpo JSON es inválido',
+                422
+            );
+        }
+
+        if (!is_array($payload)) {
+            throw new \Exception(
+                'El cuerpo JSON es inválido',
+                422
+            );
+        }
+
+        return $payload;
     }
 
     public static function counts(): void
@@ -71,39 +98,154 @@ class AdminRealEstateController
         }
     }
 
+    private static function handleError(
+        \Throwable $e
+    ): void {
+        $code = (int)$e->getCode();
+
+        if (
+            !($e instanceof \PDOException) &&
+            $code >= 400 &&
+            $code <= 499
+        ) {
+            ResponseHelper::fail(
+                $e->getMessage(),
+                $code
+            );
+        }
+
+        ResponseHelper::fromThrowable(
+            $e,
+            'No se pudo completar la operación.',
+            'AdminRealEstateController'
+        );
+    }
+
     public static function validate(): void
     {
         try {
-            $ctx = self::requireAdmin();
+            $ctx =
+                self::requireAdmin();
 
-            $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+            $payload =
+                self::readJsonObject();
 
-            $realEstateId = (int)($payload['real_estate_id'] ?? 0);
-            $action = trim((string)($payload['action'] ?? ''));
-            $validationNote = isset($payload['validation_note'])
-                ? trim((string)$payload['validation_note'])
-                : null;
-
-            if ($realEstateId <= 0) {
-                ResponseHelper::fail('real_estate_id requerido', 422);
-            }
-
-            if (!in_array($action, ['approve', 'reject'], true)) {
-                ResponseHelper::fail('action inválida', 422);
-            }
-
-            if ($action === 'reject' && $validationNote === '') {
-                ResponseHelper::fail('El motivo de rechazo es requerido', 422);
-            }
-
-            $result = AdminRealEstateService::validate(
-                (int)$ctx['id'],
-                $realEstateId,
-                $action,
-                $validationNote
+            $realEstateId = filter_var(
+                $payload['real_estate_id'] ?? null,
+                FILTER_VALIDATE_INT,
+                [
+                    'options' => [
+                        'min_range' => 1,
+                    ],
+                ]
             );
 
-            ResponseHelper::ok($result);
+            if ($realEstateId === false) {
+                throw new \Exception(
+                    'real_estate_id inválido',
+                    422
+                );
+            }
+
+            if (
+                !isset($payload['action']) ||
+                !is_string($payload['action'])
+            ) {
+                throw new \Exception(
+                    'action requerida',
+                    422
+                );
+            }
+
+            $action =
+                strtolower(
+                    trim($payload['action'])
+                );
+
+            if (
+                !in_array(
+                    $action,
+                    [
+                        'approve',
+                        'reject',
+                    ],
+                    true
+                )
+            ) {
+                throw new \Exception(
+                    'action inválida',
+                    422
+                );
+            }
+
+            $validationNote = null;
+
+            if (
+                array_key_exists(
+                    'validation_note',
+                    $payload
+                ) &&
+                $payload['validation_note'] !== null
+            ) {
+                if (
+                    !is_string(
+                        $payload['validation_note']
+                    )
+                ) {
+                    throw new \Exception(
+                        'La nota de validación es inválida',
+                        422
+                    );
+                }
+
+                $validationNote =
+                    trim(
+                        $payload['validation_note']
+                    );
+
+                if (
+                    mb_strlen(
+                        $validationNote
+                    ) > 1000
+                ) {
+                    throw new \Exception(
+                        'La nota de validación es demasiado extensa',
+                        422
+                    );
+                }
+            }
+
+            if (
+                $action === 'reject' &&
+                (
+                    $validationNote === null ||
+                    $validationNote === ''
+                )
+            ) {
+                throw new \Exception(
+                    'El motivo de rechazo es requerido',
+                    422
+                );
+            }
+
+            if (
+                $action === 'approve' &&
+                $validationNote === ''
+            ) {
+                $validationNote = null;
+            }
+
+            $result =
+                AdminRealEstateService::validate(
+                    (int)$ctx['id'],
+                    (int)$realEstateId,
+                    $action,
+                    $validationNote
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
         } catch (\Throwable $e) {
             self::handleError($e);
         }
@@ -152,13 +294,31 @@ class AdminRealEstateController
         try {
             self::requireAdmin();
 
-            $id = (int)($_GET['id'] ?? 0);
-            if ($id <= 0) {
-                ResponseHelper::fail('id requerido', 422);
+            $id = filter_var(
+                $_GET['id'] ?? null,
+                FILTER_VALIDATE_INT,
+                [
+                    'options' => [
+                        'min_range' => 1,
+                    ],
+                ]
+            );
+
+            if ($id === false) {
+                throw new \Exception(
+                    'Identificador de inmobiliaria inválido',
+                    422
+                );
             }
 
-            $data = AdminRealEstateService::getDetail($id);
-            ResponseHelper::ok($data);
+            $data =
+                AdminRealEstateService::getDetail(
+                    (int)$id
+                );
+
+            ResponseHelper::ok(
+                $data
+            );
         } catch (\Throwable $e) {
             self::handleError($e);
         }
@@ -170,20 +330,21 @@ class AdminRealEstateController
             self::requireAdmin();
 
             $payload =
-                json_decode(
-                    file_get_contents('php://input'),
-                    true
-                ) ?? [];
+                self::readJsonObject();
 
-            $realEstateId =
-                (int)(
-                    $payload['real_estate_id']
-                    ?? 0
-                );
+            $realEstateId = filter_var(
+                $payload['real_estate_id'] ?? null,
+                FILTER_VALIDATE_INT,
+                [
+                    'options' => [
+                        'min_range' => 1,
+                    ],
+                ]
+            );
 
-            if ($realEstateId <= 0) {
-                ResponseHelper::fail(
-                    'real_estate_id requerido',
+            if ($realEstateId === false) {
+                throw new \Exception(
+                    'real_estate_id inválido',
                     422
                 );
             }
@@ -194,21 +355,33 @@ class AdminRealEstateController
                     $payload
                 )
             ) {
-                ResponseHelper::fail(
+                throw new \Exception(
                     'is_active requerido',
                     422
                 );
             }
 
-            $isActive =
-                filter_var(
-                    $payload['is_active'],
-                    FILTER_VALIDATE_BOOLEAN,
-                    FILTER_NULL_ON_FAILURE
-                );
+            $rawIsActive =
+                $payload['is_active'];
 
-            if ($isActive === null) {
-                ResponseHelper::fail(
+            if (
+                in_array(
+                    $rawIsActive,
+                    [true, 1, '1'],
+                    true
+                )
+            ) {
+                $isActive = true;
+            } elseif (
+                in_array(
+                    $rawIsActive,
+                    [false, 0, '0'],
+                    true
+                )
+            ) {
+                $isActive = false;
+            } else {
+                throw new \Exception(
                     'is_active inválido',
                     422
                 );
@@ -216,7 +389,7 @@ class AdminRealEstateController
 
             $result =
                 AdminRealEstateService::setOperationalStatus(
-                    $realEstateId,
+                    (int)$realEstateId,
                     $isActive
                 );
 
