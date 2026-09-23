@@ -10,24 +10,122 @@ use App\Services\RefreshTokenService;
 
 class AuthController
 {
+
+    private static function readJsonObject(): array
+    {
+        $raw = file_get_contents('php://input');
+
+        if (
+            !is_string($raw) ||
+            trim($raw) === ''
+        ) {
+            ResponseHelper::fail(
+                'El cuerpo JSON es obligatorio.',
+                422
+            );
+        }
+
+        $trimmed = ltrim($raw);
+
+        if (
+            $trimmed === '' ||
+            $trimmed[0] !== '{'
+        ) {
+            ResponseHelper::fail(
+                'El cuerpo debe ser un objeto JSON.',
+                422
+            );
+        }
+
+        try {
+            $data = json_decode(
+                $raw,
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (\JsonException $e) {
+            ResponseHelper::fail(
+                'El cuerpo JSON no es válido.',
+                422
+            );
+        }
+
+        if (!is_array($data)) {
+            ResponseHelper::fail(
+                'El cuerpo debe ser un objeto JSON.',
+                422
+            );
+        }
+
+        return $data;
+    }
+
     public static function register(): void
     {
-        $data =
-            json_decode(
-                file_get_contents('php://input'),
-                true
-            ) ?? [];
-
         /*
-         * Máximo 5 intentos de registro
-         * por dirección IP cada hora.
-         */
+     * El límite por IP se aplica incluso
+     * cuando el JSON recibido es inválido.
+     */
         SecurityRateLimitService::hit(
             'auth_register_ip',
             SecurityRateLimitService::clientIp(),
             5,
             60 * 60
         );
+
+        $data =
+            self::readJsonObject();
+
+        $allowedFields = [
+            'first_name',
+            'last_name',
+            'email',
+            'phone',
+            'password',
+        ];
+
+        $unknownFields =
+            array_diff(
+                array_keys($data),
+                $allowedFields
+            );
+
+        if ($unknownFields !== []) {
+            ResponseHelper::fail(
+                'La solicitud contiene campos no permitidos.',
+                422
+            );
+        }
+
+        $requiredFields = [
+            'first_name',
+            'last_name',
+            'email',
+            'phone',
+            'password',
+        ];
+
+        foreach ($requiredFields as $field) {
+            if (
+                !array_key_exists(
+                    $field,
+                    $data
+                )
+            ) {
+                ResponseHelper::fail(
+                    "Falta el campo requerido: {$field}.",
+                    422
+                );
+            }
+
+            if (!is_string($data[$field])) {
+                ResponseHelper::fail(
+                    "El campo {$field} tiene un formato inválido.",
+                    422
+                );
+            }
+        }
 
         $result =
             AuthService::register($data);
@@ -40,7 +138,10 @@ class AuthController
         }
 
         ResponseHelper::ok(
-            ['message' => 'Usuario creado'],
+            [
+                'message' =>
+                'Usuario creado',
+            ],
             201
         );
     }
@@ -48,13 +149,33 @@ class AuthController
     public static function login(): void
     {
         $data =
-            json_decode(
-                file_get_contents('php://input'),
-                true
-            ) ?? [];
+            self::readJsonObject();
 
-        $email = $data['email'] ?? '';
-        $password = $data['password'] ?? '';
+        $allowedFields = [
+            'email',
+            'password',
+        ];
+
+        $unknownFields =
+            array_diff(
+                array_keys($data),
+                $allowedFields
+            );
+
+        if ($unknownFields !== []) {
+            ResponseHelper::fail(
+                'La solicitud contiene campos no permitidos.',
+                422
+            );
+        }
+
+        $email =
+            $data['email']
+            ?? null;
+
+        $password =
+            $data['password']
+            ?? null;
 
         if (
             !is_string($email) ||
@@ -69,18 +190,35 @@ class AuthController
         }
 
         $emailNormalized =
-            strtolower(trim($email));
+            strtolower(
+                trim($email)
+            );
+
+        if (
+            strlen($emailNormalized) > 254 ||
+            !filter_var(
+                $emailNormalized,
+                FILTER_VALIDATE_EMAIL
+            )
+        ) {
+            ResponseHelper::fail(
+                'Ingresá un email válido.',
+                422
+            );
+        }
 
         $clientIp =
             SecurityRateLimitService::clientIp();
 
         $loginIdentifier =
-            $emailNormalized . '|' . $clientIp;
+            $emailNormalized .
+            '|' .
+            $clientIp;
 
         /*
-         * Primero comprobamos si existe un bloqueo.
-         * Estas funciones no incrementan intentos.
-         */
+     * Estas comprobaciones no incrementan
+     * todavía la cantidad de intentos.
+     */
         SecurityRateLimitService::check(
             'auth_login_email_ip',
             $loginIdentifier
@@ -91,9 +229,6 @@ class AuthController
             $emailNormalized
         );
 
-        /*
-         * Recién ahora comprobamos las credenciales.
-         */
         $result =
             AuthService::login(
                 $emailNormalized,
@@ -101,11 +236,6 @@ class AuthController
             );
 
         if ($result === false) {
-            /*
-             * Protección general de la cuenta:
-             * 30 errores desde distintas IP generan
-             * una pausa de 15 minutos.
-             */
             SecurityRateLimitService::recordFailure(
                 'auth_login_account',
                 $emailNormalized,
@@ -113,19 +243,16 @@ class AuthController
                 [15 * 60]
             );
 
-            /*
-             * Protección progresiva para email + IP:
-             *
-             * Primer bloqueo: 30 segundos.
-             * Segundo bloqueo: 5 minutos.
-             * Tercero y siguientes: 15 minutos.
-             */
             $loginRateLimit =
                 SecurityRateLimitService::recordFailure(
                     'auth_login_email_ip',
                     $loginIdentifier,
                     5,
-                    [30, 5 * 60, 15 * 60]
+                    [
+                        30,
+                        5 * 60,
+                        15 * 60,
+                    ]
                 );
 
             $remainingAttempts =
@@ -149,7 +276,9 @@ class AuthController
                 $message,
                 401,
                 [
-                    'code' => 'INVALID_CREDENTIALS',
+                    'code' =>
+                    'INVALID_CREDENTIALS',
+
                     'remaining_attempts' =>
                     $remainingAttempts,
                 ]
@@ -166,10 +295,6 @@ class AuthController
             );
         }
 
-        /*
-         * Si el ingreso es correcto, eliminamos
-         * los intentos y penalizaciones acumulados.
-         */
         SecurityRateLimitService::clear(
             'auth_login_email_ip',
             $loginIdentifier
@@ -181,9 +306,9 @@ class AuthController
         );
 
         /*
- * El refresh token se entrega únicamente
- * mediante una cookie HttpOnly.
- */
+     * El refresh token se entrega solamente
+     * mediante la cookie HttpOnly.
+     */
         if (
             is_array($result) &&
             !empty($result['refresh_token'])
@@ -196,10 +321,6 @@ class AuthController
                     $refreshToken
                 );
             } catch (\Throwable $e) {
-                /*
-         * Si la cookie no pudo entregarse,
-         * revocamos el token creado.
-         */
                 try {
                     $stored =
                         RefreshTokenService::findValid(
@@ -229,4 +350,5 @@ class AuthController
 
         ResponseHelper::ok($result);
     }
+    
 }

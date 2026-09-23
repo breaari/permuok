@@ -10,26 +10,104 @@ use Throwable;
 
 class PasswordResetController
 {
+    private static function readJsonObject(): array
+    {
+        $raw = file_get_contents('php://input');
+
+        if (
+            !is_string($raw) ||
+            trim($raw) === ''
+        ) {
+            ResponseHelper::fail(
+                'El cuerpo JSON es obligatorio.',
+                422
+            );
+        }
+
+        $trimmed = ltrim($raw);
+
+        if (
+            $trimmed === '' ||
+            $trimmed[0] !== '{'
+        ) {
+            ResponseHelper::fail(
+                'El cuerpo debe ser un objeto JSON.',
+                422
+            );
+        }
+
+        try {
+            $data = json_decode(
+                $raw,
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (\JsonException $e) {
+            ResponseHelper::fail(
+                'El cuerpo JSON no es válido.',
+                422
+            );
+        }
+
+        if (!is_array($data)) {
+            ResponseHelper::fail(
+                'El cuerpo debe ser un objeto JSON.',
+                422
+            );
+        }
+
+        return $data;
+    }
+
     public static function request(): void
     {
+        /*
+     * Se aplica antes de procesar el JSON
+     * para contar también solicitudes inválidas.
+     */
+        SecurityRateLimitService::hit(
+            'password_reset_ip',
+            SecurityRateLimitService::clientIp(),
+            5,
+            60 * 60
+        );
+
         $data =
-            json_decode(
-                file_get_contents('php://input'),
-                true
-            ) ?? [];
+            self::readJsonObject();
+
+        $unknownFields =
+            array_diff(
+                array_keys($data),
+                ['email']
+            );
+
+        if ($unknownFields !== []) {
+            ResponseHelper::fail(
+                'La solicitud contiene campos no permitidos.',
+                422
+            );
+        }
+
+        $emailValue =
+            $data['email']
+            ?? null;
+
+        if (!is_string($emailValue)) {
+            ResponseHelper::fail(
+                'Ingresá un email válido.',
+                422
+            );
+        }
 
         $email =
             strtolower(
-                trim(
-                    (string)(
-                        $data['email']
-                        ?? ''
-                    )
-                )
+                trim($emailValue)
             );
 
         if (
             $email === '' ||
+            strlen($email) > 254 ||
             !filter_var(
                 $email,
                 FILTER_VALIDATE_EMAIL
@@ -41,20 +119,6 @@ class PasswordResetController
             );
         }
 
-        /*
-         * Evita envíos masivos desde una misma IP.
-         */
-        SecurityRateLimitService::hit(
-            'password_reset_ip',
-            SecurityRateLimitService::clientIp(),
-            5,
-            60 * 60
-        );
-
-        /*
-         * Evita repetir solicitudes para la misma
-         * cuenta desde una misma dirección.
-         */
         SecurityRateLimitService::hit(
             'password_reset_email_ip',
             hash(
@@ -68,13 +132,9 @@ class PasswordResetController
         );
 
         /*
- * Protección global de la dirección.
- *
- * Evita que distintas IP puedan bombardear
- * una misma cuenta con correos de recuperación.
- * Se aplica también a emails inexistentes para
- * no revelar si están registrados.
- */
+     * Se aplica también a correos inexistentes
+     * para no revelar si están registrados.
+     */
         SecurityRateLimitService::hit(
             'password_reset_email',
             hash(
@@ -101,9 +161,6 @@ class PasswordResetController
             );
         }
 
-        /*
-         * No revelamos si el email existe.
-         */
         ResponseHelper::ok([
             'message' =>
             'Si hay una cuenta asociada a esa dirección, recibirás un enlace para restablecer tu contraseña.',
@@ -112,24 +169,10 @@ class PasswordResetController
 
     public static function reset(): void
     {
-        $data =
-            json_decode(
-                file_get_contents('php://input'),
-                true
-            ) ?? [];
-
-        $token =
-            (string)(
-                $data['token']
-                ?? ''
-            );
-
-        $password =
-            (string)(
-                $data['password']
-                ?? ''
-            );
-
+        /*
+     * Contamos también intentos con JSON
+     * inválido o campos incorrectos.
+     */
         SecurityRateLimitService::hit(
             'password_reset_attempt_ip',
             SecurityRateLimitService::clientIp(),
@@ -137,9 +180,55 @@ class PasswordResetController
             60 * 60
         );
 
+        $data =
+            self::readJsonObject();
+
+        $allowedFields = [
+            'token',
+            'password',
+        ];
+
+        $unknownFields =
+            array_diff(
+                array_keys($data),
+                $allowedFields
+            );
+
+        if ($unknownFields !== []) {
+            ResponseHelper::fail(
+                'La solicitud contiene campos no permitidos.',
+                422
+            );
+        }
+
+        $token =
+            $data['token']
+            ?? null;
+
+        $password =
+            $data['password']
+            ?? null;
+
+        if (
+            !is_string($token) ||
+            trim($token) === ''
+        ) {
+            ResponseHelper::fail(
+                'El enlace es inválido o venció.',
+                400
+            );
+        }
+
+        if (!is_string($password)) {
+            ResponseHelper::fail(
+                'La contraseña no tiene un formato válido.',
+                422
+            );
+        }
+
         try {
             PasswordResetService::reset(
-                $token,
+                trim($token),
                 $password
             );
 
@@ -153,7 +242,10 @@ class PasswordResetController
             $status =
                 in_array(
                     (int)$e->getCode(),
-                    [400, 422],
+                    [
+                        400,
+                        422,
+                    ],
                     true
                 )
                 ? (int)$e->getCode()
