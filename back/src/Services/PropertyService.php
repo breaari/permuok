@@ -1134,6 +1134,451 @@ class PropertyService
         }
     }
 
+    private static function normalizeRequirementsPayload(
+        array $data
+    ): array {
+        $stringFields = [
+            'criteria_mode' =>
+            'El modo de criterios',
+            'cash_difference_direction' =>
+            'La dirección de la diferencia',
+            'cash_difference_currency' =>
+            'La moneda de la diferencia',
+            'price_currency' =>
+            'La moneda del valor buscado',
+            'notes' =>
+            'Las notas',
+            'property_condition' =>
+            'La condición de la propiedad',
+        ];
+
+        foreach ($stringFields as $field => $label) {
+            if (
+                array_key_exists($field, $data) &&
+                $data[$field] !== null &&
+                $data[$field] !== ''
+            ) {
+                $data[$field] =
+                    self::normalizeStringField(
+                        $data[$field],
+                        $label
+                    );
+            }
+        }
+
+        $booleanFields = [
+            'accepts_total_swap',
+            'accepts_swap_plus_cash',
+            'accepts_multiple_swap',
+            'accepts_open_proposals',
+            'accepts_cash_only',
+            'open_to_other_zones',
+        ];
+
+        foreach ($booleanFields as $field) {
+            if (!array_key_exists($field, $data)) {
+                $data[$field] = false;
+                continue;
+            }
+
+            if (
+                !in_array(
+                    $data[$field],
+                    [true, false, 0, 1, '0', '1'],
+                    true
+                )
+            ) {
+                throw new Exception(
+                    "El campo {$field} tiene un formato inválido",
+                    422
+                );
+            }
+
+            $data[$field] =
+                in_array(
+                    $data[$field],
+                    [true, 1, '1'],
+                    true
+                );
+        }
+
+        $numberFields = [
+            'cash_difference_min' =>
+            'La diferencia mínima',
+            'cash_difference_max' =>
+            'La diferencia máxima',
+            'price_min' =>
+            'El precio mínimo',
+            'price_max' =>
+            'El precio máximo',
+            'min_total_area' =>
+            'La superficie total mínima',
+            'max_total_area' =>
+            'La superficie total máxima',
+            'min_covered_area' =>
+            'La superficie cubierta mínima',
+            'max_covered_area' =>
+            'La superficie cubierta máxima',
+        ];
+
+        foreach ($numberFields as $field => $label) {
+            $data[$field] =
+                self::normalizeNullableNumber(
+                    $data[$field] ?? null,
+                    $label,
+                    0
+                );
+        }
+
+        $integerFields = [
+            'min_bedrooms' =>
+            'La cantidad mínima de dormitorios',
+            'min_bathrooms' =>
+            'La cantidad mínima de baños',
+            'min_garages' =>
+            'La cantidad mínima de cocheras',
+            'max_antiquity' =>
+            'La antigüedad máxima',
+        ];
+
+        foreach ($integerFields as $field => $label) {
+            $data[$field] =
+                self::normalizeNullableInteger(
+                    $data[$field] ?? null,
+                    $label,
+                    0
+                );
+        }
+
+        $rangePairs = [
+            [
+                'cash_difference_min',
+                'cash_difference_max',
+                'La diferencia mínima no puede superar la diferencia máxima',
+            ],
+            [
+                'price_min',
+                'price_max',
+                'El precio mínimo no puede superar el precio máximo',
+            ],
+            [
+                'min_total_area',
+                'max_total_area',
+                'La superficie total mínima no puede superar la máxima',
+            ],
+            [
+                'min_covered_area',
+                'max_covered_area',
+                'La superficie cubierta mínima no puede superar la máxima',
+            ],
+        ];
+
+        foreach (
+            $rangePairs
+            as [$minimumField, $maximumField, $message]
+        ) {
+            if (
+                $data[$minimumField] !== null &&
+                $data[$maximumField] !== null &&
+                $data[$minimumField] >
+                $data[$maximumField]
+            ) {
+                throw new Exception(
+                    $message,
+                    422
+                );
+            }
+        }
+
+        $criteriaMode =
+            $data['criteria_mode'] ?? 'open';
+
+        if (
+            !is_string($criteriaMode) ||
+            !in_array(
+                $criteriaMode,
+                ['open', 'criteria'],
+                true
+            )
+        ) {
+            throw new Exception(
+                'El modo de criterios no es válido',
+                422
+            );
+        }
+
+        $data['criteria_mode'] =
+            $criteriaMode;
+
+        $validCurrencies = [
+            'ARS',
+            'USD',
+        ];
+
+        foreach (
+            [
+                'cash_difference_currency',
+                'price_currency',
+            ]
+            as $currencyField
+        ) {
+            $currency =
+                $data[$currencyField] ?? 'USD';
+
+            if (
+                !is_string($currency) ||
+                !in_array(
+                    $currency,
+                    $validCurrencies,
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'La moneda seleccionada no es válida',
+                    422
+                );
+            }
+
+            $data[$currencyField] =
+                $currency;
+        }
+
+        $differenceDirection =
+            $data['cash_difference_direction']
+            ?? null;
+
+        if ($differenceDirection === '') {
+            $differenceDirection = null;
+        }
+
+        if (
+            $differenceDirection !== null &&
+            (
+                !is_string($differenceDirection) ||
+                !in_array(
+                    $differenceDirection,
+                    [
+                        'a_favor',
+                        'en_contra',
+                        'indistinto',
+                    ],
+                    true
+                )
+            )
+        ) {
+            throw new Exception(
+                'La dirección de la diferencia no es válida',
+                422
+            );
+        }
+
+        $data['cash_difference_direction'] =
+            $differenceDirection;
+
+        $propertyCondition =
+            $data['property_condition'] ?? null;
+
+        if ($propertyCondition === '') {
+            $propertyCondition = null;
+        }
+
+        if (
+            $propertyCondition !== null &&
+            (
+                !is_string($propertyCondition) ||
+                !in_array(
+                    $propertyCondition,
+                    [
+                        'nuevo',
+                        'bueno',
+                        'regular',
+                        'a_refaccionar',
+                    ],
+                    true
+                )
+            )
+        ) {
+            throw new Exception(
+                'La condición de la propiedad no es válida',
+                422
+            );
+        }
+
+        $data['property_condition'] =
+            $propertyCondition;
+
+        $propertyTypes =
+            $data['property_types'] ?? [];
+
+        if (!is_array($propertyTypes)) {
+            throw new Exception(
+                'Los tipos de propiedad deben enviarse como una lista',
+                422
+            );
+        }
+
+        $validPropertyTypes = [
+            'house',
+            'apartment',
+            'land',
+            'commercial',
+            'office',
+            'warehouse',
+            'other',
+        ];
+
+        $cleanPropertyTypes = [];
+
+        foreach ($propertyTypes as $type) {
+            if (!is_string($type)) {
+                throw new Exception(
+                    'Uno de los tipos de propiedad tiene un formato inválido',
+                    422
+                );
+            }
+
+            $type = trim($type);
+
+            if ($type === '') {
+                continue;
+            }
+
+            if (
+                !in_array(
+                    $type,
+                    $validPropertyTypes,
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'Uno de los tipos de propiedad no es válido',
+                    422
+                );
+            }
+
+            $cleanPropertyTypes[$type] = true;
+        }
+
+        $data['property_types'] =
+            array_keys($cleanPropertyTypes);
+
+        $locations =
+            $data['locations'] ?? [];
+
+        if (!is_array($locations)) {
+            throw new Exception(
+                'Las ubicaciones deben enviarse como una lista',
+                422
+            );
+        }
+
+        $cleanLocations = [];
+
+        foreach ($locations as $location) {
+            if (!is_array($location)) {
+                throw new Exception(
+                    'Una de las ubicaciones tiene un formato inválido',
+                    422
+                );
+            }
+
+            $countryCode =
+                self::normalizeStringField(
+                    $location['country_code'] ?? null,
+                    'El código de país'
+                );
+
+            $country =
+                self::normalizeStringField(
+                    $location['country'] ?? null,
+                    'El país'
+                );
+
+            $province =
+                self::normalizeStringField(
+                    $location['province'] ?? null,
+                    'La provincia'
+                );
+
+            $city =
+                self::normalizeStringField(
+                    $location['city'] ?? null,
+                    'La ciudad'
+                );
+
+            $zone =
+                self::normalizeStringField(
+                    $location['zone'] ?? null,
+                    'La zona'
+                );
+
+            if (
+                $countryCode !== '' &&
+                !in_array(
+                    $countryCode,
+                    ['AR', 'US', 'IT'],
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'Una de las ubicaciones tiene un país inválido',
+                    422
+                );
+            }
+
+            if (
+                $criteriaMode === 'criteria' &&
+                (
+                    $countryCode === '' ||
+                    $country === '' ||
+                    $province === ''
+                )
+            ) {
+                throw new Exception(
+                    'Cada ubicación debe incluir país, código de país y provincia',
+                    422
+                );
+            }
+
+            $locationKey = implode('|', [
+                $countryCode,
+                $country,
+                $province,
+                $city,
+                $zone,
+            ]);
+
+            $cleanLocations[$locationKey] = [
+                'country_code' =>
+                $countryCode,
+                'country' =>
+                $country,
+                'province' =>
+                $province,
+                'city' =>
+                $city,
+                'zone' =>
+                $zone,
+            ];
+        }
+
+        $data['locations'] =
+            array_values($cleanLocations);
+
+        if (
+            array_key_exists('notes', $data) &&
+            $data['notes'] !== null
+        ) {
+            $data['notes'] =
+                self::normalizeStringField(
+                    $data['notes'],
+                    'Las notas'
+                );
+        }
+
+        return $data;
+    }
+
     public static function replaceRequirements(
         int $userId,
         int $propertyId,
@@ -1143,6 +1588,11 @@ class PropertyService
             $userId,
             $propertyId
         );
+
+        $data =
+            self::normalizeRequirementsPayload(
+                $data
+            );
 
         $pdo = self::db();
 
