@@ -239,41 +239,129 @@ class DevelopmentImageService
         return $normalized;
     }
 
-    private static function storeUploadedFile(array $file, int $developmentId): string
-    {
-        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-            throw new Exception("Una de las imágenes no pudo subirse");
+    private static function storeUploadedFile(
+        array $file,
+        int $developmentId
+    ): string {
+        if (
+            ($file['error'] ?? UPLOAD_ERR_NO_FILE)
+            !== UPLOAD_ERR_OK
+        ) {
+            throw new Exception(
+                'Una de las imágenes no pudo subirse',
+                422
+            );
         }
 
-        $tmp = $file['tmp_name'] ?? '';
-        if ($tmp === '' || !is_uploaded_file($tmp)) {
-            throw new Exception("Archivo subido inválido");
+        $tmp = (string)($file['tmp_name'] ?? '');
+
+        if (
+            $tmp === '' ||
+            !is_uploaded_file($tmp)
+        ) {
+            throw new Exception(
+                'Archivo subido inválido',
+                422
+            );
         }
 
-        $size = (int)($file['size'] ?? 0);
-        if ($size <= 0 || $size > self::MAX_FILE_SIZE) {
-            throw new Exception("Cada imagen debe pesar hasta 5 MB");
+        $realSize = filesize($tmp);
+
+        if (
+            $realSize === false ||
+            $realSize <= 0 ||
+            $realSize > self::MAX_FILE_SIZE
+        ) {
+            throw new Exception(
+                'Cada imagen debe pesar hasta 5 MB',
+                422
+            );
         }
 
-        $mime = mime_content_type($tmp);
-        if (!isset(self::ALLOWED_MIME_TYPES[$mime])) {
-            throw new Exception("Formato de imagen no permitido. Usá JPG, PNG o WebP");
+        $finfo = new \finfo(
+            FILEINFO_MIME_TYPE
+        );
+
+        $mime = $finfo->file($tmp);
+
+        if (
+            !is_string($mime) ||
+            !isset(self::ALLOWED_MIME_TYPES[$mime])
+        ) {
+            throw new Exception(
+                'Formato de imagen no permitido. Usá JPG, PNG o WebP',
+                422
+            );
         }
 
-        $ext = self::ALLOWED_MIME_TYPES[$mime];
-        $baseDir = self::getUploadBaseDir();
+        $imageInfo = @getimagesize($tmp);
+
+        if ($imageInfo === false) {
+            throw new Exception(
+                'El archivo recibido no es una imagen válida',
+                422
+            );
+        }
+
+        $imageMime =
+            (string)($imageInfo['mime'] ?? '');
+
+        if (
+            $imageMime !== $mime ||
+            !isset(self::ALLOWED_MIME_TYPES[$imageMime])
+        ) {
+            throw new Exception(
+                'El contenido de la imagen no coincide con su formato',
+                422
+            );
+        }
+
+        $width = (int)($imageInfo[0] ?? 0);
+        $height = (int)($imageInfo[1] ?? 0);
+
+        if ($width <= 0 || $height <= 0) {
+            throw new Exception(
+                'La imagen tiene dimensiones inválidas',
+                422
+            );
+        }
+
+        if (
+            $width > 12000 ||
+            $height > 12000 ||
+            ($width * $height) > 40000000
+        ) {
+            throw new Exception(
+                'La imagen tiene dimensiones demasiado grandes',
+                422
+            );
+        }
+
+        $extension =
+            self::ALLOWED_MIME_TYPES[$imageMime];
+
+        $baseDir =
+            self::getUploadBaseDir();
 
         $filename = sprintf(
             'development_%d_%s.%s',
             $developmentId,
             bin2hex(random_bytes(12)),
-            $ext
+            $extension
         );
 
-        $target = $baseDir . '/' . $filename;
+        $target =
+            $baseDir . '/' . $filename;
 
-        if (!move_uploaded_file($tmp, $target)) {
-            throw new Exception("No se pudo guardar una de las imágenes");
+        if (
+            !move_uploaded_file(
+                $tmp,
+                $target
+            )
+        ) {
+            throw new Exception(
+                'No se pudo guardar una de las imágenes'
+            );
         }
 
         return 'developments/' . $filename;
@@ -653,78 +741,220 @@ class DevelopmentImageService
         );
     }
 
-    public static function reorder(int $userId, int $developmentId, array $images): array
-    {
-        [, $development] = self::getOwnedDevelopmentRow($userId, $developmentId);
+    public static function reorder(
+        int $userId,
+        int $developmentId,
+        mixed $images
+    ): array {
+        [, $development] =
+            self::getOwnedDevelopmentRow(
+                $userId,
+                $developmentId
+            );
 
-        if (!in_array($development['status'], ['draft', 'paused', 'archived', 'published'], true)) {
-            throw new Exception("No se pueden reordenar imágenes en el estado actual del desarrollo");
+        if (
+            !in_array(
+                $development['status'],
+                [
+                    'draft',
+                    'paused',
+                    'archived',
+                    'published',
+                ],
+                true
+            )
+        ) {
+            throw new Exception(
+                'No se pueden reordenar imágenes en el estado actual del desarrollo'
+            );
         }
 
-        if (!is_array($images) || !$images) {
-            throw new Exception("Debés enviar el listado de imágenes");
+        if (
+            !is_array($images) ||
+            $images === []
+        ) {
+            throw new Exception(
+                'Debés enviar el listado de imágenes',
+                422
+            );
+        }
+
+        $normalizedImages = [];
+        $seenIds = [];
+        $coverCount = 0;
+
+        foreach ($images as $image) {
+            if (!is_array($image)) {
+                throw new Exception(
+                    'El listado de imágenes es inválido',
+                    422
+                );
+            }
+
+            $rawId = $image['id'] ?? null;
+
+            $imageId = filter_var(
+                $rawId,
+                FILTER_VALIDATE_INT,
+                [
+                    'options' => [
+                        'min_range' => 1,
+                    ],
+                ]
+            );
+
+            if ($imageId === false) {
+                throw new Exception(
+                    'Una de las imágenes tiene un identificador inválido',
+                    422
+                );
+            }
+
+            if (isset($seenIds[$imageId])) {
+                throw new Exception(
+                    'El listado contiene imágenes repetidas',
+                    422
+                );
+            }
+
+            $rawCover =
+                $image['is_cover'] ?? null;
+
+            if (
+                !in_array(
+                    $rawCover,
+                    [
+                        true,
+                        false,
+                        1,
+                        0,
+                        '1',
+                        '0',
+                    ],
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'El valor de portada es inválido',
+                    422
+                );
+            }
+
+            $isCover = in_array(
+                $rawCover,
+                [true, 1, '1'],
+                true
+            );
+
+            if ($isCover) {
+                $coverCount++;
+            }
+
+            $seenIds[$imageId] = true;
+
+            $normalizedImages[] = [
+                'id' => (int)$imageId,
+                'is_cover' => $isCover ? 1 : 0,
+            ];
+        }
+
+        if ($coverCount !== 1) {
+            throw new Exception(
+                'Debés definir exactamente una imagen de portada',
+                422
+            );
         }
 
         $pdo = self::db();
+        $pdo->beginTransaction();
 
-        $st = $pdo->prepare("
+        try {
+            $lockDevelopment = $pdo->prepare("
+            SELECT id
+            FROM developments
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+        ");
+
+            $lockDevelopment->execute([
+                'id' => $developmentId,
+            ]);
+
+            if (!$lockDevelopment->fetchColumn()) {
+                throw new Exception(
+                    'Desarrollo no encontrado',
+                    404
+                );
+            }
+
+            $st = $pdo->prepare("
             SELECT id
             FROM development_images
             WHERE development_id = :development_id
               AND deleted_at IS NULL
-            ORDER BY sort_order ASC, id ASC
+            ORDER BY id ASC
+            FOR UPDATE
         ");
-        $st->execute(['development_id' => $developmentId]);
-        $current = $st->fetchAll(PDO::FETCH_COLUMN) ?: [];
-        $currentIds = array_map('intval', $current);
 
-        $incomingIds = array_map(
-            fn($img) => (int)($img['id'] ?? 0),
-            $images
-        );
+            $st->execute([
+                'development_id' => $developmentId,
+            ]);
 
-        sort($currentIds);
-        $sortedIncoming = $incomingIds;
-        sort($sortedIncoming);
+            $currentIds = array_map(
+                'intval',
+                $st->fetchAll(PDO::FETCH_COLUMN) ?: []
+            );
 
-        if ($currentIds !== $sortedIncoming) {
-            throw new Exception("Las imágenes enviadas no coinciden con las imágenes activas del desarrollo");
-        }
+            $incomingIds = array_column(
+                $normalizedImages,
+                'id'
+            );
 
-        $coverCount = 0;
-        foreach ($images as $img) {
-            if (!empty($img['is_cover'])) {
-                $coverCount++;
+            sort($currentIds);
+            sort($incomingIds);
+
+            if ($currentIds !== $incomingIds) {
+                throw new Exception(
+                    'Las imágenes enviadas no coinciden con las imágenes activas del desarrollo',
+                    422
+                );
             }
-        }
 
-        if ($coverCount !== 1) {
-            throw new Exception("Debés definir exactamente una imagen de portada");
-        }
+            $stUpdate = $pdo->prepare("
+            UPDATE development_images
+            SET
+                sort_order = :sort_order,
+                is_cover = :is_cover
+            WHERE id = :id
+              AND development_id = :development_id
+              AND deleted_at IS NULL
+            LIMIT 1
+        ");
 
-        $pdo->beginTransaction();
-
-        try {
-            foreach ($images as $index => $img) {
-                $stUpdate = $pdo->prepare("
-                    UPDATE development_images
-                    SET
-                        sort_order = :sort_order,
-                        is_cover = :is_cover
-                    WHERE id = :id
-                    LIMIT 1
-                ");
+            foreach (
+                $normalizedImages as $index => $image
+            ) {
                 $stUpdate->execute([
                     'sort_order' => $index,
-                    'is_cover' => !empty($img['is_cover']) ? 1 : 0,
-                    'id' => (int)$img['id'],
+                    'is_cover' => $image['is_cover'],
+                    'id' => $image['id'],
+                    'development_id' => $developmentId,
                 ]);
             }
 
             $pdo->commit();
-            return DevelopmentService::getDetail($userId, $developmentId);
+
+            return DevelopmentService::getDetail(
+                $userId,
+                $developmentId
+            );
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }

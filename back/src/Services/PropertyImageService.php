@@ -292,41 +292,144 @@ class PropertyImageService
         return $normalized;
     }
 
-    private static function storeUploadedFile(array $file, int $propertyId): string
-    {
-        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-            throw new Exception("Una de las imágenes no pudo subirse");
+    private static function storeUploadedFile(
+        array $file,
+        int $propertyId
+    ): string {
+        if (
+            ($file['error'] ?? UPLOAD_ERR_NO_FILE)
+            !== UPLOAD_ERR_OK
+        ) {
+            throw new Exception(
+                'Una de las imágenes no pudo subirse',
+                422
+            );
         }
 
-        $tmp = $file['tmp_name'] ?? '';
-        if ($tmp === '' || !is_uploaded_file($tmp)) {
-            throw new Exception("Archivo subido inválido");
+        $tmp = (string)($file['tmp_name'] ?? '');
+
+        if (
+            $tmp === '' ||
+            !is_uploaded_file($tmp)
+        ) {
+            throw new Exception(
+                'Archivo subido inválido',
+                422
+            );
         }
 
-        $size = (int)($file['size'] ?? 0);
-        if ($size <= 0 || $size > self::MAX_FILE_SIZE) {
-            throw new Exception("Cada imagen debe pesar hasta 5 MB");
+        /*
+     * No confiamos en el tamaño enviado por el cliente.
+     * Medimos el archivo temporal creado por PHP.
+     */
+        $realSize = filesize($tmp);
+
+        if (
+            $realSize === false ||
+            $realSize <= 0 ||
+            $realSize > self::MAX_FILE_SIZE
+        ) {
+            throw new Exception(
+                'Cada imagen debe pesar hasta 5 MB',
+                422
+            );
         }
 
-        $mime = mime_content_type($tmp);
-        if (!isset(self::ALLOWED_MIME_TYPES[$mime])) {
-            throw new Exception("Formato de imagen no permitido. Usá JPG, PNG o WebP");
+        /*
+     * Detectamos el MIME desde el contenido real.
+     */
+        $finfo = new \finfo(
+            FILEINFO_MIME_TYPE
+        );
+
+        $mime = $finfo->file($tmp);
+
+        if (
+            !is_string($mime) ||
+            !isset(self::ALLOWED_MIME_TYPES[$mime])
+        ) {
+            throw new Exception(
+                'Formato de imagen no permitido. Usá JPG, PNG o WebP',
+                422
+            );
         }
 
-        $ext = self::ALLOWED_MIME_TYPES[$mime];
-        $baseDir = self::getUploadBaseDir();
+        /*
+     * Verificamos que el archivo pueda interpretarse
+     * realmente como una imagen.
+     */
+        $imageInfo = @getimagesize($tmp);
+
+        if ($imageInfo === false) {
+            throw new Exception(
+                'El archivo recibido no es una imagen válida',
+                422
+            );
+        }
+
+        $imageMime =
+            (string)($imageInfo['mime'] ?? '');
+
+        if (
+            $imageMime !== $mime ||
+            !isset(self::ALLOWED_MIME_TYPES[$imageMime])
+        ) {
+            throw new Exception(
+                'El contenido de la imagen no coincide con su formato',
+                422
+            );
+        }
+
+        $width = (int)($imageInfo[0] ?? 0);
+        $height = (int)($imageInfo[1] ?? 0);
+
+        if ($width <= 0 || $height <= 0) {
+            throw new Exception(
+                'La imagen tiene dimensiones inválidas',
+                422
+            );
+        }
+
+        /*
+     * Límite preventivo contra imágenes diseñadas
+     * para consumir demasiada memoria al procesarse.
+     */
+        if (
+            $width > 12000 ||
+            $height > 12000 ||
+            ($width * $height) > 40000000
+        ) {
+            throw new Exception(
+                'La imagen tiene dimensiones demasiado grandes',
+                422
+            );
+        }
+
+        $extension =
+            self::ALLOWED_MIME_TYPES[$imageMime];
+
+        $baseDir =
+            self::getUploadBaseDir();
 
         $filename = sprintf(
             'property_%d_%s.%s',
             $propertyId,
             bin2hex(random_bytes(12)),
-            $ext
+            $extension
         );
 
-        $target = $baseDir . '/' . $filename;
+        $target =
+            $baseDir . '/' . $filename;
 
-        if (!move_uploaded_file($tmp, $target)) {
-            throw new Exception("No se pudo guardar una de las imágenes");
+        if (
+            !move_uploaded_file(
+                $tmp,
+                $target
+            )
+        ) {
+            throw new Exception(
+                'No se pudo guardar una de las imágenes'
+            );
         }
 
         return 'properties/' . $filename;
@@ -714,71 +817,210 @@ class PropertyImageService
         );
     }
 
-    public static function reorder(int $userId, int $propertyId, array $images): array
-    {
-        [, $property] = self::getOwnedPropertyRow($userId, $propertyId);
+    public static function reorder(
+        int $userId,
+        int $propertyId,
+        mixed $images
+    ): array {
+        [, $property] =
+            self::getOwnedPropertyRow(
+                $userId,
+                $propertyId
+            );
 
-        if (!in_array($property['status'], ['draft', 'paused', 'archived', 'published'], true)) {
-            throw new Exception("No se pueden reordenar imágenes en el estado actual de la propiedad");
+        if (
+            !in_array(
+                $property['status'],
+                [
+                    'draft',
+                    'paused',
+                    'archived',
+                    'published',
+                ],
+                true
+            )
+        ) {
+            throw new Exception(
+                'No se pueden reordenar imágenes en el estado actual de la propiedad'
+            );
         }
 
-        if (!is_array($images) || !$images) {
-            throw new Exception("Debés enviar el listado de imágenes");
+        if (
+            !is_array($images) ||
+            $images === []
+        ) {
+            throw new Exception(
+                'Debés enviar el listado de imágenes',
+                422
+            );
+        }
+
+        $normalizedImages = [];
+        $seenIds = [];
+        $coverCount = 0;
+
+        foreach ($images as $image) {
+            if (!is_array($image)) {
+                throw new Exception(
+                    'El listado de imágenes es inválido',
+                    422
+                );
+            }
+
+            $rawId = $image['id'] ?? null;
+
+            $imageId = filter_var(
+                $rawId,
+                FILTER_VALIDATE_INT,
+                [
+                    'options' => [
+                        'min_range' => 1,
+                    ],
+                ]
+            );
+
+            if ($imageId === false) {
+                throw new Exception(
+                    'Una de las imágenes tiene un identificador inválido',
+                    422
+                );
+            }
+
+            if (isset($seenIds[$imageId])) {
+                throw new Exception(
+                    'El listado contiene imágenes repetidas',
+                    422
+                );
+            }
+
+            $rawCover =
+                $image['is_cover'] ?? null;
+
+            if (
+                !in_array(
+                    $rawCover,
+                    [
+                        true,
+                        false,
+                        1,
+                        0,
+                        '1',
+                        '0',
+                    ],
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'El valor de portada es inválido',
+                    422
+                );
+            }
+
+            $isCover = in_array(
+                $rawCover,
+                [true, 1, '1'],
+                true
+            );
+
+            if ($isCover) {
+                $coverCount++;
+            }
+
+            $seenIds[$imageId] = true;
+
+            $normalizedImages[] = [
+                'id' => (int)$imageId,
+                'is_cover' => $isCover ? 1 : 0,
+            ];
+        }
+
+        if ($coverCount !== 1) {
+            throw new Exception(
+                'Debés definir exactamente una imagen de portada',
+                422
+            );
         }
 
         $pdo = self::db();
+        $pdo->beginTransaction();
 
-        $st = $pdo->prepare("
+        try {
+            /*
+         * Bloqueamos la propiedad para serializar cambios
+         * simultáneos sobre sus imágenes.
+         */
+            $lockProperty = $pdo->prepare("
+            SELECT id
+            FROM properties
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+        ");
+
+            $lockProperty->execute([
+                'id' => $propertyId,
+            ]);
+
+            if (!$lockProperty->fetchColumn()) {
+                throw new Exception(
+                    'Propiedad no encontrada',
+                    404
+                );
+            }
+
+            $st = $pdo->prepare("
             SELECT id
             FROM property_images
             WHERE property_id = :property_id
               AND deleted_at IS NULL
-            ORDER BY sort_order ASC, id ASC
+            ORDER BY id ASC
+            FOR UPDATE
         ");
-        $st->execute(['property_id' => $propertyId]);
-        $current = $st->fetchAll(PDO::FETCH_COLUMN) ?: [];
-        $currentIds = array_map('intval', $current);
 
-        $incomingIds = array_map(
-            fn($img) => (int)($img['id'] ?? 0),
-            $images
-        );
+            $st->execute([
+                'property_id' => $propertyId,
+            ]);
 
-        sort($currentIds);
-        $sortedIncoming = $incomingIds;
-        sort($sortedIncoming);
+            $currentIds = array_map(
+                'intval',
+                $st->fetchAll(PDO::FETCH_COLUMN) ?: []
+            );
 
-        if ($currentIds !== $sortedIncoming) {
-            throw new Exception("Las imágenes enviadas no coinciden con las imágenes activas de la propiedad");
-        }
+            $incomingIds = array_column(
+                $normalizedImages,
+                'id'
+            );
 
-        $coverCount = 0;
-        foreach ($images as $img) {
-            if (!empty($img['is_cover'])) {
-                $coverCount++;
+            sort($currentIds);
+            sort($incomingIds);
+
+            if ($currentIds !== $incomingIds) {
+                throw new Exception(
+                    'Las imágenes enviadas no coinciden con las imágenes activas de la propiedad',
+                    422
+                );
             }
-        }
 
-        if ($coverCount !== 1) {
-            throw new Exception("Debés definir exactamente una imagen de portada");
-        }
+            $stUpdate = $pdo->prepare("
+            UPDATE property_images
+            SET
+                sort_order = :sort_order,
+                is_cover = :is_cover
+            WHERE id = :id
+              AND property_id = :property_id
+              AND deleted_at IS NULL
+            LIMIT 1
+        ");
 
-        $pdo->beginTransaction();
-
-        try {
-            foreach ($images as $index => $img) {
-                $stUpdate = $pdo->prepare("
-                    UPDATE property_images
-                    SET
-                        sort_order = :sort_order,
-                        is_cover = :is_cover
-                    WHERE id = :id
-                    LIMIT 1
-                ");
+            foreach (
+                $normalizedImages as $index => $image
+            ) {
                 $stUpdate->execute([
                     'sort_order' => $index,
-                    'is_cover' => !empty($img['is_cover']) ? 1 : 0,
-                    'id' => (int)$img['id'],
+                    'is_cover' => $image['is_cover'],
+                    'id' => $image['id'],
+                    'property_id' => $propertyId,
                 ]);
             }
 
@@ -788,9 +1030,15 @@ class PropertyImageService
                 $propertyId
             );
 
-            return PropertyService::getDetail($userId, $propertyId);
+            return PropertyService::getDetail(
+                $userId,
+                $propertyId
+            );
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
