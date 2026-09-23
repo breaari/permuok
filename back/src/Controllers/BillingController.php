@@ -12,9 +12,31 @@ class BillingController
     private static function error(
         \Throwable $e
     ): void {
-        $message = trim(
-            $e->getMessage()
-        );
+        $message =
+            trim($e->getMessage());
+
+        $status =
+            (int)$e->getCode();
+
+        /*
+     * Conservamos los códigos de validación,
+     * autorización y conflicto generados
+     * explícitamente por el controlador.
+     */
+        if (
+            !($e instanceof \PDOException) &&
+            $status >= 400 &&
+            $status <= 499
+        ) {
+            ResponseHelper::fail(
+                $message !== ''
+                    ? $message
+                    : 'La solicitud no es válida.',
+                $status
+            );
+
+            return;
+        }
 
         $conflictMessages = [
             'Ya se está procesando otra operación',
@@ -25,8 +47,15 @@ class BillingController
             'La renovación de la membresía está cancelada',
         ];
 
-        foreach ($conflictMessages as $fragment) {
-            if (str_contains($message, $fragment)) {
+        foreach (
+            $conflictMessages as $fragment
+        ) {
+            if (
+                str_contains(
+                    $message,
+                    $fragment
+                )
+            ) {
                 ResponseHelper::fail(
                     $message,
                     409
@@ -48,8 +77,15 @@ class BillingController
             'No hay una membresía activa para operar este cambio',
         ];
 
-        foreach ($validationMessages as $fragment) {
-            if (str_contains($message, $fragment)) {
+        foreach (
+            $validationMessages as $fragment
+        ) {
+            if (
+                str_contains(
+                    $message,
+                    $fragment
+                )
+            ) {
                 ResponseHelper::fail(
                     $message,
                     422
@@ -59,6 +95,15 @@ class BillingController
             }
         }
 
+        if ($message === 'Usuario inválido') {
+            ResponseHelper::fail(
+                'No autorizado',
+                403
+            );
+
+            return;
+        }
+
         ResponseHelper::fromThrowable(
             $e,
             'No se pudo completar la operación de facturación.',
@@ -66,6 +111,98 @@ class BillingController
         );
     }
 
+    private static function readJsonObject(): array
+    {
+        $raw =
+            file_get_contents(
+                'php://input'
+            );
+
+        if (
+            $raw === false ||
+            trim($raw) === ''
+        ) {
+            throw new \Exception(
+                'El cuerpo de la solicitud está vacío',
+                422
+            );
+        }
+
+        $raw = trim($raw);
+
+        if ($raw[0] !== '{') {
+            throw new \Exception(
+                'El cuerpo JSON debe ser un objeto',
+                422
+            );
+        }
+
+        try {
+            $payload = json_decode(
+                $raw,
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (\JsonException $e) {
+            throw new \Exception(
+                'El cuerpo JSON es inválido',
+                422
+            );
+        }
+
+        if (!is_array($payload)) {
+            throw new \Exception(
+                'El cuerpo JSON es inválido',
+                422
+            );
+        }
+
+        return $payload;
+    }
+
+    private static function requiredString(
+        array $payload,
+        string $field,
+        int $maxLength = 100
+    ): string {
+        if (
+            !array_key_exists(
+                $field,
+                $payload
+            ) ||
+            !is_string(
+                $payload[$field]
+            )
+        ) {
+            throw new \Exception(
+                $field . ' requerido',
+                422
+            );
+        }
+
+        $value =
+            trim($payload[$field]);
+
+        if ($value === '') {
+            throw new \Exception(
+                $field . ' requerido',
+                422
+            );
+        }
+
+        if (
+            mb_strlen($value) >
+            $maxLength
+        ) {
+            throw new \Exception(
+                $field . ' es demasiado extenso',
+                422
+            );
+        }
+
+        return $value;
+    }
 
     public static function listPlans(): void
     {
@@ -82,22 +219,39 @@ class BillingController
     public static function createPreference(): void
     {
         try {
-            $ctx = AuthMiddleware::handle();
+            $ctx =
+                AuthMiddleware::handle();
 
-            // Solo inmobiliaria (role=2) por ahora
-            if ((int)$ctx['role'] !== 2) {
-                ResponseHelper::fail('No autorizado', 403);
+            if (
+                (int)($ctx['role'] ?? 0)
+                !== 2
+            ) {
+                throw new \Exception(
+                    'No autorizado',
+                    403
+                );
             }
 
-            $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-            $planCode = trim((string)($payload['plan_code'] ?? ''));
+            $payload =
+                self::readJsonObject();
 
-            if ($planCode === '') {
-                ResponseHelper::fail('plan_code requerido', 422);
-            }
+            $planCode =
+                self::requiredString(
+                    $payload,
+                    'plan_code',
+                    100
+                );
 
-            $result = BillingService::createPreference((int)$ctx['id'], $planCode);
-            ResponseHelper::ok($result, 201);
+            $result =
+                BillingService::createPreference(
+                    (int)$ctx['id'],
+                    $planCode
+                );
+
+            ResponseHelper::ok(
+                $result,
+                201
+            );
         } catch (\Throwable $e) {
             self::error($e);
         }
@@ -106,17 +260,118 @@ class BillingController
     public static function status(): void
     {
         try {
-            $ctx = AuthMiddleware::handle();
+            $ctx =
+                AuthMiddleware::handle();
 
-            $preferenceId = $_GET['preference_id'] ?? null;
-            $externalRef  = $_GET['external_reference'] ?? null;
+            $preferenceId = null;
+            $externalReference = null;
 
-            if (!$preferenceId && !$externalRef) {
-                ResponseHelper::fail('Debés enviar preference_id o external_reference', 422);
+            if (
+                array_key_exists(
+                    'preference_id',
+                    $_GET
+                )
+            ) {
+                if (
+                    !is_string(
+                        $_GET['preference_id']
+                    )
+                ) {
+                    throw new \Exception(
+                        'preference_id inválido',
+                        422
+                    );
+                }
+
+                $preferenceId =
+                    trim(
+                        $_GET['preference_id']
+                    );
+
+                if ($preferenceId === '') {
+                    $preferenceId = null;
+                } elseif (
+                    mb_strlen(
+                        $preferenceId
+                    ) > 255
+                ) {
+                    throw new \Exception(
+                        'preference_id es demasiado extenso',
+                        422
+                    );
+                }
             }
 
-            $data = BillingService::getPaymentStatus((int)$ctx['id'], $preferenceId, $externalRef);
-            ResponseHelper::ok($data);
+            if (
+                array_key_exists(
+                    'external_reference',
+                    $_GET
+                )
+            ) {
+                if (
+                    !is_string(
+                        $_GET['external_reference']
+                    )
+                ) {
+                    throw new \Exception(
+                        'external_reference inválido',
+                        422
+                    );
+                }
+
+                $externalReference =
+                    trim(
+                        $_GET['external_reference']
+                    );
+
+                if ($externalReference === '') {
+                    $externalReference = null;
+                } elseif (
+                    mb_strlen(
+                        $externalReference
+                    ) > 255
+                ) {
+                    throw new \Exception(
+                        'external_reference es demasiado extenso',
+                        422
+                    );
+                }
+            }
+
+            if (
+                $preferenceId === null &&
+                $externalReference === null
+            ) {
+                throw new \Exception(
+                    'Debés enviar preference_id o external_reference',
+                    422
+                );
+            }
+
+            /*
+         * Una consulta debe utilizar un único
+         * identificador para evitar resultados ambiguos.
+         */
+            if (
+                $preferenceId !== null &&
+                $externalReference !== null
+            ) {
+                throw new \Exception(
+                    'Enviá solamente preference_id o external_reference',
+                    422
+                );
+            }
+
+            $data =
+                BillingService::getPaymentStatus(
+                    (int)$ctx['id'],
+                    $preferenceId,
+                    $externalReference
+                );
+
+            ResponseHelper::ok(
+                $data
+            );
         } catch (\Throwable $e) {
             self::error($e);
         }
@@ -125,21 +380,38 @@ class BillingController
     public static function previewPlanChange(): void
     {
         try {
-            $ctx = AuthMiddleware::handle();
+            $ctx =
+                AuthMiddleware::handle();
 
-            if ((int)$ctx['role'] !== 2) {
-                ResponseHelper::fail('No autorizado', 403);
+            if (
+                (int)($ctx['role'] ?? 0)
+                !== 2
+            ) {
+                throw new \Exception(
+                    'No autorizado',
+                    403
+                );
             }
 
-            $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-            $planCode = trim((string)($payload['target_plan_code'] ?? ''));
+            $payload =
+                self::readJsonObject();
 
-            if ($planCode === '') {
-                ResponseHelper::fail('target_plan_code requerido', 422);
-            }
+            $planCode =
+                self::requiredString(
+                    $payload,
+                    'target_plan_code',
+                    100
+                );
 
-            $result = BillingService::previewPlanChange((int)$ctx['id'], $planCode);
-            ResponseHelper::ok($result);
+            $result =
+                BillingService::previewPlanChange(
+                    (int)$ctx['id'],
+                    $planCode
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
         } catch (\Throwable $e) {
             self::error($e);
         }
@@ -148,26 +420,63 @@ class BillingController
     public static function confirmPlanChange(): void
     {
         try {
-            $ctx = AuthMiddleware::handle();
+            $ctx =
+                AuthMiddleware::handle();
 
-            if ((int)$ctx['role'] !== 2) {
-                ResponseHelper::fail('No autorizado', 403);
+            if (
+                (int)($ctx['role'] ?? 0)
+                !== 2
+            ) {
+                throw new \Exception(
+                    'No autorizado',
+                    403
+                );
             }
 
-            $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-            $planCode = trim((string)($payload['target_plan_code'] ?? ''));
-            $mode = trim((string)($payload['mode'] ?? ''));
+            $payload =
+                self::readJsonObject();
 
-            if ($planCode === '') {
-                ResponseHelper::fail('target_plan_code requerido', 422);
+            $planCode =
+                self::requiredString(
+                    $payload,
+                    'target_plan_code',
+                    100
+                );
+
+            $mode =
+                self::requiredString(
+                    $payload,
+                    'mode',
+                    30
+                );
+
+            if (
+                !in_array(
+                    $mode,
+                    [
+                        'immediate',
+                        'next_cycle',
+                    ],
+                    true
+                )
+            ) {
+                throw new \Exception(
+                    'mode inválido',
+                    422
+                );
             }
 
-            if (!in_array($mode, ['immediate', 'next_cycle'], true)) {
-                ResponseHelper::fail('mode inválido', 422);
-            }
+            $result =
+                BillingService::confirmPlanChange(
+                    (int)$ctx['id'],
+                    $planCode,
+                    $mode
+                );
 
-            $result = BillingService::confirmPlanChange((int)$ctx['id'], $planCode, $mode);
-            ResponseHelper::ok($result, 201);
+            ResponseHelper::ok(
+                $result,
+                201
+            );
         } catch (\Throwable $e) {
             self::error($e);
         }
