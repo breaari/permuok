@@ -2592,12 +2592,11 @@ class PropertyService
         int $propertyId,
         string $closingType
     ): array {
-        [$user, $property] = self::getOwnedProperty(
-            $userId,
-            $propertyId
-        );
-
-        $pdo = self::db();
+        [$user, $property] =
+            self::getOwnedProperty(
+                $userId,
+                $propertyId
+            );
 
         $validClosingTypes = [
             'sold',
@@ -2614,27 +2613,37 @@ class PropertyService
             )
         ) {
             throw new Exception(
-                "Tipo de cierre inválido"
+                'El tipo de cierre no es válido',
+                422
             );
         }
+
+        $allowedStatuses = [
+            'published',
+            'paused',
+        ];
 
         if (
             !in_array(
                 $property['status'],
-                ['published', 'paused'],
+                $allowedStatuses,
                 true
             )
         ) {
             throw new Exception(
-                "La propiedad no puede cerrarse en su estado actual"
+                'La propiedad no puede cerrarse en su estado actual',
+                409
             );
         }
+
+        $oldStatus =
+            (string)$property['status'];
+
+        $pdo = self::db();
 
         $pdo->beginTransaction();
 
         try {
-            $oldStatus = $property['status'];
-
             $st = $pdo->prepare("
             UPDATE properties
             SET
@@ -2644,19 +2653,32 @@ class PropertyService
                 updated_by_user_id =
                     :updated_by_user_id
             WHERE id = :id
-              AND real_estate_id = :real_estate_id
+              AND real_estate_id =
+                    :real_estate_id
+              AND status = :old_status
               AND deleted_at IS NULL
             LIMIT 1
         ");
 
             $st->execute([
-                'closing_type' => $closingType,
+                'closing_type' =>
+                $closingType,
                 'updated_by_user_id' =>
                 (int)$user['id'],
-                'id' => $propertyId,
+                'id' =>
+                $propertyId,
                 'real_estate_id' =>
                 (int)$user['real_estate_id'],
+                'old_status' =>
+                $oldStatus,
             ]);
+
+            if ($st->rowCount() !== 1) {
+                throw new Exception(
+                    'La propiedad cambió de estado mientras se procesaba el cierre. Actualizá la página e intentá nuevamente.',
+                    409
+                );
+            }
 
             $hist = $pdo->prepare("
             INSERT INTO property_status_history (
@@ -2677,11 +2699,14 @@ class PropertyService
         ");
 
             $hist->execute([
-                'property_id' => $propertyId,
-                'old_status' => $oldStatus,
+                'property_id' =>
+                $propertyId,
+                'old_status' =>
+                $oldStatus,
                 'changed_by_user_id' =>
                 (int)$user['id'],
-                'change_reason' => $closingType,
+                'change_reason' =>
+                $closingType,
             ]);
 
             $pdo->commit();
@@ -2843,45 +2868,53 @@ class PropertyService
         int $userId,
         int $propertyId
     ): array {
-        [$user, $property] = self::getOwnedProperty(
-            $userId,
-            $propertyId
-        );
+        [$user, $property] =
+            self::getOwnedProperty(
+                $userId,
+                $propertyId
+            );
 
-        $pdo = self::db();
+        $allowedStatuses = [
+            'draft',
+            'published',
+            'paused',
+            'archived',
+            'closed',
+        ];
 
         if (
             !in_array(
                 $property['status'],
-                [
-                    'draft',
-                    'published',
-                    'paused',
-                    'archived',
-                    'closed',
-                ],
+                $allowedStatuses,
                 true
             )
         ) {
             throw new Exception(
-                "La propiedad no puede eliminarse en su estado actual"
+                'La propiedad no puede eliminarse en su estado actual',
+                409
             );
         }
+
+        $oldStatus =
+            (string)$property['status'];
+
+        $pdo = self::db();
 
         $pdo->beginTransaction();
 
         try {
-            $oldStatus = $property['status'];
-
             $st = $pdo->prepare("
             UPDATE properties
             SET
+                status = 'deleted',
                 deleted_at = NOW(),
                 is_visible = 0,
                 updated_by_user_id =
                     :updated_by_user_id
             WHERE id = :id
-              AND real_estate_id = :real_estate_id
+              AND real_estate_id =
+                    :real_estate_id
+              AND status = :old_status
               AND deleted_at IS NULL
             LIMIT 1
         ");
@@ -2889,10 +2922,20 @@ class PropertyService
             $st->execute([
                 'updated_by_user_id' =>
                 (int)$user['id'],
-                'id' => $propertyId,
+                'id' =>
+                $propertyId,
                 'real_estate_id' =>
                 (int)$user['real_estate_id'],
+                'old_status' =>
+                $oldStatus,
             ]);
+
+            if ($st->rowCount() !== 1) {
+                throw new Exception(
+                    'La propiedad cambió mientras se procesaba la eliminación. Actualizá la página e intentá nuevamente.',
+                    409
+                );
+            }
 
             $hist = $pdo->prepare("
             INSERT INTO property_status_history (
@@ -2913,8 +2956,10 @@ class PropertyService
         ");
 
             $hist->execute([
-                'property_id' => $propertyId,
-                'old_status' => $oldStatus,
+                'property_id' =>
+                $propertyId,
+                'old_status' =>
+                $oldStatus,
                 'changed_by_user_id' =>
                 (int)$user['id'],
             ]);
@@ -2927,7 +2972,10 @@ class PropertyService
 
             return [
                 'ok' => true,
-                'property_id' => $propertyId,
+                'property_id' =>
+                $propertyId,
+                'status' =>
+                'deleted',
                 'deleted_at' =>
                 date('Y-m-d H:i:s'),
             ];
