@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Helpers\ResponseHelper;
+use App\Helpers\QueryParamHelper;
 use App\Middleware\AuthMiddleware;
 use App\Services\AdminBillingService;
 
@@ -48,11 +49,24 @@ class AdminBillingController
         try {
             self::requireAdmin();
 
-            $q = isset($_GET['q']) ? (string)$_GET['q'] : null;
-            $counts = AdminBillingService::counts($q);
+            QueryParamHelper::rejectUnknown([
+                'q',
+            ]);
+
+            $q =
+                QueryParamHelper::optionalString(
+                    'q',
+                    150
+                );
+
+            $counts =
+                AdminBillingService::counts(
+                    $q
+                );
 
             ResponseHelper::ok([
-                'counts' => $counts,
+                'counts' =>
+                $counts,
             ]);
         } catch (\Throwable $e) {
             self::handleError($e);
@@ -64,13 +78,59 @@ class AdminBillingController
         try {
             self::requireAdmin();
 
-            $status = (string)($_GET['status'] ?? 'active');
-            $page = (int)($_GET['page'] ?? 1);
-            $perPage = (int)($_GET['per_page'] ?? 10);
-            $q = isset($_GET['q']) ? (string)$_GET['q'] : null;
+            QueryParamHelper::rejectUnknown([
+                'status',
+                'page',
+                'per_page',
+                'q',
+            ]);
 
-            $data = AdminBillingService::list($status, $page, $perPage, $q);
-            ResponseHelper::ok($data);
+            $status =
+                QueryParamHelper::enum(
+                    'status',
+                    [
+                        'active',
+                        'none',
+                        'cancel_at_period_end',
+                        'scheduled_change',
+                        'pending',
+                        'expired',
+                        'cancelled',
+                    ],
+                    'active'
+                );
+
+            $page =
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                );
+
+            $perPage =
+                QueryParamHelper::positiveInt(
+                    'per_page',
+                    10,
+                    100
+                );
+
+            $q =
+                QueryParamHelper::optionalString(
+                    'q',
+                    150
+                );
+
+            $data =
+                AdminBillingService::list(
+                    $status,
+                    $page,
+                    $perPage,
+                    $q
+                );
+
+            ResponseHelper::ok(
+                $data
+            );
         } catch (\Throwable $e) {
             self::handleError($e);
         }
@@ -81,14 +141,28 @@ class AdminBillingController
         try {
             self::requireAdmin();
 
-            $realEstateId = (int)($_GET['real_estate_id'] ?? $_GET['id'] ?? 0);
+            QueryParamHelper::rejectUnknown([
+                'real_estate_id',
+                'id',
+            ]);
 
-            if ($realEstateId <= 0) {
-                ResponseHelper::fail('real_estate_id requerido', 422);
-            }
+            $realEstateId =
+                QueryParamHelper::requiredPositiveIntFromAliases(
+                    [
+                        'real_estate_id',
+                        'id',
+                    ],
+                    'real_estate_id'
+                );
 
-            $data = AdminBillingService::detail($realEstateId);
-            ResponseHelper::ok($data);
+            $data =
+                AdminBillingService::detail(
+                    $realEstateId
+                );
+
+            ResponseHelper::ok(
+                $data
+            );
         } catch (\Throwable $e) {
             self::handleError($e);
         }

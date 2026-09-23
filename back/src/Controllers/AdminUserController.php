@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Helpers\ResponseHelper;
+use App\Helpers\QueryParamHelper;
 use App\Middleware\AuthMiddleware;
 use App\Services\AdminUserService;
 
@@ -139,12 +140,53 @@ class AdminUserController
         try {
             self::requireAdmin();
 
-            $q = isset($_GET['q']) ? (string)$_GET['q'] : null;
-            $status = isset($_GET['status']) ? (string)$_GET['status'] : 'all';
-            $membership = isset($_GET['membership']) ? (string)$_GET['membership'] : 'all';
+            QueryParamHelper::rejectUnknown([
+                'q',
+                'status',
+                'membership',
+            ]);
 
-            $counts = AdminUserService::counts($q, $status, $membership);
-            ResponseHelper::ok(['counts' => $counts]);
+            $q =
+                QueryParamHelper::optionalString(
+                    'q',
+                    150
+                );
+
+            $status =
+                QueryParamHelper::enum(
+                    'status',
+                    [
+                        'all',
+                        'active',
+                        'inactive',
+                    ],
+                    'all'
+                );
+
+            $membership =
+                QueryParamHelper::enum(
+                    'membership',
+                    [
+                        'all',
+                        'active',
+                        'none',
+                        'cancel_at_period_end',
+                        'scheduled_change',
+                    ],
+                    'all'
+                );
+
+            $counts =
+                AdminUserService::counts(
+                    $q,
+                    $status,
+                    $membership
+                );
+
+            ResponseHelper::ok([
+                'counts' =>
+                $counts,
+            ]);
         } catch (\Throwable $e) {
             self::handleError($e);
         }
@@ -155,23 +197,83 @@ class AdminUserController
         try {
             self::requireAdmin();
 
-            $role = (string)($_GET['role'] ?? 'real_estate');
-            $page = (int)($_GET['page'] ?? 1);
-            $perPage = (int)($_GET['per_page'] ?? 10);
-            $q = isset($_GET['q']) ? (string)$_GET['q'] : null;
-            $status = isset($_GET['status']) ? (string)$_GET['status'] : 'all';
-            $membership = isset($_GET['membership']) ? (string)$_GET['membership'] : 'all';
+            QueryParamHelper::rejectUnknown([
+                'role',
+                'page',
+                'per_page',
+                'q',
+                'status',
+                'membership',
+            ]);
 
-            $data = AdminUserService::list(
-                $role,
-                $page,
-                $perPage,
-                $q,
-                $status,
-                $membership
+            $role =
+                QueryParamHelper::enum(
+                    'role',
+                    [
+                        'real_estate',
+                        'agent',
+                        'investor',
+                    ],
+                    'real_estate'
+                );
+
+            $page =
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                );
+
+            $perPage =
+                QueryParamHelper::positiveInt(
+                    'per_page',
+                    10,
+                    100
+                );
+
+            $q =
+                QueryParamHelper::optionalString(
+                    'q',
+                    150
+                );
+
+            $status =
+                QueryParamHelper::enum(
+                    'status',
+                    [
+                        'all',
+                        'active',
+                        'inactive',
+                    ],
+                    'all'
+                );
+
+            $membership =
+                QueryParamHelper::enum(
+                    'membership',
+                    [
+                        'all',
+                        'active',
+                        'none',
+                        'cancel_at_period_end',
+                        'scheduled_change',
+                    ],
+                    'all'
+                );
+
+            $data =
+                AdminUserService::list(
+                    $role,
+                    $page,
+                    $perPage,
+                    $q,
+                    $status,
+                    $membership
+                );
+
+            ResponseHelper::ok(
+                $data
             );
-
-            ResponseHelper::ok($data);
         } catch (\Throwable $e) {
             self::handleError($e);
         }
@@ -182,26 +284,18 @@ class AdminUserController
         try {
             self::requireAdmin();
 
-            $id = filter_var(
-                $_GET['id'] ?? null,
-                FILTER_VALIDATE_INT,
-                [
-                    'options' => [
-                        'min_range' => 1,
-                    ],
-                ]
-            );
+            QueryParamHelper::rejectUnknown([
+                'id',
+            ]);
 
-            if ($id === false) {
-                throw new \Exception(
-                    'Identificador de usuario inválido',
-                    422
+            $id =
+                QueryParamHelper::requiredPositiveInt(
+                    'id'
                 );
-            }
 
             $data =
                 AdminUserService::getDetail(
-                    (int)$id
+                    $id
                 );
 
             ResponseHelper::ok(
