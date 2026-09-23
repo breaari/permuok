@@ -74,33 +74,87 @@ class NotificationService
         ];
     }
 
-    public static function markAsRead(int $userId, int $notificationId): array
-    {
-        if ($notificationId <= 0) {
-            throw new Exception('Notificación inválida.', 422);
+    public static function markAsRead(
+        int $userId,
+        int $notificationId
+    ): array {
+        if (
+            $userId <= 0 ||
+            $notificationId <= 0
+        ) {
+            throw new Exception(
+                'Notificación inválida.',
+                422
+            );
         }
 
-        $pdo = self::db();
+        $pdo =
+            self::db();
 
         $stmt = $pdo->prepare("
-            UPDATE notifications
-            SET
-                is_read = 1,
-                read_at = NOW()
+        UPDATE notifications
+        SET
+            is_read = 1,
+            read_at = CASE
+                WHEN is_read = 0
+                    THEN NOW()
+                ELSE read_at
+            END
+        WHERE id = :id
+          AND user_id = :user_id
+          AND deleted_at IS NULL
+    ");
+
+        $stmt->execute([
+            ':id' =>
+            $notificationId,
+
+            ':user_id' =>
+            $userId,
+        ]);
+
+        /*
+     * MySQL puede devolver rowCount 0 cuando
+     * la notificación ya estaba leída. En ese
+     * caso comprobamos que realmente exista.
+     */
+        if ($stmt->rowCount() === 0) {
+            $existsStmt = $pdo->prepare("
+            SELECT id
+            FROM notifications
             WHERE id = :id
               AND user_id = :user_id
               AND deleted_at IS NULL
+            LIMIT 1
         ");
 
-        $stmt->execute([
-            ':id' => $notificationId,
-            ':user_id' => $userId,
-        ]);
+            $existsStmt->execute([
+                ':id' =>
+                $notificationId,
+
+                ':user_id' =>
+                $userId,
+            ]);
+
+            if (!$existsStmt->fetchColumn()) {
+                throw new Exception(
+                    'Notificación no encontrada.',
+                    404
+                );
+            }
+        }
 
         return [
-            'id' => $notificationId,
-            'read' => true,
-            'unread_count' => self::unreadCount($userId),
+            'id' =>
+            $notificationId,
+
+            'read' =>
+            true,
+
+            'unread_count' =>
+            self::unreadCount(
+                $userId
+            ),
         ];
     }
 
