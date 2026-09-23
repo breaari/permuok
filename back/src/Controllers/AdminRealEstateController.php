@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Helpers\ResponseHelper;
+use App\Helpers\QueryParamHelper;
 use App\Middleware\AuthMiddleware;
 use App\Services\AdminRealEstateService;
 
@@ -96,10 +97,25 @@ class AdminRealEstateController
         try {
             self::requireAdmin();
 
-            $q = isset($_GET['q']) ? (string)$_GET['q'] : null;
+            QueryParamHelper::rejectUnknown([
+                'q',
+            ]);
 
-            $counts = AdminRealEstateService::counts($q);
-            ResponseHelper::ok(['counts' => $counts]);
+            $q =
+                QueryParamHelper::optionalString(
+                    'q',
+                    150
+                );
+
+            $counts =
+                AdminRealEstateService::counts(
+                    $q
+                );
+
+            ResponseHelper::ok([
+                'counts' =>
+                $counts,
+            ]);
         } catch (\Throwable $e) {
             self::handleError($e);
         }
@@ -110,18 +126,68 @@ class AdminRealEstateController
         try {
             self::requireAdmin();
 
-            $status = (string)($_GET['status'] ?? 'pending');
-            $page = (int)($_GET['page'] ?? 1);
-            $perPage = (int)($_GET['per_page'] ?? 10);
-            $q = isset($_GET['q']) ? (string)$_GET['q'] : null;
+            QueryParamHelper::rejectUnknown([
+                'status',
+                'page',
+                'per_page',
+                'q',
+            ]);
 
-            $data = AdminRealEstateService::list($status, $page, $perPage, $q);
-            ResponseHelper::ok($data);
+            /*
+         * "pending" se conserva por compatibilidad
+         * con rutas anteriores. El servicio lo
+         * interpreta como revisión inicial.
+         */
+            $status =
+                QueryParamHelper::enum(
+                    'status',
+                    [
+                        'pending',
+                        'incomplete',
+                        'ready_for_review',
+                        'initial_review',
+                        'changes_pending',
+                        'approved',
+                        'rejected',
+                    ],
+                    'pending'
+                );
+
+            $page =
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                );
+
+            $perPage =
+                QueryParamHelper::positiveInt(
+                    'per_page',
+                    10,
+                    100
+                );
+
+            $q =
+                QueryParamHelper::optionalString(
+                    'q',
+                    150
+                );
+
+            $data =
+                AdminRealEstateService::list(
+                    $status,
+                    $page,
+                    $perPage,
+                    $q
+                );
+
+            ResponseHelper::ok(
+                $data
+            );
         } catch (\Throwable $e) {
             self::handleError($e);
         }
     }
-
 
 
     public static function validate(): void
@@ -297,26 +363,18 @@ class AdminRealEstateController
         try {
             self::requireAdmin();
 
-            $id = filter_var(
-                $_GET['id'] ?? null,
-                FILTER_VALIDATE_INT,
-                [
-                    'options' => [
-                        'min_range' => 1,
-                    ],
-                ]
-            );
+            QueryParamHelper::rejectUnknown([
+                'id',
+            ]);
 
-            if ($id === false) {
-                throw new \Exception(
-                    'Identificador de inmobiliaria inválido',
-                    422
+            $id =
+                QueryParamHelper::requiredPositiveInt(
+                    'id'
                 );
-            }
 
             $data =
                 AdminRealEstateService::getDetail(
-                    (int)$id
+                    $id
                 );
 
             ResponseHelper::ok(
@@ -403,16 +461,20 @@ class AdminRealEstateController
             self::handleError($e);
         }
     }
-
     public static function operationalCounts(): void
     {
         try {
             self::requireAdmin();
 
+            QueryParamHelper::rejectUnknown([
+                'q',
+            ]);
+
             $q =
-                isset($_GET['q'])
-                ? (string)$_GET['q']
-                : null;
+                QueryParamHelper::optionalString(
+                    'q',
+                    150
+                );
 
             $counts =
                 AdminRealEstateService::operationalCounts(
@@ -433,28 +495,43 @@ class AdminRealEstateController
         try {
             self::requireAdmin();
 
+            QueryParamHelper::rejectUnknown([
+                'status',
+                'page',
+                'per_page',
+                'q',
+            ]);
+
             $status =
-                (string)(
-                    $_GET['status']
-                    ?? 'all'
+                QueryParamHelper::enum(
+                    'status',
+                    [
+                        'all',
+                        'active',
+                        'suspended',
+                    ],
+                    'all'
                 );
 
             $page =
-                (int)(
-                    $_GET['page']
-                    ?? 1
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
                 );
 
             $perPage =
-                (int)(
-                    $_GET['per_page']
-                    ?? 10
+                QueryParamHelper::positiveInt(
+                    'per_page',
+                    10,
+                    100
                 );
 
             $q =
-                isset($_GET['q'])
-                ? (string)$_GET['q']
-                : null;
+                QueryParamHelper::optionalString(
+                    'q',
+                    150
+                );
 
             $data =
                 AdminRealEstateService::operationalList(
