@@ -102,6 +102,59 @@ class PropertyImageController
         );
     }
 
+    private static function readJsonObject(): array
+    {
+        $raw = file_get_contents(
+            'php://input'
+        );
+
+        if (
+            $raw === false ||
+            trim($raw) === ''
+        ) {
+            throw new \Exception(
+                'El cuerpo de la solicitud está vacío',
+                422
+            );
+        }
+
+        $raw = trim($raw);
+
+        /*
+     * Este endpoint solamente acepta
+     * un objeto JSON, no un array raíz.
+     */
+        if ($raw[0] !== '{') {
+            throw new \Exception(
+                'El cuerpo JSON debe ser un objeto',
+                422
+            );
+        }
+
+        try {
+            $data = json_decode(
+                $raw,
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (\JsonException $e) {
+            throw new \Exception(
+                'El cuerpo JSON es inválido',
+                422
+            );
+        }
+
+        if (!is_array($data)) {
+            throw new \Exception(
+                'El cuerpo JSON es inválido',
+                422
+            );
+        }
+
+        return $data;
+    }
+
     public static function upload(): void
     {
         try {
@@ -156,20 +209,43 @@ class PropertyImageController
             $auth =
                 AuthHelper::requireUser();
 
-            $propertyId =
-                (int)($_GET['id'] ?? 0);
+            $propertyId = filter_var(
+                $_GET['id'] ?? null,
+                FILTER_VALIDATE_INT,
+                [
+                    'options' => [
+                        'min_range' => 1,
+                    ],
+                ]
+            );
+
+            if ($propertyId === false) {
+                throw new \Exception(
+                    'Identificador de propiedad inválido',
+                    422
+                );
+            }
 
             $data =
-                json_decode(
-                    file_get_contents('php://input'),
-                    true
-                ) ?? [];
+                self::readJsonObject();
+
+            if (
+                !array_key_exists(
+                    'images',
+                    $data
+                )
+            ) {
+                throw new \Exception(
+                    'Debés enviar el listado de imágenes',
+                    422
+                );
+            }
 
             $result =
                 PropertyImageService::reorder(
                     (int)$auth['id'],
-                    $propertyId,
-                    $data['images'] ?? []
+                    (int)$propertyId,
+                    $data['images']
                 );
 
             ResponseHelper::ok(

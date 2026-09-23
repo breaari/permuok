@@ -124,6 +124,55 @@ class DevelopmentImageController
         );
     }
 
+    private static function readJsonObject(): array
+    {
+        $raw = file_get_contents(
+            'php://input'
+        );
+
+        if (
+            $raw === false ||
+            trim($raw) === ''
+        ) {
+            throw new \Exception(
+                'El cuerpo de la solicitud está vacío',
+                422
+            );
+        }
+
+        $raw = trim($raw);
+
+        if ($raw[0] !== '{') {
+            throw new \Exception(
+                'El cuerpo JSON debe ser un objeto',
+                422
+            );
+        }
+
+        try {
+            $data = json_decode(
+                $raw,
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (\JsonException $e) {
+            throw new \Exception(
+                'El cuerpo JSON es inválido',
+                422
+            );
+        }
+
+        if (!is_array($data)) {
+            throw new \Exception(
+                'El cuerpo JSON es inválido',
+                422
+            );
+        }
+
+        return $data;
+    }
+
     public static function upload(): void
     {
         try {
@@ -178,20 +227,43 @@ class DevelopmentImageController
             $auth =
                 AuthHelper::requireUser();
 
-            $developmentId =
-                (int)($_GET['id'] ?? 0);
+            $developmentId = filter_var(
+                $_GET['id'] ?? null,
+                FILTER_VALIDATE_INT,
+                [
+                    'options' => [
+                        'min_range' => 1,
+                    ],
+                ]
+            );
+
+            if ($developmentId === false) {
+                throw new \Exception(
+                    'Identificador de desarrollo inválido',
+                    422
+                );
+            }
 
             $data =
-                json_decode(
-                    file_get_contents('php://input'),
-                    true
-                ) ?? [];
+                self::readJsonObject();
+
+            if (
+                !array_key_exists(
+                    'images',
+                    $data
+                )
+            ) {
+                throw new \Exception(
+                    'Debés enviar el listado de imágenes',
+                    422
+                );
+            }
 
             $result =
                 DevelopmentImageService::reorder(
                     (int)$auth['id'],
-                    $developmentId,
-                    $data['images'] ?? []
+                    (int)$developmentId,
+                    $data['images']
                 );
 
             ResponseHelper::ok(

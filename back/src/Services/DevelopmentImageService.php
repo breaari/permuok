@@ -645,72 +645,110 @@ class DevelopmentImageService
         int $userId,
         int $imageId
     ): array {
-        [, $image] =
+        [, $ownedImage] =
             self::getOwnedImage(
                 $userId,
                 $imageId
             );
 
-        $pdo = self::db();
-
         $developmentId =
-            (int)$image['development_id'];
+            (int)$ownedImage['development_id'];
 
-        $filePath =
-            (string)($image['file_path'] ?? '');
-
-        $stDevelopment = $pdo->prepare("
-        SELECT status
-        FROM developments
-        WHERE id = :id
-          AND deleted_at IS NULL
-        LIMIT 1
-    ");
-
-        $stDevelopment->execute([
-            'id' => $developmentId,
-        ]);
-
-        $development =
-            $stDevelopment->fetch();
-
-        if (!$development) {
-            throw new Exception(
-                'Desarrollo no encontrado'
-            );
-        }
-
-        if (
-            !in_array(
-                $development['status'],
-                [
-                    'draft',
-                    'paused',
-                    'archived',
-                    'published',
-                ],
-                true
-            )
-        ) {
-            throw new Exception(
-                'No se pueden eliminar imágenes en el estado actual del desarrollo'
-            );
-        }
+        $pdo = self::db();
+        $filePath = '';
 
         $pdo->beginTransaction();
 
         try {
-            $st = $pdo->prepare("
+            $stDevelopment = $pdo->prepare("
+            SELECT status
+            FROM developments
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+        ");
+
+            $stDevelopment->execute([
+                'id' => $developmentId,
+            ]);
+
+            $development =
+                $stDevelopment->fetch();
+
+            if (!$development) {
+                throw new Exception(
+                    'Desarrollo no encontrado',
+                    404
+                );
+            }
+
+            if (
+                !in_array(
+                    $development['status'],
+                    [
+                        'draft',
+                        'paused',
+                        'archived',
+                        'published',
+                    ],
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'No se pueden eliminar imágenes en el estado actual del desarrollo',
+                    422
+                );
+            }
+
+            $stImage = $pdo->prepare("
+            SELECT file_path
+            FROM development_images
+            WHERE id = :id
+              AND development_id = :development_id
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+        ");
+
+            $stImage->execute([
+                'id' => $imageId,
+                'development_id' => $developmentId,
+            ]);
+
+            $image =
+                $stImage->fetch();
+
+            if (!$image) {
+                throw new Exception(
+                    'Imagen no encontrada',
+                    404
+                );
+            }
+
+            $filePath =
+                (string)($image['file_path'] ?? '');
+
+            $stDelete = $pdo->prepare("
             UPDATE development_images
             SET deleted_at = NOW()
             WHERE id = :id
+              AND development_id = :development_id
               AND deleted_at IS NULL
             LIMIT 1
         ");
 
-            $st->execute([
+            $stDelete->execute([
                 'id' => $imageId,
+                'development_id' => $developmentId,
             ]);
+
+            if ($stDelete->rowCount() !== 1) {
+                throw new Exception(
+                    'La imagen fue modificada por otra operación. Actualizá la página e intentá nuevamente.',
+                    409
+                );
+            }
 
             self::ensureSingleCover(
                 $developmentId
@@ -725,10 +763,6 @@ class DevelopmentImageService
             throw $e;
         }
 
-        /*
-     * El archivo se elimina solamente después
-     * de confirmar la eliminación en la base.
-     */
         if ($filePath !== '') {
             self::removeStoredFile(
                 $filePath

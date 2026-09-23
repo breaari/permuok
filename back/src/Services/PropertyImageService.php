@@ -718,71 +718,119 @@ class PropertyImageService
         int $userId,
         int $imageId
     ): array {
-        [, $image] =
+        [, $ownedImage] =
             self::getOwnedImage(
                 $userId,
                 $imageId
             );
 
-        $pdo = self::db();
-
         $propertyId =
-            (int)$image['property_id'];
+            (int)$ownedImage['property_id'];
 
-        $filePath =
-            (string)($image['file_path'] ?? '');
-
-        $stProperty = $pdo->prepare("
-        SELECT status
-        FROM properties
-        WHERE id = :id
-          AND deleted_at IS NULL
-        LIMIT 1
-    ");
-
-        $stProperty->execute([
-            'id' => $propertyId,
-        ]);
-
-        $property = $stProperty->fetch();
-
-        if (!$property) {
-            throw new Exception(
-                'Propiedad no encontrada'
-            );
-        }
-
-        if (
-            !in_array(
-                $property['status'],
-                [
-                    'draft',
-                    'paused',
-                    'archived',
-                    'published',
-                ],
-                true
-            )
-        ) {
-            throw new Exception(
-                'No se pueden eliminar imágenes en el estado actual de la propiedad'
-            );
-        }
+        $pdo = self::db();
+        $filePath = '';
 
         $pdo->beginTransaction();
 
         try {
-            $st = $pdo->prepare("
+            /*
+         * Usamos el mismo orden de bloqueo que upload()
+         * y reorder(): primero la propiedad y después
+         * sus imágenes.
+         */
+            $stProperty = $pdo->prepare("
+            SELECT status
+            FROM properties
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+        ");
+
+            $stProperty->execute([
+                'id' => $propertyId,
+            ]);
+
+            $property =
+                $stProperty->fetch();
+
+            if (!$property) {
+                throw new Exception(
+                    'Propiedad no encontrada',
+                    404
+                );
+            }
+
+            if (
+                !in_array(
+                    $property['status'],
+                    [
+                        'draft',
+                        'paused',
+                        'archived',
+                        'published',
+                    ],
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'No se pueden eliminar imágenes en el estado actual de la propiedad',
+                    422
+                );
+            }
+
+            /*
+         * Volvemos a comprobar la imagen dentro
+         * de la transacción y la bloqueamos.
+         */
+            $stImage = $pdo->prepare("
+            SELECT file_path
+            FROM property_images
+            WHERE id = :id
+              AND property_id = :property_id
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+        ");
+
+            $stImage->execute([
+                'id' => $imageId,
+                'property_id' => $propertyId,
+            ]);
+
+            $image =
+                $stImage->fetch();
+
+            if (!$image) {
+                throw new Exception(
+                    'Imagen no encontrada',
+                    404
+                );
+            }
+
+            $filePath =
+                (string)($image['file_path'] ?? '');
+
+            $stDelete = $pdo->prepare("
             UPDATE property_images
             SET deleted_at = NOW()
             WHERE id = :id
+              AND property_id = :property_id
               AND deleted_at IS NULL
             LIMIT 1
         ");
 
-            $st->execute([
+            $stDelete->execute([
                 'id' => $imageId,
+                'property_id' => $propertyId,
             ]);
+
+            if ($stDelete->rowCount() !== 1) {
+                throw new Exception(
+                    'La imagen fue modificada por otra operación. Actualizá la página e intentá nuevamente.',
+                    409
+                );
+            }
 
             self::ensureSingleCover(
                 $propertyId
@@ -798,8 +846,8 @@ class PropertyImageService
         }
 
         /*
-     * El archivo se elimina solamente después
-     * de confirmar la eliminación en la base.
+     * El archivo físico solamente se elimina
+     * después de confirmar la transacción.
      */
         if ($filePath !== '') {
             self::removeStoredFile(
