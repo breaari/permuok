@@ -3,11 +3,27 @@
 namespace App\Controllers;
 
 use App\Helpers\AuthHelper;
+use App\Helpers\QueryParamHelper;
 use App\Helpers\ResponseHelper;
 use App\Services\DevelopmentUnitTypeService;
 
 class DevelopmentUnitTypeController
 {
+    private const ALLOWED_FIELDS = [
+        'unit_type',
+        'label',
+        'rooms',
+        'bedrooms',
+        'bathrooms',
+        'garages',
+        'area_from',
+        'area_to',
+        'price_from',
+        'price_to',
+        'currency',
+        'available_units',
+    ];
+
     private static function error(
         \Throwable $e
     ): void {
@@ -24,10 +40,20 @@ class DevelopmentUnitTypeController
             return;
         }
 
+        $status =
+            (int)$e->getCode();
+
+        if (
+            $status < 400 ||
+            $status > 499
+        ) {
+            $status = 422;
+        }
+
         ResponseHelper::fail(
             $e->getMessage()
                 ?: 'No se pudo completar la operación con las tipologías.',
-            422
+            $status
         );
     }
 
@@ -43,7 +69,25 @@ class DevelopmentUnitTypeController
             trim($rawBody) === ''
         ) {
             throw new \Exception(
-                'El cuerpo de la solicitud está vacío'
+                'El cuerpo de la solicitud está vacío',
+                422
+            );
+        }
+
+        if (strlen($rawBody) > 65536) {
+            throw new \Exception(
+                'El cuerpo de la solicitud es demasiado extenso',
+                413
+            );
+        }
+
+        $rawBody =
+            trim($rawBody);
+
+        if ($rawBody[0] !== '{') {
+            throw new \Exception(
+                'El cuerpo de la solicitud debe ser un objeto JSON',
+                422
             );
         }
 
@@ -57,17 +101,36 @@ class DevelopmentUnitTypeController
                 );
         } catch (\JsonException $e) {
             throw new \Exception(
-                'El cuerpo de la solicitud no contiene un JSON válido'
+                'El cuerpo de la solicitud no contiene un JSON válido',
+                422
             );
         }
 
         if (!is_array($data)) {
             throw new \Exception(
-                'El cuerpo de la solicitud debe ser un objeto JSON'
+                'El cuerpo de la solicitud debe ser un objeto JSON',
+                422
             );
         }
 
         return $data;
+    }
+
+    private static function rejectUnknownFields(
+        array $data
+    ): void {
+        $unknownFields =
+            array_diff(
+                array_keys($data),
+                self::ALLOWED_FIELDS
+            );
+
+        if ($unknownFields !== []) {
+            throw new \Exception(
+                'La solicitud contiene campos no permitidos',
+                422
+            );
+        }
     }
 
     public static function list(): void
@@ -76,8 +139,14 @@ class DevelopmentUnitTypeController
             $auth =
                 AuthHelper::requireUser();
 
+            QueryParamHelper::rejectUnknown([
+                'id',
+            ]);
+
             $developmentId =
-                (int)($_GET['id'] ?? 0);
+                QueryParamHelper::requiredPositiveInt(
+                    'id'
+                );
 
             $result =
                 DevelopmentUnitTypeService::listByDevelopment(
@@ -99,10 +168,21 @@ class DevelopmentUnitTypeController
             $auth =
                 AuthHelper::requireUser();
 
+            QueryParamHelper::rejectUnknown([
+                'id',
+            ]);
+
             $developmentId =
-                (int)($_GET['id'] ?? 0);
+                QueryParamHelper::requiredPositiveInt(
+                    'id'
+                );
+
             $data =
                 self::readJsonBody();
+
+            self::rejectUnknownFields(
+                $data
+            );
 
             $result =
                 DevelopmentUnitTypeService::create(
@@ -126,11 +206,28 @@ class DevelopmentUnitTypeController
             $auth =
                 AuthHelper::requireUser();
 
+            QueryParamHelper::rejectUnknown([
+                'unit_type_id',
+            ]);
+
             $unitTypeId =
-                (int)($_GET['unit_type_id'] ?? 0);
+                QueryParamHelper::requiredPositiveInt(
+                    'unit_type_id'
+                );
 
             $data =
                 self::readJsonBody();
+
+            self::rejectUnknownFields(
+                $data
+            );
+
+            if ($data === []) {
+                throw new \Exception(
+                    'No se enviaron campos para actualizar',
+                    422
+                );
+            }
 
             $result =
                 DevelopmentUnitTypeService::update(
@@ -153,8 +250,14 @@ class DevelopmentUnitTypeController
             $auth =
                 AuthHelper::requireUser();
 
+            QueryParamHelper::rejectUnknown([
+                'unit_type_id',
+            ]);
+
             $unitTypeId =
-                (int)($_GET['unit_type_id'] ?? 0);
+                QueryParamHelper::requiredPositiveInt(
+                    'unit_type_id'
+                );
 
             $result =
                 DevelopmentUnitTypeService::delete(
