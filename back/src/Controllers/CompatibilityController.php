@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
+use App\Helpers\QueryParamHelper;
 use App\Services\CompatibilityService;
 use Throwable;
 use App\Services\MultilateralOperationReadService;
@@ -65,19 +66,79 @@ class CompatibilityController
     public static function recommendations(): void
     {
         try {
-            $user = AuthHelper::requireUser();
+            $user =
+                AuthHelper::requireUser();
+
+            QueryParamHelper::rejectUnknown([
+                'page',
+                'limit',
+                'view',
+                'match_level',
+                'min_score',
+                'pending',
+            ]);
+
+            $filters = [
+                'page' =>
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                ),
+                'limit' =>
+                QueryParamHelper::positiveInt(
+                    'limit',
+                    12,
+                    50
+                ),
+                'view' =>
+                QueryParamHelper::enum(
+                    'view',
+                    [
+                        'active',
+                        'history',
+                        'all',
+                    ],
+                    'active'
+                ),
+                'match_level' =>
+                QueryParamHelper::enum(
+                    'match_level',
+                    [
+                        'low',
+                        'medium',
+                        'high',
+                        'total',
+                    ],
+                    ''
+                ),
+                'min_score' =>
+                QueryParamHelper::optionalNumber(
+                    'min_score',
+                    0,
+                    100
+                ),
+                'pending' =>
+                QueryParamHelper::boolean(
+                    'pending',
+                    false
+                ),
+            ];
 
             $result =
                 CompatibilityService::listRecommendations(
                     (int)$user['id'],
-                    $_GET
+                    $filters
                 );
 
-            ResponseHelper::ok($result);
+            ResponseHelper::ok(
+                $result
+            );
         } catch (Throwable $e) {
             self::error($e);
         }
     }
+
     public static function detail(int $compatibilityId): void
     {
         try {
@@ -350,13 +411,46 @@ class CompatibilityController
             $user =
                 AuthHelper::requireUser();
 
+            QueryParamHelper::rejectUnknown([
+                'page',
+                'limit',
+                'view',
+            ]);
+
+            $filters = [
+                'page' =>
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                ),
+                'limit' =>
+                QueryParamHelper::positiveInt(
+                    'limit',
+                    12,
+                    50
+                ),
+                'view' =>
+                QueryParamHelper::enum(
+                    'view',
+                    [
+                        'active',
+                        'history',
+                        'all',
+                    ],
+                    'active'
+                ),
+            ];
+
             $result =
                 MultilateralOperationReadService::listForUser(
                     (int)$user['id'],
-                    $_GET
+                    $filters
                 );
 
-            ResponseHelper::ok($result);
+            ResponseHelper::ok(
+                $result
+            );
         } catch (Throwable $e) {
             self::error($e);
         }

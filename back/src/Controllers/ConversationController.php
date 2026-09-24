@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
+use App\Helpers\QueryParamHelper;
 use App\Services\ConversationService;
 use App\Services\MembershipGuard;
 use Throwable;
@@ -151,14 +152,44 @@ class ConversationController
     public static function index(): void
     {
         try {
-            $user = AuthHelper::requireUser();
+            $user =
+                AuthHelper::requireUser();
 
-            $result = ConversationService::listConversations(
-                (int) $user['id'],
-                $_GET
+            QueryParamHelper::rejectUnknown([
+                'page',
+                'limit',
+                'archived',
+            ]);
+
+            $filters = [
+                'page' =>
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                ),
+                'limit' =>
+                QueryParamHelper::positiveInt(
+                    'limit',
+                    20,
+                    50
+                ),
+                'archived' =>
+                QueryParamHelper::boolean(
+                    'archived',
+                    false
+                ),
+            ];
+
+            $result =
+                ConversationService::listConversations(
+                    (int)$user['id'],
+                    $filters
+                );
+
+            self::success(
+                $result
             );
-
-            self::success($result);
         } catch (Throwable $e) {
             self::error($e);
         }
@@ -167,14 +198,75 @@ class ConversationController
     public static function inbox(): void
     {
         try {
-            $user = AuthHelper::requireUser();
+            $user =
+                AuthHelper::requireUser();
 
-            $result = ConversationService::getInbox(
-                (int)$user['id'],
-                $_GET
+            QueryParamHelper::rejectUnknown([
+                'tab',
+                'status',
+                'search',
+                'page',
+                'limit',
+                'archived',
+            ]);
+
+            $filters = [
+                'tab' =>
+                QueryParamHelper::enum(
+                    'tab',
+                    [
+                        'own',
+                        'external',
+                        'matches',
+                    ],
+                    'own'
+                ),
+                'status' =>
+                QueryParamHelper::enum(
+                    'status',
+                    [
+                        'all',
+                        'open',
+                        'negotiating',
+                        'visit_scheduled',
+                        'closed',
+                        'discarded',
+                    ],
+                    'all'
+                ),
+                'search' =>
+                QueryParamHelper::optionalString(
+                    'search',
+                    150
+                ),
+                'page' =>
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                ),
+                'limit' =>
+                QueryParamHelper::positiveInt(
+                    'limit',
+                    20,
+                    50
+                ),
+                'archived' =>
+                QueryParamHelper::boolean(
+                    'archived',
+                    false
+                ),
+            ];
+
+            $result =
+                ConversationService::getInbox(
+                    (int)$user['id'],
+                    $filters
+                );
+
+            self::success(
+                $result
             );
-
-            self::success($result);
         } catch (Throwable $e) {
             self::error($e);
         }
@@ -594,32 +686,98 @@ class ConversationController
     public static function unreadCount(): void
     {
         try {
-            $user = AuthHelper::requireUser();
+            $user =
+                AuthHelper::requireUser();
 
-            $result = ConversationService::unreadCount(
-                (int)$user['id']
+            QueryParamHelper::rejectUnknown([]);
+
+            $result =
+                ConversationService::unreadCount(
+                    (int)$user['id']
+                );
+
+            self::success(
+                $result
             );
-
-            self::success($result);
         } catch (Throwable $e) {
             self::error($e);
         }
     }
 
-
-
-
     public static function inboxGroup(): void
     {
         try {
-            $user = AuthHelper::requireUser();
+            $user =
+                AuthHelper::requireUser();
 
-            $result = ConversationService::getInboxGroup(
-                (int)$user['id'],
-                $_GET
+            QueryParamHelper::rejectUnknown([
+                'tab',
+                'opportunity_type',
+                'opportunity_id',
+                'page',
+                'limit',
+                'archived',
+            ]);
+
+            $filters = [
+                'tab' =>
+                QueryParamHelper::enum(
+                    'tab',
+                    [
+                        'own',
+                        'external',
+                    ],
+                    'own'
+                ),
+                'opportunity_type' =>
+                QueryParamHelper::enum(
+                    'opportunity_type',
+                    [
+                        'property',
+                        'search_request',
+                        'development',
+                    ],
+                    ''
+                ),
+                'opportunity_id' =>
+                QueryParamHelper::requiredPositiveInt(
+                    'opportunity_id'
+                ),
+                'page' =>
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                ),
+                'limit' =>
+                QueryParamHelper::positiveInt(
+                    'limit',
+                    20,
+                    50
+                ),
+                'archived' =>
+                QueryParamHelper::boolean(
+                    'archived',
+                    false
+                ),
+            ];
+
+            if ($filters['opportunity_type'] === '') {
+                throw new \Exception(
+                    'Tipo de publicación inválido.',
+                    422
+                );
+            }
+
+            $result =
+                ConversationService::getInboxGroup(
+                    (int)$user['id'],
+                    $filters
+                );
+
+            self::success(
+                $result
             );
-
-            self::success($result);
         } catch (Throwable $e) {
             self::error($e);
         }
@@ -631,13 +789,49 @@ class ConversationController
             $user =
                 AuthHelper::requireUser();
 
+            QueryParamHelper::rejectUnknown([
+                'opportunity_type',
+                'opportunity_id',
+            ]);
+
+            $opportunityType =
+                QueryParamHelper::enum(
+                    'opportunity_type',
+                    [
+                        'property',
+                        'search_request',
+                        'development',
+                    ],
+                    ''
+                );
+
+            if ($opportunityType === '') {
+                throw new \Exception(
+                    'Tipo de oportunidad inválido.',
+                    422
+                );
+            }
+
+            $opportunityId =
+                QueryParamHelper::requiredPositiveInt(
+                    'opportunity_id'
+                );
+
             $result =
                 ConversationService::findExistingForOpportunity(
                     (int)$user['id'],
-                    $_GET
+                    [
+                        'opportunity_type' =>
+                        $opportunityType,
+
+                        'opportunity_id' =>
+                        $opportunityId,
+                    ]
                 );
 
-            self::success($result);
+            self::success(
+                $result
+            );
         } catch (Throwable $e) {
             self::error($e);
         }

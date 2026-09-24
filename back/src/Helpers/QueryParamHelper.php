@@ -121,6 +121,131 @@ class QueryParamHelper
         );
     }
 
+    public static function boolean(
+        string $name,
+        bool $default = false
+    ): bool {
+        if (
+            !array_key_exists(
+                $name,
+                $_GET
+            )
+        ) {
+            return $default;
+        }
+
+        $value =
+            $_GET[$name];
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (
+            is_int($value) &&
+            in_array(
+                $value,
+                [0, 1],
+                true
+            )
+        ) {
+            return $value === 1;
+        }
+
+        if (is_string($value)) {
+            $normalized =
+                strtolower(
+                    trim($value)
+                );
+
+            if ($normalized === '') {
+                return $default;
+            }
+
+            if (
+                in_array(
+                    $normalized,
+                    ['1', 'true'],
+                    true
+                )
+            ) {
+                return true;
+            }
+
+            if (
+                in_array(
+                    $normalized,
+                    ['0', 'false'],
+                    true
+                )
+            ) {
+                return false;
+            }
+        }
+
+        throw new \Exception(
+            "El parámetro {$name} debe ser booleano.",
+            422
+        );
+    }
+
+    public static function optionalNumber(
+        string $name,
+        float $minimum,
+        float $maximum
+    ): ?float {
+        if (
+            !array_key_exists(
+                $name,
+                $_GET
+            )
+        ) {
+            return null;
+        }
+
+        $value =
+            $_GET[$name];
+
+        if (
+            $value === null ||
+            $value === ''
+        ) {
+            return null;
+        }
+
+        if (
+            !is_int($value) &&
+            !is_float($value) &&
+            !(
+                is_string($value) &&
+                is_numeric(
+                    trim($value)
+                )
+            )
+        ) {
+            throw new \Exception(
+                "El parámetro {$name} debe ser numérico.",
+                422
+            );
+        }
+
+        $normalized =
+            (float)$value;
+
+        if (
+            !is_finite($normalized) ||
+            $normalized < $minimum ||
+            $normalized > $maximum
+        ) {
+            throw new \Exception(
+                "El parámetro {$name} está fuera del rango permitido.",
+                422
+            );
+        }
+
+        return $normalized;
+    }
+
     public static function requiredPositiveInt(
         string $name,
         int $maximum = PHP_INT_MAX
