@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Helpers\AuthHelper;
+use App\Helpers\QueryParamHelper;
 use App\Helpers\ResponseHelper;
 use App\Services\PropertyImageService;
 
@@ -104,9 +105,10 @@ class PropertyImageController
 
     private static function readJsonObject(): array
     {
-        $raw = file_get_contents(
-            'php://input'
-        );
+        $raw =
+            file_get_contents(
+                'php://input'
+            );
 
         if (
             $raw === false ||
@@ -118,12 +120,16 @@ class PropertyImageController
             );
         }
 
-        $raw = trim($raw);
+        if (strlen($raw) > 65536) {
+            throw new \Exception(
+                'El cuerpo de la solicitud es demasiado extenso',
+                413
+            );
+        }
 
-        /*
-     * Este endpoint solamente acepta
-     * un objeto JSON, no un array raíz.
-     */
+        $raw =
+            trim($raw);
+
         if ($raw[0] !== '{') {
             throw new \Exception(
                 'El cuerpo JSON debe ser un objeto',
@@ -132,12 +138,13 @@ class PropertyImageController
         }
 
         try {
-            $data = json_decode(
-                $raw,
-                true,
-                512,
-                JSON_THROW_ON_ERROR
-            );
+            $data =
+                json_decode(
+                    $raw,
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
         } catch (\JsonException $e) {
             throw new \Exception(
                 'El cuerpo JSON es inválido',
@@ -161,25 +168,40 @@ class PropertyImageController
             $auth =
                 AuthHelper::requireUser();
 
-            $propertyId = filter_var(
-                $_GET['id'] ?? null,
-                FILTER_VALIDATE_INT,
-                [
-                    'options' => [
-                        'min_range' => 1,
-                    ],
-                ]
-            );
+            QueryParamHelper::rejectUnknown([
+                'id',
+            ]);
 
-            if ($propertyId === false) {
+            $propertyId =
+                QueryParamHelper::requiredPositiveInt(
+                    'id'
+                );
+
+            if ($_POST !== []) {
                 throw new \Exception(
-                    'Identificador de propiedad inválido',
+                    'La solicitud contiene campos no permitidos',
+                    422
+                );
+            }
+
+            $unknownFileFields =
+                array_diff(
+                    array_keys($_FILES),
+                    [
+                        'images',
+                    ]
+                );
+
+            if ($unknownFileFields !== []) {
+                throw new \Exception(
+                    'La solicitud contiene archivos no permitidos',
                     422
                 );
             }
 
             $files =
-                $_FILES['images'] ?? [];
+                $_FILES['images']
+                ?? [];
 
             if (!is_array($files)) {
                 throw new \Exception(
@@ -191,7 +213,7 @@ class PropertyImageController
             $result =
                 PropertyImageService::upload(
                     (int)$auth['id'],
-                    (int)$propertyId,
+                    $propertyId,
                     $files
                 );
 
@@ -203,33 +225,26 @@ class PropertyImageController
             self::error($e);
         }
     }
+
     public static function delete(): void
     {
         try {
             $auth =
                 AuthHelper::requireUser();
 
-            $imageId = filter_var(
-                $_GET['image_id'] ?? null,
-                FILTER_VALIDATE_INT,
-                [
-                    'options' => [
-                        'min_range' => 1,
-                    ],
-                ]
-            );
+            QueryParamHelper::rejectUnknown([
+                'image_id',
+            ]);
 
-            if ($imageId === false) {
-                throw new \Exception(
-                    'Identificador de imagen inválido',
-                    422
+            $imageId =
+                QueryParamHelper::requiredPositiveInt(
+                    'image_id'
                 );
-            }
 
             $result =
                 PropertyImageService::delete(
                     (int)$auth['id'],
-                    (int)$imageId
+                    $imageId
                 );
 
             ResponseHelper::ok(
@@ -246,31 +261,39 @@ class PropertyImageController
             $auth =
                 AuthHelper::requireUser();
 
-            $propertyId = filter_var(
-                $_GET['id'] ?? null,
-                FILTER_VALIDATE_INT,
-                [
-                    'options' => [
-                        'min_range' => 1,
-                    ],
-                ]
-            );
+            QueryParamHelper::rejectUnknown([
+                'id',
+            ]);
 
-            if ($propertyId === false) {
-                throw new \Exception(
-                    'Identificador de propiedad inválido',
-                    422
+            $propertyId =
+                QueryParamHelper::requiredPositiveInt(
+                    'id'
                 );
-            }
 
             $data =
                 self::readJsonObject();
+
+            $unknownFields =
+                array_diff(
+                    array_keys($data),
+                    [
+                        'images',
+                    ]
+                );
+
+            if ($unknownFields !== []) {
+                throw new \Exception(
+                    'La solicitud contiene campos no permitidos',
+                    422
+                );
+            }
 
             if (
                 !array_key_exists(
                     'images',
                     $data
-                )
+                ) ||
+                !is_array($data['images'])
             ) {
                 throw new \Exception(
                     'Debés enviar el listado de imágenes',
@@ -281,7 +304,7 @@ class PropertyImageController
             $result =
                 PropertyImageService::reorder(
                     (int)$auth['id'],
-                    (int)$propertyId,
+                    $propertyId,
                     $data['images']
                 );
 

@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
+use App\Helpers\QueryParamHelper;
 use App\Services\DevelopmentImageService;
 
 class DevelopmentImageController
@@ -126,9 +127,10 @@ class DevelopmentImageController
 
     private static function readJsonObject(): array
     {
-        $raw = file_get_contents(
-            'php://input'
-        );
+        $raw =
+            file_get_contents(
+                'php://input'
+            );
 
         if (
             $raw === false ||
@@ -140,7 +142,15 @@ class DevelopmentImageController
             );
         }
 
-        $raw = trim($raw);
+        if (strlen($raw) > 65536) {
+            throw new \Exception(
+                'El cuerpo de la solicitud es demasiado extenso',
+                413
+            );
+        }
+
+        $raw =
+            trim($raw);
 
         if ($raw[0] !== '{') {
             throw new \Exception(
@@ -150,12 +160,13 @@ class DevelopmentImageController
         }
 
         try {
-            $data = json_decode(
-                $raw,
-                true,
-                512,
-                JSON_THROW_ON_ERROR
-            );
+            $data =
+                json_decode(
+                    $raw,
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
         } catch (\JsonException $e) {
             throw new \Exception(
                 'El cuerpo JSON es inválido',
@@ -179,25 +190,40 @@ class DevelopmentImageController
             $auth =
                 AuthHelper::requireUser();
 
-            $developmentId = filter_var(
-                $_GET['id'] ?? null,
-                FILTER_VALIDATE_INT,
-                [
-                    'options' => [
-                        'min_range' => 1,
-                    ],
-                ]
-            );
+            QueryParamHelper::rejectUnknown([
+                'id',
+            ]);
 
-            if ($developmentId === false) {
+            $developmentId =
+                QueryParamHelper::requiredPositiveInt(
+                    'id'
+                );
+
+            if ($_POST !== []) {
                 throw new \Exception(
-                    'Identificador de desarrollo inválido',
+                    'La solicitud contiene campos no permitidos',
+                    422
+                );
+            }
+
+            $unknownFileFields =
+                array_diff(
+                    array_keys($_FILES),
+                    [
+                        'images',
+                    ]
+                );
+
+            if ($unknownFileFields !== []) {
+                throw new \Exception(
+                    'La solicitud contiene archivos no permitidos',
                     422
                 );
             }
 
             $files =
-                $_FILES['images'] ?? [];
+                $_FILES['images']
+                ?? [];
 
             if (!is_array($files)) {
                 throw new \Exception(
@@ -209,7 +235,7 @@ class DevelopmentImageController
             $result =
                 DevelopmentImageService::upload(
                     (int)$auth['id'],
-                    (int)$developmentId,
+                    $developmentId,
                     $files
                 );
 
@@ -228,27 +254,19 @@ class DevelopmentImageController
             $auth =
                 AuthHelper::requireUser();
 
-            $imageId = filter_var(
-                $_GET['image_id'] ?? null,
-                FILTER_VALIDATE_INT,
-                [
-                    'options' => [
-                        'min_range' => 1,
-                    ],
-                ]
-            );
+            QueryParamHelper::rejectUnknown([
+                'image_id',
+            ]);
 
-            if ($imageId === false) {
-                throw new \Exception(
-                    'Identificador de imagen inválido',
-                    422
+            $imageId =
+                QueryParamHelper::requiredPositiveInt(
+                    'image_id'
                 );
-            }
 
             $result =
                 DevelopmentImageService::delete(
                     (int)$auth['id'],
-                    (int)$imageId
+                    $imageId
                 );
 
             ResponseHelper::ok(
@@ -265,31 +283,39 @@ class DevelopmentImageController
             $auth =
                 AuthHelper::requireUser();
 
-            $developmentId = filter_var(
-                $_GET['id'] ?? null,
-                FILTER_VALIDATE_INT,
-                [
-                    'options' => [
-                        'min_range' => 1,
-                    ],
-                ]
-            );
+            QueryParamHelper::rejectUnknown([
+                'id',
+            ]);
 
-            if ($developmentId === false) {
-                throw new \Exception(
-                    'Identificador de desarrollo inválido',
-                    422
+            $developmentId =
+                QueryParamHelper::requiredPositiveInt(
+                    'id'
                 );
-            }
 
             $data =
                 self::readJsonObject();
+
+            $unknownFields =
+                array_diff(
+                    array_keys($data),
+                    [
+                        'images',
+                    ]
+                );
+
+            if ($unknownFields !== []) {
+                throw new \Exception(
+                    'La solicitud contiene campos no permitidos',
+                    422
+                );
+            }
 
             if (
                 !array_key_exists(
                     'images',
                     $data
-                )
+                ) ||
+                !is_array($data['images'])
             ) {
                 throw new \Exception(
                     'Debés enviar el listado de imágenes',
@@ -300,7 +326,7 @@ class DevelopmentImageController
             $result =
                 DevelopmentImageService::reorder(
                     (int)$auth['id'],
-                    (int)$developmentId,
+                    $developmentId,
                     $data['images']
                 );
 
