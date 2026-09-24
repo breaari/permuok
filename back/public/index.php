@@ -13,16 +13,6 @@ $dotenv->load();
 
 header_remove('X-Powered-By');
 
-$appEnv =
-    strtolower(
-        trim(
-            (string)(
-                $_ENV['APP_ENV']
-                ?? 'production'
-            )
-        )
-    );
-
 /*
 |--------------------------------------------------------------------------
 | CORS
@@ -140,7 +130,6 @@ use App\Controllers\RealEstateController;
 use App\Controllers\AdminRealEstateController;
 use App\Controllers\BillingController;
 use App\Controllers\WebhookMercadoPagoController;
-use App\Controllers\DevBillingController;
 use App\Controllers\ProvinceController;
 use App\Controllers\UserController;
 use App\Controllers\AdminUserController;
@@ -372,30 +361,6 @@ $routes = [
     'GET /compatibilities/multilateral' =>
     [CompatibilityController::class, 'multilateral'],
 ];
-
-/*
- * Las herramientas de desarrollo nunca
- * deben estar disponibles en producción.
- *
- * Si APP_ENV no está configurada,
- * asumimos production por seguridad.
- */
-if (
-    in_array(
-        $appEnv,
-        [
-            'local',
-            'development',
-            'testing',
-        ],
-        true
-    )
-) {
-    $routes['POST /dev/billing/approve'] = [
-        DevBillingController::class,
-        'approve',
-    ];
-}
 
 $key = $method . ' ' . $uri;
 
