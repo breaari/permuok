@@ -6,6 +6,7 @@ use Throwable;
 use PDOException;
 use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
+use App\Helpers\QueryParamHelper;
 use App\Services\DevelopmentService;
 use App\Services\MembershipGuard;
 use App\Services\AI\DevelopmentAIAnalysisService;
@@ -125,16 +126,54 @@ class DevelopmentController
     public static function list(): void
     {
         try {
-            $auth = AuthHelper::requireUser();
+            $auth =
+                AuthHelper::requireUser();
+
+            QueryParamHelper::rejectUnknown([
+                'status',
+                'q',
+                'limit',
+                'page',
+            ]);
 
             $filters = [
-                'status' => $_GET['status'] ?? null,
-                'q' => $_GET['q'] ?? null,
-                'limit' => $_GET['limit'] ?? 20,
-                'page' => $_GET['page'] ?? 1,
+                'status' =>
+                QueryParamHelper::enum(
+                    'status',
+                    [
+                        'draft',
+                        'published',
+                        'paused',
+                        'archived',
+                        'closed',
+                    ],
+                    ''
+                ),
+                'q' =>
+                QueryParamHelper::optionalString(
+                    'q',
+                    150
+                ),
+                'limit' =>
+                QueryParamHelper::positiveInt(
+                    'limit',
+                    20,
+                    100
+                ),
+                'page' =>
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                ),
             ];
 
-            $result = DevelopmentService::listMyDevelopments((int)$auth['id'], $filters);
+            $result =
+                DevelopmentService::listMyDevelopments(
+                    (int)$auth['id'],
+                    $filters
+                );
+
             ResponseHelper::ok($result);
         } catch (Throwable $e) {
             self::fail($e);
@@ -144,16 +183,55 @@ class DevelopmentController
     public static function explore(): void
     {
         try {
-            $auth = AuthHelper::requireUser();
+            $auth =
+                AuthHelper::requireUser();
+
+            QueryParamHelper::rejectUnknown([
+                'q',
+                'development_stage',
+                'limit',
+                'page',
+            ]);
 
             $filters = [
-                'q' => $_GET['q'] ?? null,
-                'development_stage' => $_GET['development_stage'] ?? null,
-                'limit' => $_GET['limit'] ?? 20,
-                'page' => $_GET['page'] ?? 1,
+                'q' =>
+                QueryParamHelper::optionalString(
+                    'q',
+                    150
+                ),
+                'development_stage' =>
+                QueryParamHelper::enum(
+                    'development_stage',
+                    [
+                        'land',
+                        'prelaunch',
+                        'launch',
+                        'presale',
+                        'under_construction',
+                        'finished',
+                    ],
+                    ''
+                ),
+                'limit' =>
+                QueryParamHelper::positiveInt(
+                    'limit',
+                    20,
+                    100
+                ),
+                'page' =>
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                ),
             ];
 
-            $result = DevelopmentService::listExploreDevelopments((int)$auth['id'], $filters);
+            $result =
+                DevelopmentService::listExploreDevelopments(
+                    (int)$auth['id'],
+                    $filters
+                );
+
             ResponseHelper::ok($result);
         } catch (Throwable $e) {
             self::fail($e);

@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
+use App\Helpers\QueryParamHelper;
 use App\Services\SearchRequestService;
 use App\Services\MembershipGuard;
 use App\Services\AI\SearchRequestAIAnalysisService;
@@ -119,16 +120,56 @@ class SearchRequestController
     public static function list(): void
     {
         try {
-            $auth = AuthHelper::requireUser();
+            $auth =
+                AuthHelper::requireUser();
+
+            QueryParamHelper::rejectUnknown([
+                'status',
+                'q',
+                'limit',
+                'page',
+            ]);
 
             $filters = [
-                'status' => $_GET['status'] ?? null,
-                'q' => $_GET['q'] ?? null,
-                'limit' => $_GET['limit'] ?? 20,
-                'page' => $_GET['page'] ?? 1,
+                'status' =>
+                QueryParamHelper::enum(
+                    'status',
+                    [
+                        'draft',
+                        'pending_review',
+                        'published',
+                        'paused',
+                        'rejected',
+                        'archived',
+                        'closed',
+                    ],
+                    ''
+                ),
+                'q' =>
+                QueryParamHelper::optionalString(
+                    'q',
+                    150
+                ),
+                'limit' =>
+                QueryParamHelper::positiveInt(
+                    'limit',
+                    20,
+                    100
+                ),
+                'page' =>
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                ),
             ];
 
-            $result = SearchRequestService::listMySearchRequests((int)$auth['id'], $filters);
+            $result =
+                SearchRequestService::listMySearchRequests(
+                    (int)$auth['id'],
+                    $filters
+                );
+
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail($e);
@@ -138,21 +179,65 @@ class SearchRequestController
     public static function explore(): void
     {
         try {
-            $auth = AuthHelper::requireUser();
+            $auth =
+                AuthHelper::requireUser();
+
+            QueryParamHelper::rejectUnknown([
+                'q',
+                'property_type',
+                'limit',
+                'page',
+            ]);
 
             $filters = [
-                'q' => $_GET['q'] ?? null,
-                'property_type' => $_GET['property_type'] ?? null,
-                'limit' => $_GET['limit'] ?? 20,
-                'page' => $_GET['page'] ?? 1,
+                'q' =>
+                QueryParamHelper::optionalString(
+                    'q',
+                    150
+                ),
+                'property_type' =>
+                QueryParamHelper::enum(
+                    'property_type',
+                    [
+                        'house',
+                        'apartment',
+                        'land',
+                        'commercial',
+                        'office',
+                        'warehouse',
+                        'country_house',
+                        'farm',
+                        'garage',
+                        'other',
+                    ],
+                    ''
+                ),
+                'limit' =>
+                QueryParamHelper::positiveInt(
+                    'limit',
+                    20,
+                    100
+                ),
+                'page' =>
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                ),
             ];
 
-            $result = SearchRequestService::listExploreSearchRequests((int)$auth['id'], $filters);
+            $result =
+                SearchRequestService::listExploreSearchRequests(
+                    (int)$auth['id'],
+                    $filters
+                );
+
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail($e);
         }
     }
+    
     public static function create(): void
     {
         try {

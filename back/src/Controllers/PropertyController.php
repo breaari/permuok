@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
+use App\Helpers\QueryParamHelper;
 use App\Services\PropertyService;
 use App\Services\MembershipGuard;
 
@@ -115,16 +116,59 @@ class PropertyController
     public static function list(): void
     {
         try {
-            $auth = AuthHelper::requireUser();
+            $auth =
+                AuthHelper::requireUser();
+
+            QueryParamHelper::rejectUnknown([
+                'status',
+                'q',
+                'limit',
+                'page',
+            ]);
 
             $filters = [
-                'status' => $_GET['status'] ?? null,
-                'q' => $_GET['q'] ?? null,
-                'limit' => $_GET['limit'] ?? 5,
-                'page' => $_GET['page'] ?? 1,
+                'status' =>
+                QueryParamHelper::enum(
+                    'status',
+                    [
+                        'draft',
+                        'published',
+                        'paused',
+                        'archived',
+                        'closed',
+                    ],
+                    ''
+                ),
+                'q' =>
+                QueryParamHelper::optionalString(
+                    'q',
+                    150
+                ),
+                /*
+             * Se permite recibir 100 porque actualmente
+             * getMyPublishedProperties() lo solicita.
+             * PropertyService mantiene el límite efectivo en 50.
+             */
+                'limit' =>
+                QueryParamHelper::positiveInt(
+                    'limit',
+                    5,
+                    100
+                ),
+                'page' =>
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                ),
             ];
 
-            $result = PropertyService::listMyProperties((int)$auth['id'], $filters);
+            $result =
+                PropertyService::listMyProperties(
+                    (int)$auth['id'],
+                    $filters
+                );
+
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail($e);
@@ -134,16 +178,56 @@ class PropertyController
     public static function explore(): void
     {
         try {
-            $auth = AuthHelper::requireUser();
+            $auth =
+                AuthHelper::requireUser();
+
+            QueryParamHelper::rejectUnknown([
+                'q',
+                'property_type',
+                'limit',
+                'page',
+            ]);
 
             $filters = [
-                'q' => $_GET['q'] ?? null,
-                'property_type' => $_GET['property_type'] ?? null,
-                'limit' => $_GET['limit'] ?? 6,
-                'page' => $_GET['page'] ?? 1,
+                'q' =>
+                QueryParamHelper::optionalString(
+                    'q',
+                    150
+                ),
+                'property_type' =>
+                QueryParamHelper::enum(
+                    'property_type',
+                    [
+                        'house',
+                        'apartment',
+                        'land',
+                        'commercial',
+                        'office',
+                        'warehouse',
+                        'other',
+                    ],
+                    ''
+                ),
+                'limit' =>
+                QueryParamHelper::positiveInt(
+                    'limit',
+                    6,
+                    50
+                ),
+                'page' =>
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                ),
             ];
 
-            $result = PropertyService::listExploreProperties((int)$auth['id'], $filters);
+            $result =
+                PropertyService::listExploreProperties(
+                    (int)$auth['id'],
+                    $filters
+                );
+
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail($e);
