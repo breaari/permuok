@@ -38,8 +38,7 @@ class CompatibilityController
             );
         }
 
-        $raw =
-            trim($raw);
+        $raw = trim($raw);
 
         if ($raw[0] !== '{') {
             throw new \Exception(
