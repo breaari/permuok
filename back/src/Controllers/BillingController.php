@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Helpers\ResponseHelper;
+use App\Helpers\QueryParamHelper;
 use App\Middleware\AuthMiddleware;
 use App\Services\BillingService;
 
@@ -128,7 +129,15 @@ class BillingController
             );
         }
 
-        $raw = trim($raw);
+        if (strlen($raw) > 65536) {
+            throw new \Exception(
+                'El cuerpo de la solicitud es demasiado extenso',
+                413
+            );
+        }
+
+        $raw =
+            trim($raw);
 
         if ($raw[0] !== '{') {
             throw new \Exception(
@@ -138,12 +147,13 @@ class BillingController
         }
 
         try {
-            $payload = json_decode(
-                $raw,
-                true,
-                512,
-                JSON_THROW_ON_ERROR
-            );
+            $payload =
+                json_decode(
+                    $raw,
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
         } catch (\JsonException $e) {
             throw new \Exception(
                 'El cuerpo JSON es inválido',
@@ -159,6 +169,24 @@ class BillingController
         }
 
         return $payload;
+    }
+
+    private static function rejectUnknownFields(
+        array $payload,
+        array $allowedFields
+    ): void {
+        $unknownFields =
+            array_diff(
+                array_keys($payload),
+                $allowedFields
+            );
+
+        if ($unknownFields !== []) {
+            throw new \Exception(
+                'La solicitud contiene campos no permitidos',
+                422
+            );
+        }
     }
 
     private static function requiredString(
@@ -207,12 +235,16 @@ class BillingController
     public static function listPlans(): void
     {
         try {
-            $plans = BillingService::listPlans();
-            ResponseHelper::ok(['plans' => $plans]);
+            QueryParamHelper::rejectUnknown([]);
+
+            $plans =
+                BillingService::listPlans();
+
+            ResponseHelper::ok([
+                'plans' => $plans,
+            ]);
         } catch (\Throwable $e) {
-            ResponseHelper::fromThrowable(
-                $e
-            );
+            self::error($e);
         }
     }
 
@@ -232,8 +264,17 @@ class BillingController
                 );
             }
 
+            QueryParamHelper::rejectUnknown([]);
+
             $payload =
                 self::readJsonObject();
+
+            self::rejectUnknownFields(
+                $payload,
+                [
+                    'plan_code',
+                ]
+            );
 
             $planCode =
                 self::requiredString(
@@ -263,80 +304,22 @@ class BillingController
             $ctx =
                 AuthMiddleware::handle();
 
-            $preferenceId = null;
-            $externalReference = null;
+            QueryParamHelper::rejectUnknown([
+                'preference_id',
+                'external_reference',
+            ]);
 
-            if (
-                array_key_exists(
+            $preferenceId =
+                QueryParamHelper::optionalString(
                     'preference_id',
-                    $_GET
-                )
-            ) {
-                if (
-                    !is_string(
-                        $_GET['preference_id']
-                    )
-                ) {
-                    throw new \Exception(
-                        'preference_id inválido',
-                        422
-                    );
-                }
+                    255
+                );
 
-                $preferenceId =
-                    trim(
-                        $_GET['preference_id']
-                    );
-
-                if ($preferenceId === '') {
-                    $preferenceId = null;
-                } elseif (
-                    mb_strlen(
-                        $preferenceId
-                    ) > 255
-                ) {
-                    throw new \Exception(
-                        'preference_id es demasiado extenso',
-                        422
-                    );
-                }
-            }
-
-            if (
-                array_key_exists(
+            $externalReference =
+                QueryParamHelper::optionalString(
                     'external_reference',
-                    $_GET
-                )
-            ) {
-                if (
-                    !is_string(
-                        $_GET['external_reference']
-                    )
-                ) {
-                    throw new \Exception(
-                        'external_reference inválido',
-                        422
-                    );
-                }
-
-                $externalReference =
-                    trim(
-                        $_GET['external_reference']
-                    );
-
-                if ($externalReference === '') {
-                    $externalReference = null;
-                } elseif (
-                    mb_strlen(
-                        $externalReference
-                    ) > 255
-                ) {
-                    throw new \Exception(
-                        'external_reference es demasiado extenso',
-                        422
-                    );
-                }
-            }
+                    255
+                );
 
             if (
                 $preferenceId === null &&
@@ -348,10 +331,6 @@ class BillingController
                 );
             }
 
-            /*
-         * Una consulta debe utilizar un único
-         * identificador para evitar resultados ambiguos.
-         */
             if (
                 $preferenceId !== null &&
                 $externalReference !== null
@@ -393,8 +372,17 @@ class BillingController
                 );
             }
 
+            QueryParamHelper::rejectUnknown([]);
+
             $payload =
                 self::readJsonObject();
+
+            self::rejectUnknownFields(
+                $payload,
+                [
+                    'target_plan_code',
+                ]
+            );
 
             $planCode =
                 self::requiredString(
@@ -433,8 +421,18 @@ class BillingController
                 );
             }
 
+            QueryParamHelper::rejectUnknown([]);
+
             $payload =
                 self::readJsonObject();
+
+            self::rejectUnknownFields(
+                $payload,
+                [
+                    'target_plan_code',
+                    'mode',
+                ]
+            );
 
             $planCode =
                 self::requiredString(
@@ -485,14 +483,37 @@ class BillingController
     public static function cancelMembership(): void
     {
         try {
-            $ctx = AuthMiddleware::handle();
+            $ctx =
+                AuthMiddleware::handle();
 
-            if ((int)$ctx['role'] !== 2) {
-                ResponseHelper::fail('No autorizado', 403);
+            if (
+                (int)($ctx['role'] ?? 0)
+                !== 2
+            ) {
+                throw new \Exception(
+                    'No autorizado',
+                    403
+                );
             }
 
-            $result = BillingService::cancelMembership((int)$ctx['id']);
-            ResponseHelper::ok($result);
+            QueryParamHelper::rejectUnknown([]);
+
+            $payload =
+                self::readJsonObject();
+
+            self::rejectUnknownFields(
+                $payload,
+                []
+            );
+
+            $result =
+                BillingService::cancelMembership(
+                    (int)$ctx['id']
+                );
+
+            ResponseHelper::ok(
+                $result
+            );
         } catch (\Throwable $e) {
             self::error($e);
         }
