@@ -13,8 +13,9 @@ use App\Services\MembershipGuard;
 
 class CompatibilityController
 {
-    private static function readJsonObject(): array
-    {
+    private static function readJsonObject(
+        array $allowedFields
+    ): array {
         $raw =
             file_get_contents(
                 'php://input'
@@ -30,7 +31,15 @@ class CompatibilityController
             );
         }
 
-        $raw = trim($raw);
+        if (strlen($raw) > 65536) {
+            throw new \Exception(
+                'El cuerpo de la solicitud es demasiado extenso.',
+                413
+            );
+        }
+
+        $raw =
+            trim($raw);
 
         if ($raw[0] !== '{') {
             throw new \Exception(
@@ -40,12 +49,13 @@ class CompatibilityController
         }
 
         try {
-            $body = json_decode(
-                $raw,
-                true,
-                512,
-                JSON_THROW_ON_ERROR
-            );
+            $body =
+                json_decode(
+                    $raw,
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
         } catch (\JsonException $e) {
             throw new \Exception(
                 'El cuerpo JSON es inválido.',
@@ -56,6 +66,19 @@ class CompatibilityController
         if (!is_array($body)) {
             throw new \Exception(
                 'El cuerpo JSON es inválido.',
+                422
+            );
+        }
+
+        $unknownFields =
+            array_diff(
+                array_keys($body),
+                $allowedFields
+            );
+
+        if ($unknownFields !== []) {
+            throw new \Exception(
+                'La solicitud contiene campos no permitidos.',
                 422
             );
         }
@@ -173,9 +196,10 @@ class CompatibilityController
             MembershipGuard::requireActiveMembership(
                 (int)$user['id']
             );
-
             $body =
-                self::readJsonObject();
+                self::readJsonObject([
+                    'response',
+                ]);
 
             if (
                 !array_key_exists(
@@ -242,7 +266,11 @@ class CompatibilityController
                 AuthHelper::requireUser();
 
             $body =
-                self::readJsonObject();
+                self::readJsonObject([
+                    'useful',
+                    'rating',
+                    'comment',
+                ]);
 
             $normalized = [
                 'useful' => null,
@@ -494,7 +522,9 @@ class CompatibilityController
             );
 
             $body =
-                self::readJsonObject();
+                self::readJsonObject([
+                    'response',
+                ]);
 
             if (
                 !array_key_exists(

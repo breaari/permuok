@@ -41,7 +41,11 @@ class ConversationController
             );
 
             $input =
-                self::getJsonInput();
+                self::getJsonInput([
+                    'opportunity_type',
+                    'opportunity_id',
+                    'message',
+                ]);
 
             if (
                 !isset($input['opportunity_type']) ||
@@ -311,7 +315,9 @@ class ConversationController
             );
 
             $input =
-                self::getJsonInput();
+                self::getJsonInput([
+                    'body',
+                ]);
 
             if (
                 !isset($input['body']) ||
@@ -381,7 +387,9 @@ class ConversationController
             );
 
             $input =
-                self::getJsonInput();
+                self::getJsonInput([
+                    'status',
+                ]);
 
             if (
                 !isset($input['status']) ||
@@ -475,7 +483,10 @@ class ConversationController
             );
 
             $input =
-                self::getJsonInput();
+                self::getJsonInput([
+                    'decision',
+                    'reason',
+                ]);
 
             if (
                 !isset($input['decision']) ||
@@ -571,8 +582,9 @@ class ConversationController
         }
     }
 
-    private static function getJsonInput(): array
-    {
+    private static function getJsonInput(
+        array $allowedFields
+    ): array {
         $raw =
             file_get_contents(
                 'php://input'
@@ -588,7 +600,15 @@ class ConversationController
             );
         }
 
-        $raw = trim($raw);
+        if (strlen($raw) > 65536) {
+            throw new \Exception(
+                'El cuerpo de la solicitud es demasiado extenso.',
+                413
+            );
+        }
+
+        $raw =
+            trim($raw);
 
         if ($raw[0] !== '{') {
             throw new \Exception(
@@ -598,12 +618,13 @@ class ConversationController
         }
 
         try {
-            $data = json_decode(
-                $raw,
-                true,
-                512,
-                JSON_THROW_ON_ERROR
-            );
+            $data =
+                json_decode(
+                    $raw,
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
         } catch (\JsonException $e) {
             throw new \Exception(
                 'El cuerpo JSON es inválido.',
@@ -614,6 +635,19 @@ class ConversationController
         if (!is_array($data)) {
             throw new \Exception(
                 'El cuerpo JSON es inválido.',
+                422
+            );
+        }
+
+        $unknownFields =
+            array_diff(
+                array_keys($data),
+                $allowedFields
+            );
+
+        if ($unknownFields !== []) {
+            throw new \Exception(
+                'La solicitud contiene campos no permitidos.',
                 422
             );
         }
