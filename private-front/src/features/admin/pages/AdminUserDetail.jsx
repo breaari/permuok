@@ -24,7 +24,15 @@ import {
 
 export default function AdminUserDetail() {
   const { user } = useAuth();
-  const isAdmin = Number(user?.role) === 1;
+
+  if (Number(user?.role) !== 1) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <AdminUserDetailContent />;
+}
+
+function AdminUserDetailContent() {
   const navigate = useNavigate();
   const { id } = useParams();
   const toast = useToast();
@@ -41,8 +49,6 @@ export default function AdminUserDetail() {
 
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
-
-  if (!isAdmin) return <Navigate to="/" replace />;
 
   const loadDetail = useCallback(async () => {
     setErr("");

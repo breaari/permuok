@@ -1,0 +1,295 @@
+diff --git a/private-front/src/features/admin/pages/AdminBilling.jsx b/private-front/src/features/admin/pages/AdminBilling.jsx
+index fb65be5..1e82dc0 100644
+--- a/private-front/src/features/admin/pages/AdminBilling.jsx
++++ b/private-front/src/features/admin/pages/AdminBilling.jsx
+@@ -87,8 +87,6 @@ function getPaginationRange({ totalPages, currentPage, siblingCount = 1 }) {
+ 
+ function PaginationPro({ page, perPage, total, onPageChange }) {
+   const totalPages = Math.max(1, Math.ceil(total / perPage));
+-  if (totalPages <= 1) return null;
+-
+   const start = total === 0 ? 0 : (page - 1) * perPage + 1;
+   const end = Math.min(total, page * perPage);
+ 
+@@ -102,6 +100,8 @@ function PaginationPro({ page, perPage, total, onPageChange }) {
+     [totalPages, page],
+   );
+ 
++  if (totalPages <= 1) return null;
++
+   return (
+     <div className="mt-8 flex flex-col md:flex-row md:items-center md:justify-between border-t border-slate-200 pt-6 gap-4">
+       <p className="text-sm text-slate-500">
+@@ -383,11 +383,18 @@ function AdminBillingList({ loading, items, onOpenDetail }) {
+ 
+ export default function AdminBilling() {
+   const { user } = useAuth();
+-  const isAdmin = Number(user?.role) === 1;
++
++  if (Number(user?.role) !== 1) {
++    return <Navigate to="/" replace />;
++  }
++
++  return <AdminBillingContent />;
++}
++
++function AdminBillingContent() {
+   const navigate = useNavigate();
+   const [searchParams, setSearchParams] = useSearchParams();
+   const toast = useToast();
+-  if (!isAdmin) return <Navigate to="/" replace />;
+ 
+   const initialStatus = (() => {
+     const status = searchParams.get("status") || "active";
+diff --git a/private-front/src/features/admin/pages/AdminRealEstates.jsx b/private-front/src/features/admin/pages/AdminRealEstates.jsx
+index 69c2bba..d226929 100644
+--- a/private-front/src/features/admin/pages/AdminRealEstates.jsx
++++ b/private-front/src/features/admin/pages/AdminRealEstates.jsx
+@@ -60,8 +60,6 @@ function getPaginationRange({ totalPages, currentPage, siblingCount = 1 }) {
+ 
+ function PaginationPro({ page, perPage, total, onPageChange }) {
+   const totalPages = Math.max(1, Math.ceil(total / perPage));
+-  if (totalPages <= 1) return null;
+-
+   const start = total === 0 ? 0 : (page - 1) * perPage + 1;
+   const end = Math.min(total, page * perPage);
+ 
+@@ -75,6 +73,8 @@ function PaginationPro({ page, perPage, total, onPageChange }) {
+     [totalPages, page],
+   );
+ 
++  if (totalPages <= 1) return null;
++
+   return (
+     <div className="mt-6 md:mt-8 border-t border-slate-200 pt-5 md:pt-6">
+       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+@@ -165,10 +165,16 @@ function PaginationPro({ page, perPage, total, onPageChange }) {
+ 
+ export default function AdminRealEstates() {
+   const { user } = useAuth();
+-  const isAdmin = Number(user?.role) === 1;
+-  const navigate = useNavigate();
+ 
+-  if (!isAdmin) return <Navigate to="/" replace />;
++  if (Number(user?.role) !== 1) {
++    return <Navigate to="/" replace />;
++  }
++
++  return <AdminRealEstatesContent />;
++}
++
++function AdminRealEstatesContent() {
++  const navigate = useNavigate();
+ 
+   const [tab, setTab] = useState("initial_review");
+   const [items, setItems] = useState([]);
+diff --git a/private-front/src/features/admin/pages/AdminUserDetail.jsx b/private-front/src/features/admin/pages/AdminUserDetail.jsx
+index 7c37a4f..1434dc5 100644
+--- a/private-front/src/features/admin/pages/AdminUserDetail.jsx
++++ b/private-front/src/features/admin/pages/AdminUserDetail.jsx
+@@ -24,7 +24,15 @@ import {
+ 
+ export default function AdminUserDetail() {
+   const { user } = useAuth();
+-  const isAdmin = Number(user?.role) === 1;
++
++  if (Number(user?.role) !== 1) {
++    return <Navigate to="/" replace />;
++  }
++
++  return <AdminUserDetailContent />;
++}
++
++function AdminUserDetailContent() {
+   const navigate = useNavigate();
+   const { id } = useParams();
+   const toast = useToast();
+@@ -42,8 +50,6 @@ export default function AdminUserDetail() {
+   const [statusModalOpen, setStatusModalOpen] = useState(false);
+   const [statusBusy, setStatusBusy] = useState(false);
+ 
+-  if (!isAdmin) return <Navigate to="/" replace />;
+-
+   const loadDetail = useCallback(async () => {
+     setErr("");
+     setLoading(true);
+diff --git a/private-front/src/features/admin/pages/AdminUsers.jsx b/private-front/src/features/admin/pages/AdminUsers.jsx
+index 6b6c054..b0cd33b 100644
+--- a/private-front/src/features/admin/pages/AdminUsers.jsx
++++ b/private-front/src/features/admin/pages/AdminUsers.jsx
+@@ -65,8 +65,6 @@ function getPaginationRange({ totalPages, currentPage, siblingCount = 1 }) {
+ 
+ function PaginationPro({ page, perPage, total, onPageChange }) {
+   const totalPages = Math.max(1, Math.ceil(total / perPage));
+-  if (totalPages <= 1) return null;
+-
+   const start = total === 0 ? 0 : (page - 1) * perPage + 1;
+   const end = Math.min(total, page * perPage);
+ 
+@@ -80,6 +78,8 @@ function PaginationPro({ page, perPage, total, onPageChange }) {
+     [totalPages, page],
+   );
+ 
++  if (totalPages <= 1) return null;
++
+   return (
+     <div className="mt-8 flex flex-col md:flex-row md:items-center md:justify-between border-t border-slate-200 pt-6 gap-4">
+       <p className="text-sm text-slate-500">
+@@ -145,12 +145,18 @@ function PaginationPro({ page, perPage, total, onPageChange }) {
+ 
+ export default function AdminUsers() {
+   const { user } = useAuth();
+-  const isAdmin = Number(user?.role) === 1;
++
++  if (Number(user?.role) !== 1) {
++    return <Navigate to="/" replace />;
++  }
++
++  return <AdminUsersContent />;
++}
++
++function AdminUsersContent() {
+   const navigate = useNavigate();
+   const toast = useToast();
+ 
+-  if (!isAdmin) return <Navigate to="/" replace />;
+-
+   const [tab, setTab] = useState("real_estate");
+   const [statusFilter, setStatusFilter] = useState("all");
+   const [items, setItems] = useState([]);
+diff --git a/private-front/src/features/developments/pages/DevelopmentDetail.jsx b/private-front/src/features/developments/pages/DevelopmentDetail.jsx
+index c843a1b..5daa88a 100644
+--- a/private-front/src/features/developments/pages/DevelopmentDetail.jsx
++++ b/private-front/src/features/developments/pages/DevelopmentDetail.jsx
+@@ -44,13 +44,21 @@ import { joinLocation } from "../detail/developmentDetail.helpers";
+ 
+ export default function DevelopmentDetail() {
+   const { user } = useAuth();
++  const role = Number(user?.role || 0);
++
++  if (![2, 3, 4].includes(role)) {
++    return <Navigate to="/" replace />;
++  }
++
++  return <DevelopmentDetailContent role={role} />;
++}
++
++function DevelopmentDetailContent({ role }) {
+   const navigate = useNavigate();
+   const location = useLocation();
+   const { id } = useParams();
+   const toast = useToast();
+   const [existingConversationId, setExistingConversationId] = useState(null);
+-  const role = Number(user?.role || 0);
+-  const canAccess = role === 2 || role === 3 || role === 4;
+   const isInvestor = role === 4;
+   const canContact = !isInvestor;
+ 
+@@ -136,8 +144,6 @@ export default function DevelopmentDetail() {
+     };
+   }, [id, isInvestor, location.pathname]);
+ 
+-  if (!canAccess) return <Navigate to="/" replace />;
+-
+   const development = extractDevelopment(detail);
+   const rawImages = extractDevelopmentImages(detail, development);
+   const unitTypes = extractDevelopmentUnitTypes(detail, development);
+diff --git a/private-front/src/features/real-estate-profile/pages/MyProfile.jsx b/private-front/src/features/real-estate-profile/pages/MyProfile.jsx
+index f8619d8..8ca2163 100644
+--- a/private-front/src/features/real-estate-profile/pages/MyProfile.jsx
++++ b/private-front/src/features/real-estate-profile/pages/MyProfile.jsx
+@@ -26,9 +26,7 @@ function formatDate(value) {
+ }
+ 
+ export default function MyProfile() {
+-  const { user, access, loadMe } = useAuth();
+-  const nav = useNavigate();
+-
++  const { user } = useAuth();
+   const role = Number(user?.role || 0);
+ 
+   if (![2, 3, 4].includes(role)) {
+@@ -39,6 +37,13 @@ export default function MyProfile() {
+     return <MyUserProfile />;
+   }
+ 
++  return <RealEstateProfile />;
++}
++
++function RealEstateProfile() {
++  const { access, loadMe } = useAuth();
++  const nav = useNavigate();
++
+   const { isLoaded: mapsLoaded, loadError: mapsError } = useGoogleMaps();
+ 
+   const {
+diff --git a/private-front/src/features/search-requests/pages/SearchRequestDetail.jsx b/private-front/src/features/search-requests/pages/SearchRequestDetail.jsx
+index 088b037..9d2fe4a 100644
+--- a/private-front/src/features/search-requests/pages/SearchRequestDetail.jsx
++++ b/private-front/src/features/search-requests/pages/SearchRequestDetail.jsx
+@@ -40,12 +40,20 @@ import {
+ 
+ export default function SearchRequestDetail() {
+   const { user } = useAuth();
++  const role = Number(user?.role || 0);
++
++  if (![2, 3, 4].includes(role)) {
++    return <Navigate to="/" replace />;
++  }
++
++  return <SearchRequestDetailContent role={role} />;
++}
++
++function SearchRequestDetailContent({ role }) {
+   const navigate = useNavigate();
+   const location = useLocation();
+   const { id } = useParams();
+   const [existingConversationId, setExistingConversationId] = useState(null);
+-  const role = Number(user?.role || 0);
+-  const canAccess = role === 2 || role === 3 || role === 4;
+   const isInvestor = role === 4;
+   const canContact = role === 2 || role === 3;
+ 
+@@ -132,8 +140,6 @@ export default function SearchRequestDetail() {
+     };
+   }, [id, isInvestor, location.pathname]);
+ 
+-  if (!canAccess) return <Navigate to="/" replace />;
+-
+   const request = extractRequest(detail);
+ 
+   const propertyTypes = useMemo(
+diff --git a/private-front/src/features/users/pages/Users.jsx b/private-front/src/features/users/pages/Users.jsx
+index b60da9c..3bd9cb7 100644
+--- a/private-front/src/features/users/pages/Users.jsx
++++ b/private-front/src/features/users/pages/Users.jsx
+@@ -13,6 +13,16 @@ function getRoleLabel(role) {
+ }
+ 
+ export default function Users() {
++  const { user } = useAuth();
++
++  if (Number(user?.role) !== 2) {
++    return <Navigate to="/app" replace />;
++  }
++
++  return <UsersContent />;
++}
++
++function UsersContent() {
+   const [loading, setLoading] = useState(true);
+   const [items, setItems] = useState([]);
+   const [summary, setSummary] = useState({
+@@ -26,11 +36,7 @@ export default function Users() {
+   const [creating, setCreating] = useState(false);
+   const [updatingUserId, setUpdatingUserId] = useState(null);
+ 
+-  const { user } = useAuth();
+   const toast = useToast();
+-  if (Number(user?.role) !== 2) {
+-    return <Navigate to="/app" replace />;
+-  }
+ 
+   async function loadUsers() {
+     setErr("");
+

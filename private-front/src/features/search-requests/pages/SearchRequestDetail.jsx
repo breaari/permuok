@@ -40,12 +40,20 @@ import {
 
 export default function SearchRequestDetail() {
   const { user } = useAuth();
+  const role = Number(user?.role || 0);
+
+  if (![2, 3, 4].includes(role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <SearchRequestDetailContent role={role} />;
+}
+
+function SearchRequestDetailContent({ role }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
   const [existingConversationId, setExistingConversationId] = useState(null);
-  const role = Number(user?.role || 0);
-  const canAccess = role === 2 || role === 3 || role === 4;
   const isInvestor = role === 4;
   const canContact = role === 2 || role === 3;
 
@@ -131,8 +139,6 @@ export default function SearchRequestDetail() {
       cancelled = true;
     };
   }, [id, isInvestor, location.pathname]);
-
-  if (!canAccess) return <Navigate to="/" replace />;
 
   const request = extractRequest(detail);
 

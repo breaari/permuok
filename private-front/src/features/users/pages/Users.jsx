@@ -13,6 +13,16 @@ function getRoleLabel(role) {
 }
 
 export default function Users() {
+  const { user } = useAuth();
+
+  if (Number(user?.role) !== 2) {
+    return <Navigate to="/app" replace />;
+  }
+
+  return <UsersContent />;
+}
+
+function UsersContent() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState({
@@ -26,11 +36,7 @@ export default function Users() {
   const [creating, setCreating] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState(null);
 
-  const { user } = useAuth();
   const toast = useToast();
-  if (Number(user?.role) !== 2) {
-    return <Navigate to="/app" replace />;
-  }
 
   async function loadUsers() {
     setErr("");

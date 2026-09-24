@@ -11,14 +11,14 @@
   },
   "dependencies": {
     "@react-google-maps/api": "^2.20.8",
-    "axios": "^1.13.6",
+    "axios": "^1.20.0",
     "flags": "^4.0.3",
     "framer-motion": "^12.42.2",
     "lucide-react": "^0.577.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-phone-number-input": "^3.4.16",
-    "react-router-dom": "^7.13.1"
+    "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

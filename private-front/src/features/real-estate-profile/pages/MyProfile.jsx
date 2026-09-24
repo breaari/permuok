@@ -26,9 +26,7 @@ function formatDate(value) {
 }
 
 export default function MyProfile() {
-  const { user, access, loadMe } = useAuth();
-  const nav = useNavigate();
-
+  const { user } = useAuth();
   const role = Number(user?.role || 0);
 
   if (![2, 3, 4].includes(role)) {
@@ -38,6 +36,13 @@ export default function MyProfile() {
   if (role === 3 || role === 4) {
     return <MyUserProfile />;
   }
+
+  return <RealEstateProfile />;
+}
+
+function RealEstateProfile() {
+  const { access, loadMe } = useAuth();
+  const nav = useNavigate();
 
   const { isLoaded: mapsLoaded, loadError: mapsError } = useGoogleMaps();
 

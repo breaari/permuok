@@ -44,13 +44,21 @@ import { joinLocation } from "../detail/developmentDetail.helpers";
 
 export default function DevelopmentDetail() {
   const { user } = useAuth();
+  const role = Number(user?.role || 0);
+
+  if (![2, 3, 4].includes(role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <DevelopmentDetailContent role={role} />;
+}
+
+function DevelopmentDetailContent({ role }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
   const toast = useToast();
   const [existingConversationId, setExistingConversationId] = useState(null);
-  const role = Number(user?.role || 0);
-  const canAccess = role === 2 || role === 3 || role === 4;
   const isInvestor = role === 4;
   const canContact = !isInvestor;
 
@@ -135,8 +143,6 @@ export default function DevelopmentDetail() {
       cancelled = true;
     };
   }, [id, isInvestor, location.pathname]);
-
-  if (!canAccess) return <Navigate to="/" replace />;
 
   const development = extractDevelopment(detail);
   const rawImages = extractDevelopmentImages(detail, development);

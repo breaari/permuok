@@ -60,8 +60,6 @@ function getPaginationRange({ totalPages, currentPage, siblingCount = 1 }) {
 
 function PaginationPro({ page, perPage, total, onPageChange }) {
   const totalPages = Math.max(1, Math.ceil(total / perPage));
-  if (totalPages <= 1) return null;
-
   const start = total === 0 ? 0 : (page - 1) * perPage + 1;
   const end = Math.min(total, page * perPage);
 
@@ -74,6 +72,8 @@ function PaginationPro({ page, perPage, total, onPageChange }) {
       }),
     [totalPages, page],
   );
+
+  if (totalPages <= 1) return null;
 
   return (
     <div className="mt-6 md:mt-8 border-t border-slate-200 pt-5 md:pt-6">
@@ -165,10 +165,16 @@ function PaginationPro({ page, perPage, total, onPageChange }) {
 
 export default function AdminRealEstates() {
   const { user } = useAuth();
-  const isAdmin = Number(user?.role) === 1;
-  const navigate = useNavigate();
 
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (Number(user?.role) !== 1) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <AdminRealEstatesContent />;
+}
+
+function AdminRealEstatesContent() {
+  const navigate = useNavigate();
 
   const [tab, setTab] = useState("initial_review");
   const [items, setItems] = useState([]);
