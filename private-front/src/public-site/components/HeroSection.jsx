@@ -7,6 +7,7 @@ import HeroCardsWebGL from "./HeroCardsWebGL";
 export default function HeroSection() {
   return (
     <section
+      data-hero-root
       className="
         relative
         isolate
@@ -29,34 +30,34 @@ export default function HeroSection() {
 
       {/* =====================================================
           WEBGL
-
-          Ocupa TODO el primer viewport.
-          La navbar queda flotando por encima porque es fixed z-50.
       ====================================================== */}
 
       <div className="absolute inset-0 z-10">
         <HeroCardsWebGL />
       </div>
+
       {/* =====================================================
-    TÍTULO
-====================================================== */}
+          TÍTULO
+      ====================================================== */}
 
       <div
         className="
-    pointer-events-none
-    absolute
-    left-1/2
-    top-[112px]
-    z-30
-    w-full
-    -translate-x-1/2
-    px-5
-    text-center
-    sm:px-6
-    lg:top-[108px]
-  "
+          pointer-events-none
+          absolute
+          left-1/2
+          top-[125px]
+          z-30
+          w-full
+          -translate-x-1/2
+          px-5
+          text-center
+          sm:top-[128px]
+          sm:px-6
+          lg:top-[132px]
+        "
       >
         <motion.h1
+          data-hero-title
           initial={{
             opacity: 0,
             y: 18,
@@ -70,18 +71,18 @@ export default function HeroSection() {
             ease: [0.22, 1, 0.36, 1],
           }}
           className="
-      mx-auto
-      max-w-[1120px]
-      text-[40px]
-      font-normal
-      leading-[0.96]
-      tracking-[-0.035em]
-      text-[#0a192f]
-      sm:text-[50px]
-      md:text-[58px]
-      lg:text-[62px]
-      xl:text-[64px]
-    "
+            mx-auto
+            max-w-[1120px]
+            text-[40px]
+            font-normal
+            leading-[0.96]
+            tracking-[-0.035em]
+            text-[#0a192f]
+            sm:text-[50px]
+            md:text-[58px]
+            lg:text-[62px]
+            xl:text-[64px]
+          "
         >
           La plataforma creada para revolucionar las permutas inmobiliarias.
         </motion.h1>
@@ -117,6 +118,7 @@ export default function HeroSection() {
         "
       >
         <p
+          data-hero-subtitle
           className="
             mx-auto
             max-w-[620px]

@@ -30,9 +30,6 @@ const images = [
 
 /* =========================================================
    DATOS DEMO
-
-   Tenemos 14 variantes visuales por ahora.
-   Después podés reemplazar cada foto sin tocar el motor.
 ========================================================= */
 
 const BASE_PROPERTIES = [
@@ -137,13 +134,8 @@ const BASE_PROPERTIES = [
 ];
 
 /*
- * Melius necesita bastantes elementos simultáneamente activos:
- *
- * duration / interval
- * 9.6 / 0.9 ≈ 10.7 cards por lado.
- *
- * Con 14 totales no alcanza para un flujo continuo.
- * Usamos 24 slots (12 por lado) repitiendo las existentes.
+ * 24 slots para mantener el recorrido continuo.
+ * 12 van hacia izquierda y 12 hacia derecha.
  */
 const CARDS = Array.from({ length: 24 }, (_, index) => ({
   ...BASE_PROPERTIES[index % BASE_PROPERTIES.length],
@@ -152,7 +144,7 @@ const CARDS = Array.from({ length: 24 }, (_, index) => ({
 }));
 
 /* =========================================================
-   CONFIG MELIUS
+   CONFIG
 ========================================================= */
 
 const FIRE_INTERVAL = 900;
@@ -178,8 +170,28 @@ const CYLINDRICAL_START = 1;
 const CYLINDRICAL_END = 0.7;
 const CYLINDRICAL_DURATION = 2000;
 
-const STREAM_Y_OFFSET_DESKTOP = 0.125;
-const STREAM_Y_OFFSET_MOBILE = 0.085;
+/*
+ * Curvatura vertical adicional.
+ *
+ * Las cards centrales se levantan un poco más.
+ * Ese lift va desapareciendo al acercarse a los extremos.
+ */
+const CENTER_LIFT_DESKTOP = 0.055;
+const CENTER_LIFT_MOBILE = 0.04;
+const CENTER_LIFT_POWER = 1.35;
+
+/*
+ * El cálculo principal centra matemáticamente el arco
+ * entre título y bajada.
+ *
+ * Este valor permite desplazar ópticamente TODO el arco
+ * un poco hacia abajo.
+ *
+ * MÁS ALTO = arco más abajo.
+ * MÁS BAJO = arco más arriba.
+ */
+const STREAM_VISUAL_NUDGE_DESKTOP = 0.038;
+const STREAM_VISUAL_NUDGE_MOBILE = 0.028;
 
 /* =========================================================
    EASING
@@ -191,6 +203,7 @@ function clamp01(value) {
 
 function smoothstep(edge0, edge1, x) {
   const t = clamp01((x - edge0) / (edge1 - edge0));
+
   return t * t * (3 - 2 * t);
 }
 
@@ -206,11 +219,37 @@ function power3InOut(value) {
 
 function power4Out(value) {
   const t = clamp01(value);
+
   return 1 - Math.pow(1 - t, 4);
 }
 
 function lerp(start, end, progress) {
   return start + (end - start) * progress;
+}
+
+/* =========================================================
+   POSICIONAMIENTO HERO
+========================================================= */
+
+function screenPxToWorldY(pixelY, viewportPxHeight, worldHeight) {
+  return (0.5 - pixelY / viewportPxHeight) * worldHeight;
+}
+
+function getHeroAnchors(container) {
+  const heroRoot =
+    container.closest("[data-hero-root]") || container.parentElement;
+
+  if (!heroRoot) {
+    return {
+      titleEl: null,
+      subtitleEl: null,
+    };
+  }
+
+  return {
+    titleEl: heroRoot.querySelector("[data-hero-title]"),
+    subtitleEl: heroRoot.querySelector("[data-hero-subtitle]"),
+  };
 }
 
 /* =========================================================
@@ -221,32 +260,46 @@ function roundRectPath(ctx, x, y, width, height, radius) {
   const r = Math.min(radius, width / 2, height / 2);
 
   ctx.beginPath();
+
   ctx.moveTo(x + r, y);
   ctx.lineTo(x + width - r, y);
+
   ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+
   ctx.lineTo(x + width, y + height - r);
+
   ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+
   ctx.lineTo(x + r, y + height);
+
   ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+
   ctx.lineTo(x, y + r);
+
   ctx.quadraticCurveTo(x, y, x + r, y);
+
   ctx.closePath();
 }
 
 function drawImageCover(ctx, image, x, y, width, height) {
   const imageRatio = image.width / image.height;
+
   const targetRatio = width / height;
 
   let sourceWidth = image.width;
+
   let sourceHeight = image.height;
+
   let sourceX = 0;
   let sourceY = 0;
 
   if (imageRatio > targetRatio) {
     sourceWidth = image.height * targetRatio;
+
     sourceX = (image.width - sourceWidth) / 2;
   } else {
     sourceHeight = image.width / targetRatio;
+
     sourceY = (image.height - sourceHeight) / 2;
   }
 
@@ -265,6 +318,7 @@ function drawImageCover(ctx, image, x, y, width, height) {
 
 function wrapText(ctx, text, maxWidth, maxLines = 2) {
   const words = text.split(" ");
+
   const lines = [];
 
   let line = "";
@@ -277,11 +331,15 @@ function wrapText(ctx, text, maxWidth, maxLines = 2) {
       continue;
     }
 
-    if (line) lines.push(line);
+    if (line) {
+      lines.push(line);
+    }
 
     line = word;
 
-    if (lines.length === maxLines - 1) break;
+    if (lines.length === maxLines - 1) {
+      break;
+    }
   }
 
   if (line && lines.length < maxLines) {
@@ -298,6 +356,7 @@ function loadImage(src) {
     image.decoding = "async";
 
     image.onload = () => resolve(image);
+
     image.onerror = reject;
 
     image.src = src;
@@ -320,7 +379,10 @@ async function createCardTexture(property) {
 
   const image = await loadImage(property.image);
 
-  /* Card */
+  /* =====================================================
+     CARD
+  ====================================================== */
+
   ctx.save();
 
   roundRectPath(ctx, 2, 2, WIDTH - 4, HEIGHT - 4, RADIUS);
@@ -328,20 +390,29 @@ async function createCardTexture(property) {
   ctx.clip();
 
   ctx.fillStyle = "#ffffff";
+
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  /* Foto */
+  /* =====================================================
+     FOTO
+  ====================================================== */
+
   const IMAGE_HEIGHT = 735;
 
   drawImageCover(ctx, image, 0, 0, WIDTH, IMAGE_HEIGHT);
 
-  /* Badge permuta */
+  /* =====================================================
+     BADGE PERMUTA
+  ====================================================== */
+
   ctx.font = '800 18px "Manrope", Arial, sans-serif';
 
   const badgeText = property.exchange.toUpperCase();
+
   const badgeTextWidth = ctx.measureText(badgeText).width;
 
   const badgeWidth = badgeTextWidth + 42;
+
   const badgeHeight = 44;
 
   ctx.fillStyle = "rgba(255,255,255,0.95)";
@@ -351,19 +422,25 @@ async function createCardTexture(property) {
   ctx.fill();
 
   ctx.fillStyle = "#0a192f";
+
   ctx.textBaseline = "middle";
 
   ctx.fillText(badgeText, 49, 28 + badgeHeight / 2 + 1);
 
-  /* Info */
+  /* =====================================================
+     INFO
+  ====================================================== */
+
   ctx.textBaseline = "alphabetic";
 
   ctx.fillStyle = "#047857";
+
   ctx.font = '800 19px "Manrope", Arial, sans-serif';
 
   ctx.fillText(property.type.toUpperCase(), 38, 805);
 
   ctx.fillStyle = "#0f172a";
+
   ctx.font = '800 39px "Manrope", Arial, sans-serif';
 
   const titleLines = wrapText(ctx, property.title, WIDTH - 76, 2);
@@ -372,30 +449,42 @@ async function createCardTexture(property) {
 
   for (const line of titleLines) {
     ctx.fillText(line, 38, titleY);
+
     titleY += 45;
   }
 
   ctx.fillStyle = "#0f172a";
+
   ctx.font = '800 43px "Manrope", Arial, sans-serif';
 
   ctx.fillText(property.price, 38, 995);
 
   ctx.restore();
 
-  /* Borde */
+  /* =====================================================
+     BORDE
+  ====================================================== */
+
   ctx.strokeStyle = "#dbe3ed";
+
   ctx.lineWidth = 3;
 
   roundRectPath(ctx, 2, 2, WIDTH - 4, HEIGHT - 4, RADIUS);
 
   ctx.stroke();
 
+  /* =====================================================
+     TEXTURE
+  ====================================================== */
+
   const texture = new THREE.CanvasTexture(canvas);
 
   texture.colorSpace = THREE.SRGBColorSpace;
+
   texture.generateMipmaps = false;
 
   texture.minFilter = THREE.LinearFilter;
+
   texture.magFilter = THREE.LinearFilter;
 
   texture.needsUpdate = true;
@@ -404,15 +493,7 @@ async function createCardTexture(property) {
 }
 
 /* =========================================================
-   SHADER POSTPROCESO
-
-   Acá aparece la "perspectiva" que estabas viendo:
-   NO rotamos cada card.
-
-   Distorsionamos la escena completa según su posición
-   horizontal.
-
-   Cuanto más lejos del centro, mayor la deformación.
+   POSTPROCESS
 ========================================================= */
 
 const POST_VERTEX_SHADER = `
@@ -420,7 +501,13 @@ const POST_VERTEX_SHADER = `
 
   void main() {
     vUv = uv;
-    gl_Position = vec4(position.xy, 0.0, 1.0);
+
+    gl_Position =
+      vec4(
+        position.xy,
+        0.0,
+        1.0
+      );
   }
 `;
 
@@ -433,7 +520,8 @@ const POST_FRAGMENT_SHADER = `
   varying vec2 vUv;
 
   void main() {
-    float cylindricalFactor = uCylindricalFactor;
+    float cylindricalFactor =
+      uCylindricalFactor;
 
     float stretchedY =
       vUv.y * cylindricalFactor
@@ -445,7 +533,8 @@ const POST_FRAGMENT_SHADER = `
     xFactor =
       pow(xFactor, 2.0);
 
-    vec2 uvCylindrical = vUv;
+    vec2 uvCylindrical =
+      vUv;
 
     uvCylindrical.y =
       mix(
@@ -460,7 +549,8 @@ const POST_FRAGMENT_SHADER = `
         uvCylindrical
       );
 
-    gl_FragColor = color;
+    gl_FragColor =
+      color;
 
     #include <colorspace_fragment>
   }
@@ -472,19 +562,24 @@ const POST_FRAGMENT_SHADER = `
 
 export default function HeroCardsWebGL() {
   const containerRef = useRef(null);
+
   const canvasRef = useRef(null);
 
   useEffect(() => {
     const container = containerRef.current;
+
     const canvas = canvasRef.current;
 
-    if (!container || !canvas) return;
+    if (!container || !canvas) {
+      return;
+    }
 
     let destroyed = false;
     let rafId = null;
 
     let resizeObserver = null;
     let intersectionObserver = null;
+    let alignTimeoutId = null;
 
     let isVisible = true;
 
@@ -541,6 +636,7 @@ export default function HeroCardsWebGL() {
         : THREE.UnsignedByteType,
 
       minFilter: THREE.LinearFilter,
+
       magFilter: THREE.LinearFilter,
 
       depthBuffer: true,
@@ -556,7 +652,7 @@ export default function HeroCardsWebGL() {
     }
 
     /* =====================================================
-       POST PROCESS SCENE
+       POST PROCESS
     ====================================================== */
 
     const postScene = new THREE.Scene();
@@ -599,8 +695,8 @@ export default function HeroCardsWebGL() {
 
     const cardStates = [];
 
-    let leftCards = [];
-    let rightCards = [];
+    const leftCards = [];
+    const rightCards = [];
 
     let materials = [];
     let textures = [];
@@ -609,16 +705,20 @@ export default function HeroCardsWebGL() {
     let nextFireIndexRight = 0;
 
     let fireAccumulator = 0;
-
     let revealFactor = 0;
 
     let viewportWorldWidth = 1;
     let viewportWorldHeight = 1;
 
+    /*
+     * Centro matemático entre título y bajada.
+     */
+    let targetCenterWorldY = 0;
+
     let isDesktop = true;
 
     /* =====================================================
-       CREAR TEXTURAS
+       BUILD
     ====================================================== */
 
     async function buildCards() {
@@ -628,7 +728,9 @@ export default function HeroCardsWebGL() {
 
       textures = await Promise.all(BASE_PROPERTIES.map(createCardTexture));
 
-      if (destroyed) return;
+      if (destroyed) {
+        return;
+      }
 
       materials = textures.map(
         (texture) =>
@@ -640,12 +742,8 @@ export default function HeroCardsWebGL() {
             depthTest: true,
 
             /*
-             * IMPORTANTE:
-             * las cards transparentes no escriben profundidad.
-             *
-             * Esto elimina el rectángulo/barra que aparece
-             * cuando muchos planos diminutos se superponen
-             * en el centro.
+             * Las cards transparentes
+             * no escriben profundidad.
              */
             depthWrite: false,
 
@@ -668,10 +766,8 @@ export default function HeroCardsWebGL() {
 
         const state = {
           property,
-
           mesh,
           innerGroup,
-
           direction,
 
           isFiring: false,
@@ -693,6 +789,12 @@ export default function HeroCardsWebGL() {
       });
 
       resize();
+
+      /*
+       * Recalculamos después de que termine
+       * la animación inicial del H1.
+       */
+      alignTimeoutId = window.setTimeout(resize, 850);
 
       cardsGroup.scale.setScalar(GROUP_SCALE_START);
 
@@ -742,12 +844,13 @@ export default function HeroCardsWebGL() {
     }
 
     function fireNextInPool(pool, direction) {
-      if (!pool.length) return;
+      if (!pool.length) {
+        return;
+      }
 
-      const indexKey = direction === "left" ? "left" : "right";
+      const isLeft = direction === "left";
 
-      let current =
-        indexKey === "left" ? nextFireIndexLeft : nextFireIndexRight;
+      let current = isLeft ? nextFireIndexLeft : nextFireIndexRight;
 
       const count = pool.length;
 
@@ -759,7 +862,7 @@ export default function HeroCardsWebGL() {
         if (!card.isFiring) {
           fireCard(card);
 
-          if (indexKey === "left") {
+          if (isLeft) {
             nextFireIndexLeft = (index + 1) % count;
           } else {
             nextFireIndexRight = (index + 1) % count;
@@ -776,8 +879,13 @@ export default function HeroCardsWebGL() {
       fireNextInPool(rightCards, "right");
     }
 
+    /* =====================================================
+       RESIZE / ALINEACIÓN
+    ====================================================== */
+
     function resize() {
       const width = container.clientWidth;
+
       const height = container.clientHeight;
 
       if (!width || !height) {
@@ -808,9 +916,9 @@ export default function HeroCardsWebGL() {
 
       viewportWorldWidth = viewportWorldHeight * camera.aspect;
 
-      /* =====================================================
-     DIMENSIONES
-  ====================================================== */
+      /* ===================================================
+         DIMENSIONES
+      ==================================================== */
 
       const cardWidth =
         (isDesktop ? DESKTOP_CARD_WIDTH : MOBILE_CARD_WIDTH) *
@@ -827,17 +935,50 @@ export default function HeroCardsWebGL() {
           FIRE_TARGET;
       });
 
-      /* =====================================================
-     POSICIÓN VERTICAL
+      /* ===================================================
+         CENTRO ENTRE TÍTULO Y BAJADA
+      ==================================================== */
 
-     Bajamos todo el arco como una sola unidad.
-     No modificamos la trayectoria individual.
-  ====================================================== */
+      const { titleEl, subtitleEl } = getHeroAnchors(container);
 
-      cardsGroup.position.y = isDesktop
-        ? -viewportWorldHeight * STREAM_Y_OFFSET_DESKTOP
-        : -viewportWorldHeight * STREAM_Y_OFFSET_MOBILE;
+      if (titleEl && subtitleEl) {
+        const containerRect = container.getBoundingClientRect();
+
+        const titleRect = titleEl.getBoundingClientRect();
+
+        const subtitleRect = subtitleEl.getBoundingClientRect();
+
+        const titleBottomPx = titleRect.bottom - containerRect.top;
+
+        const subtitleTopPx = subtitleRect.top - containerRect.top;
+
+        const midpointPx = (titleBottomPx + subtitleTopPx) / 2;
+
+        targetCenterWorldY = screenPxToWorldY(
+          midpointPx,
+          height,
+          viewportWorldHeight,
+        );
+      } else {
+        targetCenterWorldY = 0;
+      }
     }
+
+    resizeObserver = new ResizeObserver(resize);
+
+    resizeObserver.observe(container);
+
+    intersectionObserver = new IntersectionObserver(
+      ([entry]) => {
+        isVisible = entry.isIntersecting;
+      },
+      {
+        threshold: 0.01,
+      },
+    );
+
+    intersectionObserver.observe(container);
+
     /* =====================================================
        UPDATE CARD
     ====================================================== */
@@ -863,32 +1004,55 @@ export default function HeroCardsWebGL() {
         return;
       }
 
-      /*
-       * Exactamente la idea importante
-       * de Melius:
-       *
-       * progreso de cada card
-       * multiplicado por el reveal global.
-       */
       const progress = card.fireProgress * revealFactor;
 
-      /*
-       * MOVIMIENTO
-       */
+      /* ===================================================
+         MOVIMIENTO HORIZONTAL
+      ==================================================== */
+
       let movement = smoothstep(0, 1, progress);
 
       movement = 0.5 * easeInQuad(movement) + 0.5 * movement;
 
-      /*
-       * CRECIMIENTO
-       */
+      /* ===================================================
+         CRECIMIENTO
+      ==================================================== */
+
       const scaleStart = isDesktop ? 0.2 : 0.3;
 
       const scale =
         0.125 * smoothstep(0, 0.15, progress) +
         0.875 * smoothstep(scaleStart, 1, progress);
 
+      /* ===================================================
+         X
+      ==================================================== */
+
       card.innerGroup.position.x = card.fireTargetX * movement;
+
+      /* ===================================================
+         CURVATURA VERTICAL
+
+         Centro = más lift.
+         Extremo = prácticamente 0.
+      ==================================================== */
+
+      const centerFactor = 1 - movement;
+
+      const centerLiftStrength = isDesktop
+        ? CENTER_LIFT_DESKTOP
+        : CENTER_LIFT_MOBILE;
+
+      const centerLift =
+        Math.pow(centerFactor, CENTER_LIFT_POWER) *
+        viewportWorldHeight *
+        centerLiftStrength;
+
+      card.innerGroup.position.y = centerLift;
+
+      /* ===================================================
+         SCALE
+      ==================================================== */
 
       card.innerGroup.scale.setScalar(scale);
 
@@ -908,30 +1072,36 @@ export default function HeroCardsWebGL() {
       previousTime = startTime;
 
       function frame(time) {
-        if (destroyed) return;
+        if (destroyed) {
+          return;
+        }
 
         rafId = requestAnimationFrame(frame);
 
         if (document.hidden || !isVisible) {
           previousTime = time;
+
           return;
         }
 
         const rawDelta = time - previousTime;
 
-        /*
-         * Melius también limita saltos grandes.
-         */
         const delta = Math.min(rawDelta, 100);
 
         previousTime = time;
 
         const elapsed = time - startTime;
 
-        /* Reveal */
+        /* =================================================
+           REVEAL
+        ================================================== */
+
         revealFactor = power3InOut(elapsed / REVEAL_DURATION);
 
-        /* Zoom general */
+        /* =================================================
+           ZOOM GENERAL
+        ================================================== */
+
         const zoomProgress = power3InOut(elapsed / GROUP_ZOOM_DURATION);
 
         const groupScale = lerp(
@@ -942,7 +1112,34 @@ export default function HeroCardsWebGL() {
 
         cardsGroup.scale.setScalar(groupScale);
 
-        /* Distorsión cilíndrica */
+        /* =================================================
+           POSICIÓN VERTICAL FINAL
+
+           1. centro real título/bajada
+           2. compensación por centerLift
+           3. nudge óptico hacia abajo
+        ================================================== */
+
+        const centerLiftStrength = isDesktop
+          ? CENTER_LIFT_DESKTOP
+          : CENTER_LIFT_MOBILE;
+
+        const centerLiftWorld =
+          viewportWorldHeight * centerLiftStrength * groupScale;
+
+        const visualNudge =
+          viewportWorldHeight *
+          (isDesktop
+            ? STREAM_VISUAL_NUDGE_DESKTOP
+            : STREAM_VISUAL_NUDGE_MOBILE);
+
+        cardsGroup.position.y =
+          targetCenterWorldY - centerLiftWorld - visualNudge;
+
+        /* =================================================
+           DISTORSIÓN CILÍNDRICA
+        ================================================== */
+
         const cylinderProgress = power4Out(elapsed / CYLINDRICAL_DURATION);
 
         postMaterial.uniforms.uCylindricalFactor.value = lerp(
@@ -951,9 +1148,10 @@ export default function HeroCardsWebGL() {
           cylinderProgress,
         );
 
-        /*
-         * Nuevas parejas.
-         */
+        /* =================================================
+           NUEVAS CARDS
+        ================================================== */
+
         fireAccumulator += delta;
 
         while (fireAccumulator >= FIRE_INTERVAL) {
@@ -964,9 +1162,9 @@ export default function HeroCardsWebGL() {
 
         cardStates.forEach((card) => updateCard(card, delta));
 
-        /* =========================
+        /* =================================================
            PASS 1
-        ========================== */
+        ================================================== */
 
         renderer.setRenderTarget(target);
 
@@ -976,9 +1174,9 @@ export default function HeroCardsWebGL() {
 
         renderer.render(scene, camera);
 
-        /* =========================
+        /* =================================================
            PASS 2
-        ========================== */
+        ================================================== */
 
         renderer.setRenderTarget(null);
 
@@ -991,6 +1189,10 @@ export default function HeroCardsWebGL() {
 
       rafId = requestAnimationFrame(frame);
     }
+
+    /* =====================================================
+       INIT
+    ====================================================== */
 
     buildCards();
 
@@ -1005,6 +1207,10 @@ export default function HeroCardsWebGL() {
         cancelAnimationFrame(rafId);
       }
 
+      if (alignTimeoutId) {
+        window.clearTimeout(alignTimeoutId);
+      }
+
       resizeObserver?.disconnect();
 
       intersectionObserver?.disconnect();
@@ -1016,6 +1222,7 @@ export default function HeroCardsWebGL() {
       materials.forEach((material) => material.dispose());
 
       postQuad.geometry.dispose();
+
       postMaterial.dispose();
 
       target.dispose();
