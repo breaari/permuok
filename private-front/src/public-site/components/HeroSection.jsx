@@ -37,26 +37,24 @@ export default function HeroSection() {
       <div className="absolute inset-0 z-10">
         <HeroCardsWebGL />
       </div>
-
       {/* =====================================================
-          TÍTULO
-      ====================================================== */}
+    TÍTULO
+====================================================== */}
 
       <div
         className="
-          pointer-events-none
-          absolute
-          left-1/2
-          top-[110px]
-          z-30
-          w-full
-          max-w-5xl
-          -translate-x-1/2
-          px-5
-          text-center
-          sm:px-6
-          lg:top-[105px]
-        "
+    pointer-events-none
+    absolute
+    left-1/2
+    top-[112px]
+    z-30
+    w-full
+    -translate-x-1/2
+    px-5
+    text-center
+    sm:px-6
+    lg:top-[108px]
+  "
       >
         <motion.h1
           initial={{
@@ -72,16 +70,18 @@ export default function HeroSection() {
             ease: [0.22, 1, 0.36, 1],
           }}
           className="
-            mx-auto
-            max-w-[900px]
-            text-[42px]
-            font-normal
-            leading-[0.98]
-            tracking-[-0.035em]
-            sm:text-[54px]
-            md:text-[62px]
-            lg:text-[68px]
-          "
+      mx-auto
+      max-w-[1120px]
+      text-[40px]
+      font-normal
+      leading-[0.96]
+      tracking-[-0.035em]
+      text-[#0a192f]
+      sm:text-[50px]
+      md:text-[58px]
+      lg:text-[62px]
+      xl:text-[64px]
+    "
         >
           La plataforma creada para revolucionar las permutas inmobiliarias.
         </motion.h1>

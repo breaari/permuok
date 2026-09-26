@@ -178,8 +178,8 @@ const CYLINDRICAL_START = 1;
 const CYLINDRICAL_END = 0.7;
 const CYLINDRICAL_DURATION = 2000;
 
-const STREAM_Y_OFFSET_DESKTOP = 0.155;
-const STREAM_Y_OFFSET_MOBILE = 0.1;
+const STREAM_Y_OFFSET_DESKTOP = 0.125;
+const STREAM_Y_OFFSET_MOBILE = 0.085;
 
 /* =========================================================
    EASING
@@ -858,7 +858,7 @@ export default function HeroCardsWebGL() {
 
         card.innerGroup.scale.set(0, 0, 0);
 
-        card.mesh.renderOrder = 0;
+        card.innerGroup.renderOrder = 0;
 
         return;
       }
