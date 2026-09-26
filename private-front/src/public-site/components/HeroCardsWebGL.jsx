@@ -178,6 +178,12 @@ const CYLINDRICAL_START = 1;
 const CYLINDRICAL_END = 0.7;
 const CYLINDRICAL_DURATION = 2000;
 
+const STREAM_Y_OFFSET_DESKTOP = 0.11;
+const STREAM_Y_OFFSET_MOBILE = 0.08;
+
+const RAIL_Y_OFFSET_DESKTOP = 0.19;
+const RAIL_Y_OFFSET_MOBILE = 0.15;
+
 /* =========================================================
    EASING
 ========================================================= */
@@ -401,34 +407,6 @@ async function createCardTexture(property) {
 }
 
 /* =========================================================
-   RAIL NEGRO
-========================================================= */
-
-function createRailTexture() {
-  const canvas = document.createElement("canvas");
-
-  canvas.width = 1024;
-  canvas.height = 256;
-
-  const ctx = canvas.getContext("2d");
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = "#09090b";
-
-  roundRectPath(ctx, 0, 0, canvas.width, canvas.height, 20);
-
-  ctx.fill();
-
-  const texture = new THREE.CanvasTexture(canvas);
-
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.generateMipmaps = false;
-
-  return texture;
-}
-
-/* =========================================================
    SHADER POSTPROCESO
 
    Acá aparece la "perspectiva" que estabas viendo:
@@ -617,28 +595,6 @@ export default function HeroCardsWebGL() {
     postScene.add(postQuad);
 
     /* =====================================================
-       RAIL
-    ====================================================== */
-
-    const railTexture = createRailTexture();
-
-    const railMaterial = new THREE.MeshBasicMaterial({
-      map: railTexture,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-    });
-
-    const railMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(1, 1),
-      railMaterial,
-    );
-
-    railMesh.position.z = -0.1;
-
-    root.add(railMesh);
-
-    /* =====================================================
        CARD ENGINE
     ====================================================== */
 
@@ -817,10 +773,8 @@ export default function HeroCardsWebGL() {
     /* =====================================================
        RESIZE
     ====================================================== */
-
     function resize() {
       const width = container.clientWidth;
-
       const height = container.clientHeight;
 
       if (!width || !height) {
@@ -832,7 +786,6 @@ export default function HeroCardsWebGL() {
       const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
 
       renderer.setPixelRatio(pixelRatio);
-
       renderer.setSize(width, height, false);
 
       target.setSize(
@@ -841,7 +794,6 @@ export default function HeroCardsWebGL() {
       );
 
       camera.aspect = width / height;
-
       camera.updateProjectionMatrix();
 
       viewportWorldHeight =
@@ -850,6 +802,10 @@ export default function HeroCardsWebGL() {
         camera.position.z;
 
       viewportWorldWidth = viewportWorldHeight * camera.aspect;
+
+      /* =====================================================
+     PROPIEDADES
+  ====================================================== */
 
       const cardWidth =
         (isDesktop ? DESKTOP_CARD_WIDTH : MOBILE_CARD_WIDTH) *
@@ -866,36 +822,33 @@ export default function HeroCardsWebGL() {
           FIRE_TARGET;
       });
 
-      /*
-       * Rail negro central.
-       */
-      railMesh.scale.set(
-        viewportWorldWidth * 0.265,
+      /* =====================================================
+     POSICIÓN VERTICAL DEL STREAM
+  ====================================================== */
 
-        viewportWorldHeight * 0.16,
+      cardsGroup.position.y = isDesktop
+        ? -viewportWorldHeight * STREAM_Y_OFFSET_DESKTOP
+        : -viewportWorldHeight * STREAM_Y_OFFSET_MOBILE;
 
-        1,
-      );
+      /* =====================================================
+     BASE NEGRA
+     La dejamos más abajo para que no se vea.
+  ====================================================== */
+
+      if (typeof railMesh !== "undefined" && railMesh) {
+        railMesh.scale.set(
+          viewportWorldWidth * 0.22,
+          viewportWorldHeight * 0.07,
+          1,
+        );
+
+        railMesh.position.y = isDesktop
+          ? -viewportWorldHeight * RAIL_Y_OFFSET_DESKTOP
+          : -viewportWorldHeight * RAIL_Y_OFFSET_MOBILE;
+
+        railMesh.position.z = -0.12;
+      }
     }
-
-    resizeObserver = new ResizeObserver(resize);
-
-    resizeObserver.observe(container);
-
-    /* =====================================================
-       INTERSECTION
-    ====================================================== */
-
-    intersectionObserver = new IntersectionObserver(
-      ([entry]) => {
-        isVisible = entry.isIntersecting;
-      },
-      {
-        threshold: 0.01,
-      },
-    );
-
-    intersectionObserver.observe(container);
 
     /* =====================================================
        UPDATE CARD
@@ -1073,9 +1026,6 @@ export default function HeroCardsWebGL() {
       textures.forEach((texture) => texture.dispose());
 
       materials.forEach((material) => material.dispose());
-
-      railTexture.dispose();
-      railMaterial.dispose();
 
       postQuad.geometry.dispose();
       postMaterial.dispose();

@@ -1,6 +1,6 @@
 // src/public-site/layout/PublicNavbar.jsx
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import logo from "../../assets/logoparafondoazul.png";
 
@@ -15,118 +15,375 @@ const navItems = [
 
 export default function PublicNavbar() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    function handleScroll() {
+      setScrolled(window.scrollY > 20);
+    }
+
+    handleScroll();
+
+    window.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   function closeMenu() {
     setOpen(false);
   }
 
   return (
-    <header className="fixed left-0 top-0 z-50 w-full border-b border-white/10 bg-brand-dark/75 backdrop-blur-2xl">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        {/* Logo */}
+    <header
+      className={`
+        fixed
+        left-3
+        right-3
+        top-3
+        z-50
+        transition-all
+        duration-300
+        sm:left-4
+        sm:right-4
+        sm:top-4
+        ${scrolled ? "translate-y-0" : ""}
+      `}
+    >
+      <div
+        className="
+          relative
+          mx-auto
+          flex
+          min-h-[64px]
+          w-full
+          items-center
+          justify-between
+          rounded-[16px]
+          border
+          border-white/[0.09]
+          bg-[#0b1628]/95
+          px-4
+          shadow-[0_14px_45px_rgba(10,25,47,0.20)]
+          backdrop-blur-xl
+          sm:px-5
+          lg:px-6
+        "
+      >
+        {/* =================================================
+            LOGO
+        ================================================== */}
+
         <Link
           to="/"
-          className="group flex items-center gap-3"
           onClick={closeMenu}
+          className="
+            group
+            relative
+            z-20
+            flex
+            shrink-0
+            items-center
+          "
         >
           <img
             src={logo}
             alt="PermuOK"
-            className="h-10 w-auto object-contain transition duration-300 group-hover:scale-[1.03] md:h-11"
+            className="
+              h-9
+              w-auto
+              object-contain
+              transition
+              duration-300
+              group-hover:scale-[1.02]
+              sm:h-10
+            "
           />
         </Link>
 
-        {/* Desktop nav */}
-        <nav className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/[0.045] p-1 backdrop-blur-xl lg:flex">
+        {/* =================================================
+            NAVEGACIÓN DESKTOP
+        ================================================== */}
+
+        <nav
+          className="
+            absolute
+            left-1/2
+            top-1/2
+            hidden
+            -translate-x-1/2
+            -translate-y-1/2
+            items-center
+            lg:flex
+          "
+        >
           {navItems.map((item) => (
             <a
               key={item.href}
               href={item.href}
-              className="rounded-full px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
+              className="
+                relative
+                whitespace-nowrap
+                px-3.5
+                py-2
+                text-[13px]
+                font-semibold
+                text-slate-300
+                transition
+                duration-200
+                hover:text-white
+                xl:px-4
+                xl:text-sm
+              "
             >
               {item.label}
+
+              <span
+                className="
+                  absolute
+                  bottom-0
+                  left-1/2
+                  h-px
+                  w-0
+                  -translate-x-1/2
+                  bg-white/70
+                  transition-all
+                  duration-300
+                  group-hover:w-full
+                "
+              />
             </a>
           ))}
         </nav>
 
-        {/* Actions */}
-        <div className="hidden items-center gap-3 md:flex">
+        {/* =================================================
+            ACCIONES DESKTOP
+        ================================================== */}
+
+        <div
+          className="
+            relative
+            z-20
+            hidden
+            shrink-0
+            items-center
+            gap-2
+            md:flex
+          "
+        >
           <Link
             to="/login"
-            className="rounded-full px-5 py-2 text-sm font-bold text-slate-300 transition hover:bg-white/10 hover:text-white"
+            className="
+              rounded-xl
+              px-4
+              py-2.5
+              text-sm
+              font-bold
+              text-slate-200
+              transition
+              duration-200
+              hover:bg-white/[0.07]
+              hover:text-white
+            "
           >
             Ingresar
           </Link>
 
           <Link
             to="/register"
-            className="rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-[0_14px_36px_rgba(0,86,179,0.35)] transition hover:bg-[#004996] active:scale-[0.98]"
+            className="
+              rounded-xl
+              bg-primary
+              px-5
+              py-2.5
+              text-sm
+              font-extrabold
+              text-white
+              shadow-[0_10px_28px_rgba(0,86,179,0.30)]
+              transition
+              duration-300
+              hover:-translate-y-0.5
+              hover:bg-[#004b9d]
+              hover:shadow-[0_14px_34px_rgba(0,86,179,0.36)]
+              active:translate-y-0
+            "
           >
             Registrarme
           </Link>
         </div>
 
-        {/* Mobile button */}
+        {/* =================================================
+            BOTÓN MOBILE
+        ================================================== */}
+
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white transition hover:bg-white/10 md:hidden"
+          className="
+            relative
+            z-20
+            inline-flex
+            h-10
+            w-10
+            items-center
+            justify-center
+            rounded-xl
+            border
+            border-white/10
+            bg-white/[0.06]
+            text-white
+            transition
+            hover:bg-white/10
+            md:hidden
+          "
           aria-label={open ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={open}
         >
           <span className="relative h-5 w-5">
             <span
-              className={`absolute left-0 top-1 h-0.5 w-5 rounded-full bg-white transition ${
-                open ? "translate-y-1.5 rotate-45" : ""
-              }`}
+              className={`
+                absolute
+                left-0
+                top-1
+                h-0.5
+                w-5
+                rounded-full
+                bg-white
+                transition
+                duration-300
+                ${open ? "translate-y-1.5 rotate-45" : ""}
+              `}
             />
+
             <span
-              className={`absolute left-0 top-2.5 h-0.5 w-5 rounded-full bg-white transition ${
-                open ? "opacity-0" : ""
-              }`}
+              className={`
+                absolute
+                left-0
+                top-2.5
+                h-0.5
+                w-5
+                rounded-full
+                bg-white
+                transition
+                duration-300
+                ${open ? "opacity-0" : ""}
+              `}
             />
+
             <span
-              className={`absolute left-0 top-4 h-0.5 w-5 rounded-full bg-white transition ${
-                open ? "-translate-y-1.5 -rotate-45" : ""
-              }`}
+              className={`
+                absolute
+                left-0
+                top-4
+                h-0.5
+                w-5
+                rounded-full
+                bg-white
+                transition
+                duration-300
+                ${open ? "-translate-y-1.5 -rotate-45" : ""}
+              `}
             />
           </span>
         </button>
       </div>
 
-      {/* Mobile menu */}
+      {/* ===================================================
+          MENÚ MOBILE
+      ==================================================== */}
+
       {open && (
-        <div className="border-t border-white/10 bg-brand-dark/95 px-6 pb-6 pt-3 backdrop-blur-2xl md:hidden">
-          <nav className="mx-auto flex max-w-7xl flex-col gap-2">
+        <div
+          className="
+            mt-2
+            overflow-hidden
+            rounded-[16px]
+            border
+            border-white/[0.09]
+            bg-[#0b1628]/98
+            p-3
+            shadow-[0_18px_50px_rgba(10,25,47,0.28)]
+            backdrop-blur-2xl
+            md:hidden
+          "
+        >
+          <nav className="flex flex-col gap-1">
             {navItems.map((item) => (
               <a
                 key={item.href}
                 href={item.href}
                 onClick={closeMenu}
-                className="rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3 text-sm font-bold text-slate-200 transition hover:bg-white/10 hover:text-white"
+                className="
+                  rounded-xl
+                  px-4
+                  py-3
+                  text-sm
+                  font-bold
+                  text-slate-200
+                  transition
+                  hover:bg-white/[0.07]
+                  hover:text-white
+                "
               >
                 {item.label}
               </a>
             ))}
-
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <Link
-                to="/login"
-                onClick={closeMenu}
-                className="rounded-full border border-white/10 px-5 py-3 text-center text-sm font-bold text-white transition hover:bg-white/10"
-              >
-                Ingresar
-              </Link>
-
-              <Link
-                to="/register"
-                onClick={closeMenu}
-                className="rounded-full bg-primary px-5 py-3 text-center text-sm font-bold text-white shadow-[0_14px_36px_rgba(0,86,179,0.35)] transition hover:bg-[#004996]"
-              >
-                Registrarme
-              </Link>
-            </div>
           </nav>
+
+          <div
+            className="
+              mt-3
+              grid
+              grid-cols-2
+              gap-2
+              border-t
+              border-white/10
+              pt-3
+            "
+          >
+            <Link
+              to="/login"
+              onClick={closeMenu}
+              className="
+                rounded-xl
+                border
+                border-white/10
+                px-4
+                py-3
+                text-center
+                text-sm
+                font-bold
+                text-white
+                transition
+                hover:bg-white/[0.07]
+              "
+            >
+              Ingresar
+            </Link>
+
+            <Link
+              to="/register"
+              onClick={closeMenu}
+              className="
+                rounded-xl
+                bg-primary
+                px-4
+                py-3
+                text-center
+                text-sm
+                font-extrabold
+                text-white
+                shadow-[0_10px_28px_rgba(0,86,179,0.28)]
+                transition
+                hover:bg-[#004b9d]
+              "
+            >
+              Registrarme
+            </Link>
+          </div>
         </div>
       )}
     </header>
