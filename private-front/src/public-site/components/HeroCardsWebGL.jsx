@@ -178,11 +178,8 @@ const CYLINDRICAL_START = 1;
 const CYLINDRICAL_END = 0.7;
 const CYLINDRICAL_DURATION = 2000;
 
-const STREAM_Y_OFFSET_DESKTOP = 0.11;
-const STREAM_Y_OFFSET_MOBILE = 0.08;
-
-const RAIL_Y_OFFSET_DESKTOP = 0.19;
-const RAIL_Y_OFFSET_MOBILE = 0.15;
+const STREAM_Y_OFFSET_DESKTOP = 0.155;
+const STREAM_Y_OFFSET_MOBILE = 0.1;
 
 /* =========================================================
    EASING
@@ -641,7 +638,16 @@ export default function HeroCardsWebGL() {
             transparent: true,
 
             depthTest: true,
-            depthWrite: true,
+
+            /*
+             * IMPORTANTE:
+             * las cards transparentes no escriben profundidad.
+             *
+             * Esto elimina el rectángulo/barra que aparece
+             * cuando muchos planos diminutos se superponen
+             * en el centro.
+             */
+            depthWrite: false,
 
             alphaTest: 0.001,
           }),
@@ -714,7 +720,7 @@ export default function HeroCardsWebGL() {
 
       card.innerGroup.visible = true;
 
-      card.mesh.renderOrder = 0;
+      card.innerGroup.renderOrder = 0;
 
       card.isFiring = true;
 
@@ -770,9 +776,6 @@ export default function HeroCardsWebGL() {
       fireNextInPool(rightCards, "right");
     }
 
-    /* =====================================================
-       RESIZE
-    ====================================================== */
     function resize() {
       const width = container.clientWidth;
       const height = container.clientHeight;
@@ -786,6 +789,7 @@ export default function HeroCardsWebGL() {
       const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
 
       renderer.setPixelRatio(pixelRatio);
+
       renderer.setSize(width, height, false);
 
       target.setSize(
@@ -794,6 +798,7 @@ export default function HeroCardsWebGL() {
       );
 
       camera.aspect = width / height;
+
       camera.updateProjectionMatrix();
 
       viewportWorldHeight =
@@ -804,7 +809,7 @@ export default function HeroCardsWebGL() {
       viewportWorldWidth = viewportWorldHeight * camera.aspect;
 
       /* =====================================================
-     PROPIEDADES
+     DIMENSIONES
   ====================================================== */
 
       const cardWidth =
@@ -823,33 +828,16 @@ export default function HeroCardsWebGL() {
       });
 
       /* =====================================================
-     POSICIÓN VERTICAL DEL STREAM
+     POSICIÓN VERTICAL
+
+     Bajamos todo el arco como una sola unidad.
+     No modificamos la trayectoria individual.
   ====================================================== */
 
       cardsGroup.position.y = isDesktop
         ? -viewportWorldHeight * STREAM_Y_OFFSET_DESKTOP
         : -viewportWorldHeight * STREAM_Y_OFFSET_MOBILE;
-
-      /* =====================================================
-     BASE NEGRA
-     La dejamos más abajo para que no se vea.
-  ====================================================== */
-
-      if (typeof railMesh !== "undefined" && railMesh) {
-        railMesh.scale.set(
-          viewportWorldWidth * 0.22,
-          viewportWorldHeight * 0.07,
-          1,
-        );
-
-        railMesh.position.y = isDesktop
-          ? -viewportWorldHeight * RAIL_Y_OFFSET_DESKTOP
-          : -viewportWorldHeight * RAIL_Y_OFFSET_MOBILE;
-
-        railMesh.position.z = -0.12;
-      }
     }
-
     /* =====================================================
        UPDATE CARD
     ====================================================== */
@@ -904,7 +892,7 @@ export default function HeroCardsWebGL() {
 
       card.innerGroup.scale.setScalar(scale);
 
-      card.mesh.renderOrder = movement + scale;
+      card.innerGroup.renderOrder = movement + scale;
     }
 
     /* =====================================================
