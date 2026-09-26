@@ -62,6 +62,7 @@ export default function PropertyDetail() {
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [unavailable, setUnavailable] = useState(false);
   const [data, setData] = useState(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [actionLoading, setActionLoading] = useState(false);
@@ -76,6 +77,7 @@ export default function PropertyDetail() {
     async function loadDetail() {
       setLoading(true);
       setErr("");
+      setUnavailable(false);
 
       try {
         let payload = null;
@@ -86,24 +88,30 @@ export default function PropertyDetail() {
           location.pathname.startsWith("/explore/properties/")
         ) {
           const exploreRes = await api.get(`/explore/properties/${id}`);
+
           payload = unwrap(exploreRes);
           mode = "explore";
         } else {
           try {
             const ownedRes = await api.get(`/properties/${id}`);
+
             payload = unwrap(ownedRes);
             mode = "owned";
-          } catch {
+          } catch (ownedError) {
             const exploreRes = await api.get(`/explore/properties/${id}`);
+
             payload = unwrap(exploreRes);
             mode = "explore";
           }
         }
 
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
 
         setData(payload);
         setDetailMode(mode);
+        setUnavailable(false);
         setActiveImageIndex(0);
 
         if (canContact) {
@@ -124,13 +132,30 @@ export default function PropertyDetail() {
             }
           }
         }
-      } catch (e) {
-        if (cancelled) return;
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
 
-        setErr(getErrorMessage(e, "No se pudo cargar la publicación"));
         setData(null);
+        setExistingConversationId(null);
+
+        if (Number(error?.status) === 404) {
+          setUnavailable(true);
+          setErr("");
+        } else {
+          setUnavailable(false);
+          setErr(
+            getErrorMessage(
+              error,
+              "No pudimos cargar la publicación. Intentá nuevamente.",
+            ),
+          );
+        }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
@@ -139,7 +164,7 @@ export default function PropertyDetail() {
     return () => {
       cancelled = true;
     };
-  }, [id, isInvestor, location.pathname]);
+  }, [id, isInvestor, canContact, location.pathname]);
 
   if (!canAccess) return <Navigate to="/" replace />;
 
@@ -233,6 +258,76 @@ export default function PropertyDetail() {
       "Las cuentas inversoras pueden explorar propiedades, pero no iniciar conversaciones ni propuestas.",
     );
   }
+
+  if (!loading && unavailable) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <main className="mx-auto flex min-h-[75vh] max-w-3xl items-center justify-center px-4 py-12 sm:px-6">
+          <section className="w-full rounded-3xl border border-slate-200 bg-white px-6 py-12 text-center shadow-sm sm:px-12">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                className="h-8 w-8"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 11.5 12 4l9 7.5"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M5.5 10.5V20h13v-9.5M9 20v-6h6v6"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="m4 4 16 16"
+                />
+              </svg>
+            </div>
+
+            <p className="mt-6 text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+              Publicación no disponible
+            </p>
+
+            <h1 className="mt-3 text-2xl font-bold text-slate-900 sm:text-3xl">
+              Esta publicación ya no está disponible
+            </h1>
+
+            <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600">
+              Puede haber sido pausada, archivada o retirada por la inmobiliaria
+              que la publicó. Te invitamos a explorar otras oportunidades
+              disponibles dentro de la red.
+            </p>
+
+            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => navigate("/explore/properties")}
+                className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+              >
+                Ver otras publicaciones
+              </button>
+
+              <button
+                type="button"
+                onClick={handleBack}
+                className="rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                Volver
+              </button>
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <PropertyHeader property={property} id={id} onBack={handleBack} />

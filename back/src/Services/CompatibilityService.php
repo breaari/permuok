@@ -362,13 +362,17 @@ class CompatibilityService
 
     FROM compatibilities c
 
-    INNER JOIN properties p
-        ON p.id = c.property_id
-       AND p.deleted_at IS NULL
+  INNER JOIN properties p
+    ON p.id = c.property_id
+   AND p.status = 'published'
+   AND p.is_visible = 1
+   AND p.deleted_at IS NULL
 
-    INNER JOIN search_requests sr
-        ON sr.id = c.search_request_id
-       AND sr.deleted_at IS NULL
+INNER JOIN search_requests sr
+    ON sr.id = c.search_request_id
+   AND sr.status = 'published'
+   AND sr.is_visible = 1
+   AND sr.deleted_at IS NULL
 
     WHERE
         c.deleted_at IS NULL

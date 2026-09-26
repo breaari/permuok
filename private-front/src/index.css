@@ -1,7 +1,7 @@
 @import 'react-phone-number-input/style.css';
 @import "tailwindcss";
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Momo+Trust+Display&display=swap");
 
 @theme {
 	--color-primary: #0056b3;
@@ -13,6 +13,18 @@
 }
 
 html { font-family: Inter, sans-serif; }
+
+/* Tipografías exclusivas de la landing pública */
+
+.public-site {
+  font-family: "Manrope", Inter, sans-serif;
+}
+
+.public-site h1,
+.public-site h2 {
+  font-family: "Momo Trust Display", "Manrope", sans-serif;
+  font-weight: 400;
+}
 
 /* opcional: background global */
 body { @apply bg-background-light; }
