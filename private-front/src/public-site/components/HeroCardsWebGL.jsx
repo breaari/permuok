@@ -134,8 +134,9 @@ const BASE_PROPERTIES = [
 ];
 
 /*
- * 24 slots para mantener el recorrido continuo.
- * 12 van hacia izquierda y 12 hacia derecha.
+ * 24 slots:
+ * 12 hacia la izquierda
+ * 12 hacia la derecha
  */
 const CARDS = Array.from({ length: 24 }, (_, index) => ({
   ...BASE_PROPERTIES[index % BASE_PROPERTIES.length],
@@ -171,27 +172,36 @@ const CYLINDRICAL_END = 0.7;
 const CYLINDRICAL_DURATION = 2000;
 
 /*
- * Curvatura vertical adicional.
+ * Curva vertical.
  *
- * Las cards centrales se levantan un poco más.
- * Ese lift va desapareciendo al acercarse a los extremos.
+ * Las cards próximas al centro están un poco más elevadas.
+ * El efecto desaparece progresivamente hacia los extremos.
  */
 const CENTER_LIFT_DESKTOP = 0.055;
 const CENTER_LIFT_MOBILE = 0.04;
 const CENTER_LIFT_POWER = 1.35;
 
 /*
- * El cálculo principal centra matemáticamente el arco
- * entre título y bajada.
+ * POSICIÓN VERTICAL DEL ARCO
  *
- * Este valor permite desplazar ópticamente TODO el arco
- * un poco hacia abajo.
+ * Se calcula dentro del espacio real existente entre:
  *
- * MÁS ALTO = arco más abajo.
- * MÁS BAJO = arco más arriba.
+ * FINAL DEL TÍTULO
+ *        ↓
+ *
+ *      ARCO
+ *
+ *        ↓
+ * INICIO DE LA BAJADA
+ *
+ * 0.50 = centro exacto.
+ * Menor = más arriba.
+ * Mayor = más abajo.
+ *
+ * 0.46 deja el arco ligeramente por encima del centro.
  */
-const STREAM_VISUAL_NUDGE_DESKTOP = 0.038;
-const STREAM_VISUAL_NUDGE_MOBILE = 0.028;
+const ARC_POSITION_RATIO_DESKTOP = 0.46;
+const ARC_POSITION_RATIO_MOBILE = 0.48;
 
 /* =========================================================
    EASING
@@ -248,6 +258,7 @@ function getHeroAnchors(container) {
 
   return {
     titleEl: heroRoot.querySelector("[data-hero-title]"),
+
     subtitleEl: heroRoot.querySelector("[data-hero-subtitle]"),
   };
 }
@@ -262,6 +273,7 @@ function roundRectPath(ctx, x, y, width, height, radius) {
   ctx.beginPath();
 
   ctx.moveTo(x + r, y);
+
   ctx.lineTo(x + width - r, y);
 
   ctx.quadraticCurveTo(x + width, y, x + width, y + r);
@@ -328,6 +340,7 @@ function wrapText(ctx, text, maxWidth, maxLines = 2) {
 
     if (ctx.measureText(test).width <= maxWidth) {
       line = test;
+
       continue;
     }
 
@@ -402,7 +415,7 @@ async function createCardTexture(property) {
   drawImageCover(ctx, image, 0, 0, WIDTH, IMAGE_HEIGHT);
 
   /* =====================================================
-     BADGE PERMUTA
+     BADGE
   ====================================================== */
 
   ctx.font = '800 18px "Manrope", Arial, sans-serif';
@@ -493,7 +506,7 @@ async function createCardTexture(property) {
 }
 
 /* =========================================================
-   POSTPROCESS
+   SHADERS
 ========================================================= */
 
 const POST_VERTEX_SHADER = `
@@ -640,6 +653,7 @@ export default function HeroCardsWebGL() {
       magFilter: THREE.LinearFilter,
 
       depthBuffer: true,
+
       stencilBuffer: false,
     });
 
@@ -705,15 +719,17 @@ export default function HeroCardsWebGL() {
     let nextFireIndexRight = 0;
 
     let fireAccumulator = 0;
+
     let revealFactor = 0;
 
     let viewportWorldWidth = 1;
     let viewportWorldHeight = 1;
 
     /*
-     * Centro matemático entre título y bajada.
+     * Posición vertical objetivo,
+     * calculada desde el DOM real.
      */
-    let targetCenterWorldY = 0;
+    let targetArcWorldY = 0;
 
     let isDesktop = true;
 
@@ -741,10 +757,6 @@ export default function HeroCardsWebGL() {
 
             depthTest: true,
 
-            /*
-             * Las cards transparentes
-             * no escriben profundidad.
-             */
             depthWrite: false,
 
             alphaTest: 0.001,
@@ -791,8 +803,8 @@ export default function HeroCardsWebGL() {
       resize();
 
       /*
-       * Recalculamos después de que termine
-       * la animación inicial del H1.
+       * El título entra con motion.
+       * Recalculamos una vez terminada esa entrada.
        */
       alignTimeoutId = window.setTimeout(resize, 850);
 
@@ -880,7 +892,7 @@ export default function HeroCardsWebGL() {
     }
 
     /* =====================================================
-       RESIZE / ALINEACIÓN
+       RESIZE / POSICIONAMIENTO
     ====================================================== */
 
     function resize() {
@@ -917,7 +929,7 @@ export default function HeroCardsWebGL() {
       viewportWorldWidth = viewportWorldHeight * camera.aspect;
 
       /* ===================================================
-         DIMENSIONES
+         DIMENSIONES CARDS
       ==================================================== */
 
       const cardWidth =
@@ -936,7 +948,15 @@ export default function HeroCardsWebGL() {
       });
 
       /* ===================================================
-         CENTRO ENTRE TÍTULO Y BAJADA
+         POSICIÓN VERTICAL REAL
+
+         Tomamos:
+         - bottom del título
+         - top de la bajada
+
+         y elegimos un punto dentro de ese espacio.
+
+         46% = ligeramente por encima del centro.
       ==================================================== */
 
       const { titleEl, subtitleEl } = getHeroAnchors(container);
@@ -952,21 +972,46 @@ export default function HeroCardsWebGL() {
 
         const subtitleTopPx = subtitleRect.top - containerRect.top;
 
-        const midpointPx = (titleBottomPx + subtitleTopPx) / 2;
+        const freeSpacePx = Math.max(0, subtitleTopPx - titleBottomPx);
 
-        targetCenterWorldY = screenPxToWorldY(
-          midpointPx,
+        const ratio = isDesktop
+          ? ARC_POSITION_RATIO_DESKTOP
+          : ARC_POSITION_RATIO_MOBILE;
+
+        const targetPx = titleBottomPx + freeSpacePx * ratio;
+
+        targetArcWorldY = screenPxToWorldY(
+          targetPx,
           height,
           viewportWorldHeight,
         );
       } else {
-        targetCenterWorldY = 0;
+        targetArcWorldY = 0;
       }
     }
+
+    /* =====================================================
+       OBSERVERS
+    ====================================================== */
 
     resizeObserver = new ResizeObserver(resize);
 
     resizeObserver.observe(container);
+
+    /*
+     * También observamos título y bajada.
+     * Si cambian de tamaño por responsive,
+     * fonts o wrapping, el arco se recoloca.
+     */
+    const { titleEl, subtitleEl } = getHeroAnchors(container);
+
+    if (titleEl) {
+      resizeObserver.observe(titleEl);
+    }
+
+    if (subtitleEl) {
+      resizeObserver.observe(subtitleEl);
+    }
 
     intersectionObserver = new IntersectionObserver(
       ([entry]) => {
@@ -1007,7 +1052,7 @@ export default function HeroCardsWebGL() {
       const progress = card.fireProgress * revealFactor;
 
       /* ===================================================
-         MOVIMIENTO HORIZONTAL
+         MOVIMIENTO X
       ==================================================== */
 
       let movement = smoothstep(0, 1, progress);
@@ -1015,7 +1060,7 @@ export default function HeroCardsWebGL() {
       movement = 0.5 * easeInQuad(movement) + 0.5 * movement;
 
       /* ===================================================
-         CRECIMIENTO
+         ESCALA
       ==================================================== */
 
       const scaleStart = isDesktop ? 0.2 : 0.3;
@@ -1024,17 +1069,10 @@ export default function HeroCardsWebGL() {
         0.125 * smoothstep(0, 0.15, progress) +
         0.875 * smoothstep(scaleStart, 1, progress);
 
-      /* ===================================================
-         X
-      ==================================================== */
-
       card.innerGroup.position.x = card.fireTargetX * movement;
 
       /* ===================================================
-         CURVATURA VERTICAL
-
-         Centro = más lift.
-         Extremo = prácticamente 0.
+         CURVA VERTICAL
       ==================================================== */
 
       const centerFactor = 1 - movement;
@@ -1049,10 +1087,6 @@ export default function HeroCardsWebGL() {
         centerLiftStrength;
 
       card.innerGroup.position.y = centerLift;
-
-      /* ===================================================
-         SCALE
-      ==================================================== */
 
       card.innerGroup.scale.setScalar(scale);
 
@@ -1099,7 +1133,7 @@ export default function HeroCardsWebGL() {
         revealFactor = power3InOut(elapsed / REVEAL_DURATION);
 
         /* =================================================
-           ZOOM GENERAL
+           GROUP SCALE
         ================================================== */
 
         const zoomProgress = power3InOut(elapsed / GROUP_ZOOM_DURATION);
@@ -1113,11 +1147,13 @@ export default function HeroCardsWebGL() {
         cardsGroup.scale.setScalar(groupScale);
 
         /* =================================================
-           POSICIÓN VERTICAL FINAL
+           POSICIÓN VERTICAL
 
-           1. centro real título/bajada
-           2. compensación por centerLift
-           3. nudge óptico hacia abajo
+           targetArcWorldY ya está calculado
+           ligeramente por encima del centro del espacio.
+
+           Compensamos el lift de las cards centrales
+           para que su centro VISUAL caiga en ese punto.
         ================================================== */
 
         const centerLiftStrength = isDesktop
@@ -1127,17 +1163,10 @@ export default function HeroCardsWebGL() {
         const centerLiftWorld =
           viewportWorldHeight * centerLiftStrength * groupScale;
 
-        const visualNudge =
-          viewportWorldHeight *
-          (isDesktop
-            ? STREAM_VISUAL_NUDGE_DESKTOP
-            : STREAM_VISUAL_NUDGE_MOBILE);
-
-        cardsGroup.position.y =
-          targetCenterWorldY - centerLiftWorld - visualNudge;
+        cardsGroup.position.y = targetArcWorldY - centerLiftWorld;
 
         /* =================================================
-           DISTORSIÓN CILÍNDRICA
+           DISTORSIÓN
         ================================================== */
 
         const cylinderProgress = power4Out(elapsed / CYLINDRICAL_DURATION);

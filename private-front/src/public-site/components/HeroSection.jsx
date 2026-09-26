@@ -3,6 +3,7 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import HeroCardsWebGL from "./HeroCardsWebGL";
+import { Icon } from "../../ui/icons/Index";
 
 export default function HeroSection() {
   return (
@@ -14,16 +15,19 @@ export default function HeroSection() {
         h-[100svh]
         min-h-[720px]
         overflow-hidden
-        bg-[#f7f8f6]
+        bg-background-light
         text-[#0a192f]
       "
     >
-      {/* Fondo punteado */}
+      {/* =====================================================
+          FONDO PUNTEADO
+      ====================================================== */}
+
       <div
-        className="pointer-events-none absolute inset-0 z-0 opacity-60"
+        className="pointer-events-none absolute inset-0 z-0 opacity-65"
         style={{
           backgroundImage:
-            "radial-gradient(rgba(15,23,42,0.11) 0.75px, transparent 0.75px)",
+            "radial-gradient(rgba(71,85,105,0.13) 0.75px, transparent 0.75px)",
           backgroundSize: "18px 18px",
         }}
       />
@@ -107,33 +111,61 @@ export default function HeroSection() {
         }}
         className="
           absolute
-          bottom-[60px]
+          bottom-[54px]
           left-1/2
           z-40
-          w-[min(92vw,680px)]
+          w-[min(92vw,760px)]
           -translate-x-1/2
           text-center
-          sm:bottom-[66px]
-          lg:bottom-[70px]
+          sm:bottom-[60px]
+          lg:bottom-[64px]
         "
       >
-        <p
+        {/* Bajada */}
+        <div
           data-hero-subtitle
           className="
             mx-auto
-            max-w-[620px]
-            text-base
-            font-medium
-            leading-7
-            text-slate-600
-            sm:text-lg
+            max-w-[720px]
+            rounded-[18px]
+            bg-background-light/80
+            px-5
+            py-3
+            backdrop-blur-[2px]
+            sm:px-7
           "
         >
-          Una red inteligente donde las oportunidades de permuta se centralizan,
-          se cruzan y empiezan a encontrarse.
-        </p>
+          <p
+            className="
+              text-[16px]
+              font-extrabold
+              leading-[1.55]
+              text-slate-600
+              sm:text-[17px]
+              lg:text-[18px]
+            "
+          >
+            Una red inteligente donde las oportunidades de permuta se
+            centralizan, se cruzan y empiezan a encontrarse.
+          </p>
 
-        <div className="mt-7 flex justify-center">
+          {/* <p
+            className="
+              mt-1
+              text-[16px]
+              font-extrabold
+              tracking-[-0.015em]
+              text-[#0a192f]
+              sm:text-[17px]
+              lg:text-[18px]
+            "
+          >
+            Menos búsqueda manual. Más matches. Más operaciones.
+          </p> */}
+        </div>
+
+        {/* CTA */}
+        <div className="mt-5 flex justify-center">
           <Link
             to="/register"
             className="
@@ -169,10 +201,12 @@ export default function HeroSection() {
                 rounded-full
                 bg-white/10
                 transition
+                duration-300
                 group-hover:translate-x-0.5
+                group-hover:bg-white/15
               "
             >
-              →
+              <Icon name="arrowRight" size={16} className="text-white" />
             </span>
           </Link>
         </div>
