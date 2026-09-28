@@ -176,6 +176,12 @@ const MOBILE_CARD_WIDTH = 1.2;
 const FIRE_TARGET = 1.65;
 
 /*
+ * Separación de la pareja al nacer en mobile.
+ * Cada card se desplaza 8% del viewport hacia su lado.
+ */
+const MOBILE_PAIR_START_OFFSET = 0.08;
+
+/*
  * Limitamos únicamente el ALTO final porque nuestras
  * cards son más verticales y tienen información debajo
  * de la foto.
@@ -1187,9 +1193,27 @@ export default function HeroCardsWebGL() {
       /* ===================================================
          TRANSFORM
       ==================================================== */
+      if (isDesktop) {
+        card.innerGroup.position.x = card.fireTargetX * movement;
+      } else {
+        const directionSign = card.direction === "left" ? -1 : 1;
 
-      card.innerGroup.position.x = card.fireTargetX * movement;
+        /*
+         * Ancho actual de la card en coordenadas locales.
+         * Empieza en 0 y crece junto con la card.
+         */
+        const currentCardWidth = card.mesh.scale.x * finalScale;
 
+        /*
+         * 0.46 = casi una mitad de card.
+         * Deja la pareja prácticamente una al lado de la otra,
+         * con apenas un pequeño solapamiento.
+         */
+        const pairSeparation = currentCardWidth * 0.46;
+
+        card.innerGroup.position.x =
+          card.fireTargetX * movement + directionSign * pairSeparation;
+      }
       /*
        * Ninguna curva individual.
        */
