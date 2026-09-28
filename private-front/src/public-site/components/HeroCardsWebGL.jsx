@@ -146,7 +146,7 @@ const CARDS = BASE_PROPERTIES.map((property, index) => ({
  * menos cards permanecen simultáneamente activas.
  */
 const FIRE_INTERVAL_DESKTOP = 750;
-const FIRE_DURATION_DESKTOP = 9.6;
+const FIRE_DURATION_DESKTOP = 9.0;
 
 const FIRE_INTERVAL_MOBILE = 1000;
 const FIRE_DURATION_MOBILE = 6.4;
@@ -1186,11 +1186,7 @@ export default function HeroCardsWebGL() {
 
       const smoothMovement = smoothstep(0, 1, progress);
 
-      /*
-       * Mantiene las cards juntas cuando nacen en el centro
-       * y acelera gradualmente hacia los extremos.
-       */
-      const movement = easeInQuad(smoothMovement) * 0.6 + smoothMovement * 0.4;
+      const movement = progress * 0.2 + smoothMovement * 0.8;
 
       /* ===================================================
          ESCALA
