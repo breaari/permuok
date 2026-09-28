@@ -150,7 +150,7 @@ const FIRE_DURATION_DESKTOP = 9.6;
  * => unas 10/12 visibles en total,
  * en vez de más de 20.
  */
-const FIRE_INTERVAL_MOBILE = 1600;
+const FIRE_INTERVAL_MOBILE = 1400;
 const FIRE_DURATION_MOBILE = 6.4;
 
 const CAMERA_FOV = 45;
