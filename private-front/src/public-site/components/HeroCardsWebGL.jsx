@@ -139,8 +139,19 @@ const CARDS = BASE_PROPERTIES.map((property, index) => ({
  * 900ms / 9.6s mantiene un flujo continuo
  * sin agotar el pool.
  */
-const FIRE_INTERVAL = 900;
-const FIRE_DURATION = 9.6;
+const FIRE_INTERVAL_DESKTOP = 900;
+const FIRE_DURATION_DESKTOP = 9.6;
+
+/*
+ * Mobile:
+ * menos cards simultáneas.
+ *
+ * 6.4 / 1.1 ≈ 5.8 por lado
+ * => unas 10/12 visibles en total,
+ * en vez de más de 20.
+ */
+const FIRE_INTERVAL_MOBILE = 1100;
+const FIRE_DURATION_MOBILE = 6.4;
 
 const CAMERA_FOV = 45;
 const CAMERA_Z = 5;
@@ -204,6 +215,14 @@ const ARC_POSITION_RATIO_MOBILE = 0.35;
 /* =========================================================
    EASING
 ========================================================= */
+
+function getFireInterval(isDesktop) {
+  return isDesktop ? FIRE_INTERVAL_DESKTOP : FIRE_INTERVAL_MOBILE;
+}
+
+function getFireDuration(isDesktop) {
+  return isDesktop ? FIRE_DURATION_DESKTOP : FIRE_DURATION_MOBILE;
+}
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
@@ -845,7 +864,11 @@ export default function HeroCardsWebGL() {
      * hasta los extremos desde el primer frame.
      */
     function preDistributeCards(pool) {
-      const step = FIRE_INTERVAL / (1000 * FIRE_DURATION);
+      const fireInterval = getFireInterval(isDesktop);
+
+      const fireDuration = getFireDuration(isDesktop);
+
+      const step = fireInterval / (1000 * fireDuration);
 
       for (let index = 0; index < pool.length; index += 1) {
         const progress = index * step;
@@ -1101,7 +1124,9 @@ export default function HeroCardsWebGL() {
         return;
       }
 
-      card.fireProgress += delta / (1000 * FIRE_DURATION);
+      const fireDuration = getFireDuration(isDesktop);
+
+      card.fireProgress += delta / (1000 * fireDuration);
 
       /*
        * Igual que el motor original:
@@ -1142,11 +1167,13 @@ export default function HeroCardsWebGL() {
          ESCALA
       ==================================================== */
 
-      const scaleStart = isDesktop ? 0.2 : 0.3;
+      const scaleStart = isDesktop ? 0.2 : 0.22;
+
+      const initialScaleWeight = isDesktop ? 0.125 : 0.18;
 
       const scale =
-        0.125 * smoothstep(0, 0.15, progress) +
-        0.875 * smoothstep(scaleStart, 1, progress);
+        initialScaleWeight * smoothstep(0, 0.15, progress) +
+        (1 - initialScaleWeight) * smoothstep(scaleStart, 1, progress);
 
       const finalScale = Math.min(scale, card.maxScale);
 
@@ -1244,11 +1271,12 @@ export default function HeroCardsWebGL() {
            Cadencia continua.
            Sin waits ni acumuladores especiales.
         ================================================== */
+        const fireInterval = getFireInterval(isDesktop);
 
         fireAccumulator += delta;
 
-        while (fireAccumulator >= FIRE_INTERVAL) {
-          fireAccumulator -= FIRE_INTERVAL;
+        while (fireAccumulator >= fireInterval) {
+          fireAccumulator -= fireInterval;
 
           fireNextPair();
         }
