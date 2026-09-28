@@ -173,7 +173,8 @@ const MOBILE_CARD_WIDTH = 1.35;
  * La card termina completamente fuera del viewport
  * antes de ser reciclada.
  */
-const FIRE_TARGET = 1.65;
+const FIRE_TARGET_DESKTOP = 1;
+const FIRE_TARGET_MOBILE = 0.92;
 
 /*
  * Limitamos únicamente el ALTO final porque nuestras
@@ -437,7 +438,7 @@ async function createCardTexture(property) {
 
   /* Foto */
 
-  const IMAGE_HEIGHT = 690;
+  const IMAGE_HEIGHT = 755;
 
   drawImageCover(ctx, image, 0, 0, WIDTH, IMAGE_HEIGHT);
 
@@ -1092,8 +1093,12 @@ export default function HeroCardsWebGL() {
 
         card.maxScale = Math.min(1, maxCardScale);
 
+        const fireTarget = isDesktop ? FIRE_TARGET_DESKTOP : FIRE_TARGET_MOBILE;
+
         card.fireTargetX =
-          (card.direction === "left" ? -1 : 1) * viewportWorldWidth * 1.65;
+          (card.direction === "left" ? -1 : 1) *
+          viewportWorldWidth *
+          fireTarget;
       });
     }
 
@@ -1200,7 +1205,7 @@ export default function HeroCardsWebGL() {
         ? baseScale
         : lerp(MOBILE_MIN_SCALE, MOBILE_MAX_SCALE, baseScale);
 
-      const finalScale = Math.min(scale, card.maxScale);
+      const finalScale = scale * card.maxScale;
       /* ===================================================
    TRANSFORM
 ==================================================== */
