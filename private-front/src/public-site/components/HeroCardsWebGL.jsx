@@ -150,7 +150,7 @@ const FIRE_DURATION_DESKTOP = 9.6;
  * => unas 10/12 visibles en total,
  * en vez de más de 20.
  */
-const FIRE_INTERVAL_MOBILE = 1000;
+const FIRE_INTERVAL_MOBILE = 1200;
 const FIRE_DURATION_MOBILE = 6.4;
 
 const CAMERA_FOV = 45;
@@ -203,7 +203,7 @@ const REVEAL_DURATION = 1750;
 const CYLINDRICAL_START = 1;
 
 const CYLINDRICAL_END_DESKTOP = 0.7;
-const CYLINDRICAL_END_MOBILE = 0.92;
+const CYLINDRICAL_END_MOBILE = 0.97;
 
 const CYLINDRICAL_DURATION = 2000;
 
@@ -1169,17 +1169,32 @@ export default function HeroCardsWebGL() {
       let movement = smoothstep(0, 1, progress);
 
       movement = 0.5 * easeInQuad(movement) + 0.5 * movement;
-      /* ===================================================
+
+/* ===================================================
    ESCALA
 ==================================================== */
 
       const scaleStart = 0.2;
-
       const initialScaleWeight = 0.125;
 
-      const scale =
+      const baseScale =
         initialScaleWeight * smoothstep(0, 0.15, progress) +
         (1 - initialScaleWeight) * smoothstep(scaleStart, 1, progress);
+
+      /*
+       * Desktop queda EXACTAMENTE como está.
+       *
+       * Mobile:
+       * - no nace microscópica
+       * - los extremos no llegan a ser tan gigantes
+       * - disminuye la diferencia centro/extremos
+       */
+      const MOBILE_MIN_SCALE = 0.1;
+      const MOBILE_MAX_SCALE = 0.82;
+
+      const scale = isDesktop
+        ? baseScale
+        : lerp(MOBILE_MIN_SCALE, MOBILE_MAX_SCALE, baseScale);
 
       const finalScale = Math.min(scale, card.maxScale);
       /* ===================================================
