@@ -1169,21 +1169,35 @@ export default function HeroCardsWebGL() {
       let movement = smoothstep(0, 1, progress);
 
       movement = 0.5 * easeInQuad(movement) + 0.5 * movement;
-
       /* ===================================================
-         ESCALA
-      ==================================================== */
+   ESCALA
+==================================================== */
 
-      const scaleStart = isDesktop ? 0.2 : 0.12;
+      const scaleStart = isDesktop ? 0.25 : 0.12;
 
-      const initialScaleWeight = isDesktop ? 0.125 : 0.25;
+      const initialScaleWeight = isDesktop ? 0.05 : 0.30;
 
-      const scale =
+      /*
+       * Esta curva sigue yendo de 0 → 1.
+       */
+      const scaleProgress =
         initialScaleWeight * smoothstep(0, 0.15, progress) +
         (1 - initialScaleWeight) * smoothstep(scaleStart, 1, progress);
 
-      const finalScale = Math.min(scale, card.maxScale);
+      /*
+       * Pero la escala real ahora va de:
+       *
+       * 0.15 → 1
+       *
+       * en vez de:
+       *
+       * 0 → 1
+       */
+      const MIN_SCALE = 0.15;
 
+      const scale = MIN_SCALE + (1 - MIN_SCALE) * scaleProgress;
+
+      const finalScale = Math.min(scale, card.maxScale);
       /* ===================================================
    TRANSFORM
 ==================================================== */
