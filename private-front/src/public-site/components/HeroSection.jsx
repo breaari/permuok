@@ -177,7 +177,7 @@ export default function HeroSection() {
               px-4
               py-3
               text-sm
-              font-extrabold
+              font-semibold
               text-white
               shadow-[0_12px_30px_rgba(10,25,47,0.18)]
               transition
