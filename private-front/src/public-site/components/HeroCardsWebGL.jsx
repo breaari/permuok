@@ -163,13 +163,23 @@ const DESKTOP_CARD_WIDTH = 0.75;
 const MOBILE_CARD_WIDTH = 0.92;
 
 /*
+ * Alto máximo VISUAL que puede alcanzar una card
+ * respecto del alto total del hero.
+ *
+ * Esto evita que las cards de los extremos sean
+ * más altas que la sección.
+ */
+const MAX_CARD_VISUAL_HEIGHT_DESKTOP = 0.78;
+const MAX_CARD_VISUAL_HEIGHT_MOBILE = 0.64;
+
+/*
  * Distancia horizontal.
  *
  * En mobile recorren bastante menos para que
  * las cards laterales sigan siendo visibles.
  */
-const DESKTOP_FIRE_TARGET = 1.65;
-const MOBILE_FIRE_TARGET = 1.58;
+const EXIT_MARGIN_DESKTOP = 0.025;
+const EXIT_MARGIN_MOBILE = 0.035;
 
 const GROUP_SCALE_START = 1.2;
 const GROUP_SCALE_END = 0.5;
@@ -190,11 +200,11 @@ const CYLINDRICAL_DURATION = 2000;
  * para que no parezca simplemente la versión desktop
  * comprimida horizontalmente.
  */
-const CENTER_LIFT_DESKTOP = 0.055;
-const CENTER_LIFT_MOBILE = 0.07;
+const CENTER_LIFT_DESKTOP = 0.018;
+const CENTER_LIFT_MOBILE = 0.022;
 
-const CENTER_LIFT_POWER_DESKTOP = 1.35;
-const CENTER_LIFT_POWER_MOBILE = 1.25;
+const CENTER_LIFT_POWER_DESKTOP = 1.15;
+const CENTER_LIFT_POWER_MOBILE = 1.15;
 
 /*
  * POSICIÓN VERTICAL DEL ARCO
@@ -952,24 +962,89 @@ export default function HeroCardsWebGL() {
       viewportWorldWidth = viewportWorldHeight * camera.aspect;
 
       /* ===================================================
-         DIMENSIONES
-      ==================================================== */
+   DIMENSIONES
+==================================================== */
 
-      const cardWidth =
+      /*
+       * Tamaño ideal según ancho de pantalla.
+       */
+      const preferredCardWidth =
         (isDesktop ? DESKTOP_CARD_WIDTH : MOBILE_CARD_WIDTH) *
         viewportWorldWidth;
 
+      /*
+       * Alto máximo que queremos VER finalmente en pantalla.
+       */
+      const maxVisualCardHeight =
+        viewportWorldHeight *
+        (isDesktop
+          ? MAX_CARD_VISUAL_HEIGHT_DESKTOP
+          : MAX_CARD_VISUAL_HEIGHT_MOBILE);
+
+      /*
+       * cardsGroup termina escalado a GROUP_SCALE_END.
+       *
+       * Por eso convertimos el alto visual máximo
+       * nuevamente al espacio local de las cards.
+       */
+      const maxLocalCardHeight = maxVisualCardHeight / GROUP_SCALE_END;
+
+      const maxLocalCardWidth = maxLocalCardHeight * CARD_ASPECT;
+
+      /*
+       * Usamos el tamaño por ancho solamente mientras no
+       * exceda el alto permitido por el hero.
+       */
+      const cardWidth = Math.min(preferredCardWidth, maxLocalCardWidth);
+
       const cardHeight = cardWidth / CARD_ASPECT;
 
-      const fireTarget = isDesktop ? DESKTOP_FIRE_TARGET : MOBILE_FIRE_TARGET;
+      /*
+       * Al final de la animación cardsGroup está escalado
+       * por GROUP_SCALE_END.
+       *
+       * Calculamos el ancho REAL que tendrá la card
+       * cuando llegue al borde.
+       */
+      /*
+       * Ancho visual REAL que tendrá la card al final,
+       * después de aplicar el scale del cardsGroup.
+       */
+      const finalCardWidth = cardWidth * GROUP_SCALE_END;
+
+      const exitMargin =
+        viewportWorldWidth *
+        (isDesktop ? EXIT_MARGIN_DESKTOP : EXIT_MARGIN_MOBILE);
+
+      /*
+       * Esta es la posición que queremos ver EN PANTALLA:
+       *
+       * borde del viewport
+       * + media card
+       * + pequeño margen
+       *
+       * Ahí la card ya quedó completamente fuera.
+       */
+      const desiredWorldExitX =
+        viewportWorldWidth / 2 + finalCardWidth / 2 + exitMargin;
+
+      /*
+       * IMPORTANTE:
+       *
+       * innerGroup pertenece a cardsGroup y cardsGroup termina
+       * escalado a GROUP_SCALE_END.
+       *
+       * Por eso tenemos que compensar ese scale.
+       *
+       * Si no dividimos por GROUP_SCALE_END, el desplazamiento
+       * horizontal también queda reducido a la mitad.
+       */
+      const localExitX = desiredWorldExitX / GROUP_SCALE_END;
 
       cardStates.forEach((card) => {
         card.mesh.scale.set(cardWidth, cardHeight, 1);
 
-        card.fireTargetX =
-          (card.direction === "left" ? -1 : 1) *
-          viewportWorldWidth *
-          fireTarget;
+        card.fireTargetX = card.direction === "left" ? -localExitX : localExitX;
       });
 
       /* ===================================================
@@ -1049,7 +1124,18 @@ export default function HeroCardsWebGL() {
 
       card.fireProgress += delta / (1000 * fireDuration);
 
-      if (card.fireProgress >= 1) {
+      /*
+       * La animación visual termina en 1.
+       *
+       * Pero dejamos unos milisegundos extra con la card
+       * ya completamente fuera de pantalla antes de ocultarla.
+       * Así evitamos el "pop".
+       */
+      const visualProgress = Math.min(card.fireProgress, 1);
+
+      const progress = visualProgress * revealFactor;
+
+      if (card.fireProgress >= 1.06 && revealFactor >= 0.999) {
         card.isFiring = false;
 
         card.innerGroup.visible = false;
@@ -1062,8 +1148,6 @@ export default function HeroCardsWebGL() {
 
         return;
       }
-
-      const progress = card.fireProgress * revealFactor;
 
       /* ===================================================
          MOVIMIENTO X
@@ -1279,7 +1363,7 @@ export default function HeroCardsWebGL() {
   }, []);
 
   return (
-    <div ref={containerRef} className="absolute inset-0">
+    <div ref={containerRef} className="absolute inset-0 overflow-hidden">
       <canvas
         ref={canvasRef}
         className="pointer-events-none block h-full w-full"
