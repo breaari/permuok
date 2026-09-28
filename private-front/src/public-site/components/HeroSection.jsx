@@ -125,25 +125,22 @@ export default function HeroSection() {
         <div
           data-hero-subtitle
           className="
-            mx-auto
-            max-w-[720px]
-            rounded-[18px]
-            bg-background-light/80
-            px-5
-            py-3
-            backdrop-blur-[2px]
-            sm:px-7
-          "
+    mx-auto
+    max-w-[720px]
+    px-4
+    sm:px-7
+  "
         >
           <p
             className="
-              text-[16px]
-              font-extrabold
-              leading-[1.55]
-              text-slate-600
-              sm:text-[17px]
-              lg:text-[18px]
-            "
+    text-[16px]
+    font-extrabold
+    leading-[1.55]
+    tracking-[-0.015em]
+    text-slate-600
+    sm:text-[17px]
+    lg:text-[18px]
+  "
           >
             Una red inteligente donde las oportunidades de permuta se
             centralizan, se cruzan y empiezan a encontrarse.

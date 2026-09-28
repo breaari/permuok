@@ -10,122 +10,119 @@ const heroImageModules = import.meta.glob("../../assets/fotohero1*.*", {
   import: "default",
 });
 
-function getHeroImage(fragment) {
-  return (
-    Object.entries(heroImageModules).find(([path]) =>
-      path.includes(fragment),
-    )?.[1] || ""
-  );
-}
+/*
+ * Extraemos el número del nombre:
+ *
+ * fotohero1 (1)
+ * fotohero1 (2)
+ * ...
+ * fotohero1 (24)
+ *
+ * y ordenamos NUMÉRICAMENTE.
+ *
+ * Esto evita el orden:
+ * 1, 10, 11, 12 ... 2, 20...
+ */
+const images = Object.entries(heroImageModules)
+  .map(([path, src]) => {
+    const match = path.match(/fotohero1 \((\d+)\)/);
 
-const images = [
-  getHeroImage("fotohero1 (1)"),
-  getHeroImage("fotohero1 (2)"),
-  getHeroImage("fotohero1 (3)"),
-  getHeroImage("fotohero1 (4)"),
-  getHeroImage("fotohero1 (5)"),
-  getHeroImage("fotohero1 (6)"),
-  getHeroImage("fotohero1 (7)"),
-];
+    return {
+      number: match ? Number(match[1]) : 999,
+      src,
+    };
+  })
+  .sort((a, b) => a.number - b.number)
+  .map((item) => item.src)
+  .slice(0, 24);
 
 /* =========================================================
-   DATOS DEMO
+   DATOS DE LAS CARDS
+
+   Los textos pueden repetirse eventualmente.
+   Las imágenes NO.
 ========================================================= */
 
-const BASE_PROPERTIES = [
+const PROPERTY_META = [
   {
-    image: images[0],
     type: "Departamento",
     title: "Departamento 3 ambientes",
     price: "US$ 125.000",
     exchange: "Acepta permuta",
   },
   {
-    image: images[1],
     type: "Casa",
     title: "Casa 4 ambientes",
     price: "US$ 210.000",
     exchange: "Permuta parcial",
   },
   {
-    image: images[2],
     type: "PH",
     title: "PH con patio",
     price: "US$ 98.000",
     exchange: "Acepta permuta",
   },
   {
-    image: images[3],
     type: "Departamento",
     title: "Departamento 2 ambientes",
     price: "US$ 145.000",
     exchange: "Permuta total",
   },
   {
-    image: images[4],
     type: "Casa",
     title: "Casa con parque",
     price: "US$ 185.000",
     exchange: "Permuta + diferencia",
   },
   {
-    image: images[5],
     type: "Departamento",
     title: "Departamento con vista",
     price: "US$ 165.000",
     exchange: "Acepta permuta",
   },
   {
-    image: images[6],
     type: "Casa",
     title: "Casa moderna",
     price: "US$ 230.000",
     exchange: "Escucha propuestas",
   },
   {
-    image: images[3],
     type: "Departamento",
     title: "Departamento céntrico",
     price: "US$ 135.000",
     exchange: "Permuta total",
   },
   {
-    image: images[4],
     type: "Casa",
     title: "Casa con jardín",
     price: "US$ 195.000",
     exchange: "Permuta parcial",
   },
   {
-    image: images[2],
     type: "PH",
     title: "PH 3 ambientes",
     price: "US$ 118.000",
     exchange: "Acepta permuta",
   },
   {
-    image: images[3],
     type: "Departamento",
     title: "Departamento premium",
     price: "US$ 178.000",
     exchange: "Acepta permuta",
   },
   {
-    image: images[5],
     type: "Casa",
     title: "Casa con quincho",
     price: "US$ 240.000",
     exchange: "Permuta + diferencia",
   },
   {
-    image: images[0],
     type: "Departamento",
     title: "Departamento luminoso",
     price: "US$ 142.000",
     exchange: "Acepta permuta",
   },
   {
-    image: images[6],
     type: "Casa",
     title: "Casa residencial",
     price: "US$ 260.000",
@@ -134,14 +131,32 @@ const BASE_PROPERTIES = [
 ];
 
 /*
- * 24 slots:
- * 12 hacia la izquierda
- * 12 hacia la derecha
+ * Generamos 24 propiedades.
+ *
+ * Cada posición usa SU propia imagen:
+ *
+ * index 0  -> fotohero1 (1)
+ * index 1  -> fotohero1 (2)
+ * ...
+ * index 23 -> fotohero1 (24)
  */
-const CARDS = Array.from({ length: 24 }, (_, index) => ({
-  ...BASE_PROPERTIES[index % BASE_PROPERTIES.length],
+const BASE_PROPERTIES = images.map((image, index) => ({
+  ...PROPERTY_META[index % PROPERTY_META.length],
+  image,
+}));
+
+/*
+ * Ya no hacemos:
+ *
+ * Array.from({ length: 24 }, ...)
+ *
+ * porque BASE_PROPERTIES ya contiene exactamente
+ * las 24 cards únicas.
+ */
+const CARDS = BASE_PROPERTIES.map((property, index) => ({
+  ...property,
   id: index + 1,
-  textureIndex: index % BASE_PROPERTIES.length,
+  textureIndex: index,
 }));
 
 /* =========================================================
@@ -157,9 +172,10 @@ const CAMERA_Z = 5;
 const CARD_ASPECT = 720 / 1040;
 
 const DESKTOP_CARD_WIDTH = 0.75;
-const MOBILE_CARD_WIDTH = 1.2;
+const MOBILE_CARD_WIDTH = 0.9;
 
-const FIRE_TARGET = 1.65;
+const DESKTOP_FIRE_TARGET = 1.65;
+const MOBILE_FIRE_TARGET = 1.08;
 
 const GROUP_SCALE_START = 1.2;
 const GROUP_SCALE_END = 0.5;
@@ -940,11 +956,12 @@ export default function HeroCardsWebGL() {
 
       cardStates.forEach((card) => {
         card.mesh.scale.set(cardWidth, cardHeight, 1);
+        const fireTarget = isDesktop ? DESKTOP_FIRE_TARGET : MOBILE_FIRE_TARGET;
 
         card.fireTargetX =
           (card.direction === "left" ? -1 : 1) *
           viewportWorldWidth *
-          FIRE_TARGET;
+          fireTarget;
       });
 
       /* ===================================================
@@ -1063,11 +1080,13 @@ export default function HeroCardsWebGL() {
          ESCALA
       ==================================================== */
 
-      const scaleStart = isDesktop ? 0.2 : 0.3;
+      const scaleStart = isDesktop ? 0.2 : 0.22;
+
+      const initialScaleWeight = isDesktop ? 0.125 : 0.18;
 
       const scale =
-        0.125 * smoothstep(0, 0.15, progress) +
-        0.875 * smoothstep(scaleStart, 1, progress);
+        initialScaleWeight * smoothstep(0, 0.15, progress) +
+        (1 - initialScaleWeight) * smoothstep(scaleStart, 1, progress);
 
       card.innerGroup.position.x = card.fireTargetX * movement;
 
