@@ -176,6 +176,9 @@ const MOBILE_CARD_WIDTH = 1.35;
 const FIRE_TARGET_DESKTOP = 1;
 const FIRE_TARGET_MOBILE = 0.92;
 
+const EXIT_START_DESKTOP = 0.82;
+const EXIT_EXTRA_DESKTOP = 0.5;
+
 /*
  * Limitamos únicamente el ALTO final porque nuestras
  * cards son más verticales y tienen información debajo
@@ -1210,7 +1213,32 @@ export default function HeroCardsWebGL() {
    TRANSFORM
 ==================================================== */
 
-      card.innerGroup.position.x = card.fireTargetX * movement;
+      if (isDesktop) {
+        const directionSign = card.direction === "left" ? -1 : 1;
+
+        /*
+         * Recorrido principal:
+         * mantiene las cards compactas como ahora.
+         */
+        const baseX = card.fireTargetX * movement;
+
+        /*
+         * Tramo final:
+         * recién en el último 18% empujamos la card
+         * completamente fuera de la pantalla.
+         */
+        const exitProgress = smoothstep(EXIT_START_DESKTOP, 1, progress);
+
+        const exitX =
+          directionSign *
+          viewportWorldWidth *
+          EXIT_EXTRA_DESKTOP *
+          exitProgress;
+
+        card.innerGroup.position.x = baseX + exitX;
+      } else {
+        card.innerGroup.position.x = card.fireTargetX * movement;
+      }
 
       card.innerGroup.position.y = 0;
 
