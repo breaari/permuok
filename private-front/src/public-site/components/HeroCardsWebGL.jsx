@@ -1024,35 +1024,51 @@ export default function HeroCardsWebGL() {
       const edgeCenterPx = targetArcPx + edgeCenterOffsetPx;
 
       /* ===================================================
-     3. ESPACIO REAL DISPONIBLE
-  ==================================================== */
+   3. ESPACIO REAL DISPONIBLE
+   TENIENDO EN CUENTA EL SHADER
+==================================================== */
 
       /*
-       * Dejamos unos píxeles de seguridad para que
-       * nunca llegue exactamente al corte del hero.
+       * Margen real que queremos conservar dentro del hero.
        */
-      const bottomSafeSpacePx = isDesktop ? 24 : 16;
-
-      const topSafeSpacePx = isDesktop ? 8 : 8;
-
-      const availableBelowPx = Math.max(
-        0,
-        height - edgeCenterPx - bottomSafeSpacePx,
-      );
-
-      const availableAbovePx = Math.max(0, edgeCenterPx - topSafeSpacePx);
+      const bottomSafeSpacePx = isDesktop ? 28 : 18;
+      const topSafeSpacePx = isDesktop ? 12 : 10;
 
       /*
-       * Como edgeCenterPx representa el CENTRO de la card,
-       * podemos usar como máximo el doble del espacio
-       * disponible hacia cada dirección.
+       * IMPORTANTE:
+       *
+       * El postprocesado cilíndrico no solo modifica la forma.
+       * En los extremos también expande verticalmente la escena.
+       *
+       * CYLINDRICAL_END = 0.7
+       *
+       * significa que todo lo que está lejos del centro horizontal
+       * termina expandiéndose aproximadamente 1 / 0.7 veces
+       * respecto del centro vertical de la pantalla.
        */
-      const maxHeightByBottomPx = availableBelowPx * 2;
-
-      const maxHeightByTopPx = availableAbovePx * 2;
+      const shaderFactor = CYLINDRICAL_END;
 
       /*
-       * Conservamos además el límite general que ya teníamos.
+       * Altura máxima PRE-SHADER permitida por el borde inferior.
+       *
+       * Después del shader, el borde inferior de la card
+       * quedará exactamente dentro del hero.
+       */
+      const maxHeightByBottomPx =
+        height * (1 + shaderFactor) -
+        2 * edgeCenterPx -
+        2 * shaderFactor * bottomSafeSpacePx;
+
+      /*
+       * Lo mismo para el borde superior.
+       */
+      const maxHeightByTopPx =
+        2 * edgeCenterPx -
+        height * (1 - shaderFactor) -
+        2 * shaderFactor * topSafeSpacePx;
+
+      /*
+       * Límite general para evitar cards exageradamente grandes.
        */
       const maxHeightByRatioPx =
         height *
@@ -1061,26 +1077,24 @@ export default function HeroCardsWebGL() {
           : MAX_CARD_VISUAL_HEIGHT_MOBILE);
 
       /*
-       * Elegimos el más restrictivo.
+       * Elegimos siempre la restricción más fuerte.
        *
-       * Así la card SIEMPRE queda dentro del hero.
+       * Esta es la altura que puede tener la card ANTES
+       * del shader sin salirse después del postprocesado.
        */
-      const maxVisualCardHeightPx = Math.min(
-        maxHeightByBottomPx,
-        maxHeightByTopPx,
-        maxHeightByRatioPx,
+      const maxPreShaderCardHeightPx = Math.max(
+        0,
+        Math.min(maxHeightByBottomPx, maxHeightByTopPx, maxHeightByRatioPx),
       );
 
       /*
-       * Convertimos ese límite de píxeles
-       * al espacio del mundo WebGL.
+       * Convertimos píxeles de pantalla al mundo WebGL.
        */
       const maxVisualCardHeightWorld =
-        (maxVisualCardHeightPx / height) * viewportWorldHeight;
+        (maxPreShaderCardHeightPx / height) * viewportWorldHeight;
 
       /*
-       * cardsGroup termina en GROUP_SCALE_END.
-       * Volvemos al tamaño local.
+       * Compensamos el scale final del grupo.
        */
       const maxLocalCardHeight = maxVisualCardHeightWorld / GROUP_SCALE_END;
 
