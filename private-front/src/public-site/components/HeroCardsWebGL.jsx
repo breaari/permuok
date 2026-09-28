@@ -145,7 +145,7 @@ const CARDS = BASE_PROPERTIES.map((property, index) => ({
  * Mobile tiene una duración mucho menor:
  * menos cards permanecen simultáneamente activas.
  */
-const FIRE_INTERVAL_DESKTOP = 900;
+const FIRE_INTERVAL_DESKTOP = 750;
 const FIRE_DURATION_DESKTOP = 9.6;
 
 const FIRE_INTERVAL_MOBILE = 1000;
@@ -888,40 +888,52 @@ export default function HeroCardsWebGL() {
       }
     }
 
-    function fireNextInPool(pool, direction) {
-      if (!pool.length) {
-        return;
-      }
-
-      const isLeft = direction === "left";
-
-      let current = isLeft ? nextFireIndexLeft : nextFireIndexRight;
-
+    function findNextFreeCard(pool, startIndex) {
       const count = pool.length;
 
       for (let attempt = 0; attempt < count; attempt += 1) {
-        const index = (current + attempt) % count;
+        const index = (startIndex + attempt) % count;
 
-        const card = pool[index];
-
-        if (!card.isFiring) {
-          fireCard(card);
-
-          if (isLeft) {
-            nextFireIndexLeft = (index + 1) % count;
-          } else {
-            nextFireIndexRight = (index + 1) % count;
-          }
-
-          return;
+        if (!pool[index].isFiring) {
+          return index;
         }
       }
+
+      return -1;
     }
 
     function fireNextPair() {
-      fireNextInPool(leftCards, "left");
+      if (!leftCards.length || !rightCards.length) {
+        return false;
+      }
 
-      fireNextInPool(rightCards, "right");
+      /*
+       * Buscamos primero una card libre de cada lado.
+       *
+       * IMPORTANTE:
+       * no disparamos ninguna hasta saber que tenemos
+       * las dos disponibles.
+       */
+      const leftIndex = findNextFreeCard(leftCards, nextFireIndexLeft);
+
+      const rightIndex = findNextFreeCard(rightCards, nextFireIndexRight);
+
+      /*
+       * Si todavía no hay lugar, NO perdemos el disparo.
+       * El accumulator queda pendiente para el próximo frame.
+       */
+      if (leftIndex === -1 || rightIndex === -1) {
+        return false;
+      }
+
+      fireCard(leftCards[leftIndex]);
+      fireCard(rightCards[rightIndex]);
+
+      nextFireIndexLeft = (leftIndex + 1) % leftCards.length;
+
+      nextFireIndexRight = (rightIndex + 1) % rightCards.length;
+
+      return true;
     }
 
     /* =====================================================
@@ -1154,7 +1166,7 @@ export default function HeroCardsWebGL() {
 
       const progress = visualProgress * revealFactor;
 
-      if (card.fireProgress >= 1.06 && revealFactor >= 0.999) {
+      if (card.fireProgress >= 1.0 && revealFactor >= 0.999) {
         card.isFiring = false;
 
         card.innerGroup.visible = false;
@@ -1172,21 +1184,21 @@ export default function HeroCardsWebGL() {
          MOVIMIENTO X
       ==================================================== */
 
-      let movement = smoothstep(0, 1, progress);
+      const smoothMovement = smoothstep(0, 1, progress);
 
-      movement = 0.5 * easeInQuad(movement) + 0.5 * movement;
+      /*
+       * Mantiene las cards juntas cuando nacen en el centro
+       * y acelera gradualmente hacia los extremos.
+       */
+      const movement = easeInQuad(smoothMovement) * 0.6 + smoothMovement * 0.4;
 
       /* ===================================================
          ESCALA
       ==================================================== */
 
-      const scaleStart = isDesktop ? 0.2 : 0.22;
+      const scaleStart = isDesktop ? 0.1 : 0.14;
 
-      /*
-       * En mobile nacen ligeramente más grandes.
-       * Así el centro deja de verse como miniaturas.
-       */
-      const initialScaleWeight = isDesktop ? 0.125 : 0.18;
+      const initialScaleWeight = isDesktop ? 0.22 : 0.22;
 
       const scale =
         initialScaleWeight * smoothstep(0, 0.15, progress) +
@@ -1299,18 +1311,38 @@ export default function HeroCardsWebGL() {
         /* =================================================
            NUEVAS CARDS
         ================================================== */
+        /*
+         * Primero actualizamos las cards.
+         *
+         * Así una card que acaba de salir de pantalla
+         * queda libre ANTES de intentar lanzar la siguiente.
+         */
+        cardStates.forEach((card) => updateCard(card, delta));
 
         const fireInterval = getFireInterval(isDesktop);
 
         fireAccumulator += delta;
 
         while (fireAccumulator >= fireInterval) {
+          const fired = fireNextPair();
+
+          /*
+           * No hay slots disponibles todavía.
+           *
+           * Conservamos UN disparo pendiente y volvemos
+           * a intentar en el siguiente frame.
+           *
+           * No dejamos acumular varios porque después
+           * saldrían varias parejas juntas.
+           */
+          if (!fired) {
+            fireAccumulator = Math.min(fireAccumulator, fireInterval);
+
+            break;
+          }
+
           fireAccumulator -= fireInterval;
-
-          fireNextPair();
         }
-
-        cardStates.forEach((card) => updateCard(card, delta));
 
         /* =================================================
            PASS 1
