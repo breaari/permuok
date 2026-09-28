@@ -150,13 +150,13 @@ const FIRE_DURATION_DESKTOP = 9.6;
  * => unas 10/12 visibles en total,
  * en vez de más de 20.
  */
-const FIRE_INTERVAL_MOBILE = 1200;
+const FIRE_INTERVAL_MOBILE = 1000;
 const FIRE_DURATION_MOBILE = 6.4;
 
 const CAMERA_FOV = 45;
 const CAMERA_Z = 5;
 
-const CARD_ASPECT = 720 / 1040;
+const CARD_ASPECT = 720 / 980;
 
 /*
  * Tamaño base del efecto.
@@ -165,7 +165,7 @@ const CARD_ASPECT = 720 / 1040;
  * igual que en la referencia.
  */
 const DESKTOP_CARD_WIDTH = 0.75;
-const MOBILE_CARD_WIDTH = 1.2;
+const MOBILE_CARD_WIDTH = 1.35;
 
 /*
  * Destino horizontal.
@@ -183,7 +183,7 @@ const FIRE_TARGET = 1.65;
  * Esto evita el corte inferior sin alterar el motor.
  */
 const MAX_CARD_VISUAL_HEIGHT_DESKTOP = 0.74;
-const MAX_CARD_VISUAL_HEIGHT_MOBILE = 0.64;
+const MAX_CARD_VISUAL_HEIGHT_MOBILE = 0.9;
 
 /*
  * Zoom inicial del conjunto.
@@ -213,7 +213,7 @@ const CYLINDRICAL_DURATION = 2000;
  * disponible entre título y bajada.
  */
 const ARC_POSITION_RATIO_DESKTOP = 0.46;
-const ARC_POSITION_RATIO_MOBILE = 0.5;
+const ARC_POSITION_RATIO_MOBILE = 0.46;
 
 /* =========================================================
    EASING
@@ -410,7 +410,7 @@ function loadImage(src) {
 
 async function createCardTexture(property) {
   const WIDTH = 720;
-  const HEIGHT = 1040;
+  const HEIGHT = 980;
   const RADIUS = 32;
 
   const canvas = document.createElement("canvas");
@@ -437,7 +437,7 @@ async function createCardTexture(property) {
 
   /* Foto */
 
-  const IMAGE_HEIGHT = 735;
+  const IMAGE_HEIGHT = 690;
 
   drawImageCover(ctx, image, 0, 0, WIDTH, IMAGE_HEIGHT);
 
@@ -485,15 +485,19 @@ async function createCardTexture(property) {
 
   for (const line of titleLines) {
     ctx.fillText(line, 38, titleY);
-
     titleY += 45;
   }
 
-  ctx.fillStyle = "#0f172a";
+  /*
+   * Precio más cerca del título.
+   * titleY ya quedó justo debajo de la última línea.
+   */
+  const priceY = titleY + 22;
 
+  ctx.fillStyle = "#0f172a";
   ctx.font = '800 43px "Manrope", Arial, sans-serif';
 
-  ctx.fillText(property.price, 38, 995);
+  ctx.fillText(property.price, 38, priceY);
 
   ctx.restore();
 
@@ -1170,7 +1174,7 @@ export default function HeroCardsWebGL() {
 
       movement = 0.5 * easeInQuad(movement) + 0.5 * movement;
 
-/* ===================================================
+      /* ===================================================
    ESCALA
 ==================================================== */
 
