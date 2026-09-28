@@ -9,11 +9,14 @@ export default function HeroSection() {
   return (
     <section
       data-hero-root
-      className="relative overflow-hidden bg-[#f3f4f6]"
-      style={{
-        minHeight: "clamp(820px, 92vh, 980px)",
-        paddingBottom: "clamp(120px, 10vw, 180px)",
-      }}
+      className="
+    relative
+    isolate
+    h-[100svh]
+    min-h-[720px]
+    overflow-hidden
+    bg-[#f3f4f6]
+  "
     >
       {/* =====================================================
           FONDO PUNTEADO

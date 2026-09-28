@@ -169,8 +169,8 @@ const MOBILE_CARD_WIDTH = 0.92;
  * Esto evita que las cards de los extremos sean
  * más altas que la sección.
  */
-const MAX_CARD_VISUAL_HEIGHT_DESKTOP = 0.78;
-const MAX_CARD_VISUAL_HEIGHT_MOBILE = 0.64;
+const MAX_CARD_VISUAL_HEIGHT_DESKTOP = 0.74;
+const MAX_CARD_VISUAL_HEIGHT_MOBILE = 0.62;
 
 /*
  * Distancia horizontal.
@@ -927,10 +927,8 @@ export default function HeroCardsWebGL() {
     /* =====================================================
        RESIZE / POSICIONAMIENTO
     ====================================================== */
-
     function resize() {
       const width = container.clientWidth;
-
       const height = container.clientHeight;
 
       if (!width || !height) {
@@ -962,96 +960,17 @@ export default function HeroCardsWebGL() {
       viewportWorldWidth = viewportWorldHeight * camera.aspect;
 
       /* ===================================================
-   DIMENSIONES
-==================================================== */
-
-      /*
-       * Tamaño ideal según ancho de pantalla.
-       */
-      const preferredCardWidth =
-        (isDesktop ? DESKTOP_CARD_WIDTH : MOBILE_CARD_WIDTH) *
-        viewportWorldWidth;
-
-      /*
-       * Alto máximo que queremos VER finalmente en pantalla.
-       */
-      const maxVisualCardHeight =
-        viewportWorldHeight *
-        (isDesktop
-          ? MAX_CARD_VISUAL_HEIGHT_DESKTOP
-          : MAX_CARD_VISUAL_HEIGHT_MOBILE);
-
-      /*
-       * cardsGroup termina escalado a GROUP_SCALE_END.
-       *
-       * Por eso convertimos el alto visual máximo
-       * nuevamente al espacio local de las cards.
-       */
-      const maxLocalCardHeight = maxVisualCardHeight / GROUP_SCALE_END;
-
-      const maxLocalCardWidth = maxLocalCardHeight * CARD_ASPECT;
-
-      /*
-       * Usamos el tamaño por ancho solamente mientras no
-       * exceda el alto permitido por el hero.
-       */
-      const cardWidth = Math.min(preferredCardWidth, maxLocalCardWidth);
-
-      const cardHeight = cardWidth / CARD_ASPECT;
-
-      /*
-       * Al final de la animación cardsGroup está escalado
-       * por GROUP_SCALE_END.
-       *
-       * Calculamos el ancho REAL que tendrá la card
-       * cuando llegue al borde.
-       */
-      /*
-       * Ancho visual REAL que tendrá la card al final,
-       * después de aplicar el scale del cardsGroup.
-       */
-      const finalCardWidth = cardWidth * GROUP_SCALE_END;
-
-      const exitMargin =
-        viewportWorldWidth *
-        (isDesktop ? EXIT_MARGIN_DESKTOP : EXIT_MARGIN_MOBILE);
-
-      /*
-       * Esta es la posición que queremos ver EN PANTALLA:
-       *
-       * borde del viewport
-       * + media card
-       * + pequeño margen
-       *
-       * Ahí la card ya quedó completamente fuera.
-       */
-      const desiredWorldExitX =
-        viewportWorldWidth / 2 + finalCardWidth / 2 + exitMargin;
-
-      /*
-       * IMPORTANTE:
-       *
-       * innerGroup pertenece a cardsGroup y cardsGroup termina
-       * escalado a GROUP_SCALE_END.
-       *
-       * Por eso tenemos que compensar ese scale.
-       *
-       * Si no dividimos por GROUP_SCALE_END, el desplazamiento
-       * horizontal también queda reducido a la mitad.
-       */
-      const localExitX = desiredWorldExitX / GROUP_SCALE_END;
-
-      cardStates.forEach((card) => {
-        card.mesh.scale.set(cardWidth, cardHeight, 1);
-
-        card.fireTargetX = card.direction === "left" ? -localExitX : localExitX;
-      });
-
-      /* ===================================================
-         POSICIÓN VERTICAL
-      ==================================================== */
+     1. POSICIÓN VERTICAL DEL ARCO
+  ==================================================== */
 
       const { titleEl, subtitleEl } = getHeroAnchors(container);
+
+      /*
+       * También guardamos el centro en píxeles.
+       * Lo necesitamos para saber cuánto espacio queda
+       * realmente debajo de las cards.
+       */
+      let targetArcPx = height / 2;
 
       if (titleEl && subtitleEl) {
         const containerRect = container.getBoundingClientRect();
@@ -1070,46 +989,132 @@ export default function HeroCardsWebGL() {
           ? ARC_POSITION_RATIO_DESKTOP
           : ARC_POSITION_RATIO_MOBILE;
 
-        const targetPx = titleBottomPx + freeSpacePx * ratio;
+        targetArcPx = titleBottomPx + freeSpacePx * ratio;
 
         targetArcWorldY = screenPxToWorldY(
-          targetPx,
+          targetArcPx,
           height,
           viewportWorldHeight,
         );
       } else {
         targetArcWorldY = 0;
       }
+
+      /* ===================================================
+     2. TAMAÑO IDEAL DE CARD
+  ==================================================== */
+
+      const preferredCardWidth =
+        (isDesktop ? DESKTOP_CARD_WIDTH : MOBILE_CARD_WIDTH) *
+        viewportWorldWidth;
+
+      /*
+       * Las cards de los extremos quedan un poquito
+       * más abajo que targetArcPx debido al centerLift.
+       *
+       * Calculamos dónde está realmente el centro
+       * de una card grande de los extremos.
+       */
+      const centerLiftStrength = isDesktop
+        ? CENTER_LIFT_DESKTOP
+        : CENTER_LIFT_MOBILE;
+
+      const edgeCenterOffsetPx = height * centerLiftStrength * GROUP_SCALE_END;
+
+      const edgeCenterPx = targetArcPx + edgeCenterOffsetPx;
+
+      /* ===================================================
+     3. ESPACIO REAL DISPONIBLE
+  ==================================================== */
+
+      /*
+       * Dejamos unos píxeles de seguridad para que
+       * nunca llegue exactamente al corte del hero.
+       */
+      const bottomSafeSpacePx = isDesktop ? 24 : 16;
+
+      const topSafeSpacePx = isDesktop ? 8 : 8;
+
+      const availableBelowPx = Math.max(
+        0,
+        height - edgeCenterPx - bottomSafeSpacePx,
+      );
+
+      const availableAbovePx = Math.max(0, edgeCenterPx - topSafeSpacePx);
+
+      /*
+       * Como edgeCenterPx representa el CENTRO de la card,
+       * podemos usar como máximo el doble del espacio
+       * disponible hacia cada dirección.
+       */
+      const maxHeightByBottomPx = availableBelowPx * 2;
+
+      const maxHeightByTopPx = availableAbovePx * 2;
+
+      /*
+       * Conservamos además el límite general que ya teníamos.
+       */
+      const maxHeightByRatioPx =
+        height *
+        (isDesktop
+          ? MAX_CARD_VISUAL_HEIGHT_DESKTOP
+          : MAX_CARD_VISUAL_HEIGHT_MOBILE);
+
+      /*
+       * Elegimos el más restrictivo.
+       *
+       * Así la card SIEMPRE queda dentro del hero.
+       */
+      const maxVisualCardHeightPx = Math.min(
+        maxHeightByBottomPx,
+        maxHeightByTopPx,
+        maxHeightByRatioPx,
+      );
+
+      /*
+       * Convertimos ese límite de píxeles
+       * al espacio del mundo WebGL.
+       */
+      const maxVisualCardHeightWorld =
+        (maxVisualCardHeightPx / height) * viewportWorldHeight;
+
+      /*
+       * cardsGroup termina en GROUP_SCALE_END.
+       * Volvemos al tamaño local.
+       */
+      const maxLocalCardHeight = maxVisualCardHeightWorld / GROUP_SCALE_END;
+
+      const maxLocalCardWidth = maxLocalCardHeight * CARD_ASPECT;
+
+      const cardWidth = Math.min(preferredCardWidth, maxLocalCardWidth);
+
+      const cardHeight = cardWidth / CARD_ASPECT;
+
+      /* ===================================================
+     4. SALIDA HORIZONTAL
+  ==================================================== */
+
+      const finalCardWidth = cardWidth * GROUP_SCALE_END;
+
+      const exitMargin =
+        viewportWorldWidth *
+        (isDesktop ? EXIT_MARGIN_DESKTOP : EXIT_MARGIN_MOBILE);
+
+      const desiredWorldExitX =
+        viewportWorldWidth / 2 + finalCardWidth / 2 + exitMargin;
+
+      const localExitX = desiredWorldExitX / GROUP_SCALE_END;
+
+      /* ===================================================
+     5. APLICAR DIMENSIONES
+  ==================================================== */
+
+      cardStates.forEach((card) => {
+        card.mesh.scale.set(cardWidth, cardHeight, 1);
+
+        card.fireTargetX = card.direction === "left" ? -localExitX : localExitX;
+      });
     }
-
-    /* =====================================================
-       OBSERVERS
-    ====================================================== */
-
-    resizeObserver = new ResizeObserver(resize);
-
-    resizeObserver.observe(container);
-
-    const { titleEl, subtitleEl } = getHeroAnchors(container);
-
-    if (titleEl) {
-      resizeObserver.observe(titleEl);
-    }
-
-    if (subtitleEl) {
-      resizeObserver.observe(subtitleEl);
-    }
-
-    intersectionObserver = new IntersectionObserver(
-      ([entry]) => {
-        isVisible = entry.isIntersecting;
-      },
-      {
-        threshold: 0.01,
-      },
-    );
-
-    intersectionObserver.observe(container);
 
     /* =====================================================
        UPDATE CARD
