@@ -150,7 +150,7 @@ const FIRE_DURATION_DESKTOP = 9.6;
  * => unas 10/12 visibles en total,
  * en vez de más de 20.
  */
-const FIRE_INTERVAL_MOBILE = 1400;
+const FIRE_INTERVAL_MOBILE = 1000;
 const FIRE_DURATION_MOBILE = 6.4;
 
 const CAMERA_FOV = 45;
@@ -1173,87 +1173,20 @@ export default function HeroCardsWebGL() {
    ESCALA
 ==================================================== */
 
-      const scaleStart = isDesktop ? 0.25 : 0.12;
+      const scaleStart = 0.2;
 
-      const initialScaleWeight = isDesktop ? 0.05 : 0.30;
+      const initialScaleWeight = 0.125;
 
-      /*
-       * Esta curva sigue yendo de 0 → 1.
-       */
-      const scaleProgress =
+      const scale =
         initialScaleWeight * smoothstep(0, 0.15, progress) +
         (1 - initialScaleWeight) * smoothstep(scaleStart, 1, progress);
-
-      /*
-       * Pero la escala real ahora va de:
-       *
-       * 0.15 → 1
-       *
-       * en vez de:
-       *
-       * 0 → 1
-       */
-      const MIN_SCALE = 0.15;
-
-      const scale = MIN_SCALE + (1 - MIN_SCALE) * scaleProgress;
 
       const finalScale = Math.min(scale, card.maxScale);
       /* ===================================================
    TRANSFORM
 ==================================================== */
 
-      if (isDesktop) {
-        /*
-         * Desktop queda exactamente como está.
-         */
-        card.innerGroup.position.x = card.fireTargetX * movement;
-      } else {
-        const directionSign = card.direction === "left" ? -1 : 1;
-
-        /*
-         * MOBILE:
-         *
-         * Durante el primer 10% del recorrido las cards
-         * NO viajan hacia los extremos.
-         *
-         * Solamente aparecen y crecen juntas en el centro.
-         */
-        const MOBILE_BIRTH_END = 0.1;
-
-        const travelProgress = clamp01(
-          (progress - MOBILE_BIRTH_END) / (1 - MOBILE_BIRTH_END),
-        );
-
-        /*
-         * Una vez terminada la fase de nacimiento,
-         * usamos la misma curva de movimiento que desktop.
-         */
-        let mobileMovement = smoothstep(0, 1, travelProgress);
-
-        mobileMovement =
-          0.5 * easeInQuad(mobileMovement) + 0.5 * mobileMovement;
-
-        /*
-         * Ancho REAL actual de la card.
-         */
-        const currentCardWidth = card.mesh.scale.x * finalScale;
-
-        /*
-         * Cada card ocupa media card hacia cada lado.
-         *
-         * Resultado:
-         *
-         *        [LEFT][RIGHT]
-         *              ↑
-         *            centro
-         *
-         * No se pisan y tampoco queda un hueco.
-         */
-        const pairSeparation = currentCardWidth * 0.5;
-
-        card.innerGroup.position.x =
-          card.fireTargetX * mobileMovement + directionSign * pairSeparation;
-      }
+      card.innerGroup.position.x = card.fireTargetX * movement;
 
       card.innerGroup.position.y = 0;
 
