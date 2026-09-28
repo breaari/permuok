@@ -201,7 +201,10 @@ const REVEAL_DURATION = 1750;
  * Distorsión global.
  */
 const CYLINDRICAL_START = 1;
-const CYLINDRICAL_END = 0.7;
+
+const CYLINDRICAL_END_DESKTOP = 0.7;
+const CYLINDRICAL_END_MOBILE = 0.84;
+
 const CYLINDRICAL_DURATION = 2000;
 
 /*
@@ -210,11 +213,15 @@ const CYLINDRICAL_DURATION = 2000;
  * disponible entre título y bajada.
  */
 const ARC_POSITION_RATIO_DESKTOP = 0.46;
-const ARC_POSITION_RATIO_MOBILE = 0.35;
+const ARC_POSITION_RATIO_MOBILE = 0.50;
 
 /* =========================================================
    EASING
 ========================================================= */
+
+function getCylindricalEnd(isDesktop) {
+  return isDesktop ? CYLINDRICAL_END_DESKTOP : CYLINDRICAL_END_MOBILE;
+}
 
 function getFireInterval(isDesktop) {
   return isDesktop ? FIRE_INTERVAL_DESKTOP : FIRE_INTERVAL_MOBILE;
@@ -1026,7 +1033,7 @@ export default function HeroCardsWebGL() {
 
       const topSafeSpacePx = isDesktop ? 12 : 10;
 
-      const shaderFactor = CYLINDRICAL_END;
+      const shaderFactor = getCylindricalEnd(isDesktop);
 
       const maxHeightByBottomPx =
         height * (1 + shaderFactor) -
@@ -1259,9 +1266,11 @@ export default function HeroCardsWebGL() {
 
         const cylinderProgress = power4Out(elapsed / CYLINDRICAL_DURATION);
 
+        const cylindricalEnd = getCylindricalEnd(isDesktop);
+
         postMaterial.uniforms.uCylindricalFactor.value = lerp(
           CYLINDRICAL_START,
-          CYLINDRICAL_END,
+          cylindricalEnd,
           cylinderProgress,
         );
 
