@@ -19,9 +19,6 @@ const heroImageModules = import.meta.glob("../../assets/fotohero1*.*", {
  * fotohero1 (24)
  *
  * y ordenamos NUMÉRICAMENTE.
- *
- * Esto evita el orden:
- * 1, 10, 11, 12 ... 2, 20...
  */
 const images = Object.entries(heroImageModules)
   .map(([path, src]) => {
@@ -37,10 +34,7 @@ const images = Object.entries(heroImageModules)
   .slice(0, 24);
 
 /* =========================================================
-   DATOS DE LAS CARDS
-
-   Los textos pueden repetirse eventualmente.
-   Las imágenes NO.
+   DATOS
 ========================================================= */
 
 const PROPERTY_META = [
@@ -130,29 +124,11 @@ const PROPERTY_META = [
   },
 ];
 
-/*
- * Generamos 24 propiedades.
- *
- * Cada posición usa SU propia imagen:
- *
- * index 0  -> fotohero1 (1)
- * index 1  -> fotohero1 (2)
- * ...
- * index 23 -> fotohero1 (24)
- */
 const BASE_PROPERTIES = images.map((image, index) => ({
   ...PROPERTY_META[index % PROPERTY_META.length],
   image,
 }));
 
-/*
- * Ya no hacemos:
- *
- * Array.from({ length: 24 }, ...)
- *
- * porque BASE_PROPERTIES ya contiene exactamente
- * las 24 cards únicas.
- */
 const CARDS = BASE_PROPERTIES.map((property, index) => ({
   ...property,
   id: index + 1,
@@ -163,19 +139,37 @@ const CARDS = BASE_PROPERTIES.map((property, index) => ({
    CONFIG
 ========================================================= */
 
-const FIRE_INTERVAL = 900;
-const FIRE_DURATION = 9.6;
+/*
+ * Desktop conserva el timing que ya funcionaba.
+ *
+ * Mobile tiene una duración mucho menor:
+ * menos cards permanecen simultáneamente activas.
+ */
+const FIRE_INTERVAL_DESKTOP = 900;
+const FIRE_DURATION_DESKTOP = 9.6;
+
+const FIRE_INTERVAL_MOBILE = 1350;
+const FIRE_DURATION_MOBILE = 6.4;
 
 const CAMERA_FOV = 45;
 const CAMERA_Z = 5;
 
 const CARD_ASPECT = 720 / 1040;
 
+/*
+ * Tamaño base.
+ */
 const DESKTOP_CARD_WIDTH = 0.75;
-const MOBILE_CARD_WIDTH = 0.9;
+const MOBILE_CARD_WIDTH = 0.92;
 
+/*
+ * Distancia horizontal.
+ *
+ * En mobile recorren bastante menos para que
+ * las cards laterales sigan siendo visibles.
+ */
 const DESKTOP_FIRE_TARGET = 1.65;
-const MOBILE_FIRE_TARGET = 1.08;
+const MOBILE_FIRE_TARGET = 1.58;
 
 const GROUP_SCALE_START = 1.2;
 const GROUP_SCALE_END = 0.5;
@@ -190,34 +184,43 @@ const CYLINDRICAL_DURATION = 2000;
 /*
  * Curva vertical.
  *
- * Las cards próximas al centro están un poco más elevadas.
- * El efecto desaparece progresivamente hacia los extremos.
+ * Desktop conserva el arco actual.
+ *
+ * Mobile tiene un arco propio, algo más marcado
+ * para que no parezca simplemente la versión desktop
+ * comprimida horizontalmente.
  */
 const CENTER_LIFT_DESKTOP = 0.055;
-const CENTER_LIFT_MOBILE = 0.04;
-const CENTER_LIFT_POWER = 1.35;
+const CENTER_LIFT_MOBILE = 0.07;
+
+const CENTER_LIFT_POWER_DESKTOP = 1.35;
+const CENTER_LIFT_POWER_MOBILE = 1.25;
 
 /*
  * POSICIÓN VERTICAL DEL ARCO
  *
- * Se calcula dentro del espacio real existente entre:
- *
- * FINAL DEL TÍTULO
- *        ↓
- *
- *      ARCO
- *
- *        ↓
- * INICIO DE LA BAJADA
- *
- * 0.50 = centro exacto.
+ * 0.50 = centro exacto entre título y bajada.
  * Menor = más arriba.
  * Mayor = más abajo.
- *
- * 0.46 deja el arco ligeramente por encima del centro.
  */
 const ARC_POSITION_RATIO_DESKTOP = 0.46;
-const ARC_POSITION_RATIO_MOBILE = 0.48;
+const ARC_POSITION_RATIO_MOBILE = 0.35;
+
+/* =========================================================
+   HELPERS RESPONSIVE
+========================================================= */
+
+function getFireInterval(isDesktop) {
+  return isDesktop ? FIRE_INTERVAL_DESKTOP : FIRE_INTERVAL_MOBILE;
+}
+
+function getFireDuration(isDesktop) {
+  return isDesktop ? FIRE_DURATION_DESKTOP : FIRE_DURATION_MOBILE;
+}
+
+function getCenterLiftPower(isDesktop) {
+  return isDesktop ? CENTER_LIFT_POWER_DESKTOP : CENTER_LIFT_POWER_MOBILE;
+}
 
 /* =========================================================
    EASING
@@ -274,7 +277,6 @@ function getHeroAnchors(container) {
 
   return {
     titleEl: heroRoot.querySelector("[data-hero-title]"),
-
     subtitleEl: heroRoot.querySelector("[data-hero-subtitle]"),
   };
 }
@@ -289,7 +291,6 @@ function roundRectPath(ctx, x, y, width, height, radius) {
   ctx.beginPath();
 
   ctx.moveTo(x + r, y);
-
   ctx.lineTo(x + width - r, y);
 
   ctx.quadraticCurveTo(x + width, y, x + width, y + r);
@@ -311,11 +312,9 @@ function roundRectPath(ctx, x, y, width, height, radius) {
 
 function drawImageCover(ctx, image, x, y, width, height) {
   const imageRatio = image.width / image.height;
-
   const targetRatio = width / height;
 
   let sourceWidth = image.width;
-
   let sourceHeight = image.height;
 
   let sourceX = 0;
@@ -346,7 +345,6 @@ function drawImageCover(ctx, image, x, y, width, height) {
 
 function wrapText(ctx, text, maxWidth, maxLines = 2) {
   const words = text.split(" ");
-
   const lines = [];
 
   let line = "";
@@ -741,10 +739,6 @@ export default function HeroCardsWebGL() {
     let viewportWorldWidth = 1;
     let viewportWorldHeight = 1;
 
-    /*
-     * Posición vertical objetivo,
-     * calculada desde el DOM real.
-     */
     let targetArcWorldY = 0;
 
     let isDesktop = true;
@@ -816,12 +810,12 @@ export default function HeroCardsWebGL() {
         }
       });
 
+      /*
+       * resize() define también si estamos
+       * en desktop o mobile ANTES de distribuir.
+       */
       resize();
 
-      /*
-       * El título entra con motion.
-       * Recalculamos una vez terminada esa entrada.
-       */
       alignTimeoutId = window.setTimeout(resize, 850);
 
       cardsGroup.scale.setScalar(GROUP_SCALE_START);
@@ -858,7 +852,20 @@ export default function HeroCardsWebGL() {
     }
 
     function preDistributeCards(pool) {
-      const step = FIRE_INTERVAL / (1000 * FIRE_DURATION);
+      const fireInterval = getFireInterval(isDesktop);
+
+      const fireDuration = getFireDuration(isDesktop);
+
+      /*
+       * Desktop:
+       * 900 / 9600 ≈ 0.094
+       * -> ~10/11 cards por lado.
+       *
+       * Mobile:
+       * 950 / 4800 ≈ 0.198
+       * -> ~5 cards por lado.
+       */
+      const step = fireInterval / (1000 * fireDuration);
 
       for (let index = 0; index < pool.length; index += 1) {
         const progress = index * step;
@@ -945,7 +952,7 @@ export default function HeroCardsWebGL() {
       viewportWorldWidth = viewportWorldHeight * camera.aspect;
 
       /* ===================================================
-         DIMENSIONES CARDS
+         DIMENSIONES
       ==================================================== */
 
       const cardWidth =
@@ -954,9 +961,10 @@ export default function HeroCardsWebGL() {
 
       const cardHeight = cardWidth / CARD_ASPECT;
 
+      const fireTarget = isDesktop ? DESKTOP_FIRE_TARGET : MOBILE_FIRE_TARGET;
+
       cardStates.forEach((card) => {
         card.mesh.scale.set(cardWidth, cardHeight, 1);
-        const fireTarget = isDesktop ? DESKTOP_FIRE_TARGET : MOBILE_FIRE_TARGET;
 
         card.fireTargetX =
           (card.direction === "left" ? -1 : 1) *
@@ -965,15 +973,7 @@ export default function HeroCardsWebGL() {
       });
 
       /* ===================================================
-         POSICIÓN VERTICAL REAL
-
-         Tomamos:
-         - bottom del título
-         - top de la bajada
-
-         y elegimos un punto dentro de ese espacio.
-
-         46% = ligeramente por encima del centro.
+         POSICIÓN VERTICAL
       ==================================================== */
 
       const { titleEl, subtitleEl } = getHeroAnchors(container);
@@ -1015,11 +1015,6 @@ export default function HeroCardsWebGL() {
 
     resizeObserver.observe(container);
 
-    /*
-     * También observamos título y bajada.
-     * Si cambian de tamaño por responsive,
-     * fonts o wrapping, el arco se recoloca.
-     */
     const { titleEl, subtitleEl } = getHeroAnchors(container);
 
     if (titleEl) {
@@ -1050,7 +1045,9 @@ export default function HeroCardsWebGL() {
         return;
       }
 
-      card.fireProgress += delta / (1000 * FIRE_DURATION);
+      const fireDuration = getFireDuration(isDesktop);
+
+      card.fireProgress += delta / (1000 * fireDuration);
 
       if (card.fireProgress >= 1) {
         card.isFiring = false;
@@ -1082,6 +1079,10 @@ export default function HeroCardsWebGL() {
 
       const scaleStart = isDesktop ? 0.2 : 0.22;
 
+      /*
+       * En mobile nacen ligeramente más grandes.
+       * Así el centro deja de verse como miniaturas.
+       */
       const initialScaleWeight = isDesktop ? 0.125 : 0.18;
 
       const scale =
@@ -1100,8 +1101,10 @@ export default function HeroCardsWebGL() {
         ? CENTER_LIFT_DESKTOP
         : CENTER_LIFT_MOBILE;
 
+      const centerLiftPower = getCenterLiftPower(isDesktop);
+
       const centerLift =
-        Math.pow(centerFactor, CENTER_LIFT_POWER) *
+        Math.pow(centerFactor, centerLiftPower) *
         viewportWorldHeight *
         centerLiftStrength;
 
@@ -1167,12 +1170,6 @@ export default function HeroCardsWebGL() {
 
         /* =================================================
            POSICIÓN VERTICAL
-
-           targetArcWorldY ya está calculado
-           ligeramente por encima del centro del espacio.
-
-           Compensamos el lift de las cards centrales
-           para que su centro VISUAL caiga en ese punto.
         ================================================== */
 
         const centerLiftStrength = isDesktop
@@ -1200,10 +1197,12 @@ export default function HeroCardsWebGL() {
            NUEVAS CARDS
         ================================================== */
 
+        const fireInterval = getFireInterval(isDesktop);
+
         fireAccumulator += delta;
 
-        while (fireAccumulator >= FIRE_INTERVAL) {
-          fireAccumulator -= FIRE_INTERVAL;
+        while (fireAccumulator >= fireInterval) {
+          fireAccumulator -= fireInterval;
 
           fireNextPair();
         }
