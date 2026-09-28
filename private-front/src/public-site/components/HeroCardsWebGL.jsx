@@ -176,12 +176,6 @@ const MOBILE_CARD_WIDTH = 1.2;
 const FIRE_TARGET = 1.65;
 
 /*
- * Separación de la pareja al nacer en mobile.
- * Cada card se desplaza 8% del viewport hacia su lado.
- */
-const MOBILE_PAIR_START_OFFSET = 0.08;
-
-/*
  * Limitamos únicamente el ALTO final porque nuestras
  * cards son más verticales y tienen información debajo
  * de la foto.
@@ -1191,32 +1185,62 @@ export default function HeroCardsWebGL() {
       const finalScale = Math.min(scale, card.maxScale);
 
       /* ===================================================
-         TRANSFORM
-      ==================================================== */
+   TRANSFORM
+==================================================== */
+
       if (isDesktop) {
+        /*
+         * Desktop queda exactamente como está.
+         */
         card.innerGroup.position.x = card.fireTargetX * movement;
       } else {
         const directionSign = card.direction === "left" ? -1 : 1;
 
         /*
-         * Ancho actual de la card en coordenadas locales.
-         * Empieza en 0 y crece junto con la card.
+         * MOBILE:
+         *
+         * Durante el primer 10% del recorrido las cards
+         * NO viajan hacia los extremos.
+         *
+         * Solamente aparecen y crecen juntas en el centro.
+         */
+        const MOBILE_BIRTH_END = 0.1;
+
+        const travelProgress = clamp01(
+          (progress - MOBILE_BIRTH_END) / (1 - MOBILE_BIRTH_END),
+        );
+
+        /*
+         * Una vez terminada la fase de nacimiento,
+         * usamos la misma curva de movimiento que desktop.
+         */
+        let mobileMovement = smoothstep(0, 1, travelProgress);
+
+        mobileMovement =
+          0.5 * easeInQuad(mobileMovement) + 0.5 * mobileMovement;
+
+        /*
+         * Ancho REAL actual de la card.
          */
         const currentCardWidth = card.mesh.scale.x * finalScale;
 
         /*
-         * 0.46 = casi una mitad de card.
-         * Deja la pareja prácticamente una al lado de la otra,
-         * con apenas un pequeño solapamiento.
+         * Cada card ocupa media card hacia cada lado.
+         *
+         * Resultado:
+         *
+         *        [LEFT][RIGHT]
+         *              ↑
+         *            centro
+         *
+         * No se pisan y tampoco queda un hueco.
          */
-        const pairSeparation = currentCardWidth * 0.46;
+        const pairSeparation = currentCardWidth * 0.5;
 
         card.innerGroup.position.x =
-          card.fireTargetX * movement + directionSign * pairSeparation;
+          card.fireTargetX * mobileMovement + directionSign * pairSeparation;
       }
-      /*
-       * Ninguna curva individual.
-       */
+
       card.innerGroup.position.y = 0;
 
       card.innerGroup.scale.setScalar(finalScale);
