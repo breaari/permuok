@@ -150,7 +150,7 @@ const FIRE_DURATION_DESKTOP = 9.6;
  * => unas 10/12 visibles en total,
  * en vez de más de 20.
  */
-const FIRE_INTERVAL_MOBILE = 1100;
+const FIRE_INTERVAL_MOBILE = 1600;
 const FIRE_DURATION_MOBILE = 6.4;
 
 const CAMERA_FOV = 45;
@@ -203,7 +203,7 @@ const REVEAL_DURATION = 1750;
 const CYLINDRICAL_START = 1;
 
 const CYLINDRICAL_END_DESKTOP = 0.7;
-const CYLINDRICAL_END_MOBILE = 0.84;
+const CYLINDRICAL_END_MOBILE = 0.92;
 
 const CYLINDRICAL_DURATION = 2000;
 
@@ -213,7 +213,7 @@ const CYLINDRICAL_DURATION = 2000;
  * disponible entre título y bajada.
  */
 const ARC_POSITION_RATIO_DESKTOP = 0.46;
-const ARC_POSITION_RATIO_MOBILE = 0.50;
+const ARC_POSITION_RATIO_MOBILE = 0.5;
 
 /* =========================================================
    EASING
@@ -1174,9 +1174,9 @@ export default function HeroCardsWebGL() {
          ESCALA
       ==================================================== */
 
-      const scaleStart = isDesktop ? 0.2 : 0.22;
+      const scaleStart = isDesktop ? 0.2 : 0.12;
 
-      const initialScaleWeight = isDesktop ? 0.125 : 0.18;
+      const initialScaleWeight = isDesktop ? 0.125 : 0.25;
 
       const scale =
         initialScaleWeight * smoothstep(0, 0.15, progress) +
