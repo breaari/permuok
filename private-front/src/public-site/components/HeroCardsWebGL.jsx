@@ -144,9 +144,6 @@ const MOBILE_CARD_WIDTH = DESKTOP_CARD_WIDTH;
 const CYLINDRICAL_END_DESKTOP = 0.7;
 const CYLINDRICAL_END_MOBILE = CYLINDRICAL_END_DESKTOP;
 
-const ARC_POSITION_RATIO_DESKTOP = 0.36;
-const ARC_POSITION_RATIO_MOBILE = ARC_POSITION_RATIO_DESKTOP;
-
 const CAMERA_FOV = 45;
 const CAMERA_Z = 5;
 
@@ -797,33 +794,12 @@ export default function HeroCardsWebGL() {
 
       viewportWorldWidth = viewportWorldHeight * camera.aspect;
 
-      /* Posición vertical del arco */
-      const { titleEl, subtitleEl } = getHeroAnchors(container);
-      let targetArcPx = height / 2;
+      /* ===================================================
+   POSICIÓN VERTICAL
+   Igual a Melius: grupo centrado en la escena.
+=================================================== */
 
-      if (titleEl && subtitleEl) {
-        const containerRect = container.getBoundingClientRect();
-        const titleRect = titleEl.getBoundingClientRect();
-        const subtitleRect = subtitleEl.getBoundingClientRect();
-
-        const titleBottomPx = titleRect.bottom - containerRect.top;
-        const subtitleTopPx = subtitleRect.top - containerRect.top;
-        const freeSpacePx = Math.max(0, subtitleTopPx - titleBottomPx);
-
-        const ratio = isDesktop
-          ? ARC_POSITION_RATIO_DESKTOP
-          : ARC_POSITION_RATIO_MOBILE;
-
-        targetArcPx = titleBottomPx + freeSpacePx * ratio;
-
-        targetArcWorldY = screenPxToWorldY(
-          targetArcPx,
-          height,
-          viewportWorldHeight,
-        );
-      } else {
-        targetArcWorldY = 0;
-      }
+      targetArcWorldY = 0;
 
       /* ===================================================
    TAMAÑO DE CARD
