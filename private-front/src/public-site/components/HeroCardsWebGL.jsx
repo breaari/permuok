@@ -844,12 +844,40 @@ export default function HeroCardsWebGL() {
         card.mesh.scale.set(cardWidth, cardHeight, 1);
         card.maxScale = Math.min(1, maxCardScale);
 
-        const fireTarget = isDesktop ? FIRE_TARGET_DESKTOP : FIRE_TARGET_MOBILE;
+        /*
+         * DESTINO REAL DE SALIDA
+         *
+         * Queremos que cuando progress llegue a 1,
+         * TODA la card ya haya atravesado el borde.
+         *
+         * No hay una segunda animación.
+         * Toda la trayectoria 0 → 1 incluye la salida.
+         */
 
-        card.fireTargetX =
-          (card.direction === "left" ? -1 : 1) *
-          viewportWorldWidth *
-          fireTarget;
+        const directionSign = card.direction === "left" ? -1 : 1;
+
+        /*
+         * Como cardsGroup termina en scale 0.5,
+         * convertimos el borde visible del viewport
+         * a coordenadas locales del grupo.
+         */
+        const viewportEdgeLocal = viewportWorldWidth / (2 * GROUP_SCALE_END);
+
+        /*
+         * Media card en su tamaño FINAL.
+         */
+        const halfCardWidthLocal = (cardWidth * card.maxScale) / 2;
+
+        /*
+         * Apenas unos píxeles virtuales extra para asegurar
+         * que ni borde, rotación ni antialias queden visibles.
+         */
+        const exitPaddingLocal = viewportWorldWidth * 0.025;
+
+        const targetMagnitude =
+          viewportEdgeLocal + halfCardWidthLocal + exitPaddingLocal;
+
+        card.fireTargetX = directionSign * targetMagnitude;
       });
     }
 
@@ -893,14 +921,17 @@ export default function HeroCardsWebGL() {
       const fireDuration = getFireDuration(isDesktop);
       card.fireProgress += delta / (1000 * fireDuration);
 
-      if (card.fireProgress >= CARD_LIFETIME) {
+      if (card.fireProgress >= 1) {
         card.isFiring = false;
         card.innerGroup.visible = false;
+
         card.innerGroup.position.set(0, 0, 0);
         card.innerGroup.rotation.set(0, 0, 0);
         card.innerGroup.scale.set(0, 0, 0);
+
         card.mesh.material.opacity = 1;
         card.innerGroup.renderOrder = 0;
+
         return;
       }
 
@@ -950,7 +981,7 @@ export default function HeroCardsWebGL() {
       const exitX =
         directionSign * viewportWorldWidth * EXIT_TRAVEL * exitProgress;
 
-      card.innerGroup.position.x = baseX + exitX;
+      card.innerGroup.position.x = card.fireTargetX * movement;
 
       card.innerGroup.position.y = 0;
 
