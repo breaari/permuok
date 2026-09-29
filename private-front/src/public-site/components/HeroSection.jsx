@@ -125,39 +125,35 @@ export default function HeroSection() {
           data-hero-subtitle
           className="
     mx-auto
-    max-w-[540px]
+    max-w-[560px]
     px-4
     sm:px-6
   "
         >
           <p
             className="
-    text-[16px]
-    font-extrabold
-    leading-[1.45]
-    tracking-[-0.015em]
-    text-slate-600
-    sm:text-[17px]
-    lg:text-[17px]
-  "
+      text-[16px]
+      font-extrabold
+      leading-[1.45]
+      tracking-[-0.015em]
+      text-slate-600
+      sm:text-[17px]
+      lg:text-[17px]
+    "
           >
-            Una red inteligente donde las oportunidades de permuta se
-            centralizan, se cruzan y empiezan a encontrarse.
-          </p>
+            <span className="lg:hidden">
+              Una red inteligente sólo para inmobilairias donde las oportunidades de permuta se
+              centralizan, se cruzan y empiezan a encontrarse.
+            </span>
 
-          {/* <p
-            className="
-              mt-1
-              text-[16px]
-              font-extrabold
-              tracking-[-0.015em]
-              text-[#0a192f]
-              sm:text-[17px]
-              lg:text-[18px]
-            "
-          >
-            Menos búsqueda manual. Más matches. Más operaciones.
-          </p> */}
+            <span className="hidden lg:inline">
+              Una red inteligente sólo para inmobiliarias 
+              <br />
+               donde las  oportunidades de permuta se centralizan,
+              <br />
+               se cruzan y empiezan a encontrarse.
+            </span>
+          </p>
         </div>
 
         {/* CTA */}
