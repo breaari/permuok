@@ -129,66 +129,109 @@ const CARDS = BASE_PROPERTIES.map((property, index) => ({
    CONFIG
 ========================================================= */
 
-/* Desktop: mantenemos el comportamiento que ya funciona. */
+/*
+ * Timing original del efecto.
+ *
+ * 24 cards:
+ * 12 izquierda
+ * 12 derecha
+ *
+ * 900ms / 9.6s mantiene un flujo continuo
+ * sin agotar el pool.
+ */
 const FIRE_INTERVAL_DESKTOP = 900;
 const FIRE_DURATION_DESKTOP = 9.6;
-const DESKTOP_CARD_WIDTH = 0.75;
-const FIRE_TARGET_DESKTOP = 1.0;
 
 /*
  * Mobile:
- * - menos cards simultáneas
- * - mismo motor de movimiento que desktop
- * - arco más plano
- * - pareja central visible sin superposición
+ * menos cards simultáneas.
+ *
+ * 6.4 / 1.1 ≈ 5.8 por lado
+ * => unas 10/12 visibles en total,
+ * en vez de más de 20.
  */
-const FIRE_INTERVAL_MOBILE = 1600;
+const FIRE_INTERVAL_MOBILE = 1400;
 const FIRE_DURATION_MOBILE = 6.4;
-const MOBILE_CARD_WIDTH = 1.25;
-const FIRE_TARGET_MOBILE = 1.0;
-const MOBILE_MIN_SCALE = 0.20;
-const MOBILE_MAX_SCALE = 0.68;
-const MOBILE_PAIR_START_OFFSET = 0.125;
 
-/*
- * Perspectiva individual de cada card.
- * Las cards de cada lado giran ligeramente hacia el centro.
- */
-const CARD_TILT_DESKTOP = THREE.MathUtils.degToRad(10);
-const CARD_TILT_MOBILE = THREE.MathUtils.degToRad(8);
+const MOBILE_CARD_WIDTH = 1.35;
 
-/*
- * En vez de acelerar la última card para sacarla de pantalla,
- * todas siguen exactamente la misma trayectoria y se desvanecen
- * suavemente al llegar al límite visible.
- */
-const FADE_START_DESKTOP = 0.94;
-const FADE_START_MOBILE = 0.92;
+const FIRE_TARGET_MOBILE = 0.92;
 
 const CAMERA_FOV = 45;
 const CAMERA_Z = 5;
 
+
 const CARD_ASPECT = 720 / 980;
+/*
+ * Mobile: arco mucho más plano.
+ */
+const CYLINDRICAL_END_MOBILE = 0.99;
 
+/*
+ * Mobile: menos diferencia entre centro y extremos.
+ */
+const MOBILE_MIN_SCALE = 0.17;
+const MOBILE_MAX_SCALE = 0.72;
+
+/*
+ * Separamos mejor las cards cerca del centro.
+ * 0 = movimiento totalmente lineal
+ * 1 = easing original de desktop
+ */
+const MOBILE_MOVEMENT_EASE_MIX = 0.35;
+
+/*
+ * Las dos cards nacen apenas separadas.
+ */
+const MOBILE_PAIR_START_OFFSET = 0.035;
+
+/*
+ * Solo al final las empujamos fuera de pantalla,
+ * evitando el pop.
+ */
+const EXIT_START_MOBILE = 0.88;
+const EXIT_EXTRA_MOBILE = 0.55;
+/*
+ * Limitamos únicamente el ALTO final porque nuestras
+ * cards son más verticales y tienen información debajo
+ * de la foto.
+ *
+ * Esto evita el corte inferior sin alterar el motor.
+ */
 const MAX_CARD_VISUAL_HEIGHT_DESKTOP = 0.74;
-const MAX_CARD_VISUAL_HEIGHT_MOBILE = 0.76;
+const MAX_CARD_VISUAL_HEIGHT_MOBILE = 0.9;
 
+/*
+ * Zoom inicial del conjunto.
+ */
 const GROUP_SCALE_START = 1.2;
 const GROUP_SCALE_END = 0.5;
 const GROUP_ZOOM_DURATION = 1500;
 
+/*
+ * Aparición.
+ */
 const REVEAL_DURATION = 1750;
 
+/*
+ * Distorsión global.
+ */
 const CYLINDRICAL_START = 1;
+
 const CYLINDRICAL_END_DESKTOP = 0.7;
-const CYLINDRICAL_END_MOBILE = 0.99;
+
 const CYLINDRICAL_DURATION = 2000;
 
+/*
+ * PermuOK:
+ * ubicamos el eje de las cards dentro del espacio
+ * disponible entre título y bajada.
+ */
 const ARC_POSITION_RATIO_DESKTOP = 0.46;
 const ARC_POSITION_RATIO_MOBILE = 0.46;
 
 /* =========================================================
-   HELPERS
+   EASING
 ========================================================= */
 
 function getCylindricalEnd(isDesktop) {
@@ -209,6 +252,7 @@ function clamp01(value) {
 
 function smoothstep(edge0, edge1, x) {
   const t = clamp01((x - edge0) / (edge1 - edge0));
+
   return t * t * (3 - 2 * t);
 }
 
@@ -216,13 +260,25 @@ function easeInQuad(value) {
   return value * value;
 }
 
+/*
+ * Equivalente a GSAP power3.inOut.
+ *
+ * Power3 = quartic.
+ */
 function power3InOut(value) {
   const t = clamp01(value);
+
   return t < 0.5 ? 8 * Math.pow(t, 4) : 1 - Math.pow(-2 * t + 2, 4) / 2;
 }
 
+/*
+ * Equivalente a GSAP power4.out.
+ *
+ * Power4 = quintic.
+ */
 function power4Out(value) {
   const t = clamp01(value);
+
   return 1 - Math.pow(1 - t, 5);
 }
 
@@ -263,32 +319,46 @@ function roundRectPath(ctx, x, y, width, height, radius) {
   const r = Math.min(radius, width / 2, height / 2);
 
   ctx.beginPath();
+
   ctx.moveTo(x + r, y);
   ctx.lineTo(x + width - r, y);
+
   ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+
   ctx.lineTo(x + width, y + height - r);
+
   ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+
   ctx.lineTo(x + r, y + height);
+
   ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+
   ctx.lineTo(x, y + r);
+
   ctx.quadraticCurveTo(x, y, x + r, y);
+
   ctx.closePath();
 }
 
 function drawImageCover(ctx, image, x, y, width, height) {
   const imageRatio = image.width / image.height;
+
   const targetRatio = width / height;
 
   let sourceWidth = image.width;
+
   let sourceHeight = image.height;
+
   let sourceX = 0;
   let sourceY = 0;
 
   if (imageRatio > targetRatio) {
     sourceWidth = image.height * targetRatio;
+
     sourceX = (image.width - sourceWidth) / 2;
   } else {
     sourceHeight = image.width / targetRatio;
+
     sourceY = (image.height - sourceHeight) / 2;
   }
 
@@ -307,7 +377,9 @@ function drawImageCover(ctx, image, x, y, width, height) {
 
 function wrapText(ctx, text, maxWidth, maxLines = 2) {
   const words = text.split(" ");
+
   const lines = [];
+
   let line = "";
 
   for (const word of words) {
@@ -315,6 +387,7 @@ function wrapText(ctx, text, maxWidth, maxLines = 2) {
 
     if (ctx.measureText(test).width <= maxWidth) {
       line = test;
+
       continue;
     }
 
@@ -339,9 +412,13 @@ function wrapText(ctx, text, maxWidth, maxLines = 2) {
 function loadImage(src) {
   return new Promise((resolve, reject) => {
     const image = new Image();
+
     image.decoding = "async";
+
     image.onload = () => resolve(image);
+
     image.onerror = reject;
+
     image.src = src;
   });
 }
@@ -352,76 +429,115 @@ async function createCardTexture(property) {
   const RADIUS = 32;
 
   const canvas = document.createElement("canvas");
+
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
 
   const ctx = canvas.getContext("2d");
+
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
   const image = await loadImage(property.image);
 
+  /* Card */
   ctx.save();
+
   roundRectPath(ctx, 2, 2, WIDTH - 4, HEIGHT - 4, RADIUS);
+
   ctx.clip();
 
   ctx.fillStyle = "#ffffff";
+
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
   /* Foto */
+
   const IMAGE_HEIGHT = 755;
+
   drawImageCover(ctx, image, 0, 0, WIDTH, IMAGE_HEIGHT);
 
   /* Badge */
+
   ctx.font = '800 18px "Manrope", Arial, sans-serif';
 
   const badgeText = property.exchange.toUpperCase();
+
   const badgeTextWidth = ctx.measureText(badgeText).width;
+
   const badgeWidth = badgeTextWidth + 42;
+
   const badgeHeight = 44;
 
   ctx.fillStyle = "rgba(255,255,255,0.95)";
+
   roundRectPath(ctx, 28, 28, badgeWidth, badgeHeight, badgeHeight / 2);
+
   ctx.fill();
 
   ctx.fillStyle = "#0a192f";
+
   ctx.textBaseline = "middle";
+
   ctx.fillText(badgeText, 49, 28 + badgeHeight / 2 + 1);
 
   /* Info */
+
   ctx.textBaseline = "alphabetic";
+
   ctx.fillStyle = "#047857";
+
   ctx.font = '800 19px "Manrope", Arial, sans-serif';
-  ctx.fillText(property.type.toUpperCase(), 38, 795);
+
+  ctx.fillText(property.type.toUpperCase(), 38, 805);
 
   ctx.fillStyle = "#0f172a";
+
   ctx.font = '800 39px "Manrope", Arial, sans-serif';
 
   const titleLines = wrapText(ctx, property.title, WIDTH - 76, 2);
-  let titleY = 842;
+
+  let titleY = 860;
 
   for (const line of titleLines) {
     ctx.fillText(line, 38, titleY);
-    titleY += 43;
+    titleY += 45;
   }
 
-  const priceY = titleY + 16;
+  /*
+   * Precio más cerca del título.
+   * titleY ya quedó justo debajo de la última línea.
+   */
+  const priceY = titleY + 22;
 
   ctx.fillStyle = "#0f172a";
   ctx.font = '800 43px "Manrope", Arial, sans-serif';
+
   ctx.fillText(property.price, 38, priceY);
 
   ctx.restore();
 
+  /* Borde */
+
   ctx.strokeStyle = "#dbe3ed";
+
   ctx.lineWidth = 3;
+
   roundRectPath(ctx, 2, 2, WIDTH - 4, HEIGHT - 4, RADIUS);
+
   ctx.stroke();
 
+  /* Texture */
+
   const texture = new THREE.CanvasTexture(canvas);
+
   texture.colorSpace = THREE.SRGBColorSpace;
+
   texture.generateMipmaps = false;
+
   texture.minFilter = THREE.LinearFilter;
+
   texture.magFilter = THREE.LinearFilter;
+
   texture.needsUpdate = true;
 
   return texture;
@@ -436,7 +552,13 @@ const POST_VERTEX_SHADER = `
 
   void main() {
     vUv = uv;
-    gl_Position = vec4(position.xy, 0.0, 1.0);
+
+    gl_Position =
+      vec4(
+        position.xy,
+        0.0,
+        1.0
+      );
   }
 `;
 
@@ -449,21 +571,45 @@ const POST_FRAGMENT_SHADER = `
   varying vec2 vUv;
 
   void main() {
-    float cylindricalFactor = uCylindricalFactor;
+    float cylindricalFactor =
+      uCylindricalFactor;
 
+    /*
+     * El centro casi no se modifica.
+     * Cuanto más cerca del borde horizontal,
+     * más se comprime el rango Y que muestreamos.
+     *
+     * Al volver a proyectarlo sobre toda la pantalla
+     * produce la perspectiva/arco del conjunto.
+     */
     float stretchedY =
       vUv.y * cylindricalFactor +
       (1.0 - cylindricalFactor) * 0.5;
 
-    float xFactor = abs(0.5 - vUv.x) * 2.0;
-    xFactor = pow(xFactor, 2.0);
+    float xFactor =
+      abs(0.5 - vUv.x) * 2.0;
 
-    vec2 distortedUv = vUv;
-    distortedUv.y = mix(vUv.y, stretchedY, xFactor);
+    xFactor =
+      pow(xFactor, 2.0);
 
-    vec4 color = texture2D(tMap, distortedUv);
+    vec2 distortedUv =
+      vUv;
 
-    gl_FragColor = color;
+    distortedUv.y =
+      mix(
+        vUv.y,
+        stretchedY,
+        xFactor
+      );
+
+    vec4 color =
+      texture2D(
+        tMap,
+        distortedUv
+      );
+
+    gl_FragColor =
+      color;
 
     #include <colorspace_fragment>
   }
@@ -475,21 +621,25 @@ const POST_FRAGMENT_SHADER = `
 
 export default function HeroCardsWebGL() {
   const containerRef = useRef(null);
+
   const canvasRef = useRef(null);
 
   useEffect(() => {
     const container = containerRef.current;
+
     const canvas = canvasRef.current;
 
     if (!container || !canvas) {
-      return undefined;
+      return;
     }
 
     let destroyed = false;
     let rafId = null;
+
     let resizeObserver = null;
     let intersectionObserver = null;
     let alignTimeoutId = null;
+
     let isVisible = true;
 
     /* =====================================================
@@ -506,6 +656,7 @@ export default function HeroCardsWebGL() {
     });
 
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+
     renderer.setClearColor(new THREE.Color(0x000000), 0);
 
     /* =====================================================
@@ -513,7 +664,9 @@ export default function HeroCardsWebGL() {
     ====================================================== */
 
     const scene = new THREE.Scene();
+
     const cardsGroup = new THREE.Group();
+
     scene.add(cardsGroup);
 
     /* =====================================================
@@ -521,7 +674,9 @@ export default function HeroCardsWebGL() {
     ====================================================== */
 
     const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 1000);
+
     camera.position.set(0, 0, CAMERA_Z);
+
     camera.lookAt(0, 0, 0);
 
     /* =====================================================
@@ -534,9 +689,13 @@ export default function HeroCardsWebGL() {
       type: renderer.capabilities.isWebGL2
         ? THREE.HalfFloatType
         : THREE.UnsignedByteType,
+
       minFilter: THREE.LinearFilter,
+
       magFilter: THREE.LinearFilter,
+
       depthBuffer: true,
+
       stencilBuffer: false,
     });
 
@@ -544,6 +703,7 @@ export default function HeroCardsWebGL() {
 
     if (renderer.capabilities.isWebGL2) {
       const maxSamples = gl.getParameter(gl.MAX_SAMPLES) || 0;
+
       target.samples = Math.min(2, maxSamples);
     }
 
@@ -552,19 +712,24 @@ export default function HeroCardsWebGL() {
     ====================================================== */
 
     const postScene = new THREE.Scene();
+
     const postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
     const postMaterial = new THREE.ShaderMaterial({
       vertexShader: POST_VERTEX_SHADER,
+
       fragmentShader: POST_FRAGMENT_SHADER,
+
       uniforms: {
         tMap: {
           value: target.texture,
         },
+
         uCylindricalFactor: {
           value: CYLINDRICAL_START,
         },
       },
+
       transparent: true,
       depthTest: false,
       depthWrite: false,
@@ -585,6 +750,7 @@ export default function HeroCardsWebGL() {
     const geometry = new THREE.PlaneGeometry(1, 1);
 
     const cardStates = [];
+
     const leftCards = [];
     const rightCards = [];
 
@@ -593,12 +759,16 @@ export default function HeroCardsWebGL() {
 
     let nextFireIndexLeft = 0;
     let nextFireIndexRight = 0;
+
     let fireAccumulator = 0;
+
     let revealFactor = 0;
 
     let viewportWorldWidth = 1;
     let viewportWorldHeight = 1;
+
     let targetArcWorldY = 0;
+
     let isDesktop = true;
 
     /* =====================================================
@@ -620,19 +790,31 @@ export default function HeroCardsWebGL() {
         (texture) =>
           new THREE.MeshBasicMaterial({
             map: texture,
+
             transparent: true,
+
             depthTest: true,
+
+            /*
+             * Igual que la referencia:
+             * planos transparentes sin escribir
+             * en depth buffer.
+             */
             depthWrite: false,
+
             alphaTest: 0.001,
           }),
       );
 
       CARDS.forEach((property, index) => {
         const material = materials[property.textureIndex];
+
         const mesh = new THREE.Mesh(geometry, material);
+
         const innerGroup = new THREE.Group();
 
         innerGroup.add(mesh);
+
         cardsGroup.add(innerGroup);
 
         const direction = index % 2 === 0 ? "left" : "right";
@@ -642,6 +824,7 @@ export default function HeroCardsWebGL() {
           mesh,
           innerGroup,
           direction,
+
           isFiring: false,
           fireProgress: 0,
           fireTargetX: 0,
@@ -649,6 +832,7 @@ export default function HeroCardsWebGL() {
         };
 
         innerGroup.visible = false;
+
         innerGroup.scale.set(0, 0, 0);
 
         cardStates.push(state);
@@ -661,11 +845,13 @@ export default function HeroCardsWebGL() {
       });
 
       resize();
+
       alignTimeoutId = window.setTimeout(resize, 850);
 
       cardsGroup.scale.setScalar(GROUP_SCALE_START);
 
       preDistributeCards(leftCards);
+
       preDistributeCards(rightCards);
 
       startAnimation();
@@ -681,20 +867,33 @@ export default function HeroCardsWebGL() {
       }
 
       card.fireProgress = initialProgress;
+
       card.innerGroup.position.set(0, 0, 0);
-      card.innerGroup.rotation.set(0, 0, 0);
+
       card.innerGroup.scale.set(0, 0, 0);
-      card.mesh.material.opacity = 1;
+
       card.innerGroup.visible = true;
+
       card.innerGroup.renderOrder = 0;
+
       card.isFiring = true;
 
       return true;
     }
 
+    /*
+     * Mismo pre-distribute del motor de referencia.
+     *
+     * 900 / 9600 = 0.09375
+     *
+     * Esto coloca las cards desde el centro
+     * hasta los extremos desde el primer frame.
+     */
     function preDistributeCards(pool) {
       const fireInterval = getFireInterval(isDesktop);
+
       const fireDuration = getFireDuration(isDesktop);
+
       const step = fireInterval / (1000 * fireDuration);
 
       for (let index = 0; index < pool.length; index += 1) {
@@ -714,11 +913,14 @@ export default function HeroCardsWebGL() {
       }
 
       const isLeft = direction === "left";
+
       let current = isLeft ? nextFireIndexLeft : nextFireIndexRight;
+
       const count = pool.length;
 
       for (let attempt = 0; attempt < count; attempt += 1) {
         const index = (current + attempt) % count;
+
         const card = pool[index];
 
         if (!card.isFiring) {
@@ -737,6 +939,7 @@ export default function HeroCardsWebGL() {
 
     function fireNextPair() {
       fireNextInPool(leftCards, "left");
+
       fireNextInPool(rightCards, "right");
     }
 
@@ -746,6 +949,7 @@ export default function HeroCardsWebGL() {
 
     function resize() {
       const width = container.clientWidth;
+
       const height = container.clientHeight;
 
       if (!width || !height) {
@@ -754,10 +958,17 @@ export default function HeroCardsWebGL() {
 
       isDesktop = width >= 1024;
 
+      /*
+       * En mobile reducimos apenas el DPR.
+       * No cambia la geometría, pero ayuda
+       * mucho a mantener los 60fps.
+       */
       const maxPixelRatio = isDesktop ? 2 : 1.5;
+
       const pixelRatio = Math.min(window.devicePixelRatio || 1, maxPixelRatio);
 
       renderer.setPixelRatio(pixelRatio);
+
       renderer.setSize(width, height, false);
 
       target.setSize(
@@ -766,6 +977,7 @@ export default function HeroCardsWebGL() {
       );
 
       camera.aspect = width / height;
+
       camera.updateProjectionMatrix();
 
       viewportWorldHeight =
@@ -775,17 +987,25 @@ export default function HeroCardsWebGL() {
 
       viewportWorldWidth = viewportWorldHeight * camera.aspect;
 
-      /* Posición vertical del arco */
+      /* ===================================================
+         POSICIÓN DEL EJE
+      ==================================================== */
+
       const { titleEl, subtitleEl } = getHeroAnchors(container);
+
       let targetArcPx = height / 2;
 
       if (titleEl && subtitleEl) {
         const containerRect = container.getBoundingClientRect();
+
         const titleRect = titleEl.getBoundingClientRect();
+
         const subtitleRect = subtitleEl.getBoundingClientRect();
 
         const titleBottomPx = titleRect.bottom - containerRect.top;
+
         const subtitleTopPx = subtitleRect.top - containerRect.top;
+
         const freeSpacePx = Math.max(0, subtitleTopPx - titleBottomPx);
 
         const ratio = isDesktop
@@ -803,14 +1023,35 @@ export default function HeroCardsWebGL() {
         targetArcWorldY = 0;
       }
 
-      /* Tamaño base */
+      /* ===================================================
+         TAMAÑO BASE
+      ==================================================== */
+
       const preferredCardWidth =
         (isDesktop ? DESKTOP_CARD_WIDTH : MOBILE_CARD_WIDTH) *
         viewportWorldWidth;
 
+      /*
+       * No existe desplazamiento Y individual.
+       * Todas las cards nacen sobre el mismo eje.
+       *
+       * La curva visual la genera exclusivamente
+       * el postprocesado.
+       */
       const cardCenterPx = targetArcPx;
+
+      /* ===================================================
+         LÍMITE DE ALTURA
+
+         Adaptación necesaria porque nuestras cards
+         incluyen información inmobiliaria y son
+         más verticales.
+      ==================================================== */
+
       const bottomSafeSpacePx = isDesktop ? 28 : 18;
+
       const topSafeSpacePx = isDesktop ? 12 : 10;
+
       const shaderFactor = getCylindricalEnd(isDesktop);
 
       const maxHeightByBottomPx =
@@ -833,23 +1074,40 @@ export default function HeroCardsWebGL() {
         0,
         Math.min(maxHeightByBottomPx, maxHeightByTopPx, maxHeightByRatioPx),
       );
-
+      /*
+       * IMPORTANTE:
+       * mantenemos el tamaño BASE real del efecto.
+       *
+       * No achicamos toda la geometría para hacer entrar
+       * las cards de los extremos.
+       */
       const cardWidth = preferredCardWidth;
+
       const cardHeight = cardWidth / CARD_ASPECT;
 
+      /*
+       * Convertimos la altura máxima permitida a mundo WebGL.
+       */
       const maxVisualCardHeightWorld =
         (maxPreShaderCardHeightPx / height) * viewportWorldHeight;
 
+      /*
+       * Calculamos cuánto puede escalar como máximo esta card
+       * cuando cardsGroup ya llegó a GROUP_SCALE_END.
+       */
       const maxCardScale =
         maxVisualCardHeightWorld / (cardHeight * GROUP_SCALE_END);
 
+      /* ===================================================
+         APLICAR
+      ==================================================== */
+
       cardStates.forEach((card) => {
         card.mesh.scale.set(cardWidth, cardHeight, 1);
+
         card.maxScale = Math.min(1, maxCardScale);
 
-        const fireTarget = isDesktop
-          ? FIRE_TARGET_DESKTOP
-          : FIRE_TARGET_MOBILE;
+        const fireTarget = isDesktop ? FIRE_TARGET_DESKTOP : FIRE_TARGET_MOBILE;
 
         card.fireTargetX =
           (card.direction === "left" ? -1 : 1) *
@@ -863,6 +1121,7 @@ export default function HeroCardsWebGL() {
     ====================================================== */
 
     resizeObserver = new ResizeObserver(resize);
+
     resizeObserver.observe(container);
 
     const { titleEl, subtitleEl } = getHeroAnchors(container);
@@ -896,36 +1155,59 @@ export default function HeroCardsWebGL() {
       }
 
       const fireDuration = getFireDuration(isDesktop);
+
       card.fireProgress += delta / (1000 * fireDuration);
 
+      /*
+       * Igual que el motor original:
+       * cuando progress llega a 1 la card ya está
+       * completamente fuera del viewport.
+       */
       if (card.fireProgress >= 1) {
         card.isFiring = false;
+
         card.innerGroup.visible = false;
+
         card.innerGroup.position.set(0, 0, 0);
-        card.innerGroup.rotation.set(0, 0, 0);
+
         card.innerGroup.scale.set(0, 0, 0);
-        card.mesh.material.opacity = 1;
+
         card.innerGroup.renderOrder = 0;
+
         return;
       }
 
-      const progress = isDesktop
-        ? card.fireProgress * revealFactor
-        : card.fireProgress;
+      const progress = card.fireProgress * revealFactor;
 
       /* ===================================================
          MOVIMIENTO
 
-         Desktop y mobile usan la MISMA curva. La diferencia
-         mobile está únicamente en el punto inicial, el tamaño,
-         la cantidad de cards y la distorsión del arco.
+         ESTA ES LA PARTE CLAVE.
+
+         No linealizamos.
+         No agregamos offsets.
+         No movemos Y.
       ==================================================== */
+
       let movement = smoothstep(0, 1, progress);
+
       movement = 0.5 * easeInQuad(movement) + 0.5 * movement;
 
+      /*
+       * Desktop conserva exactamente su movimiento.
+       *
+       * Mobile mezcla el easing con movimiento lineal.
+       * Esto evita el embotellamiento de cards
+       * en la zona central.
+       */
+      const horizontalMovement = isDesktop
+        ? movement
+        : lerp(progress, movement, MOBILE_MOVEMENT_EASE_MIX);
+
       /* ===================================================
-         ESCALA
-      ==================================================== */
+   ESCALA
+==================================================== */
+
       const scaleStart = 0.2;
       const initialScaleWeight = 0.125;
 
@@ -938,78 +1220,88 @@ export default function HeroCardsWebGL() {
         : lerp(MOBILE_MIN_SCALE, MOBILE_MAX_SCALE, baseScale);
 
       const finalScale = scale * card.maxScale;
-      const directionSign = card.direction === "left" ? -1 : 1;
+    /* ===================================================
+   TRANSFORM
+==================================================== */
 
-      /* ===================================================
-         POSICIÓN HORIZONTAL
+const directionSign =
+  card.direction === "left" ? -1 : 1;
 
-         Desktop parte exactamente del centro.
+if (isDesktop) {
+  /*
+   * DESKTOP:
+   * NO CAMBIAMOS NADA.
+   */
+  const baseX =
+    card.fireTargetX *
+    horizontalMovement;
 
-         Mobile parte con una separación mínima calculada para
-         que LEFT y RIGHT nazcan una al lado de la otra. Después
-         ambas siguen la misma trayectoria monotónica de desktop.
-      ==================================================== */
-      if (isDesktop) {
-        card.innerGroup.position.x =
-          card.fireTargetX * movement;
-      } else {
-        const startMagnitude =
-          viewportWorldWidth * MOBILE_PAIR_START_OFFSET;
+  const exitProgress =
+    smoothstep(
+      EXIT_START_DESKTOP,
+      1,
+      progress,
+    );
 
-        const targetMagnitude = Math.abs(card.fireTargetX);
+  const exitX =
+    directionSign *
+    viewportWorldWidth *
+    EXIT_EXTRA_DESKTOP *
+    exitProgress;
 
-        const magnitude = lerp(
-          startMagnitude,
-          targetMagnitude,
-          movement,
-        );
+  card.innerGroup.position.x =
+    baseX + exitX;
+} else {
+  /*
+   * MOBILE
+   *
+   * Las dos cards nacen ligeramente separadas.
+   * Desde ahí SIEMPRE se mueven hacia afuera.
+   */
+  const pairStartX =
+    directionSign *
+    viewportWorldWidth *
+    MOBILE_PAIR_START_OFFSET;
 
-        card.innerGroup.position.x =
-          directionSign * magnitude;
-      }
+  const baseX =
+    card.fireTargetX *
+    horizontalMovement;
 
-      card.innerGroup.position.y = 0;
-      card.innerGroup.scale.setScalar(finalScale);
+  /*
+   * Este tramo solo actúa cuando la card
+   * ya está llegando al borde.
+   *
+   * No modifica la disposición del arco.
+   */
+  const exitProgress =
+    smoothstep(
+      EXIT_START_MOBILE,
+      1,
+      progress,
+    );
 
-      /* ===================================================
-         GIRO 3D HACIA EL CENTRO
+  const exitX =
+    directionSign *
+    viewportWorldWidth *
+    EXIT_EXTRA_MOBILE *
+    exitProgress;
 
-         Izquierda mira levemente a la derecha.
-         Derecha mira levemente a la izquierda.
-         El giro crece junto con el recorrido.
-      ==================================================== */
-      const maxTilt = isDesktop
-        ? CARD_TILT_DESKTOP
-        : CARD_TILT_MOBILE;
+  card.innerGroup.position.x =
+    pairStartX +
+    baseX +
+    exitX;
+}
 
-      const tiltProgress = smoothstep(0.08, 0.75, movement);
+card.innerGroup.position.y = 0;
 
-      card.innerGroup.rotation.y =
-        -directionSign * maxTilt * tiltProgress;
+card.innerGroup.scale.setScalar(
+  finalScale,
+);
 
-      /* ===================================================
-         SALIDA
-
-         No aceleramos la última card: todas recorren la misma
-         curva. Al llegar al borde simplemente bajamos opacity,
-         evitando el pop sin deformar el recorrido.
-      ==================================================== */
-      const fadeStart = isDesktop
-        ? FADE_START_DESKTOP
-        : FADE_START_MOBILE;
-
-      const fadeProgress = smoothstep(
-        fadeStart,
-        1,
-        progress,
-      );
-
-      card.mesh.material.opacity =
-        1 - fadeProgress;
-
-      card.innerGroup.renderOrder =
-        movement + finalScale;
-    }
+card.innerGroup.renderOrder =
+  horizontalMovement +
+  finalScale;
+}
 
     /* =====================================================
        LOOP
@@ -1020,6 +1312,7 @@ export default function HeroCardsWebGL() {
 
     function startAnimation() {
       startTime = performance.now();
+
       previousTime = startTime;
 
       function frame(time) {
@@ -1031,18 +1324,30 @@ export default function HeroCardsWebGL() {
 
         if (document.hidden || !isVisible) {
           previousTime = time;
+
           return;
         }
 
         const rawDelta = time - previousTime;
+
         const delta = Math.min(rawDelta, 100);
+
         previousTime = time;
 
         const elapsed = time - startTime;
 
+        /* =================================================
+           REVEAL
+        ================================================== */
+
         revealFactor = power3InOut(elapsed / REVEAL_DURATION);
 
+        /* =================================================
+           ZOOM GENERAL
+        ================================================== */
+
         const zoomProgress = power3InOut(elapsed / GROUP_ZOOM_DURATION);
+
         const groupScale = lerp(
           GROUP_SCALE_START,
           GROUP_SCALE_END,
@@ -1050,9 +1355,20 @@ export default function HeroCardsWebGL() {
         );
 
         cardsGroup.scale.setScalar(groupScale);
+
+        /*
+         * El conjunto se mueve como una sola unidad.
+         *
+         * Nada de centerLift.
+         */
         cardsGroup.position.y = targetArcWorldY;
 
+        /* =================================================
+           DISTORSIÓN GLOBAL
+        ================================================== */
+
         const cylinderProgress = power4Out(elapsed / CYLINDRICAL_DURATION);
+
         const cylindricalEnd = getCylindricalEnd(isDesktop);
 
         postMaterial.uniforms.uCylindricalFactor.value = lerp(
@@ -1061,31 +1377,66 @@ export default function HeroCardsWebGL() {
           cylinderProgress,
         );
 
+        /* =================================================
+           DISPAROS
+
+           Cadencia continua.
+           Sin waits ni acumuladores especiales.
+        ================================================== */
         const fireInterval = getFireInterval(isDesktop);
+
         fireAccumulator += delta;
 
         while (fireAccumulator >= fireInterval) {
           fireAccumulator -= fireInterval;
+
           fireNextPair();
         }
 
+        /*
+         * Igual que la referencia:
+         * primero se procesa el firing y después
+         * se actualizan las entidades.
+         */
         cardStates.forEach((card) => updateCard(card, delta));
 
+        /* =================================================
+           PASS 1
+        ================================================== */
+
         renderer.setRenderTarget(target);
+
         renderer.setClearColor(0x000000, 0);
+
         renderer.clear();
+
         renderer.render(scene, camera);
 
+        /* =================================================
+           PASS 2
+        ================================================== */
+
         renderer.setRenderTarget(null);
+
         renderer.setClearColor(0x000000, 0);
+
         renderer.clear();
+
         renderer.render(postScene, postCamera);
       }
 
       rafId = requestAnimationFrame(frame);
     }
 
+    /* =====================================================
+       INIT
+    ====================================================== */
+
     buildCards();
+
+    /* =====================================================
+       CLEANUP
+    ====================================================== */
 
     return () => {
       destroyed = true;
@@ -1099,15 +1450,21 @@ export default function HeroCardsWebGL() {
       }
 
       resizeObserver?.disconnect();
+
       intersectionObserver?.disconnect();
 
       geometry.dispose();
+
       textures.forEach((texture) => texture.dispose());
+
       materials.forEach((material) => material.dispose());
 
       postQuad.geometry.dispose();
+
       postMaterial.dispose();
+
       target.dispose();
+
       renderer.dispose();
     };
   }, []);
