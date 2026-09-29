@@ -109,16 +109,16 @@ export default function HeroSection() {
           duration: 0.65,
         }}
         className="
-          absolute
-          bottom-[54px]
-          left-1/2
-          z-40
-          w-[min(92vw,760px)]
-          -translate-x-1/2
-          text-center
-          sm:bottom-[60px]
-          lg:bottom-[64px]
-        "
+  absolute
+  bottom-[54px]
+  left-1/2
+  z-40
+  w-[min(92vw,760px)]
+  -translate-x-1/2
+  text-center
+  sm:bottom-[60px]
+  lg:bottom-[clamp(110px,16vh,140px)]
+"
       >
         {/* Bajada */}
         <div
