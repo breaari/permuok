@@ -322,7 +322,7 @@ function loadImage(src) {
 
 async function createCardTexture(property) {
   const WIDTH = 720;
-  const HEIGHT = 780;
+  const HEIGHT = 760;
   const RADIUS = 32;
 
   const canvas = document.createElement("canvas");
@@ -400,7 +400,7 @@ async function createCardTexture(property) {
 
   const titleLines = wrapText(ctx, property.title, WIDTH - 76, 2);
 
-  let titleY = 657;
+  let titleY = 655;
 
   for (const line of titleLines) {
     ctx.fillText(line, 38, titleY);
@@ -409,7 +409,7 @@ async function createCardTexture(property) {
   }
 
   /* Precio */
-  const priceY = titleY + 12;
+  const priceY = titleY + 16;
 
   ctx.fillStyle = "#0f172a";
 
