@@ -141,12 +141,6 @@ const FIRE_INTERVAL_MOBILE = FIRE_INTERVAL_DESKTOP;
 const FIRE_DURATION_MOBILE = FIRE_DURATION_DESKTOP;
 const MOBILE_CARD_WIDTH = DESKTOP_CARD_WIDTH;
 
-const CARD_TILT_DESKTOP = THREE.MathUtils.degToRad(10);
-const CARD_TILT_MOBILE = CARD_TILT_DESKTOP;
-
-const MAX_CARD_VISUAL_HEIGHT_DESKTOP = 0.74;
-const MAX_CARD_VISUAL_HEIGHT_MOBILE = MAX_CARD_VISUAL_HEIGHT_DESKTOP;
-
 const CYLINDRICAL_END_DESKTOP = 0.7;
 const CYLINDRICAL_END_MOBILE = CYLINDRICAL_END_DESKTOP;
 
@@ -625,7 +619,6 @@ export default function HeroCardsWebGL() {
           isFiring: false,
           fireProgress: 0,
           fireTargetX: 0,
-          maxScale: 1,
         };
 
         innerGroup.visible = false;
@@ -783,54 +776,29 @@ export default function HeroCardsWebGL() {
         targetArcWorldY = 0;
       }
 
-      /* Tamaño base */
-      const preferredCardWidth =
+      /* ===================================================
+   TAMAÑO DE CARD
+   Igual al motor de Melius.
+=================================================== */
+
+      const cardWidth =
         (isDesktop ? DESKTOP_CARD_WIDTH : MOBILE_CARD_WIDTH) *
         viewportWorldWidth;
 
-      const cardCenterPx = targetArcPx;
-      const bottomSafeSpacePx = 28;
-      const topSafeSpacePx = 12;
-      const shaderFactor = getCylindricalEnd(isDesktop);
-
-      const maxHeightByBottomPx =
-        height * (1 + shaderFactor) -
-        2 * cardCenterPx -
-        2 * shaderFactor * bottomSafeSpacePx;
-
-      const maxHeightByTopPx =
-        2 * cardCenterPx -
-        height * (1 - shaderFactor) -
-        2 * shaderFactor * topSafeSpacePx;
-
-      const maxHeightByRatioPx =
-        height *
-        (isDesktop
-          ? MAX_CARD_VISUAL_HEIGHT_DESKTOP
-          : MAX_CARD_VISUAL_HEIGHT_MOBILE);
-
-      const maxPreShaderCardHeightPx = Math.max(
-        0,
-        Math.min(maxHeightByBottomPx, maxHeightByTopPx, maxHeightByRatioPx),
-      );
-
-      const cardWidth = preferredCardWidth;
       const cardHeight = cardWidth / CARD_ASPECT;
 
-      const maxVisualCardHeightWorld =
-        (maxPreShaderCardHeightPx / height) * viewportWorldHeight;
-
-      const maxCardScale =
-        maxVisualCardHeightWorld / (cardHeight * GROUP_SCALE_END);
-
       cardStates.forEach((card) => {
-        
         card.mesh.scale.set(cardWidth, cardHeight, 1);
-
-        card.maxScale = Math.min(1, maxCardScale);
 
         const directionSign = card.direction === "left" ? -1 : 1;
 
+        /*
+         * Valor exacto usado por Melius.
+         *
+         * El final de smoothstep ocurre lejos del
+         * viewport; por eso la desaceleración final
+         * no genera el embotellamiento visible.
+         */
         card.fireTargetX = directionSign * viewportWorldWidth * 1.65;
       });
     }
@@ -888,64 +856,53 @@ export default function HeroCardsWebGL() {
 
         return;
       }
-
-      const progress = clamp01(card.fireProgress * revealFactor);
+      // VIOLETA
+      const progress = card.fireProgress * revealFactor;
 
       /* ===================================================
-         MOVIMIENTO
+   MOVIMIENTO
+   Exactamente Melius
+=================================================== */
 
-         Desktop y mobile usan la MISMA curva. La diferencia
-         mobile está únicamente en el punto inicial, el tamaño,
-         la cantidad de cards y la distorsión del arco.
-      ==================================================== */
       let movement = smoothstep(0, 1, progress);
+
       movement = 0.5 * easeInQuad(movement) + 0.5 * movement;
 
       /* ===================================================
-         ESCALA
-      ==================================================== */
-      const scaleStart = 0.2;
-      const initialScaleWeight = 0.125;
+   ESCALA
+   Exactamente Melius
+=================================================== */
 
-      const baseScale =
-        initialScaleWeight * smoothstep(0, 0.15, progress) +
-        (1 - initialScaleWeight) * smoothstep(scaleStart, 1, progress);
+      const scaleStart = isDesktop ? 0.2 : 0.3;
 
-      const finalScale = baseScale * card.maxScale;
-
-      const directionSign = card.direction === "left" ? -1 : 1;
+      const cardScale =
+        0.125 * smoothstep(0, 0.15, progress) +
+        0.875 * smoothstep(scaleStart, 1, progress);
 
       /* ===================================================
-   POSICIÓN HORIZONTAL
+   TRANSFORM
 =================================================== */
 
       card.innerGroup.position.x = card.fireTargetX * movement;
 
       card.innerGroup.position.y = 0;
 
-      card.innerGroup.scale.setScalar(finalScale);
-
-      /* ===================================================
-   GIRO 3D HACIA EL CENTRO
-=================================================== */
-
-      const maxTilt = CARD_TILT_DESKTOP;
-
-      const tiltProgress = smoothstep(0.08, 0.75, movement);
-
-      card.innerGroup.rotation.y = -directionSign * maxTilt * tiltProgress;
-
-      /* ===================================================
-   OPACIDAD
-=================================================== */
+      /*
+       * IMPORTANTE:
+       * nada de card.maxScale.
+       */
+      card.innerGroup.scale.setScalar(cardScale);
 
       /*
-       * Nunca desvanecemos la card.
-       * Sale físicamente del viewport.
+       * Melius NO aplica giro individual.
        */
+      card.innerGroup.rotation.set(0, 0, 0);
+
       card.mesh.material.opacity = 1;
 
-      card.innerGroup.renderOrder = movement + finalScale;
+      card.innerGroup.renderOrder = movement + cardScale;
+
+      //VIOLETA
     }
 
     /* =====================================================
