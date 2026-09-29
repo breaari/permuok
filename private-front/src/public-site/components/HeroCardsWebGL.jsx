@@ -147,7 +147,7 @@ const CYLINDRICAL_END_MOBILE = CYLINDRICAL_END_DESKTOP;
 const CAMERA_FOV = 45;
 const CAMERA_Z = 5;
 
-const CARD_ASPECT = 720 / 780;
+const CARD_ASPECT = 720 / 760;
 
 const GROUP_SCALE_START = 1.2;
 const GROUP_SCALE_END = 0.5;
@@ -799,7 +799,7 @@ export default function HeroCardsWebGL() {
    Igual a Melius: grupo centrado en la escena.
 =================================================== */
 
-      targetArcWorldY = -viewportWorldHeight * ARC_VERTICAL_OFFSET;
+      targetArcWorldY = 0;
 
       /* ===================================================
    TAMAÑO DE CARD
