@@ -75,7 +75,7 @@ export default function HeroSection() {
           }}
           className="
   mx-auto
-  max-w-[1060px]
+  max-w-[1040px]
   text-[38px]
   font-normal
   leading-[0.98]
@@ -83,8 +83,8 @@ export default function HeroSection() {
   text-[#0a192f]
   sm:text-[48px]
   md:text-[54px]
-  lg:text-[56px]
-  xl:text-[58px]
+  lg:text-[54px]
+  xl:text-[56px]
 "
         >
           La plataforma creada para revolucionar las permutas inmobiliarias.
@@ -125,9 +125,9 @@ export default function HeroSection() {
           data-hero-subtitle
           className="
     mx-auto
-    max-w-[720px]
+    max-w-[540px]
     px-4
-    sm:px-7
+    sm:px-6
   "
         >
           <p
