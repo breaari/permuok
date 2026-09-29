@@ -129,49 +129,37 @@ const CARDS = BASE_PROPERTIES.map((property, index) => ({
    CONFIG
 ========================================================= */
 
-/* Desktop: mantenemos el comportamiento que ya funciona. */
+/* Desktop */
 const FIRE_INTERVAL_DESKTOP = 900;
 const FIRE_DURATION_DESKTOP = 9.6;
 const DESKTOP_CARD_WIDTH = 0.75;
 const FIRE_TARGET_DESKTOP = 1.0;
 
-/*
- * Mobile:
- * - menos cards simultáneas
- * - mismo motor de movimiento que desktop
- * - arco más plano
- * - pareja central visible sin superposición
- */
-const FIRE_INTERVAL_MOBILE = 1600;
-const FIRE_DURATION_MOBILE = 6.4;
-const MOBILE_CARD_WIDTH = 1.25;
-const FIRE_TARGET_MOBILE = 1.0;
-const MOBILE_MIN_SCALE = 0.20;
-const MOBILE_MAX_SCALE = 0.68;
-const MOBILE_PAIR_START_OFFSET = 0.125;
+/* Mobile = exactamente igual a desktop */
+const FIRE_INTERVAL_MOBILE = FIRE_INTERVAL_DESKTOP;
+const FIRE_DURATION_MOBILE = FIRE_DURATION_DESKTOP;
+const MOBILE_CARD_WIDTH = DESKTOP_CARD_WIDTH;
+const FIRE_TARGET_MOBILE = FIRE_TARGET_DESKTOP;
 
-/*
- * Perspectiva individual de cada card.
- * Las cards de cada lado giran ligeramente hacia el centro.
- */
 const CARD_TILT_DESKTOP = THREE.MathUtils.degToRad(10);
-const CARD_TILT_MOBILE = THREE.MathUtils.degToRad(8);
+const CARD_TILT_MOBILE = CARD_TILT_DESKTOP;
 
-/*
- * En vez de acelerar la última card para sacarla de pantalla,
- * todas siguen exactamente la misma trayectoria y se desvanecen
- * suavemente al llegar al límite visible.
- */
 const FADE_START_DESKTOP = 0.94;
-const FADE_START_MOBILE = 0.92;
+const FADE_START_MOBILE = FADE_START_DESKTOP;
+
+const MAX_CARD_VISUAL_HEIGHT_DESKTOP = 0.74;
+const MAX_CARD_VISUAL_HEIGHT_MOBILE = MAX_CARD_VISUAL_HEIGHT_DESKTOP;
+
+const CYLINDRICAL_END_DESKTOP = 0.7;
+const CYLINDRICAL_END_MOBILE = CYLINDRICAL_END_DESKTOP;
+
+const ARC_POSITION_RATIO_DESKTOP = 0.46;
+const ARC_POSITION_RATIO_MOBILE = ARC_POSITION_RATIO_DESKTOP;
 
 const CAMERA_FOV = 45;
 const CAMERA_Z = 5;
 
 const CARD_ASPECT = 720 / 980;
-
-const MAX_CARD_VISUAL_HEIGHT_DESKTOP = 0.74;
-const MAX_CARD_VISUAL_HEIGHT_MOBILE = 0.76;
 
 const GROUP_SCALE_START = 1.2;
 const GROUP_SCALE_END = 0.5;
@@ -180,12 +168,7 @@ const GROUP_ZOOM_DURATION = 1500;
 const REVEAL_DURATION = 1750;
 
 const CYLINDRICAL_START = 1;
-const CYLINDRICAL_END_DESKTOP = 0.7;
-const CYLINDRICAL_END_MOBILE = 0.99;
 const CYLINDRICAL_DURATION = 2000;
-
-const ARC_POSITION_RATIO_DESKTOP = 0.46;
-const ARC_POSITION_RATIO_MOBILE = 0.46;
 
 /* =========================================================
    HELPERS
@@ -809,8 +792,8 @@ export default function HeroCardsWebGL() {
         viewportWorldWidth;
 
       const cardCenterPx = targetArcPx;
-      const bottomSafeSpacePx = isDesktop ? 28 : 18;
-      const topSafeSpacePx = isDesktop ? 12 : 10;
+      const bottomSafeSpacePx = 28;
+      const topSafeSpacePx = 12;
       const shaderFactor = getCylindricalEnd(isDesktop);
 
       const maxHeightByBottomPx =
@@ -847,9 +830,7 @@ export default function HeroCardsWebGL() {
         card.mesh.scale.set(cardWidth, cardHeight, 1);
         card.maxScale = Math.min(1, maxCardScale);
 
-        const fireTarget = isDesktop
-          ? FIRE_TARGET_DESKTOP
-          : FIRE_TARGET_MOBILE;
+        const fireTarget = isDesktop ? FIRE_TARGET_DESKTOP : FIRE_TARGET_MOBILE;
 
         card.fireTargetX =
           (card.direction === "left" ? -1 : 1) *
@@ -909,9 +890,7 @@ export default function HeroCardsWebGL() {
         return;
       }
 
-      const progress = isDesktop
-        ? card.fireProgress * revealFactor
-        : card.fireProgress;
+      const progress = card.fireProgress * revealFactor;
 
       /* ===================================================
          MOVIMIENTO
@@ -933,11 +912,8 @@ export default function HeroCardsWebGL() {
         initialScaleWeight * smoothstep(0, 0.15, progress) +
         (1 - initialScaleWeight) * smoothstep(scaleStart, 1, progress);
 
-      const scale = isDesktop
-        ? baseScale
-        : lerp(MOBILE_MIN_SCALE, MOBILE_MAX_SCALE, baseScale);
+      const finalScale = baseScale * card.maxScale;
 
-      const finalScale = scale * card.maxScale;
       const directionSign = card.direction === "left" ? -1 : 1;
 
       /* ===================================================
@@ -949,24 +925,7 @@ export default function HeroCardsWebGL() {
          que LEFT y RIGHT nazcan una al lado de la otra. Después
          ambas siguen la misma trayectoria monotónica de desktop.
       ==================================================== */
-      if (isDesktop) {
-        card.innerGroup.position.x =
-          card.fireTargetX * movement;
-      } else {
-        const startMagnitude =
-          viewportWorldWidth * MOBILE_PAIR_START_OFFSET;
-
-        const targetMagnitude = Math.abs(card.fireTargetX);
-
-        const magnitude = lerp(
-          startMagnitude,
-          targetMagnitude,
-          movement,
-        );
-
-        card.innerGroup.position.x =
-          directionSign * magnitude;
-      }
+      card.innerGroup.position.x = card.fireTargetX * movement;
 
       card.innerGroup.position.y = 0;
       card.innerGroup.scale.setScalar(finalScale);
@@ -978,14 +937,11 @@ export default function HeroCardsWebGL() {
          Derecha mira levemente a la izquierda.
          El giro crece junto con el recorrido.
       ==================================================== */
-      const maxTilt = isDesktop
-        ? CARD_TILT_DESKTOP
-        : CARD_TILT_MOBILE;
+      const maxTilt = CARD_TILT_DESKTOP;
 
       const tiltProgress = smoothstep(0.08, 0.75, movement);
 
-      card.innerGroup.rotation.y =
-        -directionSign * maxTilt * tiltProgress;
+      card.innerGroup.rotation.y = -directionSign * maxTilt * tiltProgress;
 
       /* ===================================================
          SALIDA
@@ -994,21 +950,13 @@ export default function HeroCardsWebGL() {
          curva. Al llegar al borde simplemente bajamos opacity,
          evitando el pop sin deformar el recorrido.
       ==================================================== */
-      const fadeStart = isDesktop
-        ? FADE_START_DESKTOP
-        : FADE_START_MOBILE;
+      const fadeStart = FADE_START_DESKTOP;
 
-      const fadeProgress = smoothstep(
-        fadeStart,
-        1,
-        progress,
-      );
+      const fadeProgress = smoothstep(fadeStart, 1, progress);
 
-      card.mesh.material.opacity =
-        1 - fadeProgress;
+      card.mesh.material.opacity = 1 - fadeProgress;
 
-      card.innerGroup.renderOrder =
-        movement + finalScale;
+      card.innerGroup.renderOrder = movement + finalScale;
     }
 
     /* =====================================================
