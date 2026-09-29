@@ -158,6 +158,8 @@ const REVEAL_DURATION = 1750;
 const CYLINDRICAL_START = 1;
 const CYLINDRICAL_DURATION = 2000;
 
+const ARC_VERTICAL_OFFSET = 0.05;
+
 /* =========================================================
    HELPERS
 ========================================================= */
@@ -618,7 +620,7 @@ export default function HeroCardsWebGL() {
 
     let viewportWorldWidth = 1;
     let viewportWorldHeight = 1;
-    let targetArcWorldY = 0;
+    let targetArcWorldY = -viewportWorldHeight * ARC_VERTICAL_OFFSET;
     let isDesktop = true;
 
     /* =====================================================
