@@ -144,9 +144,6 @@ const FIRE_TARGET_MOBILE = FIRE_TARGET_DESKTOP;
 const CARD_TILT_DESKTOP = THREE.MathUtils.degToRad(10);
 const CARD_TILT_MOBILE = CARD_TILT_DESKTOP;
 
-const FADE_START_DESKTOP = 0.94;
-const FADE_START_MOBILE = FADE_START_DESKTOP;
-
 const MAX_CARD_VISUAL_HEIGHT_DESKTOP = 0.74;
 const MAX_CARD_VISUAL_HEIGHT_MOBILE = MAX_CARD_VISUAL_HEIGHT_DESKTOP;
 
@@ -169,6 +166,23 @@ const REVEAL_DURATION = 1750;
 
 const CYLINDRICAL_START = 1;
 const CYLINDRICAL_DURATION = 2000;
+
+/*
+ * La trayectoria normal termina en 1.
+ * Después dejamos un pequeño tramo adicional para que
+ * la card termine de salir físicamente del viewport.
+ *
+ * 1.10 sigue entrando dentro del pool de 12 cards por lado:
+ * 9.6s * 1.10 = 10.56s
+ * 10.56 / 0.9 = 11.73 cards activas.
+ */
+const CARD_LIFETIME = 1.1;
+
+/*
+ * Distancia adicional exclusivamente fuera del borde.
+ * No modifica la distribución visible principal.
+ */
+const EXIT_TRAVEL = 0.32;
 
 /* =========================================================
    HELPERS
@@ -879,7 +893,7 @@ export default function HeroCardsWebGL() {
       const fireDuration = getFireDuration(isDesktop);
       card.fireProgress += delta / (1000 * fireDuration);
 
-      if (card.fireProgress >= 1) {
+      if (card.fireProgress >= CARD_LIFETIME) {
         card.isFiring = false;
         card.innerGroup.visible = false;
         card.innerGroup.position.set(0, 0, 0);
@@ -890,7 +904,7 @@ export default function HeroCardsWebGL() {
         return;
       }
 
-      const progress = card.fireProgress * revealFactor;
+      const progress = clamp01(card.fireProgress * revealFactor);
 
       /* ===================================================
          MOVIMIENTO
@@ -917,26 +931,35 @@ export default function HeroCardsWebGL() {
       const directionSign = card.direction === "left" ? -1 : 1;
 
       /* ===================================================
-         POSICIÓN HORIZONTAL
+   POSICIÓN HORIZONTAL
+=================================================== */
 
-         Desktop parte exactamente del centro.
+      const baseX = card.fireTargetX * movement;
 
-         Mobile parte con una separación mínima calculada para
-         que LEFT y RIGHT nazcan una al lado de la otra. Después
-         ambas siguen la misma trayectoria monotónica de desktop.
-      ==================================================== */
-      card.innerGroup.position.x = card.fireTargetX * movement;
+      /*
+       * Tramo adicional de salida.
+       *
+       * Hasta progress 1:
+       * comportamiento actual sin modificaciones.
+       *
+       * De 1 a 1.10:
+       * sigue físicamente hacia afuera.
+       */
+      const exitProgress = smoothstep(1, CARD_LIFETIME, card.fireProgress);
+
+      const exitX =
+        directionSign * viewportWorldWidth * EXIT_TRAVEL * exitProgress;
+
+      card.innerGroup.position.x = baseX + exitX;
 
       card.innerGroup.position.y = 0;
+
       card.innerGroup.scale.setScalar(finalScale);
 
       /* ===================================================
-         GIRO 3D HACIA EL CENTRO
+   GIRO 3D HACIA EL CENTRO
+=================================================== */
 
-         Izquierda mira levemente a la derecha.
-         Derecha mira levemente a la izquierda.
-         El giro crece junto con el recorrido.
-      ==================================================== */
       const maxTilt = CARD_TILT_DESKTOP;
 
       const tiltProgress = smoothstep(0.08, 0.75, movement);
@@ -944,17 +967,14 @@ export default function HeroCardsWebGL() {
       card.innerGroup.rotation.y = -directionSign * maxTilt * tiltProgress;
 
       /* ===================================================
-         SALIDA
+   OPACIDAD
+=================================================== */
 
-         No aceleramos la última card: todas recorren la misma
-         curva. Al llegar al borde simplemente bajamos opacity,
-         evitando el pop sin deformar el recorrido.
-      ==================================================== */
-      const fadeStart = FADE_START_DESKTOP;
-
-      const fadeProgress = smoothstep(fadeStart, 1, progress);
-
-      card.mesh.material.opacity = 1 - fadeProgress;
+      /*
+       * Nunca desvanecemos la card.
+       * Sale físicamente del viewport.
+       */
+      card.mesh.material.opacity = 1;
 
       card.innerGroup.renderOrder = movement + finalScale;
     }
