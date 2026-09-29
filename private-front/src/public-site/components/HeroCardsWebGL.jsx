@@ -130,17 +130,16 @@ const CARDS = BASE_PROPERTIES.map((property, index) => ({
 ========================================================= */
 
 /* Desktop */
-const FIRE_INTERVAL_DESKTOP = 1000;
+const FIRE_INTERVAL_DESKTOP = 900;
 const FIRE_DURATION_DESKTOP = 9.6;
 const DESKTOP_CARD_WIDTH = 0.75;
 
 /* Mobile = exactamente igual a desktop */
 
-// ARIANA 
+// ARIANA
 const FIRE_INTERVAL_MOBILE = FIRE_INTERVAL_DESKTOP;
 const FIRE_DURATION_MOBILE = FIRE_DURATION_DESKTOP;
 const MOBILE_CARD_WIDTH = DESKTOP_CARD_WIDTH;
-
 
 const CARD_TILT_DESKTOP = THREE.MathUtils.degToRad(10);
 const CARD_TILT_MOBILE = CARD_TILT_DESKTOP;
@@ -825,43 +824,14 @@ export default function HeroCardsWebGL() {
         maxVisualCardHeightWorld / (cardHeight * GROUP_SCALE_END);
 
       cardStates.forEach((card) => {
+        
         card.mesh.scale.set(cardWidth, cardHeight, 1);
-        card.maxScale = Math.min(1, maxCardScale);
 
-        /*
-         * DESTINO REAL DE SALIDA
-         *
-         * Queremos que cuando progress llegue a 1,
-         * TODA la card ya haya atravesado el borde.
-         *
-         * No hay una segunda animación.
-         * Toda la trayectoria 0 → 1 incluye la salida.
-         */
+        card.maxScale = Math.min(1, maxCardScale);
 
         const directionSign = card.direction === "left" ? -1 : 1;
 
-        /*
-         * Como cardsGroup termina en scale 0.5,
-         * convertimos el borde visible del viewport
-         * a coordenadas locales del grupo.
-         */
-        const viewportEdgeLocal = viewportWorldWidth / (2 * GROUP_SCALE_END);
-
-        /*
-         * Media card en su tamaño FINAL.
-         */
-        const halfCardWidthLocal = (cardWidth * card.maxScale) / 2;
-
-        /*
-         * Apenas unos píxeles virtuales extra para asegurar
-         * que ni borde, rotación ni antialias queden visibles.
-         */
-        const exitPaddingLocal = viewportWorldWidth * 0.025;
-
-        const targetMagnitude =
-          viewportEdgeLocal + halfCardWidthLocal + exitPaddingLocal;
-
-        card.fireTargetX = directionSign * targetMagnitude;
+        card.fireTargetX = directionSign * viewportWorldWidth * 1.65;
       });
     }
 
