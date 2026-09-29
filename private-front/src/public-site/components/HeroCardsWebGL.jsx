@@ -130,16 +130,17 @@ const CARDS = BASE_PROPERTIES.map((property, index) => ({
 ========================================================= */
 
 /* Desktop */
-const FIRE_INTERVAL_DESKTOP = 900;
+const FIRE_INTERVAL_DESKTOP = 1000;
 const FIRE_DURATION_DESKTOP = 9.6;
 const DESKTOP_CARD_WIDTH = 0.75;
-const FIRE_TARGET_DESKTOP = 1.0;
 
 /* Mobile = exactamente igual a desktop */
+
+// ARIANA 
 const FIRE_INTERVAL_MOBILE = FIRE_INTERVAL_DESKTOP;
 const FIRE_DURATION_MOBILE = FIRE_DURATION_DESKTOP;
 const MOBILE_CARD_WIDTH = DESKTOP_CARD_WIDTH;
-const FIRE_TARGET_MOBILE = FIRE_TARGET_DESKTOP;
+
 
 const CARD_TILT_DESKTOP = THREE.MathUtils.degToRad(10);
 const CARD_TILT_MOBILE = CARD_TILT_DESKTOP;
@@ -166,23 +167,6 @@ const REVEAL_DURATION = 1750;
 
 const CYLINDRICAL_START = 1;
 const CYLINDRICAL_DURATION = 2000;
-
-/*
- * La trayectoria normal termina en 1.
- * Después dejamos un pequeño tramo adicional para que
- * la card termine de salir físicamente del viewport.
- *
- * 1.10 sigue entrando dentro del pool de 12 cards por lado:
- * 9.6s * 1.10 = 10.56s
- * 10.56 / 0.9 = 11.73 cards activas.
- */
-const CARD_LIFETIME = 1.1;
-
-/*
- * Distancia adicional exclusivamente fuera del borde.
- * No modifica la distribución visible principal.
- */
-const EXIT_TRAVEL = 0.32;
 
 /* =========================================================
    HELPERS
@@ -964,22 +948,6 @@ export default function HeroCardsWebGL() {
       /* ===================================================
    POSICIÓN HORIZONTAL
 =================================================== */
-
-      const baseX = card.fireTargetX * movement;
-
-      /*
-       * Tramo adicional de salida.
-       *
-       * Hasta progress 1:
-       * comportamiento actual sin modificaciones.
-       *
-       * De 1 a 1.10:
-       * sigue físicamente hacia afuera.
-       */
-      const exitProgress = smoothstep(1, CARD_LIFETIME, card.fireProgress);
-
-      const exitX =
-        directionSign * viewportWorldWidth * EXIT_TRAVEL * exitProgress;
 
       card.innerGroup.position.x = card.fireTargetX * movement;
 
