@@ -150,7 +150,7 @@ const ARC_POSITION_RATIO_MOBILE = ARC_POSITION_RATIO_DESKTOP;
 const CAMERA_FOV = 45;
 const CAMERA_Z = 5;
 
-const CARD_ASPECT = 720 / 980;
+const CARD_ASPECT = 720 / 820;
 
 const GROUP_SCALE_START = 1.2;
 const GROUP_SCALE_END = 0.5;
@@ -322,80 +322,129 @@ function loadImage(src) {
 
 async function createCardTexture(property) {
   const WIDTH = 720;
-  const HEIGHT = 980;
+  const HEIGHT = 820;
   const RADIUS = 32;
 
   const canvas = document.createElement("canvas");
+
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
 
   const ctx = canvas.getContext("2d");
+
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
   const image = await loadImage(property.image);
 
   ctx.save();
+
   roundRectPath(ctx, 2, 2, WIDTH - 4, HEIGHT - 4, RADIUS);
+
   ctx.clip();
 
   ctx.fillStyle = "#ffffff";
+
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  /* Foto */
-  const IMAGE_HEIGHT = 755;
+  /* ===================================================
+     FOTO
+  =================================================== */
+
+  const IMAGE_HEIGHT = 620;
+
   drawImageCover(ctx, image, 0, 0, WIDTH, IMAGE_HEIGHT);
 
-  /* Badge */
+  /* ===================================================
+     BADGE
+  =================================================== */
+
   ctx.font = '800 18px "Manrope", Arial, sans-serif';
 
   const badgeText = property.exchange.toUpperCase();
+
   const badgeTextWidth = ctx.measureText(badgeText).width;
+
   const badgeWidth = badgeTextWidth + 42;
+
   const badgeHeight = 44;
 
   ctx.fillStyle = "rgba(255,255,255,0.95)";
+
   roundRectPath(ctx, 28, 28, badgeWidth, badgeHeight, badgeHeight / 2);
+
   ctx.fill();
 
   ctx.fillStyle = "#0a192f";
+
   ctx.textBaseline = "middle";
+
   ctx.fillText(badgeText, 49, 28 + badgeHeight / 2 + 1);
 
-  /* Info */
-  ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "#047857";
-  ctx.font = '800 19px "Manrope", Arial, sans-serif';
-  ctx.fillText(property.type.toUpperCase(), 38, 795);
+  /* ===================================================
+     INFO
+  =================================================== */
 
+  ctx.textBaseline = "alphabetic";
+
+  /* Tipo */
+  ctx.fillStyle = "#047857";
+
+  ctx.font = '800 18px "Manrope", Arial, sans-serif';
+
+  ctx.fillText(property.type.toUpperCase(), 38, 655);
+
+  /* Título */
   ctx.fillStyle = "#0f172a";
-  ctx.font = '800 39px "Manrope", Arial, sans-serif';
+
+  ctx.font = '800 35px "Manrope", Arial, sans-serif';
 
   const titleLines = wrapText(ctx, property.title, WIDTH - 76, 2);
-  let titleY = 842;
+
+  let titleY = 697;
 
   for (const line of titleLines) {
     ctx.fillText(line, 38, titleY);
-    titleY += 43;
+
+    titleY += 38;
   }
 
-  const priceY = titleY + 16;
+  /* Precio */
+  const priceY = titleY + 12;
 
   ctx.fillStyle = "#0f172a";
-  ctx.font = '800 43px "Manrope", Arial, sans-serif';
+
+  ctx.font = '800 38px "Manrope", Arial, sans-serif';
+
   ctx.fillText(property.price, 38, priceY);
 
   ctx.restore();
 
+  /* ===================================================
+     BORDE
+  =================================================== */
+
   ctx.strokeStyle = "#dbe3ed";
+
   ctx.lineWidth = 3;
+
   roundRectPath(ctx, 2, 2, WIDTH - 4, HEIGHT - 4, RADIUS);
+
   ctx.stroke();
 
+  /* ===================================================
+     TEXTURE
+  =================================================== */
+
   const texture = new THREE.CanvasTexture(canvas);
+
   texture.colorSpace = THREE.SRGBColorSpace;
+
   texture.generateMipmaps = false;
+
   texture.minFilter = THREE.LinearFilter;
+
   texture.magFilter = THREE.LinearFilter;
+
   texture.needsUpdate = true;
 
   return texture;
