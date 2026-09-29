@@ -144,13 +144,13 @@ const MOBILE_CARD_WIDTH = DESKTOP_CARD_WIDTH;
 const CYLINDRICAL_END_DESKTOP = 0.7;
 const CYLINDRICAL_END_MOBILE = CYLINDRICAL_END_DESKTOP;
 
-const ARC_POSITION_RATIO_DESKTOP = 0.46;
+const ARC_POSITION_RATIO_DESKTOP = 0.36;
 const ARC_POSITION_RATIO_MOBILE = ARC_POSITION_RATIO_DESKTOP;
 
 const CAMERA_FOV = 45;
 const CAMERA_Z = 5;
 
-const CARD_ASPECT = 720 / 820;
+const CARD_ASPECT = 720 / 780;
 
 const GROUP_SCALE_START = 1.2;
 const GROUP_SCALE_END = 0.5;
@@ -322,7 +322,7 @@ function loadImage(src) {
 
 async function createCardTexture(property) {
   const WIDTH = 720;
-  const HEIGHT = 820;
+  const HEIGHT = 780;
   const RADIUS = 32;
 
   const canvas = document.createElement("canvas");
@@ -350,7 +350,7 @@ async function createCardTexture(property) {
      FOTO
   =================================================== */
 
-  const IMAGE_HEIGHT = 620;
+  const IMAGE_HEIGHT = 580;
 
   drawImageCover(ctx, image, 0, 0, WIDTH, IMAGE_HEIGHT);
 
@@ -391,7 +391,7 @@ async function createCardTexture(property) {
 
   ctx.font = '800 18px "Manrope", Arial, sans-serif';
 
-  ctx.fillText(property.type.toUpperCase(), 38, 655);
+  ctx.fillText(property.type.toUpperCase(), 38, 615);
 
   /* Título */
   ctx.fillStyle = "#0f172a";
@@ -400,7 +400,7 @@ async function createCardTexture(property) {
 
   const titleLines = wrapText(ctx, property.title, WIDTH - 76, 2);
 
-  let titleY = 697;
+  let titleY = 657;
 
   for (const line of titleLines) {
     ctx.fillText(line, 38, titleY);

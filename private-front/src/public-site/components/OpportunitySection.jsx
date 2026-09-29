@@ -22,13 +22,9 @@ export default function OpportunitySection() {
       const viewportHeight = window.innerHeight;
 
       const totalScrollable = sectionHeight - viewportHeight;
-      const scrolled = Math.min(
-        Math.max(-rect.top, 0),
-        totalScrollable
-      );
+      const scrolled = Math.min(Math.max(-rect.top, 0), totalScrollable);
 
-      const nextProgress =
-        totalScrollable > 0 ? scrolled / totalScrollable : 0;
+      const nextProgress = totalScrollable > 0 ? scrolled / totalScrollable : 0;
 
       setProgress(nextProgress);
     };
@@ -47,9 +43,9 @@ export default function OpportunitySection() {
   return (
     <section
       ref={sectionRef}
-      className="relative h-[600vh] bg-background-light"
+      className="relative h-[520vh] bg-background-light"
     >
-      <div className="sticky top-0 flex h-screen items-center overflow-hidden">
+      <div className="sticky top-0 h-screen overflow-hidden">
         <div className="mx-auto w-full max-w-[1440px] px-6 lg:px-12">
           <OpportunityIntro progress={progress} />
 
@@ -65,27 +61,36 @@ export default function OpportunitySection() {
 }
 
 function OpportunityIntro({ progress }) {
-  const opacity = range(progress, 0, 0.15);
-
-  const exit = inverseRange(progress, 0.14, 0.23);
+  const opacity = range(progress, 0, 0.12);
+  const exit = inverseRange(progress, 0.14, 0.22);
 
   return (
     <div
-      className="pointer-events-none absolute inset-0 flex items-center justify-center px-6"
+      className="
+        pointer-events-none
+        absolute
+        inset-x-0
+        top-0
+        flex
+        justify-center
+        px-6
+        pt-[8vh]
+        md:pt-[10vh]
+      "
       style={{
         opacity: opacity * exit,
-        transform: `translateY(${lerp(40, -30, progress)}px)`,
+        transform: `translateY(${lerp(24, -20, progress)}px)`,
       }}
     >
       <h2
         className="
-          max-w-5xl
+          max-w-[1000px]
           text-center
           font-display
-          text-[clamp(2.5rem,6vw,6.5rem)]
+          text-[clamp(2.2rem,4.4vw,4.8rem)]
           font-bold
-          leading-[0.98]
-          tracking-[-0.05em]
+          leading-[1.03]
+          tracking-[-0.045em]
           text-slate-950
         "
       >
@@ -106,8 +111,7 @@ function OpportunitySources({ progress }) {
       className="absolute inset-0 flex items-center justify-center"
       style={{
         opacity:
-          range(progress, 0.15, 0.22) *
-          inverseRange(progress, 0.56, 0.63),
+          range(progress, 0.15, 0.22) * inverseRange(progress, 0.56, 0.63),
       }}
     >
       <div className="relative h-full w-full max-w-[1300px]">
@@ -117,11 +121,7 @@ function OpportunitySources({ progress }) {
           const itemStart = index * step;
           const itemEnd = itemStart + step * 1.9;
 
-          const itemProgress = range(
-            localProgress,
-            itemStart,
-            itemEnd
-          );
+          const itemProgress = range(localProgress, itemStart, itemEnd);
 
           const positions = [
             {
@@ -237,14 +237,14 @@ function OpportunityImpact({ progress }) {
     >
       <div className="mx-auto max-w-5xl text-center">
         <p className="mb-8 text-lg font-medium text-slate-500 md:text-xl">
-          Y mientras esas oportunidades quedan dispersas,
-          también quedan operaciones sin cerrar.
+          Y mientras esas oportunidades quedan dispersas, también quedan
+          operaciones sin cerrar.
         </p>
 
         <h3
           className="
             font-display
-            text-[clamp(2.6rem,6vw,6rem)]
+            text-[clamp(2.1rem,4.2vw,4.6rem)]
             font-bold
             leading-[1]
             tracking-[-0.05em]
@@ -279,17 +279,13 @@ function OpportunitySolution({ progress }) {
         <div
           style={{
             opacity: problemEnter,
-            transform: `translateY(${lerp(
-              35,
-              0,
-              problemEnter
-            )}px)`,
+            transform: `translateY(${lerp(35, 0, problemEnter)}px)`,
           }}
         >
           <h3
             className="
               font-display
-              text-[clamp(2.8rem,7vw,7rem)]
+              text-[clamp(2.2rem,4.6vw,5rem)]
               font-bold
               leading-[0.95]
               tracking-[-0.055em]
@@ -303,7 +299,7 @@ function OpportunitySolution({ progress }) {
             className="
               mt-4
               font-display
-              text-[clamp(2.8rem,7vw,7rem)]
+              text-[clamp(2.2rem,4.6vw,5rem)]
               font-bold
               leading-[0.95]
               tracking-[-0.055em]
@@ -327,11 +323,7 @@ function OpportunitySolution({ progress }) {
           "
           style={{
             opacity: solutionEnter,
-            transform: `translateY(${lerp(
-              25,
-              0,
-              solutionEnter
-            )}px)`,
+            transform: `translateY(${lerp(25, 0, solutionEnter)}px)`,
           }}
         >
           Permuok pone todas esas posibilidades a trabajar en una misma red
