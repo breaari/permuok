@@ -45,19 +45,19 @@ export default function HeroSection() {
 
       <div
         className="
-          pointer-events-none
-          absolute
-          left-1/2
-          top-[125px]
-          z-30
-          w-full
-          -translate-x-1/2
-          px-5
-          text-center
-          sm:top-[128px]
-          sm:px-6
-          lg:top-[132px]
-        "
+  pointer-events-none
+  absolute
+  left-1/2
+  top-[125px]
+  z-30
+  w-full
+  -translate-x-1/2
+  px-5
+  text-center
+  sm:top-[128px]
+  sm:px-6
+  lg:top-[124px]
+"
       >
         <motion.h1
           data-hero-title
@@ -74,18 +74,18 @@ export default function HeroSection() {
             ease: [0.22, 1, 0.36, 1],
           }}
           className="
-            mx-auto
-            max-w-[1120px]
-            text-[40px]
-            font-normal
-            leading-[0.96]
-            tracking-[-0.035em]
-            text-[#0a192f]
-            sm:text-[50px]
-            md:text-[58px]
-            lg:text-[62px]
-            xl:text-[64px]
-          "
+  mx-auto
+  max-w-[1060px]
+  text-[38px]
+  font-normal
+  leading-[0.98]
+  tracking-[-0.035em]
+  text-[#0a192f]
+  sm:text-[48px]
+  md:text-[54px]
+  lg:text-[56px]
+  xl:text-[58px]
+"
         >
           La plataforma creada para revolucionar las permutas inmobiliarias.
         </motion.h1>
@@ -134,11 +134,11 @@ export default function HeroSection() {
             className="
     text-[16px]
     font-extrabold
-    leading-[1.55]
+    leading-[1.45]
     tracking-[-0.015em]
     text-slate-600
     sm:text-[17px]
-    lg:text-[18px]
+    lg:text-[17px]
   "
           >
             Una red inteligente donde las oportunidades de permuta se
