@@ -124,43 +124,36 @@ export default function OpportunitySection() {
       >
         <div
           className="
-            mx-auto
-            flex
-            h-full
-            w-full
-            max-w-[1320px]
-            flex-col
-            px-6
-            sm:px-8
-            lg:px-10
-          "
+    mx-auto
+    flex
+    h-full
+    w-full
+    max-w-[1320px]
+    items-center
+    px-6
+    sm:px-8
+    lg:px-10
+  "
         >
-          {/* =================================================
-              BLOQUE PRINCIPAL
-          ================================================== */}
+          <div className="w-full">
+            <div
+              className="
+        grid
+        w-full
+        items-center
+        gap-12
 
-          <div
-            className="
-              grid
-              w-full
-              items-start
-              gap-12
-              pt-[clamp(30px,5vh,50px)]
+        lg:grid-cols-[minmax(0,0.92fr)_minmax(430px,0.82fr)]
+        lg:gap-24
+      "
+            >
+              <LeftContent />
 
-              lg:grid-cols-[minmax(0,0.92fr)_minmax(430px,0.82fr)]
-              lg:gap-24
-            "
-          >
-            <LeftContent />
+              <RightList progress={progress} activeIndex={activeIndex} />
+            </div>
 
-            <RightList progress={progress} activeIndex={activeIndex} />
+            <Conclusion />
           </div>
-
-          {/* =================================================
-              CONCLUSIÓN
-          ================================================== */}
-
-          <Conclusion />
         </div>
       </div>
     </section>
