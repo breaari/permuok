@@ -136,17 +136,17 @@ export default function OpportunitySection() {
   "
         >
           <div className="w-full">
-            <div
-              className="
-        grid
-        w-full
-        items-center
-        gap-12
+         <div
+  className="
+    grid
+    w-full
+    items-start
+    gap-12
 
-        lg:grid-cols-[minmax(0,0.92fr)_minmax(430px,0.82fr)]
-        lg:gap-24
-      "
-            >
+    lg:grid-cols-[minmax(0,0.92fr)_minmax(430px,0.82fr)]
+    lg:gap-24
+  "
+>
               <LeftContent />
 
               <RightList progress={progress} activeIndex={activeIndex} />
