@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 const items = [
   "En un grupo de Facebook o WhatsApp.",
@@ -10,7 +10,66 @@ const items = [
 
 export default function OpportunitySection() {
   const sectionRef = useRef(null);
+
   const [progress, setProgress] = useState(0);
+  const [navbarBottom, setNavbarBottom] = useState(80);
+
+  /* =========================================================
+     MEDIMOS EL FINAL REAL DE LA NAVBAR
+  ========================================================= */
+
+  useLayoutEffect(() => {
+    let rafId = null;
+
+    const navbar = document.querySelector("[data-public-navbar]");
+
+    function updateNavbarBottom() {
+      if (!navbar) return;
+
+      const rect = navbar.getBoundingClientRect();
+
+      /*
+       * La navbar es fixed.
+       * rect.bottom nos da exactamente dónde termina
+       * dentro del viewport.
+       */
+      setNavbarBottom(Math.round(rect.bottom));
+    }
+
+    function scheduleUpdate() {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+
+      rafId = requestAnimationFrame(updateNavbarBottom);
+    }
+
+    scheduleUpdate();
+
+    const resizeObserver = new ResizeObserver(scheduleUpdate);
+
+    if (navbar) {
+      resizeObserver.observe(navbar);
+    }
+
+    window.addEventListener("resize", scheduleUpdate);
+    window.addEventListener("orientationchange", scheduleUpdate);
+
+    return () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+
+      resizeObserver.disconnect();
+
+      window.removeEventListener("resize", scheduleUpdate);
+      window.removeEventListener("orientationchange", scheduleUpdate);
+    };
+  }, []);
+
+  /* =========================================================
+     PROGRESO DEL SCROLL
+  ========================================================= */
 
   useEffect(() => {
     const handleScroll = () => {
@@ -21,6 +80,7 @@ export default function OpportunitySection() {
       const viewportHeight = window.innerHeight;
 
       const maxScroll = Math.max(sectionHeight - viewportHeight, 1);
+
       const current = Math.min(Math.max(-rect.top, 0), maxScroll);
 
       setProgress(current / maxScroll);
@@ -38,10 +98,10 @@ export default function OpportunitySection() {
   }, []);
 
   const activeIndex = useMemo(() => {
-    if (progress < 0.16) return 0;
-    if (progress < 0.29) return 1;
-    if (progress < 0.42) return 2;
-    if (progress < 0.55) return 3;
+    if (progress < 0.14) return 0;
+    if (progress < 0.27) return 1;
+    if (progress < 0.4) return 2;
+    if (progress < 0.53) return 3;
 
     return 4;
   }, [progress]);
@@ -49,30 +109,45 @@ export default function OpportunitySection() {
   return (
     <section
       ref={sectionRef}
-      className="relative h-[165vh] bg-[var(--landing-bg,#f5f7fa)]"
+      className="
+        relative
+        h-[155vh]
+        bg-[#f3f4f6]
+      "
     >
-      <div className="sticky top-[96px] h-[calc(100vh-96px)] overflow-hidden">
+      <div
+        className="sticky overflow-hidden"
+        style={{
+          top: `${navbarBottom}px`,
+          height: `calc(100svh - ${navbarBottom}px)`,
+        }}
+      >
         <div
           className="
-    mx-auto
-    flex
-    h-full
-    w-full
-    max-w-[1320px]
-    flex-col
-    px-6
-    pt-[4vh]
-    lg:px-10
-    lg:pt-[3vh]
-  "
+            mx-auto
+            flex
+            h-full
+            w-full
+            max-w-[1320px]
+            flex-col
+            px-6
+            sm:px-8
+            lg:px-10
+          "
         >
+          {/* =================================================
+              BLOQUE PRINCIPAL
+          ================================================== */}
+
           <div
             className="
               grid
               w-full
-              items-center
-              gap-14
-              lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,0.8fr)]
+              items-start
+              gap-12
+              pt-[clamp(30px,5vh,50px)]
+
+              lg:grid-cols-[minmax(0,0.92fr)_minmax(430px,0.82fr)]
               lg:gap-24
             "
           >
@@ -81,6 +156,10 @@ export default function OpportunitySection() {
             <RightList progress={progress} activeIndex={activeIndex} />
           </div>
 
+          {/* =================================================
+              CONCLUSIÓN
+          ================================================== */}
+
           <Conclusion />
         </div>
       </div>
@@ -88,34 +167,51 @@ export default function OpportunitySection() {
   );
 }
 
+/* =========================================================
+   IZQUIERDA
+========================================================= */
+
 function LeftContent() {
   return (
-    <div className="max-w-[700px]">
+    <div className="max-w-[660px]">
+      {/* 
+        Mismo lenguaje visual que la bajada del HERO:
+        mismo color, tracking, peso e interlineado.
+      */}
+
       <p
         className="
           max-w-[620px]
-          font-sans
-          text-[clamp(1.1rem,1.45vw,1.35rem)]
-          font-normal
-          leading-[1.5]
-          tracking-[-0.015em]
-          text-slate-600
+          text-[18px]
+          font-medium
+          leading-[1.4]
+          tracking-[-0.02em]
+          text-[#30363d]
+
+          sm:text-[19px]
+
+          lg:text-[22px]
+          lg:leading-[1.42]
         "
       >
         Detrás de una permuta puede estar la operación que hoy no estás pudiendo
         cerrar.
       </p>
 
+      {/* 
+        NO es un h1/h2 para que NO herede Momo Trust Display.
+        Esta frase queda en Manrope.
+      */}
+
       <p
         className="
           mt-7
-          max-w-[650px]
-          font-sans
-          text-[clamp(1.65rem,2.5vw,2.55rem)]
+          max-w-[620px]
+          text-[clamp(1.7rem,2.35vw,2.45rem)]
           font-semibold
           leading-[1.12]
           tracking-[-0.035em]
-          text-[#0c1628]
+          text-[#0a192f]
         "
       >
         Y esa oportunidad puede estar en{" "}
@@ -124,6 +220,10 @@ function LeftContent() {
     </div>
   );
 }
+
+/* =========================================================
+   MARCADOR
+========================================================= */
 
 function MarkerText({ children }) {
   return (
@@ -135,9 +235,9 @@ function MarkerText({ children }) {
           -left-[2%]
           -right-[2%]
           bottom-[1px]
-          h-[38%]
           -z-10
-          -rotate-[0.8deg]
+          h-[37%]
+          -rotate-[0.7deg]
           bg-[#9fc5ff]
         "
       />
@@ -147,16 +247,25 @@ function MarkerText({ children }) {
   );
 }
 
+/* =========================================================
+   LISTA DERECHA
+========================================================= */
+
 function RightList({ progress, activeIndex }) {
   return (
     <div className="space-y-3.5">
       {items.map((item, index) => {
+        /*
+         * El primero está visible desde el momento
+         * en que aparece la sección.
+         */
         let itemProgress = 1;
 
         if (index > 0) {
-          const starts = [0, 0.045, 0.16, 0.275, 0.39];
+          const starts = [0, 0.04, 0.15, 0.26, 0.37];
+
           const itemStart = starts[index];
-          const itemEnd = itemStart + 0.09;
+          const itemEnd = itemStart + 0.085;
 
           itemProgress = clamp((progress - itemStart) / (itemEnd - itemStart));
         }
@@ -172,25 +281,39 @@ function RightList({ progress, activeIndex }) {
               py-[18px]
               transition-[background-color,border-color,box-shadow]
               duration-500
+
               ${
                 isActive
-                  ? "border-[#72bb61] bg-[#eef8e9] shadow-[0_14px_36px_rgba(79,164,72,0.11)]"
-                  : "border-[#91c986] bg-white/75"
+                  ? `
+                    border-[#72bb61]
+                    bg-[#eef8e9]
+                    shadow-[0_14px_36px_rgba(79,164,72,0.11)]
+                  `
+                  : `
+                    border-[#91c986]
+                    bg-white/75
+                  `
               }
             `}
             style={{
               opacity: itemProgress,
-              transform: `translateY(${mix(12, 0, itemProgress)}px)`,
+
+              transform: `
+                translateY(
+                  ${mix(10, 0, itemProgress)}px
+                )
+              `,
             }}
           >
             <p
               className={`
-                font-sans
                 text-[16px]
                 font-medium
                 leading-[1.35]
                 tracking-[-0.015em]
+
                 md:text-[18px]
+
                 ${isActive ? "text-[#285f28]" : "text-[#172033]"}
               `}
             >
@@ -203,26 +326,59 @@ function RightList({ progress, activeIndex }) {
   );
 }
 
+/* =========================================================
+   CONCLUSIÓN
+========================================================= */
+
 function Conclusion() {
   return (
-    <div className="mx-auto mt-14 max-w-[1080px] text-center md:mt-16">
-      <p
+    <div
+      className="
+        mx-auto
+        mt-[clamp(36px,5vh,58px)]
+        max-w-[1300px]
+        text-center
+      "
+    >
+      {/*
+        IMPORTANTE:
+
+        Es h2 porque tu CSS actual tiene:
+
+        .public-site h1,
+        .public-site h2 {
+          font-family: "Momo Trust Display", "Manrope", sans-serif;
+          font-weight: 400;
+        }
+
+        Por lo tanto usa EXACTAMENTE la misma fuente
+        que el título del HeroSection.
+      */}
+
+      <h2
         className="
-          font-display
-          text-balance
-          text-[clamp(1.8rem,3vw,3.15rem)]
-          font-bold
-          leading-[1.03]
-          tracking-[-0.045em]
-          text-[#07101f]
-        "
+    text-balance
+    text-[clamp(2rem,3vw,3.2rem)]
+    font-normal
+    leading-[1.02]
+    tracking-[-0.035em]
+    text-[#0a192f]
+  "
       >
-        Permuok no solo centraliza esta información. La conecta para detectar
-        compatibilidades y abrir nuevas posibilidades de operación.
-      </p>
+        Permuok no solo centraliza esta información.
+        <br className="hidden sm:block" />
+        <span className="sm:ml-2">
+          La conecta para detectar compatibilidades
+          <br />y abrir nuevas posibilidades de operación.
+        </span>
+      </h2>
     </div>
   );
 }
+
+/* =========================================================
+   HELPERS
+========================================================= */
 
 function clamp(value, min = 0, max = 1) {
   return Math.min(Math.max(value, min), max);
