@@ -129,33 +129,33 @@ export default function OpportunitySection() {
         className="
     relative
     z-10
+
     lg:sticky
+    lg:top-[var(--navbar-bottom)]
     lg:overflow-hidden
   "
         style={{
-          top: navbarBottom,
+          "--navbar-bottom": `${navbarBottom}px`,
         }}
       >
         <div
           className="
-    mx-auto
-    flex
-    w-full
-    max-w-[1320px]
-    px-5
-    pb-16
-    pt-8
+      mx-auto
+      flex
+      w-full
+      max-w-[1320px]
 
-    sm:px-8
+      px-5
+      pb-16
+      pt-[calc(var(--navbar-bottom)+24px)]
 
-    lg:h-full
-    lg:items-center
-    lg:px-10
-    lg:py-0
-  "
-          style={{
-            marginTop: `calc(${navbarBottom}px + 16px)`,
-          }}
+      sm:px-8
+
+      lg:h-[calc(100svh-var(--navbar-bottom))]
+      lg:items-center
+      lg:px-10
+      lg:py-0
+    "
         >
           <div className="w-full">
             <div
