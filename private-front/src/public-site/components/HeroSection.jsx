@@ -7,19 +7,20 @@ import { Icon } from "../../ui/icons/Index";
 
 export default function HeroSection() {
   return (
-    <section
-      data-hero-root
-      className="
+   <section
+  data-hero-root
+  className="
     relative
     isolate
     h-[100svh]
     min-h-[720px]
     overflow-hidden
     bg-[#f3f4f6]
-        mt-[45px]
 
+    mt-0
+    lg:mt-[45px]
   "
-    >
+>
       {/* =====================================================
           FONDO PUNTEADO
       ====================================================== */}
@@ -213,14 +214,13 @@ lg:bottom-[clamp(110px,16vh,140px)]
             whileTap={{
               scale: 0.98,
             }}
-            className="
-      w-[270px]
-      max-w-full
-        w-[300px]
+className="
+  w-[300px]
   max-w-[calc(100vw-48px)]
 
   lg:w-[270px]
-    "
+  lg:max-w-full
+"
           >
             <Link
               to="/register"

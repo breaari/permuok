@@ -1,55 +1,45 @@
-// OpportunityNetworkSection.jsx
+import { useEffect, useRef, useState } from "react";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-
-const channels = [
+const opportunities = [
   {
-    id: "facebook",
-    label: "Facebook",
-    detail: "Grupo de permutas",
-    x: 15,
-    y: 25,
-    rotate: -5,
-  },
-  {
-    id: "whatsapp",
-    label: "WhatsApp",
-    detail: "Mensaje en un grupo",
-    x: 75,
-    y: 22,
-    rotate: 4,
-  },
-  {
-    id: "inmobiliaria",
-    label: "Otra inmobiliaria",
-    detail: "Publicación de una propiedad",
-    x: 18,
-    y: 66,
-    rotate: 4,
-  },
-  {
-    id: "instagram",
-    label: "Instagram",
-    detail: "Historia que viste una vez",
-    x: 78,
-    y: 64,
+    eyebrow: "WHATSAPP",
+    text: "Busco 3 ambientes en Güemes",
+    meta: "Hasta USD 130.000",
+    x: 13,
+    y: 35,
     rotate: -4,
   },
   {
-    id: "colegas",
-    label: "Entre colegas",
-    detail: "Una conversación",
-    x: 48,
-    y: 18,
-    rotate: 2,
+    eyebrow: "OTRA INMOBILIARIA",
+    text: "3 ambientes · Güemes",
+    meta: "USD 125.000",
+    x: 72,
+    y: 32,
+    rotate: 3,
   },
   {
-    id: "boca",
-    label: "Boca a boca",
-    detail: "Una oportunidad que nunca se publicó",
-    x: 50,
-    y: 76,
-    rotate: -2,
+    eyebrow: "FACEBOOK",
+    text: "Permuto casa por departamento",
+    meta: "Mar del Plata",
+    x: 8,
+    y: 67,
+    rotate: 3,
+  },
+  {
+    eyebrow: "INSTAGRAM",
+    text: "Casa · Rumencó",
+    meta: "Acepta propiedad en parte de pago",
+    x: 75,
+    y: 68,
+    rotate: -3,
+  },
+  {
+    eyebrow: "ENTRE COLEGAS",
+    text: "Tengo un cliente buscando algo así",
+    meta: "Conversación",
+    x: 46,
+    y: 74,
+    rotate: 2,
   },
 ];
 
@@ -58,252 +48,324 @@ export default function OpportunitySection() {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    const onScroll = () => {
+    const update = () => {
       if (!sectionRef.current) return;
 
       const rect = sectionRef.current.getBoundingClientRect();
-      const height = sectionRef.current.offsetHeight;
-      const viewport = window.innerHeight;
+      const maxScroll =
+        sectionRef.current.offsetHeight - window.innerHeight;
 
-      const max = Math.max(height - viewport, 1);
-      const current = Math.min(Math.max(-rect.top, 0), max);
+      const current = Math.min(
+        Math.max(-rect.top, 0),
+        Math.max(maxScroll, 1)
+      );
 
-      setProgress(current / max);
+      setProgress(current / Math.max(maxScroll, 1));
     };
 
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
+    update();
 
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener("scroll", update, {
+      passive: true,
+    });
+
+    return () => window.removeEventListener("scroll", update);
   }, []);
 
   return (
     <section
       ref={sectionRef}
-      className="relative h-[185vh] bg-[#f7f9fc]"
+      className="relative h-[165vh] bg-[#f5f7fa]"
     >
       <div className="sticky top-0 h-screen overflow-hidden">
-        <div className="mx-auto h-full max-w-[1440px] px-6 lg:px-10">
-          <Scene progress={progress} />
+        <div className="mx-auto h-full max-w-[1500px] px-6 lg:px-10">
+          <StoryScene progress={progress} />
         </div>
       </div>
     </section>
   );
 }
 
-function Scene({ progress }) {
-  const scatter = range(progress, 0, 0.28);
-  const problem = range(progress, 0.25, 0.55);
-  const network = range(progress, 0.55, 0.9);
+function StoryScene({ progress }) {
+  const intro = 1 - smooth(progress, 0.25, 0.46);
+  const problem = smooth(progress, 0.28, 0.47);
+  const product = smooth(progress, 0.54, 0.82);
 
   return (
     <div className="relative h-full w-full">
-      <Header progress={progress} />
 
-      <NetworkLines progress={network} />
+      {/* texto principal */}
+      <div
+        className="absolute left-[4%] top-[14%] z-30 max-w-[570px]"
+        style={{
+          opacity: intro,
+          transform: `translateY(${mix(0, -20, progress)}px)`,
+        }}
+      >
+        <p className="mb-4 text-[12px] font-semibold uppercase tracking-[.18em] text-slate-400">
+          Oportunidades que hoy están dispersas
+        </p>
 
-      {channels.map((channel, index) => (
-        <ChannelCard
-          key={channel.id}
-          channel={channel}
+        <h2 className="text-[clamp(2.2rem,4.2vw,4.8rem)] font-bold leading-[.98] tracking-[-.055em] text-[#07101f]">
+          Una oportunidad de permuta puede estar en cualquier lado.
+        </h2>
+      </div>
+
+      {/* oportunidades dispersas */}
+      {opportunities.map((item, index) => (
+        <Opportunity
+          key={item.text}
+          item={item}
           index={index}
-          scatter={scatter}
-          network={network}
+          progress={progress}
+          product={product}
         />
       ))}
 
-      <CenterCore progress={network} />
+      {/* casi match */}
+      <MissedMatch progress={problem} />
 
-      <ProblemMessage progress={problem} />
+      {/* producto */}
+      <ProductPanel progress={product} />
 
-      <FinalMessage progress={network} />
+      {/* cierre */}
+      <Closing progress={product} />
+
     </div>
   );
 }
 
-function Header({ progress }) {
-  const opacity = inverseRange(progress, 0.32, 0.52);
-
-  return (
-    <div
-      className="absolute left-1/2 top-[12%] z-20 w-full max-w-[820px] -translate-x-1/2 text-center"
-      style={{ opacity }}
-    >
-      <p className="mb-3 text-[12px] font-bold uppercase tracking-[0.18em] text-slate-400">
-        Oportunidades dispersas
-      </p>
-
-      <h2 className="text-balance text-[clamp(2rem,4vw,4rem)] font-black leading-[0.98] tracking-[-0.05em] text-slate-950">
-        Una oportunidad de permuta puede estar en cualquier lado.
-      </h2>
-    </div>
+function Opportunity({ item, index, progress, product }) {
+  const appear = smooth(
+    progress,
+    0.02 + index * 0.025,
+    0.17 + index * 0.025
   );
-}
 
-function ChannelCard({ channel, index, scatter, network }) {
-  const entry = range(scatter, index * 0.07, 0.45 + index * 0.05);
+  const drift = Math.sin(progress * 5 + index * 1.8) * 6;
 
   const centerX = 50;
-  const centerY = 52;
+  const centerY = 49;
 
-  const x = lerp(channel.x, centerX, network * 0.72);
-  const y = lerp(channel.y, centerY, network * 0.72);
+  const x = mix(item.x, centerX, product * 0.7);
+  const y = mix(item.y, centerY, product * 0.7);
 
-  const scale = lerp(0.94, 1, entry);
-
-  const float =
-    Math.sin((index + 1) * 1.7 + scatter * Math.PI * 2) * 4 * (1 - network);
+  const opacity =
+    appear * (1 - smooth(product, 0.55, 0.95));
 
   return (
     <div
-      className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
+      className="absolute z-10"
       style={{
         left: `${x}%`,
         top: `${y}%`,
-        opacity: entry,
+        opacity,
         transform: `
           translate(-50%, -50%)
-          translateY(${float}px)
-          rotate(${lerp(channel.rotate, 0, network)}deg)
-          scale(${scale})
+          translateY(${drift * (1 - product)}px)
+          rotate(${mix(item.rotate, 0, product)}deg)
         `,
       }}
     >
-      <div className="min-w-[190px] rounded-[22px] border border-white/80 bg-white/90 px-5 py-4 shadow-[0_22px_50px_rgba(15,23,42,.08)] backdrop-blur-xl md:min-w-[230px]">
-        <div className="mb-3 flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-          <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
-            {channel.label}
-          </span>
-        </div>
+      <div
+        className="
+          min-w-[220px]
+          max-w-[290px]
+          rounded-[20px]
+          border
+          border-slate-200/70
+          bg-white/90
+          px-5
+          py-4
+          shadow-[0_18px_55px_rgba(15,23,42,0.07)]
+          backdrop-blur-xl
+        "
+      >
+        <p className="mb-2 text-[10px] font-bold tracking-[.15em] text-slate-400">
+          {item.eyebrow}
+        </p>
 
-        <p className="max-w-[220px] text-[15px] font-semibold leading-snug text-slate-800 md:text-[16px]">
-          {channel.detail}
+        <p className="text-[15px] font-semibold leading-snug text-slate-800">
+          {item.text}
+        </p>
+
+        <p className="mt-2 text-[12px] text-slate-400">
+          {item.meta}
         </p>
       </div>
     </div>
   );
 }
 
-function ProblemMessage({ progress }) {
+function MissedMatch({ progress }) {
   const opacity =
-    range(progress, 0.18, 0.5) *
-    inverseRange(progress, 0.62, 0.88);
+    smooth(progress, 0.05, 0.35) *
+    (1 - smooth(progress, 0.7, 1));
 
   return (
     <div
-      className="absolute left-1/2 top-1/2 z-30 w-full max-w-[680px] -translate-x-1/2 -translate-y-1/2 text-center"
+      className="absolute left-1/2 top-[47%] z-20 w-full max-w-[520px] -translate-x-1/2 text-center"
       style={{
         opacity,
         transform: `
-          translate(-50%, -50%)
-          translateY(${lerp(30, 0, progress)}px)
+          translateX(-50%)
+          translateY(${mix(30, 0, progress)}px)
         `,
       }}
     >
-      <p className="mb-4 text-[15px] font-medium leading-relaxed text-slate-500 md:text-[18px]">
+      <div className="mx-auto mb-7 flex w-max items-center gap-3">
+        <span className="h-[1px] w-20 bg-slate-300" />
+
+        <span className="text-[10px] font-bold uppercase tracking-[.18em] text-slate-400">
+          nunca se encontraron
+        </span>
+
+        <span className="h-[1px] w-20 bg-slate-300" />
+      </div>
+
+      <p className="text-[15px] font-medium leading-relaxed text-slate-500">
         Operaciones que podrían cerrarse.
         <br />
-        Clientes que siguen esperando.
+        Clientes que siguen buscando.
       </p>
 
-      <h3 className="text-balance text-[clamp(2rem,3.8vw,3.7rem)] font-black leading-[1] tracking-[-0.045em] text-slate-950">
+      <h3 className="mt-6 text-[clamp(2rem,3.7vw,3.8rem)] font-bold leading-[.98] tracking-[-.05em] text-[#07101f]">
         El problema no es que la oportunidad no exista.
       </h3>
 
-      <p className="mt-2 text-[clamp(2rem,3.8vw,3.7rem)] font-black leading-[1] tracking-[-0.045em] text-blue-600">
+      <p className="mt-2 text-[clamp(2rem,3.7vw,3.8rem)] font-bold leading-none tracking-[-.05em] text-[#2166c2]">
         Es encontrarla.
       </p>
     </div>
   );
 }
 
-function CenterCore({ progress }) {
+function ProductPanel({ progress }) {
   return (
     <div
-      className="absolute left-1/2 top-[52%] z-20 -translate-x-1/2 -translate-y-1/2"
+      className="absolute left-1/2 top-[46%] z-20 w-[min(860px,85vw)] -translate-x-1/2 -translate-y-1/2"
       style={{
-        opacity: range(progress, 0.12, 0.55),
+        opacity: progress,
         transform: `
           translate(-50%, -50%)
-          scale(${lerp(0.7, 1, progress)})
+          scale(${mix(0.92, 1, progress)})
         `,
       }}
     >
-      <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-blue-500/20 bg-white shadow-[0_0_80px_rgba(37,99,235,.16)]">
-        <div className="absolute inset-3 rounded-full bg-blue-600/5" />
+      <div
+        className="
+          overflow-hidden
+          rounded-[30px]
+          border
+          border-white/10
+          bg-[#121c2d]
+          shadow-[0_50px_120px_rgba(15,23,42,.2)]
+        "
+      >
+        {/* header */}
+        <div className="flex items-center justify-between border-b border-white/[.07] px-7 py-5">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[.18em] text-white/35">
+              PERMUOK NETWORK
+            </p>
 
-        <span className="relative text-[14px] font-black tracking-[-0.02em] text-slate-900">
-          permuok
-        </span>
+            <p className="mt-1 text-[15px] font-semibold text-white">
+              Oportunidades detectadas
+            </p>
+          </div>
+
+          <span className="rounded-full bg-blue-500/10 px-3 py-1.5 text-[11px] font-semibold text-blue-300">
+            Match encontrado
+          </span>
+        </div>
+
+        {/* match */}
+        <div className="grid gap-4 p-7 md:grid-cols-[1fr_auto_1fr] md:items-center">
+
+          <MatchItem
+            type="BÚSQUEDA"
+            title="Departamento"
+            details={[
+              "3 ambientes",
+              "Güemes",
+              "Hasta USD 130.000",
+            ]}
+          />
+
+          <div className="hidden flex-col items-center md:flex">
+            <div className="h-10 w-[1px] bg-gradient-to-b from-transparent via-blue-400 to-transparent" />
+
+            <div className="my-3 flex h-20 w-20 items-center justify-center rounded-full border border-blue-400/20 bg-blue-500/10 shadow-[0_0_45px_rgba(59,130,246,.15)]">
+              <div className="text-center">
+                <strong className="block text-[20px] font-bold text-white">
+                  94%
+                </strong>
+
+                <span className="text-[9px] font-bold uppercase tracking-[.12em] text-blue-300">
+                  match
+                </span>
+              </div>
+            </div>
+
+            <div className="h-10 w-[1px] bg-gradient-to-b from-blue-400 via-blue-400 to-transparent" />
+          </div>
+
+          <MatchItem
+            type="PROPIEDAD"
+            title="Departamento"
+            details={[
+              "3 ambientes",
+              "Güemes",
+              "USD 125.000",
+            ]}
+          />
+
+        </div>
       </div>
     </div>
   );
 }
 
-function NetworkLines({ progress }) {
-  const paths = useMemo(
-    () => [
-      { x1: 15, y1: 25 },
-      { x1: 75, y1: 22 },
-      { x1: 18, y1: 66 },
-      { x1: 78, y1: 64 },
-      { x1: 48, y1: 18 },
-      { x1: 50, y1: 76 },
-    ],
-    []
-  );
-
+function MatchItem({ type, title, details }) {
   return (
-    <svg
-      className="pointer-events-none absolute inset-0 z-[5] h-full w-full"
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      style={{ opacity: progress }}
-    >
-      {paths.map((p, index) => (
-        <path
-          key={index}
-          d={`M ${p.x1} ${p.y1} Q 50 ${p.y1} 50 52`}
-          fill="none"
-          stroke="rgba(37,99,235,.22)"
-          strokeWidth="0.22"
-          strokeDasharray="1.2 1.2"
-          style={{
-            pathLength: progress,
-          }}
-        />
-      ))}
-    </svg>
+    <div className="rounded-[20px] border border-white/[.07] bg-white/[.035] p-5">
+      <p className="text-[9px] font-bold tracking-[.18em] text-white/30">
+        {type}
+      </p>
+
+      <h4 className="mt-3 text-xl font-semibold text-white">
+        {title}
+      </h4>
+
+      <div className="mt-4 space-y-1.5">
+        {details.map((detail) => (
+          <p
+            key={detail}
+            className="text-[13px] text-white/45"
+          >
+            {detail}
+          </p>
+        ))}
+      </div>
+    </div>
   );
 }
 
-function FinalMessage({ progress }) {
-  const opacity = range(progress, 0.45, 0.88);
+function Closing({ progress }) {
+  const opacity = smooth(progress, 0.64, 0.94);
 
   return (
     <div
-      className="absolute bottom-[8%] left-1/2 z-30 w-full max-w-[820px] -translate-x-1/2 text-center"
-      style={{
-        opacity,
-        transform: `
-          translateX(-50%)
-          translateY(${lerp(28, 0, opacity)}px)
-        `,
-      }}
+      className="absolute bottom-[7%] left-1/2 z-30 w-full max-w-[780px] -translate-x-1/2 text-center"
+      style={{ opacity }}
     >
-      <p className="text-balance text-[18px] font-semibold leading-relaxed text-slate-700 md:text-[22px]">
-        Permuok pone todas esas posibilidades a trabajar en una misma red
-        inmobiliaria.
+      <p className="text-[18px] font-medium leading-relaxed text-slate-700 md:text-[21px]">
+        Permuok pone todas esas posibilidades a trabajar en una misma red inmobiliaria.
       </p>
 
-      <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-blue-500/15 bg-blue-500/[0.06] px-4 py-2">
-        <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-
-        <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-blue-600 md:text-[12px]">
-          Una red profesional. Solo para inmobiliarias.
-        </span>
-      </div>
+      <p className="mt-3 text-[12px] font-bold uppercase tracking-[.15em] text-[#2166c2]">
+        Una red profesional · Solo para inmobiliarias
+      </p>
     </div>
   );
 }
@@ -312,14 +374,11 @@ function clamp(value, min = 0, max = 1) {
   return Math.min(Math.max(value, min), max);
 }
 
-function range(value, start, end) {
-  return clamp((value - start) / (end - start));
+function smooth(value, start, end) {
+  const x = clamp((value - start) / (end - start));
+  return x * x * (3 - 2 * x);
 }
 
-function inverseRange(value, start, end) {
-  return 1 - range(value, start, end);
-}
-
-function lerp(start, end, progress) {
+function mix(start, end, progress) {
   return start + (end - start) * progress;
 }
