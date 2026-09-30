@@ -54,17 +54,17 @@ export default function OpportunitySection() {
       <div className="sticky top-[96px] h-[calc(100vh-96px)] overflow-hidden">
         <div
           className="
-      mx-auto
-      flex
-      h-full
-      w-full
-      max-w-[1320px]
-      flex-col
-      px-6
-      pt-[8vh]
-      lg:px-10
-      lg:pt-[7vh]
-    "
+    mx-auto
+    flex
+    h-full
+    w-full
+    max-w-[1320px]
+    flex-col
+    px-6
+    pt-[4vh]
+    lg:px-10
+    lg:pt-[3vh]
+  "
         >
           <div
             className="
@@ -90,14 +90,14 @@ export default function OpportunitySection() {
 
 function LeftContent() {
   return (
-    <div className="max-w-[680px]">
+    <div className="max-w-[700px]">
       <p
         className="
-          max-w-[610px]
+          max-w-[620px]
           font-sans
-          text-[clamp(1.15rem,1.55vw,1.4rem)]
+          text-[clamp(1.1rem,1.45vw,1.35rem)]
           font-normal
-          leading-[1.45]
+          leading-[1.5]
           tracking-[-0.015em]
           text-slate-600
         "
@@ -106,21 +106,21 @@ function LeftContent() {
         cerrar.
       </p>
 
-      <h2
+      <p
         className="
           mt-7
           max-w-[650px]
           font-sans
-          text-[clamp(2rem,3vw,3.15rem)]
+          text-[clamp(1.65rem,2.5vw,2.55rem)]
           font-semibold
-          leading-[1.08]
-          tracking-[-0.04em]
+          leading-[1.12]
+          tracking-[-0.035em]
           text-[#0c1628]
         "
       >
         Y esa oportunidad puede estar en{" "}
         <MarkerText>cualquier lado.</MarkerText>
-      </h2>
+      </p>
     </div>
   );
 }
@@ -134,10 +134,10 @@ function MarkerText({ children }) {
           absolute
           -left-[2%]
           -right-[2%]
-          bottom-[2px]
-          h-[42%]
+          bottom-[1px]
+          h-[38%]
           -z-10
-          -rotate-[0.7deg]
+          -rotate-[0.8deg]
           bg-[#9fc5ff]
         "
       />
