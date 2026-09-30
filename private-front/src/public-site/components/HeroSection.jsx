@@ -4,12 +4,193 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import HeroCardsWebGL from "./HeroCardsWebGL";
 import { Icon } from "../../ui/icons/Index";
+import { useLayoutEffect, useRef, useState } from "react";
 
 export default function HeroSection() {
+  const sectionRef = useRef(null);
+
+  const [mobileShiftY, setMobileShiftY] = useState(0);
+
+  const currentShiftRef = useRef(0);
+
+  useLayoutEffect(() => {
+    const section = sectionRef.current;
+
+    if (!section) {
+      return undefined;
+    }
+
+    let rafId = null;
+
+    function calculateMobileCenter() {
+      /*
+       * Desktop queda completamente bloqueado.
+       */
+      if (window.innerWidth >= 1024) {
+        currentShiftRef.current = 0;
+
+        setMobileShiftY(0);
+
+        return;
+      }
+
+      const navbar = document.querySelector("[data-public-navbar]");
+
+      const title = section.querySelector("[data-hero-title]");
+
+      const cta = section.querySelector("[data-hero-cta]");
+
+      if (!navbar || !title || !cta) {
+        return;
+      }
+
+      const sectionRect = section.getBoundingClientRect();
+
+      const navbarRect = navbar.getBoundingClientRect();
+
+      const titleRect = title.getBoundingClientRect();
+
+      const ctaRect = cta.getBoundingClientRect();
+
+      /*
+       * Espacio real disponible:
+       *
+       * NAVBAR
+       * ───────────────
+       * + 12px
+       *
+       *      HERO
+       *
+       * - 12px
+       * ───────────────
+       * FIN DE PANTALLA
+       */
+
+      const SAFE_GAP = 12;
+
+      const availableTop = Math.max(
+        navbarRect.bottom - sectionRect.top + SAFE_GAP,
+        0,
+      );
+
+      /*
+       * Si min-h-[720px] hace que el hero sea
+       * mayor que la pantalla, tomamos únicamente
+       * la parte realmente visible.
+       */
+      const visibleViewportBottom = Math.min(
+        sectionRect.bottom,
+        window.innerHeight,
+      );
+
+      const availableBottom =
+        visibleViewportBottom - sectionRect.top - SAFE_GAP;
+
+      const availableCenter = (availableTop + availableBottom) / 2;
+
+      /*
+       * Límites reales de nuestra composición:
+       *
+       * TOP DEL TÍTULO
+       * ↓
+       *
+       * título
+       * cards
+       * bajada
+       * botones
+       *
+       * ↓
+       * BOTTOM DE LOS CTA
+       */
+
+      const measuredContentTop = titleRect.top - sectionRect.top;
+
+      const measuredContentBottom = ctaRect.bottom - sectionRect.top;
+
+      const measuredContentCenter =
+        (measuredContentTop + measuredContentBottom) / 2;
+
+      /*
+       * Como el grupo ya puede estar trasladado,
+       * quitamos el desplazamiento anterior para
+       * recuperar su centro original.
+       */
+
+      const originalContentCenter =
+        measuredContentCenter - currentShiftRef.current;
+
+      /*
+       * Cantidad exacta que hay que mover TODO.
+       */
+
+      const nextShift = Math.round(availableCenter - originalContentCenter);
+
+      currentShiftRef.current = nextShift;
+
+      setMobileShiftY(nextShift);
+    }
+
+    function scheduleCalculation() {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+
+      rafId = requestAnimationFrame(calculateMobileCenter);
+    }
+
+    /*
+     * Recalcular si cambia la pantalla,
+     * orientación, textos o navbar.
+     */
+
+    const resizeObserver = new ResizeObserver(scheduleCalculation);
+
+    resizeObserver.observe(section);
+
+    const navbar = document.querySelector("[data-public-navbar]");
+
+    const title = section.querySelector("[data-hero-title]");
+
+    const cta = section.querySelector("[data-hero-cta]");
+
+    if (navbar) {
+      resizeObserver.observe(navbar);
+    }
+
+    if (title) {
+      resizeObserver.observe(title);
+    }
+
+    if (cta) {
+      resizeObserver.observe(cta);
+    }
+
+    window.addEventListener("resize", scheduleCalculation);
+
+    window.addEventListener("orientationchange", scheduleCalculation);
+
+    scheduleCalculation();
+
+    document.fonts?.ready.then(scheduleCalculation);
+
+    return () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+
+      resizeObserver.disconnect();
+
+      window.removeEventListener("resize", scheduleCalculation);
+
+      window.removeEventListener("orientationchange", scheduleCalculation);
+    };
+  }, []);
+
   return (
-   <section
-  data-hero-root
-  className="
+    <section
+      ref={sectionRef}
+      data-hero-root
+      className="
     relative
     isolate
     h-[100svh]
@@ -20,7 +201,7 @@ export default function HeroSection() {
     mt-0
     lg:mt-[45px]
   "
->
+    >
       {/* =====================================================
           FONDO PUNTEADO
       ====================================================== */}
@@ -33,6 +214,20 @@ export default function HeroSection() {
           backgroundSize: "18px 18px",
         }}
       />
+
+      <div
+        className="
+    absolute
+    inset-0
+  "
+        style={{
+          transform: `translate3d(
+      0,
+      ${mobileShiftY}px,
+      0
+    )`,
+        }}
+      >
 
       {/* =====================================================
           WEBGL
@@ -51,7 +246,7 @@ export default function HeroSection() {
   pointer-events-none
   absolute
   left-1/2
-  top-[96px]
+  top-[115px]
   z-30
   w-full
   -translate-x-1/2
@@ -107,6 +302,7 @@ export default function HeroSection() {
       ====================================================== */}
 
       <motion.div
+      data-hero-cta
         initial={{
           opacity: 0,
           y: 14,
@@ -214,7 +410,7 @@ lg:bottom-[clamp(110px,16vh,140px)]
             whileTap={{
               scale: 0.98,
             }}
-className="
+            className="
   w-[300px]
   max-w-[calc(100vw-48px)]
 
@@ -276,9 +472,9 @@ className="
   lg:w-[220px]
     "
           >
-           <a
-  href="#como-funciona"
-  className="
+            <a
+              href="#como-funciona"
+              className="
     flex
     min-h-[54px]
     w-full
@@ -297,12 +493,13 @@ className="
     hover:bg-[#30363d]
     hover:text-white
   "
->
-  Cómo funciona
-</a>
+            >
+              Cómo funciona
+            </a>
           </motion.div>
         </div>
       </motion.div>
+      </div>
     </section>
   );
 }

@@ -39,6 +39,7 @@ export default function PublicNavbar() {
 
   return (
     <header
+      data-public-navbar
       className={`
         fixed
         left-3
