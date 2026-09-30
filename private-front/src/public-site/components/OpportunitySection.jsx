@@ -111,10 +111,11 @@ export default function OpportunitySection() {
       ref={sectionRef}
       className="
     relative
-    h-[155vh]
     bg-[#f3f4f6]
+    lg:h-[155vh]
   "
     >
+      {/* Fondo punteado */}
       <div
         className="pointer-events-none absolute inset-0 z-0 opacity-65"
         style={{
@@ -125,51 +126,55 @@ export default function OpportunitySection() {
       />
 
       <div
-        className="sticky z-10 overflow-hidden"
+        className="
+    relative
+    z-10
+    lg:sticky
+    lg:overflow-hidden
+  "
         style={{
-          top: `${navbarBottom}px`,
-          height: `calc(100svh - ${navbarBottom}px)`,
+          top: navbarBottom,
         }}
       >
         <div
-          className="sticky overflow-hidden"
-          style={{
-            top: `${navbarBottom}px`,
-            height: `calc(100svh - ${navbarBottom}px)`,
-          }}
-        >
-          <div
-            className="
+          className="
     mx-auto
     flex
-    h-full
     w-full
     max-w-[1320px]
-    items-center
-    px-6
+    px-5
+    pb-16
+    pt-8
+
     sm:px-8
+
+    lg:h-full
+    lg:items-center
     lg:px-10
+    lg:py-0
   "
-          >
-            <div className="w-full">
-              <div
-                className="
-    grid
-    w-full
-    items-start
-    gap-12
+          style={{
+            marginTop: `calc(${navbarBottom}px + 16px)`,
+          }}
+        >
+          <div className="w-full">
+            <div
+              className="
+            grid
+            w-full
+            items-start
+            gap-8
 
-    lg:grid-cols-[minmax(0,0.92fr)_minmax(430px,0.82fr)]
-    lg:gap-24
-  "
-              >
-                <LeftContent />
+            lg:grid-cols-[minmax(0,0.92fr)_minmax(430px,0.82fr)]
+            lg:gap-24
+          "
+            >
+              <LeftContent />
 
-                <RightList progress={progress} activeIndex={activeIndex} />
-              </div>
-
-              <Conclusion />
+              <RightList progress={progress} activeIndex={activeIndex} />
             </div>
+
+            <Conclusion />
           </div>
         </div>
       </div>
@@ -187,16 +192,15 @@ function LeftContent() {
       <p
         className="
           max-w-[620px]
-          text-[24px]
+          text-[18px]
           font-medium
-          leading-[1.4]
+          leading-[1.42]
           tracking-[-0.02em]
           text-[#30363d]
 
           sm:text-[19px]
 
           lg:text-[24px]
-          lg:leading-[1.42]
         "
       >
         Detrás de una permuta puede estar la operación que no estás pudiendo
@@ -205,13 +209,19 @@ function LeftContent() {
 
       <p
         className="
-          my-7
+          my-6
           max-w-[620px]
-          text-[clamp(1.7rem,2.35vw,2.45rem)]
+          text-[30px]
           font-semibold
-          leading-[1.12]
-          tracking-[-0.035em]
+          leading-[1.06]
+          tracking-[-0.04em]
           text-[#0a192f]
+
+          sm:text-[34px]
+
+          lg:my-7
+          lg:text-[clamp(1.7rem,2.35vw,2.45rem)]
+          lg:leading-[1.12]
         "
       >
         Hoy, encontrarla implica buscar en{" "}
@@ -223,14 +233,13 @@ function LeftContent() {
           max-w-[620px]
           text-[18px]
           font-medium
-          leading-[1.4]
+          leading-[1.42]
           tracking-[-0.02em]
           text-[#30363d]
 
           sm:text-[19px]
 
           lg:text-[24px]
-          lg:leading-[1.42]
         "
       >
         Y aun así, puede existir sin que llegues a encontrarla.
@@ -271,12 +280,8 @@ function MarkerText({ children }) {
 
 function RightList({ progress, activeIndex }) {
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-2 lg:space-y-2.5">
       {items.map((item, index) => {
-        /*
-         * El primero está visible desde el momento
-         * en que aparece la sección.
-         */
         let itemProgress = 1;
 
         if (index > 0) {
@@ -294,33 +299,38 @@ function RightList({ progress, activeIndex }) {
           <div
             key={item}
             className={`
-  border
-  px-5
-  py-3
-  transition
-  duration-300
+              border
+              border-[#76bc21]
+              bg-[#76bc21]
+              px-4
+              py-3
 
-  ${
-    isActive
-      ? "border-[#86cc31] bg-[#86cc31] shadow-[0_10px_24px_rgba(118,188,33,0.20)]"
-      : "border-[#76bc21] bg-[#76bc21]"
-  }
-`}
+              lg:px-5
+              lg:transition
+              lg:duration-300
+
+              ${
+                isActive
+                  ? "lg:border-[#86cc31] lg:bg-[#86cc31] lg:shadow-[0_10px_24px_rgba(118,188,33,0.20)]"
+                  : ""
+              }
+            `}
             style={{
-              opacity: itemProgress,
-              transform: `translateY(${mix(10, 0, itemProgress)}px)`,
+              "--item-opacity": itemProgress,
+              "--item-y": `${mix(10, 0, itemProgress)}px`,
             }}
           >
             <p
               className="
-      text-[15px]
-      font-semibold
-      leading-[1.25]
-      tracking-[-0.015em]
-      text-white
+                text-[14px]
+                font-semibold
+                leading-[1.25]
+                tracking-[-0.015em]
+                text-white
 
-      md:text-[16px]
-    "
+                sm:text-[15px]
+                md:text-[16px]
+              "
             >
               {item}
             </p>
@@ -340,41 +350,33 @@ function Conclusion() {
     <div
       className="
         mx-auto
-        mt-[clamp(36px,5vh,58px)]
+        mt-10
         max-w-[1300px]
         text-center
+
+        lg:mt-[clamp(36px,5vh,58px)]
       "
     >
-      {/*
-        IMPORTANTE:
-
-        Es h2 porque tu CSS actual tiene:
-
-        .public-site h1,
-        .public-site h2 {
-          font-family: "Momo Trust Display", "Manrope", sans-serif;
-          font-weight: 400;
-        }
-
-        Por lo tanto usa EXACTAMENTE la misma fuente
-        que el título del HeroSection.
-      */}
-
       <h2
         className="
-    text-balance
-    text-[clamp(2rem,3vw,3.2rem)]
-    font-normal
-    leading-[1.02]
-    tracking-[-0.035em]
-    text-[#0a192f]
-  "
+          text-balance
+          text-[30px]
+          font-normal
+          leading-[1.02]
+          tracking-[-0.035em]
+          text-[#0a192f]
+
+          sm:text-[36px]
+
+          lg:text-[clamp(2rem,3vw,3.2rem)]
+        "
       >
         Permuok no solo centraliza esta información.
-        <br className="hidden sm:block" />
-        <span className="sm:ml-2">
-          La conecta para detectar compatibilidades
-          <br />y abrir nuevas posibilidades de operación.
+        <br className="hidden lg:block" />
+        <span>
+          La conecta para detectar compatibilidades{" "}
+          <br className="hidden lg:block" />y abrir nuevas posibilidades de
+          operación.
         </span>
       </h2>
     </div>
