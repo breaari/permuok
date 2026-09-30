@@ -16,6 +16,8 @@ export default function HeroSection() {
     min-h-[720px]
     overflow-hidden
     bg-[#f3f4f6]
+        mt-[45px]
+
   "
     >
       {/* =====================================================
@@ -48,7 +50,7 @@ export default function HeroSection() {
   pointer-events-none
   absolute
   left-1/2
-  top-[125px]
+  top-[105px]
   z-30
   w-full
   -translate-x-1/2
@@ -76,7 +78,7 @@ export default function HeroSection() {
           className="
   mx-auto
   max-w-[1040px]
-  text-[38px]
+  text-[40px]
   font-normal
   leading-[0.98]
   tracking-[-0.035em]
@@ -125,82 +127,140 @@ export default function HeroSection() {
           data-hero-subtitle
           className="
     mx-auto
-    max-w-[560px]
+    max-w-[610px]
     px-4
     sm:px-6
+
   "
         >
           <p
             className="
-      text-[16px]
-      font-extrabold
-      leading-[1.45]
-      tracking-[-0.015em]
+      text-[17px]
+      font-medium
+      leading-[1.4]
+      tracking-[-0.02em]
       text-slate-600
-      sm:text-[17px]
-      lg:text-[17px]
+      sm:text-[18px]
+      lg:text-[20px]
     "
           >
-            <span className="lg:hidden">
-              Una red inteligente sólo para inmobilairias donde las oportunidades de permuta se
-              centralizan, se cruzan y empiezan a encontrarse.
+            <span className="lg:hidden ">
+              Una red inteligente sólo para inmobiliarias donde las
+              oportunidades de permuta se centralizan, se cruzan y empiezan a
+              encontrarse.
             </span>
 
             <span className="hidden lg:inline">
-              Una red inteligente sólo para inmobiliarias 
+              Una red inteligente sólo para inmobiliarias
               <br />
-               donde las  oportunidades de permuta se centralizan,
+              donde las oportunidades de permuta se centralizan,
               <br />
-               se cruzan y empiezan a encontrarse.
+              se cruzan y empiezan a encontrarse.
             </span>
           </p>
         </div>
 
         {/* CTA */}
-        <div className="mt-5 flex justify-center">
-          <Link
-            to="/register"
-            className="
-              group
-              inline-flex
-              min-w-[220px]
-              items-center
-              justify-between
-              gap-5
-              rounded-xl
-              bg-[#0a192f]
-              px-4
-              py-3
-              text-sm
-              font-semibold
-              text-white
-              shadow-[0_12px_30px_rgba(10,25,47,0.18)]
-              transition
-              duration-300
-              hover:-translate-y-0.5
-              hover:bg-primary
-            "
+        <div className="mt-6 flex justify-center">
+          <motion.div
+            animate={{
+              scale: [1, 1.018, 1],
+              boxShadow: [
+                "0 0 18px rgba(118,188,33,0.30), 0 10px 30px rgba(118,188,33,0.18)",
+                "0 0 34px rgba(118,188,33,0.62), 0 12px 38px rgba(118,188,33,0.30)",
+                "0 0 18px rgba(118,188,33,0.30), 0 10px 30px rgba(118,188,33,0.18)",
+              ],
+            }}
+            transition={{
+              duration: 2.4,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            whileHover={{
+              scale: 1.045,
+              y: -3,
+            }}
+            whileTap={{
+              scale: 0.98,
+            }}
+            className="rounded-[14px]"
           >
-            <span>Sumarme a la red</span>
-
-            <span
+            <Link
+              to="/register"
               className="
-                flex
-                h-8
-                w-8
-                items-center
-                justify-center
-                rounded-full
-                bg-white/10
-                transition
-                duration-300
-                group-hover:translate-x-0.5
-                group-hover:bg-white/15
-              "
+        group
+        relative
+        inline-flex
+        min-w-[250px]
+        items-center
+        justify-between
+        gap-6
+        overflow-hidden
+        rounded-[14px]
+        border
+        border-[#9ee34a]
+        bg-[#76bc21]
+        px-5
+        py-3.5
+        text-[15px]
+        font-bold
+        text-[#0a192f]
+        transition
+        duration-300
+        hover:bg-[#82ca28]
+      "
             >
-              <Icon name="arrowRight" size={16} className="text-white" />
-            </span>
-          </Link>
+              {/* Destello que cruza el botón */}
+              <motion.span
+                aria-hidden="true"
+                className="
+          pointer-events-none
+          absolute
+          inset-y-0
+          w-20
+          -skew-x-12
+          bg-gradient-to-r
+          from-transparent
+          via-white/35
+          to-transparent
+        "
+                initial={{
+                  x: "-180%",
+                }}
+                animate={{
+                  x: "420%",
+                }}
+                transition={{
+                  duration: 1.2,
+                  repeat: Infinity,
+                  repeatDelay: 2.4,
+                  ease: "easeInOut",
+                }}
+              />
+
+              <span className="relative z-10">Sumarme a la red</span>
+
+              <span
+                className="
+          relative
+          z-10
+          flex
+          h-9
+          w-9
+          items-center
+          justify-center
+          rounded-full
+          bg-[#0a192f]
+          transition
+          duration-300
+          group-hover:translate-x-1
+          group-hover:scale-105
+        "
+              >
+                <Icon name="arrowRight" size={17} className="text-white" />
+              </span>
+            </Link>
+          </motion.div>
         </div>
       </motion.div>
     </section>
