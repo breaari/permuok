@@ -165,7 +165,7 @@ export default function HeroSection() {
         {/* CTA */}
         <div
           className="
-    mt-9
+    mt-[56px]
     flex
     flex-wrap
     items-center
@@ -177,9 +177,9 @@ export default function HeroSection() {
           <motion.div
             animate={{
               boxShadow: [
-                "0 0 12px rgba(118,188,33,0.25), 0 10px 30px rgba(10,25,47,0.14)",
-                "0 0 28px rgba(118,188,33,0.60), 0 12px 38px rgba(118,188,33,0.20)",
-                "0 0 12px rgba(118,188,33,0.25), 0 10px 30px rgba(10,25,47,0.14)",
+                "0 0 10px rgba(118,188,33,0.22)",
+                "0 0 26px rgba(118,188,33,0.48)",
+                "0 0 10px rgba(118,188,33,0.22)",
               ],
             }}
             transition={{
@@ -188,112 +188,86 @@ export default function HeroSection() {
               ease: "easeInOut",
             }}
             whileHover={{
-              scale: 1.035,
               y: -2,
             }}
             whileTap={{
               scale: 0.98,
             }}
-            className="rounded-xl"
           >
             <Link
               to="/register"
               className="
         group
-        relative
         inline-flex
+        min-w-[225px]
         items-center
+        justify-center
         gap-3
-        overflow-hidden
-        rounded-xl
+        rounded-none
         border
         border-[#76bc21]
-        bg-[#0a192f]
-        px-6
+        bg-[#76bc21]
+        px-7
         py-3.5
         text-[15px]
         font-bold
         text-white
         transition
         duration-300
-        hover:border-[#9ee34a]
-        hover:bg-[#0d213d]
+        hover:border-[#86cc31]
+        hover:bg-[#86cc31]
       "
             >
-              {/* brillo sutil */}
-              <motion.span
-                aria-hidden="true"
-                className="
-          pointer-events-none
-          absolute
-          inset-y-0
-          w-16
-          -skew-x-12
-          bg-gradient-to-r
-          from-transparent
-          via-white/20
-          to-transparent
-        "
-                initial={{ x: "-200%" }}
-                animate={{ x: "500%" }}
-                transition={{
-                  duration: 1,
-                  repeat: Infinity,
-                  repeatDelay: 3,
-                  ease: "easeInOut",
-                }}
-              />
+              <span>Sumarme a la red</span>
 
-              <span className="relative z-10">Sumarme a la red</span>
-
-              <span
+              <Icon
+                name="arrowRight"
+                size={17}
                 className="
-          relative
-          z-10
-          flex
-          h-8
-          w-8
-          items-center
-          justify-center
-          rounded-full
-          bg-[#76bc21]
-          transition
+          text-white
+          transition-transform
           duration-300
-          group-hover:translate-x-0.5
-          group-hover:scale-105
+          group-hover:translate-x-1
         "
-              >
-                <Icon name="arrowRight" size={15} className="text-[#0a192f]" />
-              </span>
+              />
             </Link>
           </motion.div>
 
           {/* CTA SECUNDARIO */}
-          <a
-            href="#como-funciona"
-            className="
-      inline-flex
-      items-center
-      justify-center
-      rounded-xl
-      border
-      border-slate-300
-      bg-white/70
-      px-5
-      py-3.5
-      text-[15px]
-      font-semibold
-      text-[#30363d]
-      backdrop-blur-sm
-      transition
-      duration-300
-      hover:-translate-y-0.5
-      hover:border-[#76bc21]
-      hover:bg-white
-    "
+          <motion.div
+            whileHover={{
+              y: -2,
+            }}
+            whileTap={{
+              scale: 0.98,
+            }}
           >
-            Cómo funciona
-          </a>
+            <a
+              href="#como-funciona"
+              className="
+        inline-flex
+        min-w-[190px]
+        items-center
+        justify-center
+        rounded-none
+        border
+        border-[#30363d]
+        bg-white/70
+        px-7
+        py-3.5
+        text-[15px]
+        font-semibold
+        text-[#30363d]
+        backdrop-blur-sm
+        transition
+        duration-300
+        hover:bg-[#30363d]
+        hover:text-white
+      "
+            >
+              Cómo funciona
+            </a>
+          </motion.div>
         </div>
       </motion.div>
     </section>
