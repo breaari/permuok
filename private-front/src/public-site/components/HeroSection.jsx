@@ -126,11 +126,13 @@ export default function HeroSection() {
         <div
           data-hero-subtitle
           className="
+    relative
+    top-[8px]
     mx-auto
     max-w-[610px]
     px-4
     sm:px-6
-
+    lg:top-[24px]
   "
         >
           <p
@@ -139,7 +141,7 @@ export default function HeroSection() {
       font-medium
       leading-[1.4]
       tracking-[-0.02em]
-      text-slate-600
+     text-[#30363d]
       sm:text-[18px]
       lg:text-[20px]
     "
@@ -161,29 +163,38 @@ export default function HeroSection() {
         </div>
 
         {/* CTA */}
-        <div className="mt-6 flex justify-center">
+        <div
+          className="
+    mt-9
+    flex
+    flex-wrap
+    items-center
+    justify-center
+    gap-3
+  "
+        >
+          {/* CTA PRINCIPAL */}
           <motion.div
             animate={{
-              scale: [1, 1.018, 1],
               boxShadow: [
-                "0 0 18px rgba(118,188,33,0.30), 0 10px 30px rgba(118,188,33,0.18)",
-                "0 0 34px rgba(118,188,33,0.62), 0 12px 38px rgba(118,188,33,0.30)",
-                "0 0 18px rgba(118,188,33,0.30), 0 10px 30px rgba(118,188,33,0.18)",
+                "0 0 12px rgba(118,188,33,0.25), 0 10px 30px rgba(10,25,47,0.14)",
+                "0 0 28px rgba(118,188,33,0.60), 0 12px 38px rgba(118,188,33,0.20)",
+                "0 0 12px rgba(118,188,33,0.25), 0 10px 30px rgba(10,25,47,0.14)",
               ],
             }}
             transition={{
-              duration: 2.4,
+              duration: 2.6,
               repeat: Infinity,
               ease: "easeInOut",
             }}
             whileHover={{
-              scale: 1.045,
-              y: -3,
+              scale: 1.035,
+              y: -2,
             }}
             whileTap={{
               scale: 0.98,
             }}
-            className="rounded-[14px]"
+            className="rounded-xl"
           >
             <Link
               to="/register"
@@ -191,49 +202,44 @@ export default function HeroSection() {
         group
         relative
         inline-flex
-        min-w-[250px]
         items-center
-        justify-between
-        gap-6
+        gap-3
         overflow-hidden
-        rounded-[14px]
+        rounded-xl
         border
-        border-[#9ee34a]
-        bg-[#76bc21]
-        px-5
+        border-[#76bc21]
+        bg-[#0a192f]
+        px-6
         py-3.5
         text-[15px]
         font-bold
-        text-[#0a192f]
+        text-white
         transition
         duration-300
-        hover:bg-[#82ca28]
+        hover:border-[#9ee34a]
+        hover:bg-[#0d213d]
       "
             >
-              {/* Destello que cruza el botón */}
+              {/* brillo sutil */}
               <motion.span
                 aria-hidden="true"
                 className="
           pointer-events-none
           absolute
           inset-y-0
-          w-20
+          w-16
           -skew-x-12
           bg-gradient-to-r
           from-transparent
-          via-white/35
+          via-white/20
           to-transparent
         "
-                initial={{
-                  x: "-180%",
-                }}
-                animate={{
-                  x: "420%",
-                }}
+                initial={{ x: "-200%" }}
+                animate={{ x: "500%" }}
                 transition={{
-                  duration: 1.2,
+                  duration: 1,
                   repeat: Infinity,
-                  repeatDelay: 2.4,
+                  repeatDelay: 3,
                   ease: "easeInOut",
                 }}
               />
@@ -245,22 +251,49 @@ export default function HeroSection() {
           relative
           z-10
           flex
-          h-9
-          w-9
+          h-8
+          w-8
           items-center
           justify-center
           rounded-full
-          bg-[#0a192f]
+          bg-[#76bc21]
           transition
           duration-300
-          group-hover:translate-x-1
+          group-hover:translate-x-0.5
           group-hover:scale-105
         "
               >
-                <Icon name="arrowRight" size={17} className="text-white" />
+                <Icon name="arrowRight" size={15} className="text-[#0a192f]" />
               </span>
             </Link>
           </motion.div>
+
+          {/* CTA SECUNDARIO */}
+          <a
+            href="#como-funciona"
+            className="
+      inline-flex
+      items-center
+      justify-center
+      rounded-xl
+      border
+      border-slate-300
+      bg-white/70
+      px-5
+      py-3.5
+      text-[15px]
+      font-semibold
+      text-[#30363d]
+      backdrop-blur-sm
+      transition
+      duration-300
+      hover:-translate-y-0.5
+      hover:border-[#76bc21]
+      hover:bg-white
+    "
+          >
+            Cómo funciona
+          </a>
         </div>
       </motion.div>
     </section>
