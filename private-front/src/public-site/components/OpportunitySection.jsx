@@ -131,15 +131,15 @@ export default function OpportunitySection() {
           height: `calc(100svh - ${navbarBottom}px)`,
         }}
       >
-      <div
-        className="sticky overflow-hidden"
-        style={{
-          top: `${navbarBottom}px`,
-          height: `calc(100svh - ${navbarBottom}px)`,
-        }}
-      >
         <div
-          className="
+          className="sticky overflow-hidden"
+          style={{
+            top: `${navbarBottom}px`,
+            height: `calc(100svh - ${navbarBottom}px)`,
+          }}
+        >
+          <div
+            className="
     mx-auto
     flex
     h-full
@@ -150,10 +150,10 @@ export default function OpportunitySection() {
     sm:px-8
     lg:px-10
   "
-        >
-          <div className="w-full">
-            <div
-              className="
+          >
+            <div className="w-full">
+              <div
+                className="
     grid
     w-full
     items-start
@@ -162,16 +162,16 @@ export default function OpportunitySection() {
     lg:grid-cols-[minmax(0,0.92fr)_minmax(430px,0.82fr)]
     lg:gap-24
   "
-            >
-              <LeftContent />
+              >
+                <LeftContent />
 
-              <RightList progress={progress} activeIndex={activeIndex} />
+                <RightList progress={progress} activeIndex={activeIndex} />
+              </div>
+
+              <Conclusion />
             </div>
-
-            <Conclusion />
           </div>
         </div>
-      </div>
       </div>
     </section>
   );
@@ -184,10 +184,38 @@ export default function OpportunitySection() {
 function LeftContent() {
   return (
     <div className="max-w-[660px]">
-      {/* 
-        Mismo lenguaje visual que la bajada del HERO:
-        mismo color, tracking, peso e interlineado.
-      */}
+      <p
+        className="
+          max-w-[620px]
+          text-[24px]
+          font-medium
+          leading-[1.4]
+          tracking-[-0.02em]
+          text-[#30363d]
+
+          sm:text-[19px]
+
+          lg:text-[24px]
+          lg:leading-[1.42]
+        "
+      >
+        Detrás de una permuta puede estar la operación que no estás pudiendo
+        cerrar.
+      </p>
+
+      <p
+        className="
+          my-7
+          max-w-[620px]
+          text-[clamp(1.7rem,2.35vw,2.45rem)]
+          font-semibold
+          leading-[1.12]
+          tracking-[-0.035em]
+          text-[#0a192f]
+        "
+      >
+        Hoy, encontrarla implica buscar en {" "} <MarkerText>demasiados lugares.</MarkerText>
+      </p>
 
       <p
         className="
@@ -200,32 +228,11 @@ function LeftContent() {
 
           sm:text-[19px]
 
-          lg:text-[22px]
+          lg:text-[24px]
           lg:leading-[1.42]
         "
       >
-        Detrás de una permuta puede estar la operación que hoy no estás pudiendo
-        cerrar.
-      </p>
-
-      {/* 
-        NO es un h1/h2 para que NO herede Momo Trust Display.
-        Esta frase queda en Manrope.
-      */}
-
-      <p
-        className="
-          mt-7
-          max-w-[620px]
-          text-[clamp(1.7rem,2.35vw,2.45rem)]
-          font-semibold
-          leading-[1.12]
-          tracking-[-0.035em]
-          text-[#0a192f]
-        "
-      >
-        Y esa oportunidad puede estar en{" "}
-        <MarkerText>cualquier lado.</MarkerText>
+        Y aun así, puede existir sin que llegues a encontrarla.
       </p>
     </div>
   );
@@ -332,7 +339,6 @@ function RightList({ progress, activeIndex }) {
           </div>
         );
       })}
-      
     </div>
   );
 }
