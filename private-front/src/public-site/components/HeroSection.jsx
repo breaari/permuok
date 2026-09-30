@@ -50,14 +50,15 @@ export default function HeroSection() {
   pointer-events-none
   absolute
   left-1/2
-  top-[105px]
+  top-[96px]
   z-30
   w-full
   -translate-x-1/2
   px-5
   text-center
-  sm:top-[128px]
+  sm:top-[108px]
   sm:px-6
+  md:top-[116px]
   lg:top-[124px]
 "
       >
@@ -77,15 +78,22 @@ export default function HeroSection() {
           }}
           className="
   mx-auto
-  max-w-[1040px]
-  text-[40px]
+  max-w-[350px]
+  text-[36px]
   font-normal
-  leading-[0.98]
+  leading-[0.97]
   tracking-[-0.035em]
   text-[#0a192f]
-  sm:text-[48px]
-  md:text-[54px]
+
+  sm:max-w-[520px]
+  sm:text-[44px]
+
+  md:max-w-[760px]
+  md:text-[50px]
+
+  lg:max-w-[1040px]
   lg:text-[54px]
+
   xl:text-[56px]
 "
         >
@@ -112,14 +120,14 @@ export default function HeroSection() {
         }}
         className="
   absolute
-  bottom-[54px]
+  bottom-[64px]
   left-1/2
   z-40
   w-[min(92vw,760px)]
   -translate-x-1/2
   text-center
-  sm:bottom-[60px]
-  lg:bottom-[clamp(110px,16vh,140px)]
+sm:bottom-[64px]
+lg:bottom-[clamp(110px,16vh,140px)]
 "
       >
         {/* Bajada */}
@@ -127,24 +135,32 @@ export default function HeroSection() {
           data-hero-subtitle
           className="
     relative
-    top-[8px]
+    top-0
     mx-auto
-    max-w-[610px]
-    px-4
-    sm:px-6
+    max-w-[350px]
+    px-3
+
+    sm:max-w-[460px]
+    sm:px-5
+
     lg:top-[24px]
+    lg:max-w-[610px]
+    lg:px-6
   "
         >
           <p
             className="
-      text-[17px]
-      font-medium
-      leading-[1.4]
-      tracking-[-0.02em]
-     text-[#30363d]
-      sm:text-[18px]
-      lg:text-[20px]
-    "
+  text-[16px]
+  font-medium
+  leading-[1.38]
+  tracking-[-0.02em]
+  text-[#30363d]
+
+  sm:text-[17px]
+
+  lg:text-[20px]
+  lg:leading-[1.4]
+"
           >
             <span className="lg:hidden ">
               Una red inteligente sólo para inmobiliarias donde las
@@ -165,21 +181,25 @@ export default function HeroSection() {
         {/* CTA */}
         <div
           className="
-    mt-[56px]
-    flex
-    flex-wrap
-    items-center
-    justify-center
-    gap-3
-  "
+  mt-7
+  flex
+  flex-col
+  items-center
+  justify-center
+  gap-3
+
+  lg:mt-[60px]
+  lg:flex-row
+  lg:gap-3
+"
         >
           {/* CTA PRINCIPAL */}
           <motion.div
             animate={{
               boxShadow: [
-                "0 0 10px rgba(118,188,33,0.22)",
-                "0 0 26px rgba(118,188,33,0.48)",
-                "0 0 10px rgba(118,188,33,0.22)",
+                "0 0 10px rgba(118,188,33,0.20)",
+                "0 0 28px rgba(118,188,33,0.52)",
+                "0 0 10px rgba(118,188,33,0.20)",
               ],
             }}
             transition={{
@@ -193,42 +213,50 @@ export default function HeroSection() {
             whileTap={{
               scale: 0.98,
             }}
+            className="
+      w-[270px]
+      max-w-full
+        w-[300px]
+  max-w-[calc(100vw-48px)]
+
+  lg:w-[270px]
+    "
           >
             <Link
               to="/register"
               className="
-        group
-        inline-flex
-        min-w-[225px]
-        items-center
-        justify-center
-        gap-3
-        rounded-none
-        border
-        border-[#76bc21]
-        bg-[#76bc21]
-        px-7
-        py-3.5
-        text-[15px]
-        font-bold
-        text-white
-        transition
-        duration-300
-        hover:border-[#86cc31]
-        hover:bg-[#86cc31]
-      "
+    group
+    flex
+    min-h-[56px]
+    w-full
+    items-center
+    justify-center
+    gap-3
+    rounded-none
+    border
+    border-[#76bc21]
+    bg-[#76bc21]
+    px-7
+    text-[16px]
+    font-bold
+    text-white
+    transition
+    duration-300
+    hover:border-[#86cc31]
+    hover:bg-[#86cc31]
+  "
             >
               <span>Sumarme a la red</span>
 
               <Icon
                 name="arrowRight"
-                size={17}
+                size={18}
                 className="
-          text-white
-          transition-transform
-          duration-300
-          group-hover:translate-x-1
-        "
+      text-white
+      transition-transform
+      duration-300
+      group-hover:translate-x-1
+    "
               />
             </Link>
           </motion.div>
@@ -241,32 +269,37 @@ export default function HeroSection() {
             whileTap={{
               scale: 0.98,
             }}
+            className="
+      w-[220px]
+  max-w-[calc(100vw-48px)]
+
+  lg:w-[220px]
+    "
           >
-            <a
-              href="#como-funciona"
-              className="
-        inline-flex
-        min-w-[190px]
-        items-center
-        justify-center
-        rounded-none
-        border
-        border-[#30363d]
-        bg-white/70
-        px-7
-        py-3.5
-        text-[15px]
-        font-semibold
-        text-[#30363d]
-        backdrop-blur-sm
-        transition
-        duration-300
-        hover:bg-[#30363d]
-        hover:text-white
-      "
-            >
-              Cómo funciona
-            </a>
+           <a
+  href="#como-funciona"
+  className="
+    flex
+    min-h-[54px]
+    w-full
+    items-center
+    justify-center
+    rounded-none
+    border
+    border-[#30363d]
+    bg-white
+    px-7
+    text-[16px]
+    font-semibold
+    text-[#30363d]
+    transition
+    duration-300
+    hover:bg-[#30363d]
+    hover:text-white
+  "
+>
+  Cómo funciona
+</a>
           </motion.div>
         </div>
       </motion.div>
