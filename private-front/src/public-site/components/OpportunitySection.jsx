@@ -214,7 +214,8 @@ function LeftContent() {
           text-[#0a192f]
         "
       >
-        Hoy, encontrarla implica buscar en {" "} <MarkerText>demasiados lugares.</MarkerText>
+        Hoy, encontrarla implica buscar en{" "}
+        <MarkerText>demasiados lugares.</MarkerText>
       </p>
 
       <p
@@ -270,7 +271,7 @@ function MarkerText({ children }) {
 
 function RightList({ progress, activeIndex }) {
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-2.5">
       {items.map((item, index) => {
         /*
          * El primero está visible desde el momento
@@ -293,46 +294,33 @@ function RightList({ progress, activeIndex }) {
           <div
             key={item}
             className={`
-              border
-              px-6
-              py-[18px]
-              transition-[background-color,border-color,box-shadow]
-              duration-500
+  border
+  px-5
+  py-3
+  transition
+  duration-300
 
-              ${
-                isActive
-                  ? `
-                    border-[#72bb61]
-                    bg-[#eef8e9]
-                    shadow-[0_14px_36px_rgba(79,164,72,0.11)]
-                  `
-                  : `
-                    border-[#91c986]
-                    bg-white/75
-                  `
-              }
-            `}
+  ${
+    isActive
+      ? "border-[#86cc31] bg-[#86cc31] shadow-[0_10px_24px_rgba(118,188,33,0.20)]"
+      : "border-[#76bc21] bg-[#76bc21]"
+  }
+`}
             style={{
               opacity: itemProgress,
-
-              transform: `
-                translateY(
-                  ${mix(10, 0, itemProgress)}px
-                )
-              `,
+              transform: `translateY(${mix(10, 0, itemProgress)}px)`,
             }}
           >
             <p
-              className={`
-                text-[16px]
-                font-medium
-                leading-[1.35]
-                tracking-[-0.015em]
+              className="
+      text-[15px]
+      font-semibold
+      leading-[1.25]
+      tracking-[-0.015em]
+      text-white
 
-                md:text-[18px]
-
-                ${isActive ? "text-[#285f28]" : "text-[#172033]"}
-              `}
+      md:text-[16px]
+    "
             >
               {item}
             </p>
