@@ -110,11 +110,27 @@ export default function OpportunitySection() {
     <section
       ref={sectionRef}
       className="
-        relative
-        h-[155vh]
-        bg-[#f3f4f6]
-      "
+    relative
+    h-[155vh]
+    bg-[#f3f4f6]
+  "
     >
+      <div
+        className="pointer-events-none absolute inset-0 z-0 opacity-65"
+        style={{
+          backgroundImage:
+            "radial-gradient(rgba(71,85,105,0.13) 0.75px, transparent 0.75px)",
+          backgroundSize: "18px 18px",
+        }}
+      />
+
+      <div
+        className="sticky z-10 overflow-hidden"
+        style={{
+          top: `${navbarBottom}px`,
+          height: `calc(100svh - ${navbarBottom}px)`,
+        }}
+      >
       <div
         className="sticky overflow-hidden"
         style={{
@@ -136,8 +152,8 @@ export default function OpportunitySection() {
   "
         >
           <div className="w-full">
-         <div
-  className="
+            <div
+              className="
     grid
     w-full
     items-start
@@ -146,7 +162,7 @@ export default function OpportunitySection() {
     lg:grid-cols-[minmax(0,0.92fr)_minmax(430px,0.82fr)]
     lg:gap-24
   "
->
+            >
               <LeftContent />
 
               <RightList progress={progress} activeIndex={activeIndex} />
@@ -155,6 +171,7 @@ export default function OpportunitySection() {
             <Conclusion />
           </div>
         </div>
+      </div>
       </div>
     </section>
   );
@@ -315,6 +332,7 @@ function RightList({ progress, activeIndex }) {
           </div>
         );
       })}
+      
     </div>
   );
 }
