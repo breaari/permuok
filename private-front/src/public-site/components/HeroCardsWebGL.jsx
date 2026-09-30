@@ -137,9 +137,17 @@ const DESKTOP_CARD_WIDTH = 0.75;
 /* Mobile = exactamente igual a desktop */
 
 // ARIANA
-const FIRE_INTERVAL_MOBILE = FIRE_INTERVAL_DESKTOP;
+const FIRE_INTERVAL_MOBILE = 1400;
 const FIRE_DURATION_MOBILE = FIRE_DURATION_DESKTOP;
 const MOBILE_CARD_WIDTH = 1.2;
+
+/*
+ * Mobile:
+ * las cards adquieren presencia antes
+ * al salir del centro.
+ */
+const MOBILE_INITIAL_SCALE_WEIGHT = 0.2;
+const MOBILE_SCALE_START = 0.18;
 
 const CYLINDRICAL_END_DESKTOP = 0.7;
 const CYLINDRICAL_END_MOBILE = CYLINDRICAL_END_DESKTOP;
@@ -898,12 +906,15 @@ export default function HeroCardsWebGL() {
    Exactamente Melius
 =================================================== */
 
-      const scaleStart = isDesktop ? 0.2 : 0.3;
+      const initialScaleWeight = isDesktop
+        ? 0.125
+        : MOBILE_INITIAL_SCALE_WEIGHT;
+
+      const scaleStart = isDesktop ? 0.2 : MOBILE_SCALE_START;
 
       const cardScale =
-        0.125 * smoothstep(0, 0.15, progress) +
-        0.875 * smoothstep(scaleStart, 1, progress);
-
+        initialScaleWeight * smoothstep(0, 0.15, progress) +
+        (1 - initialScaleWeight) * smoothstep(scaleStart, 1, progress);
       /* ===================================================
    TRANSFORM
 =================================================== */

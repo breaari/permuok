@@ -27,35 +27,61 @@ export default function OpportunitySection() {
     };
 
     handleScroll();
-    window.addEventListener("scroll", handleScroll, { passive: true });
 
-    return () => window.removeEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
   }, []);
 
   const activeIndex = useMemo(() => {
-    const step = 1 / (items.length + 0.6);
-    let index = -1;
+    if (progress < 0.16) return 0;
+    if (progress < 0.29) return 1;
+    if (progress < 0.42) return 2;
+    if (progress < 0.55) return 3;
 
-    items.forEach((_, i) => {
-      const threshold = 0.08 + i * step;
-      if (progress >= threshold) index = i;
-    });
-
-    return index;
+    return 4;
   }, [progress]);
 
   return (
     <section
       ref={sectionRef}
-      className="relative h-[180vh] bg-[#f5f7fa]"
+      className="relative h-[165vh] bg-[var(--landing-bg,#f5f7fa)]"
     >
-      <div className="sticky top-0 flex h-screen items-center overflow-hidden">
-        <div className="mx-auto w-full max-w-[1380px] px-6 lg:px-10">
-          <div className="grid items-center gap-14 lg:grid-cols-[minmax(0,1fr)_480px] lg:gap-20">
+      <div className="sticky top-[96px] h-[calc(100vh-96px)] overflow-hidden">
+        <div
+          className="
+      mx-auto
+      flex
+      h-full
+      w-full
+      max-w-[1320px]
+      flex-col
+      px-6
+      pt-[8vh]
+      lg:px-10
+      lg:pt-[7vh]
+    "
+        >
+          <div
+            className="
+              grid
+              w-full
+              items-center
+              gap-14
+              lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,0.8fr)]
+              lg:gap-24
+            "
+          >
             <LeftContent />
 
             <RightList progress={progress} activeIndex={activeIndex} />
           </div>
+
+          <Conclusion />
         </div>
       </div>
     </section>
@@ -64,114 +90,136 @@ export default function OpportunitySection() {
 
 function LeftContent() {
   return (
-    <div className="max-w-[760px]">
-      <h2 className="text-balance text-[clamp(2.3rem,5vw,5.2rem)] font-bold leading-[0.95] tracking-[-0.06em] text-[#07101f]">
-        Una oportunidad de permuta puede estar en cualquier lado.
+    <div className="max-w-[680px]">
+      <p
+        className="
+          max-w-[610px]
+          font-sans
+          text-[clamp(1.15rem,1.55vw,1.4rem)]
+          font-normal
+          leading-[1.45]
+          tracking-[-0.015em]
+          text-slate-600
+        "
+      >
+        Detrás de una permuta puede estar la operación que hoy no estás pudiendo
+        cerrar.
+      </p>
+
+      <h2
+        className="
+          mt-7
+          max-w-[650px]
+          font-sans
+          text-[clamp(2rem,3vw,3.15rem)]
+          font-semibold
+          leading-[1.08]
+          tracking-[-0.04em]
+          text-[#0c1628]
+        "
+      >
+        Y esa oportunidad puede estar en{" "}
+        <MarkerText>cualquier lado.</MarkerText>
       </h2>
-
-      <div className="mt-10 max-w-[720px]">
-        <h3 className="text-balance text-[clamp(1.8rem,3.5vw,3.4rem)] font-bold leading-[0.98] tracking-[-0.05em] text-[#07101f]">
-          El problema no es que la oportunidad no exista.
-        </h3>
-
-        <p className="mt-2 text-balance text-[clamp(1.8rem,3.5vw,3.4rem)] font-bold leading-[0.98] tracking-[-0.05em] text-[#2166c2]">
-          Es encontrarla.
-        </p>
-      </div>
-
-      <div className="mt-10 max-w-[640px]">
-        <p className="text-[18px] font-semibold leading-relaxed text-slate-700 md:text-[21px]">
-          Permuok pone todas esas posibilidades a trabajar en una misma red
-          inmobiliaria.
-        </p>
-      </div>
     </div>
+  );
+}
+
+function MarkerText({ children }) {
+  return (
+    <span className="relative inline-block whitespace-nowrap">
+      <span
+        aria-hidden="true"
+        className="
+          absolute
+          -left-[2%]
+          -right-[2%]
+          bottom-[2px]
+          h-[42%]
+          -z-10
+          -rotate-[0.7deg]
+          bg-[#9fc5ff]
+        "
+      />
+
+      {children}
+    </span>
   );
 }
 
 function RightList({ progress, activeIndex }) {
   return (
-    <div className="relative">
-      <div className="mb-5 flex items-center gap-3">
-        <span className="h-[1px] w-10 bg-[#8acb88]" />
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-          Puede aparecer...
-        </p>
-      </div>
+    <div className="space-y-3.5">
+      {items.map((item, index) => {
+        let itemProgress = 1;
 
-      <div className="space-y-4">
-        {items.map((item, index) => {
-          const itemStart = 0.08 + index * 0.14;
-          const itemEnd = itemStart + 0.12;
-          const itemProgress = clamp((progress - itemStart) / (itemEnd - itemStart));
+        if (index > 0) {
+          const starts = [0, 0.045, 0.16, 0.275, 0.39];
+          const itemStart = starts[index];
+          const itemEnd = itemStart + 0.09;
 
-          const isVisible = itemProgress > 0;
-          const isActive = index === activeIndex;
+          itemProgress = clamp((progress - itemStart) / (itemEnd - itemStart));
+        }
 
-          return (
-            <div
-              key={item}
+        const isActive = index === activeIndex;
+
+        return (
+          <div
+            key={item}
+            className={`
+              border
+              px-6
+              py-[18px]
+              transition-[background-color,border-color,box-shadow]
+              duration-500
+              ${
+                isActive
+                  ? "border-[#72bb61] bg-[#eef8e9] shadow-[0_14px_36px_rgba(79,164,72,0.11)]"
+                  : "border-[#91c986] bg-white/75"
+              }
+            `}
+            style={{
+              opacity: itemProgress,
+              transform: `translateY(${mix(12, 0, itemProgress)}px)`,
+            }}
+          >
+            <p
               className={`
-                relative
-                border
-                px-5
-                py-5
-                transition-all
-                duration-500
-                md:px-6
-                md:py-5
-                ${
-                  isActive
-                    ? "border-[#72c16b] bg-[#eaf8e8] shadow-[0_14px_32px_rgba(114,193,107,0.18)]"
-                    : "border-[#72c16b]/55 bg-white shadow-[0_12px_26px_rgba(15,23,42,0.05)]"
-                }
+                font-sans
+                text-[16px]
+                font-medium
+                leading-[1.35]
+                tracking-[-0.015em]
+                md:text-[18px]
+                ${isActive ? "text-[#285f28]" : "text-[#172033]"}
               `}
-              style={{
-                opacity: itemProgress,
-                transform: `
-                  translateY(${mix(28, 0, itemProgress)}px)
-                  scale(${mix(0.985, 1, itemProgress)})
-                `,
-              }}
             >
-              <div className="flex items-start gap-4">
-                <span
-                  className={`
-                    mt-[5px]
-                    h-3
-                    w-3
-                    flex-shrink-0
-                    border
-                    ${
-                      isActive
-                        ? "border-[#4fa448] bg-[#4fa448]"
-                        : "border-[#72c16b] bg-transparent"
-                    }
-                  `}
-                />
+              {item}
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-                <p
-                  className={`
-                    text-[16px]
-                    font-semibold
-                    leading-snug
-                    md:text-[18px]
-                    ${
-                      isVisible ? "text-slate-800" : "text-slate-400"
-                    }
-                  `}
-                >
-                  {item}
-                </p>
-              </div>
-
-              {isActive && (
-                <span className="absolute right-0 top-0 h-full w-[4px] bg-[#4fa448]" />
-              )}
-            </div>
-          );
-        })}
-      </div>
+function Conclusion() {
+  return (
+    <div className="mx-auto mt-14 max-w-[1080px] text-center md:mt-16">
+      <p
+        className="
+          font-display
+          text-balance
+          text-[clamp(1.8rem,3vw,3.15rem)]
+          font-bold
+          leading-[1.03]
+          tracking-[-0.045em]
+          text-[#07101f]
+        "
+      >
+        Permuok no solo centraliza esta información. La conecta para detectar
+        compatibilidades y abrir nuevas posibilidades de operación.
+      </p>
     </div>
   );
 }
