@@ -196,8 +196,7 @@ export default function HeroSection() {
     h-[100svh]
     min-h-[720px]
     overflow-hidden
-    bg-[#f3f4f6]
-
+bg-transparent
     mt-0
     lg:mt-[45px]
   "
@@ -206,43 +205,21 @@ export default function HeroSection() {
           FONDO PUNTEADO
       ====================================================== */}
 
-      <div
-        className="pointer-events-none absolute inset-0 z-0 opacity-65"
-        style={{
-          backgroundImage:
-            "radial-gradient(rgba(71,85,105,0.13) 0.75px, transparent 0.75px)",
-          backgroundSize: "18px 18px",
-        }}
-      />
-
-      <div
-        className="
-    absolute
-    inset-0
-  "
-        style={{
-          transform: `translate3d(
-      0,
-      ${mobileShiftY}px,
-      0
-    )`,
-        }}
-      >
-
-      {/* =====================================================
+      <div className="absolute inset-0">
+        {/* =====================================================
           WEBGL
       ====================================================== */}
 
-      <div className="absolute inset-0 z-10">
-        <HeroCardsWebGL />
-      </div>
+        <div className="absolute inset-0 z-10">
+          <HeroCardsWebGL />
+        </div>
 
-      {/* =====================================================
+        {/* =====================================================
           TÍTULO
       ====================================================== */}
 
-      <div
-        className="
+        <div
+          className="
   pointer-events-none
   absolute
   left-1/2
@@ -257,22 +234,22 @@ export default function HeroSection() {
   md:top-[116px]
   lg:top-[124px]
 "
-      >
-        <motion.h1
-          data-hero-title
-          initial={{
-            opacity: 0,
-            y: 18,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          transition={{
-            duration: 0.7,
-            ease: [0.22, 1, 0.36, 1],
-          }}
-          className="
+        >
+          <motion.h1
+            data-hero-title
+            initial={{
+              opacity: 0,
+              y: 18,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            transition={{
+              duration: 0.7,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            className="
   mx-auto
   max-w-[350px]
   text-[36px]
@@ -292,30 +269,30 @@ export default function HeroSection() {
 
   xl:text-[56px]
 "
-        >
-          La plataforma creada para revolucionar las permutas inmobiliarias.
-        </motion.h1>
-      </div>
+          >
+            La plataforma creada para revolucionar las permutas inmobiliarias.
+          </motion.h1>
+        </div>
 
-      {/* =====================================================
+        {/* =====================================================
           BAJADA + CTA
       ====================================================== */}
 
-      <motion.div
-      data-hero-cta
-        initial={{
-          opacity: 0,
-          y: 14,
-        }}
-        animate={{
-          opacity: 1,
-          y: 0,
-        }}
-        transition={{
-          delay: 0.5,
-          duration: 0.65,
-        }}
-        className="
+        <motion.div
+          data-hero-cta
+          initial={{
+            opacity: 0,
+            y: 14,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
+          transition={{
+            delay: 0.5,
+            duration: 0.65,
+          }}
+          className="
   absolute
   bottom-[64px]
   left-1/2
@@ -326,11 +303,11 @@ export default function HeroSection() {
 sm:bottom-[64px]
 lg:bottom-[clamp(110px,16vh,140px)]
 "
-      >
-        {/* Bajada */}
-        <div
-          data-hero-subtitle
-          className="
+        >
+          {/* Bajada */}
+          <div
+            data-hero-subtitle
+            className="
     relative
     top-0
     mx-auto
@@ -344,9 +321,9 @@ lg:bottom-[clamp(110px,16vh,140px)]
     lg:max-w-[610px]
     lg:px-6
   "
-        >
-          <p
-            className="
+          >
+            <p
+              className="
   text-[16px]
   font-medium
   leading-[1.38]
@@ -358,26 +335,26 @@ lg:bottom-[clamp(110px,16vh,140px)]
   lg:text-[20px]
   lg:leading-[1.4]
 "
-          >
-            <span className="lg:hidden ">
-              Una red inteligente sólo para inmobiliarias donde las
-              oportunidades de permuta se centralizan, se cruzan y empiezan a
-              encontrarse.
-            </span>
+            >
+              <span className="lg:hidden ">
+                Una red inteligente sólo para inmobiliarias donde las
+                oportunidades de permuta se centralizan, se cruzan y empiezan a
+                encontrarse.
+              </span>
 
-            <span className="hidden lg:inline">
-              Una red inteligente sólo para inmobiliarias
-              <br />
-              donde las oportunidades de permuta se centralizan,
-              <br />
-              se cruzan y empiezan a encontrarse.
-            </span>
-          </p>
-        </div>
+              <span className="hidden lg:inline">
+                Una red inteligente sólo para inmobiliarias
+                <br />
+                donde las oportunidades de permuta se centralizan,
+                <br />
+                se cruzan y empiezan a encontrarse.
+              </span>
+            </p>
+          </div>
 
-        {/* CTA */}
-        <div
-          className="
+          {/* CTA */}
+          <div
+            className="
   mt-7
   flex
   flex-col
@@ -389,38 +366,38 @@ lg:bottom-[clamp(110px,16vh,140px)]
   lg:flex-row
   lg:gap-3
 "
-        >
-          {/* CTA PRINCIPAL */}
-          <motion.div
-            animate={{
-              boxShadow: [
-                "0 0 10px rgba(118,188,33,0.20)",
-                "0 0 28px rgba(118,188,33,0.52)",
-                "0 0 10px rgba(118,188,33,0.20)",
-              ],
-            }}
-            transition={{
-              duration: 2.6,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
-            whileHover={{
-              y: -2,
-            }}
-            whileTap={{
-              scale: 0.98,
-            }}
-            className="
+          >
+            {/* CTA PRINCIPAL */}
+            <motion.div
+              animate={{
+                boxShadow: [
+                  "0 0 10px rgba(118,188,33,0.20)",
+                  "0 0 28px rgba(118,188,33,0.52)",
+                  "0 0 10px rgba(118,188,33,0.20)",
+                ],
+              }}
+              transition={{
+                duration: 2.6,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              whileHover={{
+                y: -2,
+              }}
+              whileTap={{
+                scale: 0.98,
+              }}
+              className="
   w-[300px]
   max-w-[calc(100vw-48px)]
 
   lg:w-[270px]
   lg:max-w-full
 "
-          >
-            <Link
-              to="/register"
-              className="
+            >
+              <Link
+                to="/register"
+                className="
     group
     flex
     min-h-[56px]
@@ -441,40 +418,40 @@ lg:bottom-[clamp(110px,16vh,140px)]
     hover:border-[#86cc31]
     hover:bg-[#86cc31]
   "
-            >
-              <span>Sumarme a la red</span>
+              >
+                <span>Sumarme a la red</span>
 
-              <Icon
-                name="arrowRight"
-                size={18}
-                className="
+                <Icon
+                  name="arrowRight"
+                  size={18}
+                  className="
       text-white
       transition-transform
       duration-300
       group-hover:translate-x-1
     "
-              />
-            </Link>
-          </motion.div>
+                />
+              </Link>
+            </motion.div>
 
-          {/* CTA SECUNDARIO */}
-          <motion.div
-            whileHover={{
-              y: -2,
-            }}
-            whileTap={{
-              scale: 0.98,
-            }}
-            className="
+            {/* CTA SECUNDARIO */}
+            <motion.div
+              whileHover={{
+                y: -2,
+              }}
+              whileTap={{
+                scale: 0.98,
+              }}
+              className="
       w-[220px]
   max-w-[calc(100vw-48px)]
 
   lg:w-[220px]
     "
-          >
-            <a
-              href="#como-funciona"
-              className="
+            >
+              <a
+                href="#como-funciona"
+                className="
     flex
     min-h-[54px]
     w-full
@@ -493,12 +470,12 @@ lg:bottom-[clamp(110px,16vh,140px)]
     hover:bg-[#30363d]
     hover:text-white
   "
-            >
-              Cómo funciona
-            </a>
-          </motion.div>
-        </div>
-      </motion.div>
+              >
+                Cómo funciona
+              </a>
+            </motion.div>
+          </div>
+        </motion.div>
       </div>
     </section>
   );

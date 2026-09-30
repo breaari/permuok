@@ -14,8 +14,21 @@ import OpportunitySection from "../components/OpportunitySection";
 export default function HomePage() {
   return (
     <PublicLayout>
-      <HeroSection />
-      <OpportunitySection />
+      <div className="relative bg-[#f3f4f6]">
+        <div
+          className="pointer-events-none absolute inset-0 z-0 opacity-65"
+          style={{
+            backgroundImage:
+              "radial-gradient(rgba(71,85,105,0.13) 0.75px, transparent 0.75px)",
+            backgroundSize: "18px 18px",
+          }}
+        />
+
+        <div className="relative z-10">
+          <HeroSection />
+          <OpportunitySection />
+        </div>
+      </div>
       <ProblemSection />
       <AiSection />
       <HowItWorksSection />

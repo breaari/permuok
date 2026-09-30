@@ -111,20 +111,12 @@ export default function OpportunitySection() {
       ref={sectionRef}
       className="
     relative
-    bg-[#f3f4f6]
+    bg-transparent
     lg:h-[155vh]
   "
     >
       {/* Fondo punteado */}
-      <div
-        className="pointer-events-none absolute inset-0 z-0 opacity-65"
-        style={{
-          backgroundImage:
-            "radial-gradient(rgba(71,85,105,0.13) 0.75px, transparent 0.75px)",
-          backgroundSize: "18px 18px",
-        }}
-      />
-
+  
       <div
         className="
     relative
@@ -140,22 +132,23 @@ export default function OpportunitySection() {
       >
         <div
           className="
-      mx-auto
-      flex
-      w-full
-      max-w-[1320px]
+  mx-auto
+  flex
+  w-full
+  max-w-[1320px]
 
-      px-5
-      pb-16
-      pt-[calc(var(--navbar-bottom)+24px)]
+  px-5
+  pb-16
+  pt-8
 
-      sm:px-8
+  sm:px-8
+  sm:pt-10
 
-      lg:h-[calc(100svh-var(--navbar-bottom))]
-      lg:items-center
-      lg:px-10
-      lg:py-0
-    "
+  lg:h-[calc(100svh-var(--navbar-bottom))]
+  lg:items-center
+  lg:px-10
+  lg:py-0
+"
         >
           <div className="w-full">
             <div
@@ -211,7 +204,7 @@ function LeftContent() {
         className="
           my-6
           max-w-[620px]
-          text-[30px]
+          text-[25px]
           font-semibold
           leading-[1.06]
           tracking-[-0.04em]
@@ -360,7 +353,7 @@ function Conclusion() {
       <h2
         className="
           text-balance
-          text-[30px]
+          text-[25px]
           font-normal
           leading-[1.02]
           tracking-[-0.035em]
@@ -372,7 +365,7 @@ function Conclusion() {
         "
       >
         Permuok no solo centraliza esta información.
-        <br className="hidden lg:block" />
+        <br className="" />
         <span>
           La conecta para detectar compatibilidades{" "}
           <br className="hidden lg:block" />y abrir nuevas posibilidades de
