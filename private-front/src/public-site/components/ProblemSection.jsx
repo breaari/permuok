@@ -123,9 +123,11 @@ export default function ProblemSection() {
                 "
               >
                 Menos tiempo buscando.{" "}
+                <br></br>
                 <span className="text-[#0a192f]">
                   Más tiempo donde realmente aportás valor.
                 </span>
+                
               </p>
             </div>
           </Reveal>
@@ -140,17 +142,23 @@ export default function ProblemSection() {
                 group
                 relative
                 mt-10
+                max-w-[610px]
                 overflow-hidden
-                bg-[#e6e9ee]
+                rounded-[22px]
+                border
+                border-[#9fc5ff]/55
+                bg-[#eaf2ff]
+                shadow-[0_16px_42px_rgba(52,112,190,0.10)]
 
                 sm:mt-12
+                sm:rounded-[26px]
               "
             >
               <img
                 src={fotoAsesor}
                 alt="Asesor inmobiliario trabajando con un cliente"
                 className="
-                  h-[340px]
+                  h-[290px]
                   w-full
                   object-cover
                   object-center
@@ -158,22 +166,21 @@ export default function ProblemSection() {
                   duration-[900ms]
                   ease-out
 
-                  group-hover:scale-[1.025]
+                  group-hover:scale-[1.02]
 
-                  sm:h-[390px]
+                  sm:h-[330px]
 
-                  lg:h-[430px]
+                  lg:h-[360px]
                 "
               />
 
-              {/* sombreado mínimo para integrar la imagen */}
               <div
                 className="
                   pointer-events-none
                   absolute
                   inset-0
                   bg-gradient-to-t
-                  from-[#07182c]/10
+                  from-[#9fc5ff]/10
                   via-transparent
                   to-transparent
                 "
@@ -189,10 +196,7 @@ export default function ProblemSection() {
         <div className="lg:pt-2">
           <div className="border-t border-[#cfd5dd]">
             {features.map((feature, index) => (
-              <Reveal
-                key={feature.title}
-                delay={index * 0.06}
-              >
+              <Reveal key={feature.title} delay={index * 0.06}>
                 <FeatureItem {...feature} />
               </Reveal>
             ))}
@@ -220,7 +224,8 @@ function FeatureItem({ icon, title, text }) {
         lg:py-5
       "
     >
-      {/* línea verde hover */}
+      {/* línea celeste hover */}
+
       <div
         className="
           absolute
@@ -228,7 +233,7 @@ function FeatureItem({ icon, title, text }) {
           left-0
           h-px
           w-0
-          bg-[#76bc21]
+          bg-[#9fc5ff]
           transition-all
           duration-500
           ease-out
@@ -256,25 +261,23 @@ function FeatureItem({ icon, title, text }) {
             w-10
             items-center
             justify-center
+            rounded-[10px]
             border
-            border-[#76bc21]/30
-            bg-[#76bc21]/[0.07]
-            text-[#76bc21]
+            border-[#9fc5ff]/70
+            bg-[#9fc5ff]/20
+            text-[#3974ba]
             transition
             duration-300
 
-            group-hover:border-[#76bc21]
-            group-hover:bg-[#76bc21]
-            group-hover:text-white
+            group-hover:border-[#9fc5ff]
+            group-hover:bg-[#9fc5ff]
+            group-hover:text-[#0a192f]
 
             sm:h-11
             sm:w-11
           "
         >
-          <Icon
-            name={icon}
-            size={20}
-          />
+          <Icon name={icon} size={20} />
         </div>
 
         {/* TEXTO */}
@@ -293,7 +296,7 @@ function FeatureItem({ icon, title, text }) {
               font-bold
               leading-[1]
               tracking-[-0.025em]
-              text-[#76bc21]
+              text-[#3974ba]
 
               sm:text-[20px]
 

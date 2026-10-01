@@ -3,7 +3,6 @@
 import PublicLayout from "../layout/PublicLayout";
 import HeroSection from "../components/HeroSection";
 import ProblemSection from "../components/ProblemSection";
-import AiSection from "../components/AiSection";
 import HowItWorksSection from "../components/HowItWorksSection";
 import BenefitsSection from "../components/BenefitsSection";
 import MembershipsSection from "../components/MembershipsSection";
@@ -30,7 +29,6 @@ export default function HomePage() {
         </div>
       </div>
       <ProblemSection />
-      <AiSection />
       <HowItWorksSection />
       <BenefitsSection />
       <MembershipsSection />
