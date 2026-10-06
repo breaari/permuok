@@ -42,7 +42,7 @@ const steps = [
   },
 ];
 
-const ease = [0.22, 1, 0.36, 1];
+const ease = [0.76, 0, 0.24, 1];
 
 export default function HowItWorksSection() {
   const sectionRef = useRef(null);
@@ -130,24 +130,25 @@ export default function HowItWorksSection() {
           "
         >
           {/* ===================================================
-              IZQUIERDA
+              IZQUIERDA — PASOS
           =================================================== */}
 
           <div>
             <h2
               className="
-                max-w-[520px]
-                text-[48px]
-                font-normal
-                leading-[0.97]
-                tracking-[-0.04em]
-                text-[#0a192f]
-              "
+    max-w-[520px]
+    text-[48px]
+    font-normal
+    leading-[0.97]
+    tracking-[-0.04em]
+    text-[#30363d]
+  "
             >
-              Así funciona Permuok
+              Así funciona Permu
+              <span className="text-[#2166c2]">ok</span>
             </h2>
 
-            <div className="mt-10 border-t border-[#cfd5dd]">
+            <div className="mt-10">
               {steps.map((step, index) => {
                 const isActive = index === activeIndex;
 
@@ -168,6 +169,7 @@ export default function HowItWorksSection() {
                     "
                   >
                     {/* línea activa */}
+
                     <motion.span
                       initial={false}
                       animate={{
@@ -190,12 +192,10 @@ export default function HowItWorksSection() {
 
                     <motion.div
                       animate={{
-                        x: isActive ? 0 : -2,
-                        opacity: isActive ? 1 : 0.48,
+                        opacity: isActive ? 1 : 0.38,
                       }}
                       transition={{
                         duration: 0.35,
-                        ease,
                       }}
                     >
                       <h3
@@ -220,20 +220,17 @@ export default function HowItWorksSection() {
                             initial={{
                               height: 0,
                               opacity: 0,
-                              y: -6,
                             }}
                             animate={{
                               height: "auto",
                               opacity: 1,
-                              y: 0,
                             }}
                             exit={{
                               height: 0,
                               opacity: 0,
-                              y: -4,
                             }}
                             transition={{
-                              duration: 0.4,
+                              duration: 0.42,
                               ease,
                             }}
                             className="overflow-hidden"
@@ -261,7 +258,7 @@ export default function HowItWorksSection() {
           </div>
 
           {/* ===================================================
-              DERECHA — ESCENA DE CAPTURAS
+              DERECHA — SCREENSHOTS
           =================================================== */}
 
           <div
@@ -274,135 +271,65 @@ export default function HowItWorksSection() {
               justify-center
             "
           >
-            {/* marco fijo */}
+            {/* viewport fijo donde las capturas se deslizan */}
+
             <div
               className="
-    relative
-    flex
-    h-[500px]
-    w-full
-    max-w-[760px]
-    items-center
-    justify-center
-    overflow-visible
-  "
+                relative
+                h-[430px]
+                w-full
+                max-w-[760px]
+                overflow-hidden
+                rounded-[20px]
+                border
+                border-[#d8e1eb]
+                shadow-[0_26px_70px_rgba(15,23,42,0.12)]
+              "
             >
-              {/* halo suave */}
-              <div
-                className="
-                  pointer-events-none
-                  absolute
-                  left-1/2
-                  top-1/2
-                  h-[360px]
-                  w-[620px]
-                  -translate-x-1/2
-                  -translate-y-1/2
-                  rounded-full
-                  bg-[#9fc5ff]/15
-                  blur-3xl
-                "
-              />
-
-              <AnimatePresence initial={false} mode="wait" custom={direction}>
+              <AnimatePresence initial={false} custom={direction} mode="sync">
                 <motion.div
                   key={activeIndex}
                   custom={direction}
                   variants={{
                     enter: (dir) => ({
-                      opacity: 0,
-                      x: dir > 0 ? 34 : -34,
-                      y: 10,
-                      scale: 0.975,
+                      y: dir > 0 ? "100%" : "-100%",
                     }),
 
                     center: {
-                      opacity: 1,
-                      x: 0,
-                      y: 0,
-                      scale: 1,
+                      y: "0%",
                     },
 
                     exit: (dir) => ({
-                      opacity: 0,
-                      x: dir > 0 ? -26 : 26,
-                      y: -6,
-                      scale: 0.985,
+                      y: dir > 0 ? "-100%" : "100%",
                     }),
                   }}
                   initial="enter"
                   animate="center"
                   exit="exit"
                   transition={{
-                    duration: 0.55,
+                    duration: 0.72,
                     ease,
                   }}
                   className="
-                    relative
-                    z-10
-                    flex
+                    absolute
+                    inset-0
                     h-full
                     w-full
-                    items-center
-                    justify-center
                   "
                 >
-                  <div
+                  <img
+                    src={steps[activeIndex].image}
+                    alt={steps[activeIndex].title}
                     className="
-    h-[410px]
-    w-full
-    overflow-hidden
-    rounded-[20px]
-    border
-    border-[#d8e1eb]
-    shadow-[0_26px_70px_rgba(15,23,42,0.14)]
-  "
-                  >
-                    <img
-                      src={steps[activeIndex].image}
-                      alt={steps[activeIndex].title}
-                      className="
-      block
-      h-full
-      w-full
-      object-cover
-      object-center
-    "
-                    />
-                  </div>
+                      block
+                      h-full
+                      w-full
+                      object-cover
+                      object-center
+                    "
+                  />
                 </motion.div>
               </AnimatePresence>
-            </div>
-
-            {/* indicador inferior */}
-            <div
-              className="
-                absolute
-                bottom-5
-                left-1/2
-                flex
-                -translate-x-1/2
-                gap-2
-              "
-            >
-              {steps.map((step, index) => (
-                <motion.span
-                  key={step.title}
-                  animate={{
-                    width: index === activeIndex ? 30 : 6,
-                    opacity: index === activeIndex ? 1 : 0.4,
-                  }}
-                  transition={{
-                    duration: 0.35,
-                    ease,
-                  }}
-                  className="
-                    h-1.5
-                    rounded-full
-                    bg-[#3974ba]
-                  "
-                />
-              ))}
             </div>
           </div>
         </div>
@@ -517,48 +444,34 @@ function MobileStep({ step, index }) {
         {step.text}
       </p>
 
-      {/* tamaño visual constante también en mobile */}
+      {/* captura mobile */}
+
       <div
         className="
           mt-6
-          flex
           h-[260px]
           w-full
-          items-center
-          justify-center
           overflow-hidden
           rounded-[18px]
           border
-          border-[#9fc5ff]/45
-          bg-[#eaf2ff]/50
-          p-2
+          border-[#d8e1eb]
           shadow-[0_18px_45px_rgba(15,23,42,0.10)]
 
           sm:h-[390px]
           sm:rounded-[22px]
-          sm:p-3
         "
       >
-        <div
+        <img
+          src={step.image}
+          alt={step.title}
           className="
-    h-full
-    w-full
-    overflow-hidden
-    rounded-[14px]
-  "
-        >
-          <img
-            src={step.image}
-            alt={step.title}
-            className="
-      block
-      h-full
-      w-full
-      object-cover
-      object-center
-    "
-          />
-        </div>
+            block
+            h-full
+            w-full
+            object-cover
+            object-center
+          "
+        />
       </div>
     </motion.article>
   );
