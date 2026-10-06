@@ -277,20 +277,15 @@ export default function HowItWorksSection() {
             {/* marco fijo */}
             <div
               className="
-                relative
-                flex
-                h-[500px]
-                w-full
-                max-w-[760px]
-                items-center
-                justify-center
-                overflow-hidden
-                rounded-[28px]
-                border
-                border-[#9fc5ff]/40
-                bg-[#eaf2ff]/60
-                p-4
-              "
+    relative
+    flex
+    h-[500px]
+    w-full
+    max-w-[760px]
+    items-center
+    justify-center
+    overflow-visible
+  "
             >
               {/* halo suave */}
               <div
