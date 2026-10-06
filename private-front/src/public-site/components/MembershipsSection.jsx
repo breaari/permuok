@@ -94,40 +94,18 @@ export default function MembershipsSection() {
           </div>
         </Reveal>
 
-        {/* Mobile */}
-        <div className="mt-12 lg:hidden">
-          <div
-            className="
-              -mx-5
-              overflow-x-auto
-              px-5
-              pb-4
-              [scrollbar-width:none]
-
-              sm:-mx-8
-              sm:px-8
-
-              [&::-webkit-scrollbar]:hidden
-            "
-          >
-            <div className="flex w-max snap-x snap-mandatory gap-4 pr-5">
-              {plans.map((plan, index) => (
-                <PlanCard key={plan.name} plan={plan} index={index} mobile />
-              ))}
-            </div>
-          </div>
-
-          <p
-            className="
-              mt-3
-              text-center
-              text-[13px]
-              font-medium
-              text-[#7a8491]
-            "
-          >
-            Deslizá para comparar los planes
-          </p>
+        {/* Mobile / tablet */}
+        <div
+          className="
+    mt-12
+    grid
+    gap-7
+    lg:hidden
+  "
+        >
+          {plans.map((plan, index) => (
+            <PlanCard key={plan.name} plan={plan} index={index} mobile />
+          ))}
         </div>
 
         {/* Desktop */}
@@ -167,16 +145,17 @@ function PlanCard({ plan, index, mobile = false }) {
   rounded-[18px]
   border
   bg-white
-  px-6
-  pt-10
-  pb-7
   shadow-[0_18px_45px_rgba(15,23,42,0.05)]
 
-  sm:px-7
-  sm:pt-11
-  sm:pb-8
+px-5
+pt-9
+pb-6
 
-          ${mobile ? "w-[calc(100vw-58px)] max-w-[355px] snap-start" : ""}
+sm:px-7
+sm:pt-10
+sm:pb-7
+
+          ${mobile ? "w-full" : ""}
 
           ${
             plan.highlighted
@@ -225,7 +204,8 @@ function PlanCard({ plan, index, mobile = false }) {
           <div className="mt-5 flex items-end gap-2">
             <p
               className="
-                text-[42px]
+                text-[38px]
+sm:text-[42px]
                 font-semibold
                 leading-none
                 tracking-[-0.05em]
@@ -250,7 +230,7 @@ function PlanCard({ plan, index, mobile = false }) {
           <p
             className="
               mt-4
-              min-h-[72px]
+              lg:min-h-[72px]
               text-[15px]
               font-medium
               leading-[1.45]
