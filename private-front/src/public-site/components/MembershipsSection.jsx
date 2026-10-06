@@ -160,20 +160,21 @@ function PlanCard({ plan, index, mobile = false }) {
           ease: [0.22, 1, 0.36, 1],
         }}
         className={`
-          relative
-          flex
-          h-full
-          flex-col
-          overflow-hidden
-          rounded-[18px]
-          border
-          bg-white
-          px-6
-          py-7
-          shadow-[0_18px_45px_rgba(15,23,42,0.05)]
+  relative
+  flex
+  h-full
+  flex-col
+  rounded-[18px]
+  border
+  bg-white
+  px-6
+  pt-10
+  pb-7
+  shadow-[0_18px_45px_rgba(15,23,42,0.05)]
 
-          sm:px-7
-          sm:py-8
+  sm:px-7
+  sm:pt-11
+  sm:pb-8
 
           ${mobile ? "w-[calc(100vw-58px)] max-w-[355px] snap-start" : ""}
 
@@ -187,22 +188,23 @@ function PlanCard({ plan, index, mobile = false }) {
         {plan.highlighted && (
           <div
             className="
-              absolute
-              left-1/2
-              top-0
-              -translate-x-1/2
-              -translate-y-1/2
-              rounded-full
-              bg-[#2166c2]
-              px-4
-              py-2
-              text-[11px]
-              font-bold
-              uppercase
-              tracking-[0.08em]
-              text-white
-              shadow-[0_10px_30px_rgba(33,102,194,0.22)]
-            "
+    absolute
+    left-1/2
+    top-0
+    -translate-x-1/2
+    -translate-y-1/2
+    whitespace-nowrap
+    rounded-full
+    bg-[#2166c2]
+    px-5
+    py-2
+    text-[11px]
+    font-bold
+    uppercase
+    tracking-[0.08em]
+    text-white
+    shadow-[0_10px_30px_rgba(33,102,194,0.22)]
+  "
           >
             {plan.badge}
           </div>
