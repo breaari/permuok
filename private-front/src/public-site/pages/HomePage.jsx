@@ -30,7 +30,7 @@ export default function HomePage() {
       </div>
       <ProblemSection />
       <HowItWorksSection />
-      <BenefitsSection />
+      {/* <BenefitsSection /> */}
       <MembershipsSection />
       <FaqSection />
       <ContactSection />
