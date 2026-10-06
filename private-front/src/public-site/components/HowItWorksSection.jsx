@@ -334,145 +334,251 @@ export default function HowItWorksSection() {
           </div>
         </div>
       </div>
-
       {/* =====================================================
-          MOBILE / TABLET
-      ====================================================== */}
+    MOBILE / TABLET
+===================================================== */}
 
       <div
         className="
-          relative
-          z-10
-          px-5
-          py-20
+    relative
+    z-10
+    px-5
+    py-20
 
-          sm:px-8
-          sm:py-24
+    sm:px-8
+    sm:py-24
 
-          lg:hidden
-        "
+    lg:hidden
+  "
       >
-        <div className="mx-auto max-w-[760px]">
-          <h2
-            className="
-              text-[38px]
-              font-normal
-              leading-[0.98]
-              tracking-[-0.04em]
-              text-[#0a192f]
-
-              sm:text-[46px]
-            "
-          >
-            Así funciona Permuok
-          </h2>
-
-          <div className="mt-12 space-y-14">
-            {steps.map((step, index) => (
-              <MobileStep key={step.title} step={step} index={index} />
-            ))}
-          </div>
-        </div>
+        <MobileHowItWorks />
       </div>
     </section>
   );
 }
 
 /* =========================================================
-   MOBILE STEP
+   MOBILE / TABLET ACCORDION
 ========================================================= */
 
-function MobileStep({ step, index }) {
+function MobileHowItWorks() {
+  const [mobileActiveIndex, setMobileActiveIndex] = useState(0);
+
+  function toggleStep(index) {
+    setMobileActiveIndex(index);
+  }
+
   return (
-    <motion.article
-      initial={{
-        opacity: 0,
-        y: 28,
-      }}
-      whileInView={{
-        opacity: 1,
-        y: 0,
-      }}
-      viewport={{
-        once: true,
-        amount: 0.25,
-      }}
-      transition={{
-        duration: 0.55,
-        ease,
-      }}
-    >
-      <p
+    <div className="mx-auto max-w-[760px]">
+      <h2
         className="
-          text-[11px]
-          font-bold
-          uppercase
-          tracking-[0.14em]
-          text-[#3974ba]
+          text-[38px]
+          font-normal
+          leading-[0.98]
+          tracking-[-0.04em]
+          text-[#30363d]
+
+          sm:text-[46px]
         "
       >
-        Paso {index + 1}
-      </p>
+        Así funciona Permu
+        <span className="text-[#2166c2]">ok</span>
+      </h2>
 
-      <h3
-        className="
-          mt-2
-          text-[24px]
-          font-bold
-          leading-[1.12]
-          tracking-[-0.03em]
-          text-[#0a192f]
+      <div className="mt-10">
+        {steps.map((step, index) => {
+          const isActive = mobileActiveIndex === index;
 
-          sm:text-[28px]
-        "
-      >
-        {step.title}
-      </h3>
+          return (
+            <div
+              key={step.title}
+              className="
+                border-b
+                border-[#cfd5dd]
+              "
+            >
+              {/* CABECERA */}
 
-      <p
-        className="
-          mt-3
-          max-w-[600px]
-          text-[16px]
-          font-medium
-          leading-[1.45]
-          text-[#4b5563]
+              <button
+                type="button"
+                onClick={() => toggleStep(index)}
+                className="
+                  flex
+                  w-full
+                  items-start
+                  justify-between
+                  gap-5
+                  py-6
+                  text-left
+                "
+              >
+                <h3
+                  className={`
+                    text-[20px]
+                    font-semibold
+                    leading-[1.2]
+                    tracking-[-0.025em]
+                    transition-colors
+                    duration-300
 
-          sm:text-[17px]
-        "
-      >
-        {step.text}
-      </p>
+                    ${isActive ? "text-[#30363d]" : "text-[#687384]"}
+                  `}
+                >
+                  {step.title}
+                </h3>
 
-      {/* captura mobile */}
+                {/* + / − */}
 
-      <div
-        className="
-          mt-6
-          h-[260px]
-          w-full
-          overflow-hidden
-          rounded-[18px]
-          border
-          border-[#d8e1eb]
-          shadow-[0_18px_45px_rgba(15,23,42,0.10)]
+                <span
+                  className="
+                    relative
+                    mt-[2px]
+                    block
+                    h-5
+                    w-5
+                    shrink-0
+                  "
+                >
+                  <span
+                    className="
+                      absolute
+                      left-1/2
+                      top-1/2
+                      h-px
+                      w-4
+                      -translate-x-1/2
+                      -translate-y-1/2
+                      bg-[#687384]
+                    "
+                  />
 
-          sm:h-[390px]
-          sm:rounded-[22px]
-        "
-      >
-        <img
-          src={step.image}
-          alt={step.title}
-          className="
-            block
-            h-full
-            w-full
-            object-cover
-            object-center
-          "
-        />
+                  <motion.span
+                    animate={{
+                      rotate: isActive ? 0 : 90,
+                      opacity: isActive ? 0 : 1,
+                    }}
+                    transition={{
+                      duration: 0.3,
+                      ease,
+                    }}
+                    className="
+                      absolute
+                      left-1/2
+                      top-1/2
+                      h-px
+                      w-4
+                      -translate-x-1/2
+                      -translate-y-1/2
+                      bg-[#687384]
+                    "
+                  />
+                </span>
+              </button>
+
+              {/* CONTENIDO ABIERTO */}
+
+              <AnimatePresence initial={false}>
+                {isActive && (
+                  <motion.div
+                    key={`${step.title}-mobile-content`}
+                    initial={{
+                      height: 0,
+                      opacity: 0,
+                    }}
+                    animate={{
+                      height: "auto",
+                      opacity: 1,
+                    }}
+                    exit={{
+                      height: 0,
+                      opacity: 0,
+                    }}
+                    transition={{
+                      duration: 0.5,
+                      ease,
+                    }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pb-7">
+                      <motion.p
+                        initial={{
+                          opacity: 0,
+                          y: 10,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                        }}
+                        transition={{
+                          delay: 0.08,
+                          duration: 0.42,
+                          ease,
+                        }}
+                        className="
+                          max-w-[620px]
+                          text-[16px]
+                          font-medium
+                          leading-[1.5]
+                          text-[#4b5563]
+
+                          sm:text-[17px]
+                        "
+                      >
+                        {step.text}
+                      </motion.p>
+
+                      {/* IMAGEN */}
+
+                      <motion.div
+                        initial={{
+                          opacity: 0,
+                          y: 20,
+                          scale: 0.985,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                          scale: 1,
+                        }}
+                        transition={{
+                          delay: 0.12,
+                          duration: 0.55,
+                          ease,
+                        }}
+                        className="
+                          mt-6
+                          h-[260px]
+                          w-full
+                          overflow-hidden
+                          rounded-[16px]
+                          border
+                          border-[#d8e1eb]
+                          shadow-[0_18px_45px_rgba(15,23,42,0.10)]
+
+                          sm:h-[390px]
+                          sm:rounded-[20px]
+                        "
+                      >
+                        <img
+                          src={step.image}
+                          alt={step.title}
+                          className="
+                            block
+                            h-full
+                            w-full
+                            object-cover
+                            object-center
+                          "
+                        />
+                      </motion.div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
       </div>
-    </motion.article>
+    </div>
   );
 }
