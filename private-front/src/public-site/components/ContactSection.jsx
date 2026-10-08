@@ -11,7 +11,7 @@ export default function ContactSection() {
       className="
         relative
         flex
-        min-h-[78svh]
+        min-h-[70svh]
         items-center
         overflow-hidden
         bg-[#f3f4f6]
@@ -22,9 +22,9 @@ export default function ContactSection() {
         sm:px-8
         sm:py-28
 
-        lg:min-h-[88svh]
+        lg:min-h-[72svh]
         lg:px-10
-        lg:py-32
+        lg:py-28
       "
     >
       {/* =====================================================
@@ -40,26 +40,10 @@ export default function ContactSection() {
         }}
       />
 
-      {/* halo muy sutil */}
-      <div
-        className="
-          pointer-events-none
-          absolute
-          left-1/2
-          top-1/2
-          z-0
-          h-[520px]
-          w-[520px]
-          -translate-x-1/2
-          -translate-y-1/2
-          rounded-full
-          bg-[#9fc5ff]/20
-          blur-[120px]
 
-          lg:h-[720px]
-          lg:w-[720px]
-        "
-      />
+      {/* =====================================================
+          CONTENIDO
+      ====================================================== */}
 
       <div
         className="
@@ -67,101 +51,115 @@ export default function ContactSection() {
           z-10
           mx-auto
           w-full
-          max-w-[1180px]
+          max-w-[1120px]
           text-center
         "
       >
+        {/* FRASE PRINCIPAL */}
+
         <Reveal>
           <h2
             className="
               mx-auto
-              max-w-[1050px]
-              text-[42px]
+              max-w-[980px]
+              text-[40px]
               font-normal
               leading-[0.98]
               tracking-[-0.045em]
               text-[#30363d]
 
-              sm:text-[52px]
+              sm:text-[50px]
 
-              md:text-[62px]
+              md:text-[58px]
 
-              lg:text-[62px]
+              lg:text-[60px]
             "
           >
             El próximo gran activo inmobiliario no es una propiedad.
           </h2>
         </Reveal>
 
+        {/* REMATE */}
+
         <Reveal delay={0.1}>
           <p
             className="
               mx-auto
-              mt-6
-              max-w-[1000px]
-              text-[32px]
-              font-normal
-              leading-[1]
-              tracking-[-0.04em]
-              text-[#687384]
+              mt-5
+              max-w-[860px]
+              text-[26px]
+              font-medium
+              leading-[1.08]
+              tracking-[-0.035em]
+              text-[#4b5563]
 
-              sm:mt-7
-              sm:text-[42px]
+              sm:mt-6
+              sm:text-[34px]
 
-              md:text-[50px]
+              md:text-[40px]
 
-              lg:text-[50px]
+              lg:text-[42px]
             "
           >
             Es la red que permite conectarlas.
           </p>
         </Reveal>
 
-        {/* CTA */}
+        {/* =====================================================
+            CTA
+        ====================================================== */}
 
-        <Reveal delay={0.28}>
-          <motion.div
+        <Reveal delay={0.24}>
+          <div
             className="
-              mt-12
+              mt-10
               flex
-              justify-center
+              flex-col
+              items-center
 
-              sm:mt-14
+              sm:mt-12
             "
-            whileHover={{
-              y: -2,
-            }}
-            transition={{
-              duration: 0.25,
-              ease: [0.22, 1, 0.36, 1],
-            }}
           >
-            <Link
-              to="/register"
-              className="
-                inline-flex
-                min-h-[54px]
-                items-center
-                justify-center
-                bg-[#76bc21]
-                px-8
-                text-[15px]
-                font-bold
-                text-white
-                shadow-[0_16px_40px_rgba(118,188,33,0.22)]
-                transition
-                duration-300
-
-                hover:bg-[#68aa18]
-
-                sm:min-h-[58px]
-                sm:px-10
-                sm:text-[16px]
-              "
+            <motion.div
+              whileHover={{
+                y: -2,
+              }}
+              whileTap={{
+                scale: 0.985,
+              }}
+              transition={{
+                duration: 0.25,
+                ease: [0.22, 1, 0.36, 1],
+              }}
             >
-              Sumarme a la red
-            </Link>
-          </motion.div>
+              <Link
+                to="/register"
+                className="
+                  inline-flex
+                  min-h-[56px]
+                  items-center
+                  justify-center
+                  bg-[#76bc21]
+                  px-9
+                  text-[15px]
+                  font-bold
+                  text-white
+                  shadow-[0_16px_40px_rgba(118,188,33,0.22)]
+                  transition
+                  duration-300
+
+                  hover:bg-[#68aa18]
+                  hover:shadow-[0_20px_48px_rgba(118,188,33,0.28)]
+
+                  sm:min-h-[60px]
+                  sm:px-11
+                  sm:text-[16px]
+                "
+              >
+                Sumarme a la red
+              </Link>
+            </motion.div>
+          </div>
         </Reveal>
       </div>
     </section>
