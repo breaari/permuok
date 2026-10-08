@@ -39,7 +39,7 @@ export default function ProblemSection() {
       className="
         relative
         overflow-hidden
-        bg-[#f3f4f6]
+bg-transparent
         px-5
       
         text-[#0a192f]
@@ -48,22 +48,10 @@ export default function ProblemSection() {
          lg:px-10
 
 py-16
-sm:py-18
+sm:py-20
 lg:py-20
       "
     >
-      {/* =====================================================
-          FONDO PUNTEADO
-      ====================================================== */}
-
-      <div
-        className="pointer-events-none absolute inset-0 z-0 opacity-65"
-        style={{
-          backgroundImage:
-            "radial-gradient(rgba(71,85,105,0.13) 0.75px, transparent 0.75px)",
-          backgroundSize: "18px 18px",
-        }}
-      />
 
       {/* =====================================================
           CONTENIDO
@@ -217,17 +205,21 @@ lg:py-20
 
 function FeatureItem({ icon, title, text, isLast }) {
   return (
-    <div
-      className="
-        group
-        relative
-        border-b
-        border-[#cfd5dd]
-        py-5
-        sm:py-5
-        lg:py-5
-      "
-    >
+  <div
+  className={`
+    group
+    relative
+    py-5
+    sm:py-5
+    lg:py-5
+
+    ${
+      isLast
+        ? ""
+        : "border-b border-[#cfd5dd]"
+    }
+  `}
+>
       {/* línea celeste hover */}
 
       <div

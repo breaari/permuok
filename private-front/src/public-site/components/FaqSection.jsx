@@ -48,7 +48,6 @@ export default function FaqSection() {
       className="
         relative
         overflow-hidden
-        bg-[#f3f4f6]
      
        
         text-[#30363d]
@@ -63,18 +62,7 @@ lg:py-20
       
       "
     >
-      {/* =====================================================
-          FONDO PUNTEADO
-      ====================================================== */}
-
-      <div
-        className="pointer-events-none absolute inset-0 z-0 opacity-65"
-        style={{
-          backgroundImage:
-            "radial-gradient(rgba(71,85,105,0.13) 0.75px, transparent 0.75px)",
-          backgroundSize: "18px 18px",
-        }}
-      />
+  
 
       <div
         className="

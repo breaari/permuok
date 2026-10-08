@@ -50,7 +50,6 @@ export default function MembershipsSection() {
       className="
         relative
         overflow-hidden
-        bg-[#f3f4f6]
         px-5
        py-16
 sm:py-20
@@ -65,16 +64,6 @@ lg:py-24
      
       "
     >
-      {/* Fondo punteado */}
-      <div
-        className="pointer-events-none absolute inset-0 z-0 opacity-65"
-        style={{
-          backgroundImage:
-            "radial-gradient(rgba(71,85,105,0.13) 0.75px, transparent 0.75px)",
-          backgroundSize: "18px 18px",
-        }}
-      />
-
       <div className="relative z-10 mx-auto w-full max-w-[1320px]">
         {/* Header */}
         <Reveal>

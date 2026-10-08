@@ -80,31 +80,17 @@ export default function HowItWorksSection() {
       id="funciona"
       className="
         relative
-        bg-[#f3f4f6]
         text-[#0a192f]
 
 lg:h-[380vh]
       "
     >
       {/* =====================================================
-          FONDO PUNTEADO
-      ====================================================== */}
-
-      <div
-        className="pointer-events-none absolute inset-0 z-0 opacity-65"
-        style={{
-          backgroundImage:
-            "radial-gradient(rgba(71,85,105,0.13) 0.75px, transparent 0.75px)",
-          backgroundSize: "18px 18px",
-        }}
-      />
-
-      {/* =====================================================
           DESKTOP
       ====================================================== */}
 
-     <div
-  className="
+      <div
+        className="
     relative
     z-10
     hidden
@@ -117,7 +103,7 @@ lg:h-[380vh]
     lg:items-start
     lg:pt-[135px]
   "
->
+      >
         <div
           className="
             mx-auto
@@ -390,16 +376,12 @@ function MobileHowItWorks() {
           const isActive = mobileActiveIndex === index;
 
           return (
-         <div
-  key={step.title}
-  className={`
-    ${
-      index === steps.length - 1
-        ? ""
-        : "border-b border-[#cfd5dd]"
-    }
+            <div
+              key={step.title}
+              className={`
+    ${index === steps.length - 1 ? "" : "border-b border-[#cfd5dd]"}
   `}
->
+            >
               {/* CABECERA */}
 
               <button
