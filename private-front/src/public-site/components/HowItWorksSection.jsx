@@ -390,13 +390,16 @@ function MobileHowItWorks() {
           const isActive = mobileActiveIndex === index;
 
           return (
-            <div
-              key={step.title}
-              className="
-                border-b
-                border-[#cfd5dd]
-              "
-            >
+         <div
+  key={step.title}
+  className={`
+    ${
+      index === steps.length - 1
+        ? ""
+        : "border-b border-[#cfd5dd]"
+    }
+  `}
+>
               {/* CABECERA */}
 
               <button

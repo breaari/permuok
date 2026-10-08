@@ -52,7 +52,7 @@ export default function FaqSection() {
      
        
         text-[#30363d]
-        
+
    px-5
         sm:px-8
         lg:px-10
@@ -151,13 +151,17 @@ lg:py-20
 
             return (
               <Reveal key={faq.question} delay={index * 0.04}>
-                <div
-                  className="
-                    relative
-                    border-b
-                    border-[#cfd5dd]
-                  "
-                >
+               <div
+  className={`
+    relative
+
+    ${
+      index === faqs.length - 1
+        ? ""
+        : "border-b border-[#cfd5dd]"
+    }
+  `}
+>
                   {/* línea activa */}
 
                   <motion.div

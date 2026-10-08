@@ -196,11 +196,14 @@ lg:py-20
 
         <div className="lg:pt-2">
           <div className="border-t border-[#cfd5dd]">
-            {features.map((feature, index) => (
-              <Reveal key={feature.title} delay={index * 0.06}>
-                <FeatureItem {...feature} />
-              </Reveal>
-            ))}
+      {features.map((feature, index) => (
+  <Reveal key={feature.title} delay={index * 0.06}>
+    <FeatureItem
+      {...feature}
+      isLast={index === features.length - 1}
+    />
+  </Reveal>
+))}
           </div>
         </div>
       </div>
@@ -212,7 +215,7 @@ lg:py-20
    FEATURE ITEM
 ========================================================= */
 
-function FeatureItem({ icon, title, text }) {
+function FeatureItem({ icon, title, text, isLast }) {
   return (
     <div
       className="
