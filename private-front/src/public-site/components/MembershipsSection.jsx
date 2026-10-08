@@ -187,7 +187,7 @@ sm:pb-7
               text-[24px]
               font-bold
               tracking-[-0.03em]
-              text-[#0f172a]
+    text-[#30363d]
             "
           >
             {plan.name}
@@ -261,7 +261,7 @@ sm:text-[42px]
                   : `
                     border-[#e5e7eb]
                     bg-[#f3f4f6]
-                    text-[#0f172a]
+            text-[#30363d]
                     hover:bg-[#e8ecf2]
                   `
               }

@@ -42,7 +42,7 @@ export default function ProblemSection() {
 bg-transparent
         px-5
       
-        text-[#0a192f]
+text-[#30363d]
 
         sm:px-8
          lg:px-10
@@ -52,7 +52,6 @@ sm:py-20
 lg:py-20
       "
     >
-
       {/* =====================================================
           CONTENIDO
       ====================================================== */}
@@ -86,7 +85,7 @@ lg:py-20
                   font-normal
                   leading-[0.97]
                   tracking-[-0.04em]
-                  text-[#0a192f]
+            text-[#30363d]
 
                   sm:text-[43px]
 
@@ -111,12 +110,10 @@ lg:py-20
                   lg:text-[25px]
                 "
               >
-                Menos tiempo buscando.{" "}
-                <br></br>
-                <span className="text-[#0a192f]">
+                Menos tiempo buscando. <br></br>
+                <span className="text-[#30363d]">
                   Más tiempo donde realmente aportás valor.
                 </span>
-                
               </p>
             </div>
           </Reveal>
@@ -184,14 +181,14 @@ lg:py-20
 
         <div className="lg:pt-2">
           <div className="border-t border-[#cfd5dd]">
-      {features.map((feature, index) => (
-  <Reveal key={feature.title} delay={index * 0.06}>
-    <FeatureItem
-      {...feature}
-      isLast={index === features.length - 1}
-    />
-  </Reveal>
-))}
+            {features.map((feature, index) => (
+              <Reveal key={feature.title} delay={index * 0.06}>
+                <FeatureItem
+                  {...feature}
+                  isLast={index === features.length - 1}
+                />
+              </Reveal>
+            ))}
           </div>
         </div>
       </div>
@@ -205,21 +202,17 @@ lg:py-20
 
 function FeatureItem({ icon, title, text, isLast }) {
   return (
-  <div
-  className={`
+    <div
+      className={`
     group
     relative
     py-5
     sm:py-5
     lg:py-5
 
-    ${
-      isLast
-        ? ""
-        : "border-b border-[#cfd5dd]"
-    }
+    ${isLast ? "" : "border-b border-[#cfd5dd]"}
   `}
->
+    >
       {/* línea celeste hover */}
 
       <div
@@ -267,7 +260,7 @@ function FeatureItem({ icon, title, text, isLast }) {
 
             group-hover:border-[#9fc5ff]
             group-hover:bg-[#9fc5ff]
-            group-hover:text-[#0a192f]
+            group-hover:text-[#30363d]
 
             sm:h-11
             sm:w-11

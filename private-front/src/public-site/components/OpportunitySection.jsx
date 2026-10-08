@@ -208,7 +208,7 @@ function LeftContent() {
           font-semibold
           leading-[1.06]
           tracking-[-0.04em]
-          text-[#0a192f]
+  text-[#30363d]
 
           sm:text-[34px]
 
@@ -357,8 +357,7 @@ function Conclusion() {
           font-normal
           leading-[1.02]
           tracking-[-0.035em]
-          text-[#0a192f]
-
+       text-[#30363d]
           sm:text-[36px]
 
           lg:text-[clamp(2rem,3vw,3.2rem)]

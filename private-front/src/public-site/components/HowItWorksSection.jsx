@@ -80,7 +80,7 @@ export default function HowItWorksSection() {
       id="funciona"
       className="
         relative
-        text-[#0a192f]
+text-[#30363d]
 
 lg:h-[380vh]
       "
@@ -193,7 +193,7 @@ lg:h-[380vh]
                           transition-colors
                           duration-300
 
-                          ${isActive ? "text-[#0a192f]" : "text-[#687384]"}
+                          ${isActive ? "text-[#30363d]" : "text-[#687384]"}
                         `}
                       >
                         {step.title}

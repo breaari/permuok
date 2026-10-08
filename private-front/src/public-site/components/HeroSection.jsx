@@ -256,7 +256,7 @@ bg-transparent
   font-normal
   leading-[0.97]
   tracking-[-0.035em]
-  text-[#0a192f]
+text-[#30363d]
 
   sm:max-w-[520px]
   sm:text-[44px]
