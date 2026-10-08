@@ -8,24 +8,20 @@ export default function ContactSection() {
   return (
     <section
       id="contacto"
-      className="
-        relative
-        flex
-        min-h-[70svh]
-        items-center
-        overflow-hidden
-        bg-[#f3f4f6]
-        px-5
-        py-24
-        text-[#30363d]
+className="
+  relative
+  overflow-hidden
+  bg-[#f3f4f6]
+  px-5
+  py-16
+  text-[#30363d]
 
-        sm:px-8
-        sm:py-28
+  sm:px-8
+  sm:py-20
 
-        lg:min-h-[72svh]
-        lg:px-10
-        lg:py-28
-      "
+  lg:px-10
+  lg:py-24
+"
     >
       {/* =====================================================
           FONDO PUNTEADO

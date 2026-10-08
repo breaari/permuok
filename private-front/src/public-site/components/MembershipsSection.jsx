@@ -52,14 +52,17 @@ export default function MembershipsSection() {
         overflow-hidden
         bg-[#f3f4f6]
         px-5
-        py-20
+       py-16
+sm:py-20
+lg:py-24
+
         text-[#30363d]
 
         sm:px-8
-        sm:py-24
+      
 
         lg:px-10
-        lg:py-28
+     
       "
     >
       {/* Fondo punteado */}

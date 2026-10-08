@@ -49,15 +49,18 @@ export default function FaqSection() {
         relative
         overflow-hidden
         bg-[#f3f4f6]
-        px-5
-        py-20
+     
+       
         text-[#30363d]
-
+        
+   px-5
         sm:px-8
-        sm:py-24
-
         lg:px-10
-        lg:py-28
+
+        py-14
+sm:py-16
+lg:py-20
+      
       "
     >
       {/* =====================================================

@@ -41,14 +41,15 @@ export default function ProblemSection() {
         overflow-hidden
         bg-[#f3f4f6]
         px-5
-        py-20
+      
         text-[#0a192f]
 
         sm:px-8
-        sm:py-24
+         lg:px-10
 
-        lg:px-10
-        lg:py-28
+py-16
+sm:py-20
+lg:py-24
       "
     >
       {/* =====================================================
