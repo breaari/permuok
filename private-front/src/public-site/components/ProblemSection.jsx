@@ -48,8 +48,8 @@ export default function ProblemSection() {
          lg:px-10
 
 py-16
-sm:py-20
-lg:py-24
+sm:py-18
+lg:py-20
       "
     >
       {/* =====================================================

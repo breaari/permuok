@@ -97,14 +97,14 @@ export default function OpportunitySection() {
     };
   }, []);
 
-  const activeIndex = useMemo(() => {
-    if (progress < 0.14) return 0;
-    if (progress < 0.27) return 1;
-    if (progress < 0.4) return 2;
-    if (progress < 0.53) return 3;
+const activeIndex = useMemo(() => {
+  if (progress < 0.18) return 0;
+  if (progress < 0.36) return 1;
+  if (progress < 0.54) return 2;
+  if (progress < 0.72) return 3;
 
-    return 4;
-  }, [progress]);
+  return 4;
+}, [progress]);
 
   return (
     <section
@@ -278,7 +278,7 @@ function RightList({ progress, activeIndex }) {
         let itemProgress = 1;
 
         if (index > 0) {
-          const starts = [0, 0.04, 0.15, 0.26, 0.37];
+const starts = [0, 0.12, 0.3, 0.48, 0.66];
 
           const itemStart = starts[index];
           const itemEnd = itemStart + 0.085;

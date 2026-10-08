@@ -83,7 +83,7 @@ export default function HowItWorksSection() {
         bg-[#f3f4f6]
         text-[#0a192f]
 
-        lg:h-[500vh]
+lg:h-[380vh]
       "
     >
       {/* =====================================================
@@ -103,20 +103,21 @@ export default function HowItWorksSection() {
           DESKTOP
       ====================================================== */}
 
-      <div
-        className="
-          relative
-          z-10
-          hidden
-          h-screen
-          items-center
-          overflow-hidden
+     <div
+  className="
+    relative
+    z-10
+    hidden
+    h-screen
+    overflow-hidden
 
-          lg:sticky
-          lg:top-0
-          lg:flex
-        "
-      >
+    lg:sticky
+    lg:top-0
+    lg:flex
+    lg:items-start
+    lg:pt-[135px]
+  "
+>
         <div
           className="
             mx-auto
@@ -124,7 +125,6 @@ export default function HowItWorksSection() {
             w-full
             max-w-[1320px]
             grid-cols-[0.78fr_1.22fr]
-            items-center
             gap-20
             px-10
           "
