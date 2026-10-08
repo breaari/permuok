@@ -126,11 +126,7 @@ lg:py-20
         <div
           className="
             mt-12
-            border-t
-            border-[#cfd5dd]
-
             sm:mt-14
-
             lg:mt-16
           "
         >

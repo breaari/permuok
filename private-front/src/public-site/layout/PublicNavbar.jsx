@@ -6,11 +6,9 @@ import logo from "../../assets/logoparafondoazul.png";
 
 const navItems = [
   { label: "Permutas", href: "#permutas" },
-  { label: "IA", href: "#ia" },
   { label: "Cómo funciona", href: "#funciona" },
-  { label: "Membresías", href: "#membresias" },
+  { label: "Planes", href: "#membresias" },
   { label: "FAQ", href: "#faq" },
-  { label: "Contacto", href: "#contacto" },
 ];
 
 export default function PublicNavbar() {
@@ -48,9 +46,11 @@ export default function PublicNavbar() {
         z-50
         transition-all
         duration-300
+
         sm:left-4
         sm:right-4
         sm:top-4
+
         ${scrolled ? "translate-y-0" : ""}
       `}
     >
@@ -70,7 +70,9 @@ export default function PublicNavbar() {
           px-4
           shadow-[0_14px_45px_rgba(10,25,47,0.20)]
           backdrop-blur-xl
+
           sm:px-5
+
           lg:px-6
         "
       >
@@ -92,14 +94,16 @@ export default function PublicNavbar() {
         >
           <img
             src={logo}
-            alt="PermuOK"
+            alt="Permuok"
             className="
               h-9
               w-auto
               object-contain
               transition
               duration-300
+
               group-hover:scale-[1.02]
+
               sm:h-10
             "
           />
@@ -118,6 +122,7 @@ export default function PublicNavbar() {
             -translate-x-1/2
             -translate-y-1/2
             items-center
+
             lg:flex
           "
         >
@@ -126,17 +131,20 @@ export default function PublicNavbar() {
               key={item.href}
               href={item.href}
               className="
+                group
                 relative
                 whitespace-nowrap
-                px-3.5
+                px-4
                 py-2
                 text-[13px]
                 font-semibold
                 text-slate-300
                 transition
                 duration-200
+
                 hover:text-white
-                xl:px-4
+
+                xl:px-5
                 xl:text-sm
               "
             >
@@ -150,10 +158,11 @@ export default function PublicNavbar() {
                   h-px
                   w-0
                   -translate-x-1/2
-                  bg-white/70
+                  bg-[#76bc21]
                   transition-all
                   duration-300
-                  group-hover:w-full
+
+                  group-hover:w-[55%]
                 "
               />
             </a>
@@ -172,6 +181,7 @@ export default function PublicNavbar() {
             shrink-0
             items-center
             gap-2
+
             md:flex
           "
         >
@@ -186,6 +196,7 @@ export default function PublicNavbar() {
               text-slate-200
               transition
               duration-200
+
               hover:bg-white/[0.07]
               hover:text-white
             "
@@ -197,22 +208,27 @@ export default function PublicNavbar() {
             to="/register"
             className="
               rounded-xl
-              bg-primary
+              border
+              border-[#76bc21]
+              bg-[#76bc21]
               px-5
               py-2.5
               text-sm
               font-extrabold
               text-white
-              shadow-[0_10px_28px_rgba(0,86,179,0.30)]
+              shadow-[0_10px_28px_rgba(118,188,33,0.24)]
               transition
               duration-300
+
               hover:-translate-y-0.5
-              hover:bg-[#004b9d]
-              hover:shadow-[0_14px_34px_rgba(0,86,179,0.36)]
+              hover:border-[#86cc31]
+              hover:bg-[#86cc31]
+              hover:shadow-[0_14px_34px_rgba(118,188,33,0.30)]
+
               active:translate-y-0
             "
           >
-            Registrarme
+            Sumarme a la red
           </Link>
         </div>
 
@@ -237,7 +253,9 @@ export default function PublicNavbar() {
             bg-white/[0.06]
             text-white
             transition
+
             hover:bg-white/10
+
             md:hidden
           "
           aria-label={open ? "Cerrar menú" : "Abrir menú"}
@@ -255,6 +273,7 @@ export default function PublicNavbar() {
                 bg-white
                 transition
                 duration-300
+
                 ${open ? "translate-y-1.5 rotate-45" : ""}
               `}
             />
@@ -270,6 +289,7 @@ export default function PublicNavbar() {
                 bg-white
                 transition
                 duration-300
+
                 ${open ? "opacity-0" : ""}
               `}
             />
@@ -285,6 +305,7 @@ export default function PublicNavbar() {
                 bg-white
                 transition
                 duration-300
+
                 ${open ? "-translate-y-1.5 -rotate-45" : ""}
               `}
             />
@@ -308,6 +329,7 @@ export default function PublicNavbar() {
             p-3
             shadow-[0_18px_50px_rgba(10,25,47,0.28)]
             backdrop-blur-2xl
+
             md:hidden
           "
         >
@@ -325,6 +347,7 @@ export default function PublicNavbar() {
                   font-bold
                   text-slate-200
                   transition
+
                   hover:bg-white/[0.07]
                   hover:text-white
                 "
@@ -359,6 +382,7 @@ export default function PublicNavbar() {
                 font-bold
                 text-white
                 transition
+
                 hover:bg-white/[0.07]
               "
             >
@@ -370,19 +394,23 @@ export default function PublicNavbar() {
               onClick={closeMenu}
               className="
                 rounded-xl
-                bg-primary
+                border
+                border-[#76bc21]
+                bg-[#76bc21]
                 px-4
                 py-3
                 text-center
                 text-sm
                 font-extrabold
                 text-white
-                shadow-[0_10px_28px_rgba(0,86,179,0.28)]
+                shadow-[0_10px_28px_rgba(118,188,33,0.24)]
                 transition
-                hover:bg-[#004b9d]
+
+                hover:border-[#86cc31]
+                hover:bg-[#86cc31]
               "
             >
-              Registrarme
+              Sumarme a la red
             </Link>
           </div>
         </div>
