@@ -140,7 +140,13 @@ class AuthController
         ResponseHelper::ok(
             [
                 'message' =>
-                'Usuario creado',
+                'Cuenta creada. Revisá tu correo para verificar tu email.',
+
+                'email' =>
+                $result['email'] ?? null,
+
+                'email_verification_required' =>
+                true,
             ],
             201
         );
@@ -284,14 +290,29 @@ class AuthController
                 ]
             );
         }
-
         if (
             is_array($result) &&
             isset($result['error'])
         ) {
+            $status =
+                isset($result['status'])
+                ? (int)$result['status']
+                : 403;
+
+            $code =
+                isset($result['code'])
+                ? (string)$result['code']
+                : null;
+
             ResponseHelper::fail(
-                $result['error'],
-                403
+                (string)$result['error'],
+                $status,
+                $code !== null
+                    ? [
+                        'code' =>
+                        $code,
+                    ]
+                    : null
             );
         }
 
@@ -350,5 +371,4 @@ class AuthController
 
         ResponseHelper::ok($result);
     }
-    
 }

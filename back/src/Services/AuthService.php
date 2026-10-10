@@ -50,9 +50,9 @@ class AuthService
             $data['phone'] ?? null;
 
         /*
- * No convertimos arrays u objetos silenciosamente
- * a texto. Todos estos campos deben ser strings.
- */
+     * No convertimos arrays u objetos silenciosamente
+     * a texto. Todos estos campos deben ser strings.
+     */
         if (!is_string($emailValue)) {
             return [
                 'error' =>
@@ -154,10 +154,6 @@ class AuthService
             ];
         }
 
-        /*
- * Permite letras Unicode, espacios, apóstrofes,
- * puntos y guiones habituales en nombres.
- */
         $namePattern =
             "/^[\p{L}\p{M}][\p{L}\p{M}\s.'’\-]*$/u";
 
@@ -185,10 +181,6 @@ class AuthService
             ];
         }
 
-        /*
- * PhoneField envía el número normalizado
- * internacionalmente, por ejemplo +549223...
- */
         if (
             preg_match(
                 '/^\+[1-9][0-9]{7,14}$/',
@@ -238,24 +230,71 @@ class AuthService
         }
 
         $check = $pdo->prepare("
-    SELECT id
-    FROM users
-    WHERE email = :email
-    LIMIT 1
-");
-        $check->execute(['email' => $emailNorm]);
+        SELECT id
+        FROM users
+        WHERE email = :email
+        LIMIT 1
+    ");
+
+        $check->execute([
+            'email' =>
+            $emailNorm,
+        ]);
+
         if ($check->fetch()) {
-            return ['error' => 'El email ya está registrado'];
+            return [
+                'error' =>
+                'El email ya está registrado',
+            ];
         }
 
-        $stmt = $pdo->prepare("
-            INSERT INTO users
-            (role, first_name, last_name, email, phone, password_hash, is_active, created_at)
-            VALUES
-            (:role, :first_name, :last_name, :email, :phone, :password, 1, NOW())
-        ");
+        $passwordHash =
+            password_hash(
+                $password,
+                PASSWORD_DEFAULT
+            );
+
+        if (!is_string($passwordHash)) {
+            throw new \Exception(
+                'No se pudo proteger la contraseña.'
+            );
+        }
+
+        /*
+     * Usuario + token de verificación + email job
+     * se crean dentro de la misma transacción.
+     *
+     * Si alguno falla, no queda una cuenta
+     * creada parcialmente.
+     */
+        $pdo->beginTransaction();
 
         try {
+            $stmt = $pdo->prepare("
+            INSERT INTO users (
+                role,
+                first_name,
+                last_name,
+                email,
+                email_verified_at,
+                phone,
+                password_hash,
+                is_active,
+                created_at
+            )
+            VALUES (
+                :role,
+                :first_name,
+                :last_name,
+                :email,
+                NULL,
+                :phone,
+                :password,
+                1,
+                NOW()
+            )
+        ");
+
             $stmt->execute([
                 'role' =>
                 self::ROLE_REAL_ESTATE,
@@ -273,16 +312,45 @@ class AuthService
                 $phone,
 
                 'password' =>
-                password_hash(
-                    $password,
-                    PASSWORD_DEFAULT
-                ),
+                $passwordHash,
             ]);
-        } catch (PDOException $e) {
+
+            $userId =
+                (int)$pdo->lastInsertId();
+
             /*
-     * El índice único protege también
-     * dos registros simultáneos.
-     */
+         * Genera email_verification_tokens
+         * y email_jobs usando esta misma conexión.
+         */
+            EmailVerificationService::issueForUser(
+                $userId,
+                $pdo
+            );
+
+            $pdo->commit();
+
+            return [
+                'success' =>
+                true,
+
+                'user_id' =>
+                $userId,
+
+                'email' =>
+                $emailNorm,
+
+                'email_verification_required' =>
+                true,
+            ];
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            /*
+         * El índice único también protege
+         * registros simultáneos.
+         */
             if ($e->getCode() === '23000') {
                 return [
                     'error' =>
@@ -291,11 +359,13 @@ class AuthService
             }
 
             throw $e;
-        }
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
 
-        return [
-            'success' => true,
-        ];
+            throw $e;
+        }
     }
 
     /*
@@ -303,40 +373,104 @@ class AuthService
     | LOGIN
     |--------------------------------------------------------------------------
     */
-    public static function login(string $email, string $password)
-    {
+    public static function login(
+        string $email,
+        string $password
+    ) {
         $pdo = self::db();
 
         $stmt = $pdo->prepare("
-            SELECT id, role, email, password_hash, is_active
-            FROM users
-            WHERE email = :email
-              AND deleted_at IS NULL
-            LIMIT 1
-        ");
+        SELECT
+            id,
+            role,
+            email,
+            password_hash,
+            email_verified_at,
+            is_active
+        FROM users
+        WHERE email = :email
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
 
-        $stmt->execute(['email' => $email]);
-        $user = $stmt->fetch();
+        $stmt->execute([
+            'email' =>
+            $email,
+        ]);
+
+        $user =
+            $stmt->fetch();
+
+        if (!$user) {
+            return false;
+        }
+
+        /*
+     * Una cuenta creada únicamente mediante
+     * un proveedor externo puede no tener
+     * contraseña local.
+     */
+        $passwordHash =
+            $user['password_hash']
+            ?? null;
 
         if (
-            !$user ||
+            !is_string($passwordHash) ||
+            trim($passwordHash) === '' ||
             !password_verify(
                 $password,
-                (string)$user['password_hash']
+                $passwordHash
             )
         ) {
             return false;
+        }
+
+        /*
+     * Primero validamos las credenciales.
+     * Recién después informamos que falta
+     * verificar el email para no revelar
+     * estados de cuentas sin contraseña válida.
+     */
+        if (
+            $user['email_verified_at']
+            === null
+        ) {
+            return [
+                'error' =>
+                'Todavía tenés que verificar tu email antes de iniciar sesión.',
+
+                'code' =>
+                'EMAIL_NOT_VERIFIED',
+
+                'status' =>
+                403,
+            ];
         }
 
         if ((int)$user['is_active'] !== 1) {
             return [
                 'error' =>
                 'Tu cuenta está inactiva. Contactá al administrador para solicitar asistencia.',
+
+                'code' =>
+                'USER_INACTIVE',
+
+                'status' =>
+                403,
             ];
         }
 
-        $upd = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = :id LIMIT 1");
-        $upd->execute(['id' => (int)$user['id']]);
+        $upd = $pdo->prepare("
+        UPDATE users
+        SET last_login = NOW()
+        WHERE id = :id
+        LIMIT 1
+    ");
+
+        $upd->execute([
+            'id' =>
+            (int)$user['id'],
+        ]);
 
         $access =
             self::buildAccessFromMiddleware(
@@ -353,24 +487,31 @@ class AuthService
                 (int)$user['role'],
             ]);
 
-        /*
- * El refresh token se crea al final,
- * cuando la respuesta ya está preparada.
- */
         $refreshToken =
             RefreshTokenService::issue(
                 (int)$user['id']
             );
 
         return [
-            'access_token'  => $accessToken,
-            'refresh_token' => $refreshToken,
+            'access_token' =>
+            $accessToken,
+
+            'refresh_token' =>
+            $refreshToken,
+
             'user' => [
-                'id'    => (int)$user['id'],
-                'email' => (string)$user['email'],
-                'role'  => (int)$user['role'],
+                'id' =>
+                (int)$user['id'],
+
+                'email' =>
+                (string)$user['email'],
+
+                'role' =>
+                (int)$user['role'],
             ],
-            'access' => $access,
+
+            'access' =>
+            $access,
         ];
     }
 
