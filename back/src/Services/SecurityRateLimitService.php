@@ -149,9 +149,9 @@ class SecurityRateLimitService
             );
 
             ResponseHelper::fail(
-                'Por seguridad, pausamos temporalmente los intentos de inicio de sesión. Podrás volver a probar en ' .
-                    $retryAfter .
-                    ' segundos.',
+                'Por seguridad, pausamos temporalmente los intentos. Podrás volver a probar en ' .
+                    self::formatWaitTime($retryAfter) .
+                    '.',
                 429,
                 [
                     'code' => 'RATE_LIMIT_EXCEEDED',
@@ -169,6 +169,39 @@ class SecurityRateLimitService
             'retry_after' => $retryAfter,
         ];
     }
+
+
+    private static function formatWaitTime(
+        int $seconds
+    ): string {
+        $seconds = max(1, $seconds);
+
+        if ($seconds < 60) {
+            return $seconds .
+                ($seconds === 1
+                    ? ' segundo'
+                    : ' segundos');
+        }
+
+        if ($seconds < 3600) {
+            $minutes =
+                (int)ceil($seconds / 60);
+
+            return $minutes .
+                ($minutes === 1
+                    ? ' minuto'
+                    : ' minutos');
+        }
+
+        $hours =
+            (int)ceil($seconds / 3600);
+
+        return $hours .
+            ($hours === 1
+                ? ' hora'
+                : ' horas');
+    }
+
 
     /**
      * Comprueba si el identificador tiene un bloqueo activo.
