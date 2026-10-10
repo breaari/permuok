@@ -12,26 +12,30 @@ export default function AuthLayout({ title, subtitle, children }) {
             alt="Imagen de fondo"
             className="absolute inset-0 w-full h-full object-cover"
           />
+
           <div className="absolute inset-0 bg-gradient-to-br from-slate-950/90 to-slate-950/60 flex flex-col justify-center px-16 text-white">
             <div className="max-w-md">
-              <h1 className="text-5xl font-bold mb-6 leading-tight">
+              <h1 className="text-5xl font-normal mb-6 leading-tight">
                 La nueva forma de intercambiar propiedades.
               </h1>
+
               <p className="text-xl text-slate-200 mb-8 leading-relaxed">
-                Accedé a una red exclusiva de intercambios inmobiliarios. Encontrá tu próxima
-                propiedad de manera inteligente y segura.
+                Accedé a una red exclusiva de intercambios inmobiliarios.
+                Encontrá tu próxima propiedad de manera inteligente y segura.
               </p>
 
               <div className="text-sm text-slate-200">
-                <span className="font-semibold text-white">+500 profesionales</span> ya están
-                intercambiando hoy.
+                <span className="font-semibold text-white">
+                  +500 profesionales
+                </span>{" "}
+                ya están intercambiando hoy.
               </div>
             </div>
           </div>
 
           <div className="absolute bottom-8 left-16 opacity-60 text-white">
-            <span className="text-xs uppercase tracking-widest font-semibold">
-              permuok.com © 2026
+            <span className="text-xs tracking-widest font-semibold">
+              Permuok.com © 2026
             </span>
           </div>
         </div>
@@ -51,7 +55,8 @@ export default function AuthLayout({ title, subtitle, children }) {
 
             {/* Title */}
             <div className="mb-6 sm:mb-8 text-center">
-              <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
+              <h2 className="text-2xl font-normal text-slate-900">{title}</h2>
+
               {subtitle ? (
                 <p className="text-slate-500 mt-2">{subtitle}</p>
               ) : null}

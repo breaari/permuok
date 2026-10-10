@@ -1,34 +1,55 @@
-@import 'react-phone-number-input/style.css';
+@import "react-phone-number-input/style.css";
 @import "tailwindcss";
 
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Momo+Trust+Display&display=swap");
 
 @theme {
-	--color-primary: #0056b3;
-	--color-secondary: #76bc21;
-	--color-background-light: #f8fafc;
-	--color-background-dark: #0f172a;
-	--color-brand-dark: #0a192f;
-	--font-display: Inter, sans-serif;
+  --color-primary: #0056b3;
+  --color-secondary: #76bc21;
+  --color-background-light: #f8fafc;
+  --color-background-dark: #0f172a;
+  --color-brand-dark: #30363d;
+  --font-display: "Momo Trust Display", "Manrope", sans-serif;
 }
 
-html { font-family: Inter, sans-serif; }
+/* =========================================================
+   TIPOGRAFÍA GLOBAL PERMUOK
+========================================================= */
 
-/* Tipografías exclusivas de la landing pública */
-
-.public-site {
+html,
+body {
   font-family: "Manrope", Inter, sans-serif;
 }
 
-.public-site h1,
-.public-site h2 {
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+h1,
+h2 {
   font-family: "Momo Trust Display", "Manrope", sans-serif;
   font-weight: 400;
 }
 
-/* opcional: background global */
-body { @apply bg-background-light; }
-.dark body { @apply bg-background-dark; }
+/* =========================================================
+   BASE
+========================================================= */
+
+body {
+  @apply bg-background-light;
+  color: #30363d;
+}
+
+.dark body {
+  @apply bg-background-dark;
+}
+
+/* =========================================================
+   PHONE INPUT
+========================================================= */
 
 .phone-field-shell {
   width: 100%;
@@ -37,12 +58,12 @@ body { @apply bg-background-light; }
 }
 
 .phone-field-shell--profile {
-  border: 1px solid rgb(226 232 240); /* slate-200 */
-  background-color: rgb(248 250 252); /* slate-50 */
+  border: 1px solid rgb(226 232 240);
+  background-color: rgb(248 250 252);
 }
 
 .phone-field-shell--auth {
-  border: 1px solid rgb(226 232 240); /* slate-200 */
+  border: 1px solid rgb(226 232 240);
   background-color: white;
 }
 
@@ -61,10 +82,7 @@ body { @apply bg-background-light; }
   width: 100%;
 }
 
-.phone-field--profile {
-  min-height: 48px;
-}
-
+.phone-field--profile,
 .phone-field--auth {
   min-height: 48px;
 }
@@ -93,7 +111,7 @@ body { @apply bg-background-light; }
   outline: none;
   background: transparent;
   font: inherit;
-  color: rgb(15 23 42);
+  color: #30363d;
   cursor: pointer;
 }
 
@@ -117,7 +135,7 @@ body { @apply bg-background-light; }
   outline: none;
   background: transparent;
   font: inherit;
-  color: rgb(15 23 42);
+  color: #30363d;
   line-height: 1.5;
 }
 
@@ -133,6 +151,10 @@ body { @apply bg-background-light; }
   color: rgb(148 163 184);
 }
 
+/* =========================================================
+   GOOGLE PLACE AUTOCOMPLETE
+========================================================= */
+
 gmp-place-autocomplete {
   width: 100% !important;
 }
@@ -141,31 +163,17 @@ gmp-place-autocomplete input {
   width: 100% !important;
   padding: 12px 16px !important;
   border-radius: 0.5rem !important;
-  border: 1px solid #e2e8f0 !important; /* slate-200 */
-  background-color: #f8fafc !important; /* slate-50 */
+  border: 1px solid #e2e8f0 !important;
+  background-color: #f8fafc !important;
   font-size: 0.875rem !important;
+  font-family: "Manrope", Inter, sans-serif !important;
+  color: #30363d !important;
   outline: none !important;
 }
 
 gmp-place-autocomplete input:focus {
   box-shadow: 0 0 0 2px var(--color-primary);
   border-color: transparent;
-}
-
-/* Oculta flechas en inputs number */
-.no-spinner::-webkit-outer-spin-button,
-.no-spinner::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.no-spinner {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-
-gmp-place-autocomplete {
-  width: 100%;
 }
 
 gmp-place-autocomplete::part(text-field) {
@@ -175,6 +183,7 @@ gmp-place-autocomplete::part(text-field) {
   background: transparent !important;
   height: 100%;
   font-size: 14px;
+  font-family: "Manrope", Inter, sans-serif !important;
   padding: 0;
 }
 
@@ -216,11 +225,13 @@ gmp-place-autocomplete::part(input) {
   margin: 0 !important;
   min-height: 46px !important;
   height: 46px !important;
+  font-family: "Manrope", Inter, sans-serif !important;
 }
 
 .permuok-place-autocomplete::part(input) {
   font-size: 14px !important;
   line-height: 1.25rem !important;
+  color: #30363d !important;
 }
 
 .permuok-place-autocomplete::part(input):focus,
@@ -231,10 +242,30 @@ gmp-place-autocomplete::part(input) {
   box-shadow: none !important;
 }
 
+/* =========================================================
+   INPUT NUMBER — OCULTAR FLECHAS
+========================================================= */
+
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.no-spinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* =========================================================
+   LANDING — MARQUEE
+========================================================= */
+
 @keyframes public-marquee {
   from {
     transform: translateX(0);
   }
+
   to {
     transform: translateX(-50%);
   }
@@ -243,6 +274,10 @@ gmp-place-autocomplete::part(input) {
 .public-marquee {
   animation: public-marquee 26s linear infinite;
 }
+
+/* =========================================================
+   LANDING — GRID BACKGROUND
+========================================================= */
 
 .public-grid-bg {
   background-image: radial-gradient(
