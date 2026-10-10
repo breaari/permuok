@@ -151,6 +151,7 @@ use App\Controllers\AdminDashboardController;
 use App\Controllers\CompatibilityController;
 use App\Controllers\AdminSystemController;
 use App\Controllers\PasswordResetController;
+use App\Controllers\EmailVerificationController;
 use App\Helpers\ResponseHelper;
 
 set_exception_handler(
@@ -220,6 +221,15 @@ $routes = [
     'POST /auth/reset-password' => [
         PasswordResetController::class,
         'reset',
+    ],
+    'POST /auth/verify-email' => [
+        EmailVerificationController::class,
+        'verify',
+    ],
+
+    'POST /auth/resend-verification' => [
+        EmailVerificationController::class,
+        'resend',
     ],
     'GET /me'             => [MeController::class, 'handle'],
     'POST /refresh'       => [RefreshController::class, 'handle'],
