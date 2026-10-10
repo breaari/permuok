@@ -55,6 +55,9 @@ import AdminEmailJobs from "./features/admin/pages/AdminEmailJobs";
 import ForgotPassword from "./features/auth/pages/ForgotPassword";
 import ResetPassword from "./features/auth/pages/ResetPassword";
 
+import VerifyEmail from "./features/auth/pages/VerifyEmail";
+import VerifyEmailPending from "./features/auth/pages/VerifyEmailPending";
+
 export default function App() {
   return (
     <Routes>
@@ -66,6 +69,8 @@ export default function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/verify-email-pending" element={<VerifyEmailPending />} />
       {/* App privada */}
       <Route
         element={

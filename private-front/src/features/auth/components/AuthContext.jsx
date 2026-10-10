@@ -154,12 +154,21 @@ export function AuthProvider({ children }) {
     setLoading(true);
 
     try {
-      const res = await api.post("/auth/register", data);
-      unwrap(res);
-      return true;
+      const res = await api.post("/auth/register", data, {
+        skipAuth: true,
+      });
+
+      return unwrap(res);
     } catch (e) {
       const message = getErrorMessage(e, "No se pudo registrar la cuenta");
+
       setError(message);
+
+      if (e instanceof Error) {
+        e.message = message;
+        throw e;
+      }
+
       throw new Error(message);
     } finally {
       setLoading(false);

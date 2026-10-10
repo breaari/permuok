@@ -26,6 +26,7 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [showPass, setShowPass] = useState(false);
+  const [showConfirmationPass, setShowConfirmationPass] = useState(false);
   const [terms, setTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -53,34 +54,36 @@ export default function Register() {
       toast.error("El número de teléfono no es válido.");
       return;
     }
+
     if (!passwordIsValid) {
       toast.error("La contraseña no cumple todos los requisitos.");
-
       return;
     }
 
     if (!passwordsMatch) {
       toast.error("Las contraseñas no coinciden.");
-
       return;
     }
 
     try {
       setSubmitting(true);
 
-      await register({
+      const normalizedEmail = email.trim().toLowerCase();
+
+      const result = await register({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         phone,
         password,
       });
 
-      toast.success("Cuenta creada correctamente. Ahora iniciá sesión.");
-
-      setTimeout(() => {
-        nav("/login", { replace: true });
-      }, 700);
+      nav("/verify-email-pending", {
+        replace: true,
+        state: {
+          email: result?.email || normalizedEmail,
+        },
+      });
     } catch (e) {
       toast.error(getErrorMessage(e, "No se pudo crear la cuenta"));
     } finally {
@@ -151,11 +154,12 @@ export default function Register() {
             <button
               type="button"
               className="text-slate-400 hover:text-slate-600"
-              onClick={() => setShowPass((s) => !s)}
+              onClick={() => setShowPass((current) => !current)}
               tabIndex={-1}
               aria-label={
                 showPass ? "Ocultar contraseña" : "Mostrar contraseña"
               }
+              disabled={submitting}
             >
               <Icon name={showPass ? "eyeOff" : "eye"} />
             </button>
@@ -165,14 +169,31 @@ export default function Register() {
           maxLength={72}
           disabled={submitting}
         />
+
         <Input
           label="Repetir contraseña"
           value={passwordConfirmation}
           onChange={setPasswordConfirmation}
-          type={showPass ? "text" : "password"}
+          type={showConfirmationPass ? "text" : "password"}
           placeholder="••••••••"
           autoComplete="new-password"
           iconLeft={<Icon name="lock" className="opacity-80" />}
+          rightSlot={
+            <button
+              type="button"
+              className="text-slate-400 hover:text-slate-600"
+              onClick={() => setShowConfirmationPass((current) => !current)}
+              tabIndex={-1}
+              aria-label={
+                showConfirmationPass
+                  ? "Ocultar contraseña"
+                  : "Mostrar contraseña"
+              }
+              disabled={submitting}
+            >
+              <Icon name={showConfirmationPass ? "eyeOff" : "eye"} />
+            </button>
+          }
           required
           minLength={8}
           maxLength={72}
@@ -184,6 +205,7 @@ export default function Register() {
           confirmation={passwordConfirmation}
           showMatch
         />
+
         <label className="flex items-start gap-2 text-xs text-slate-600">
           <input
             type="checkbox"

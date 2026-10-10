@@ -103,6 +103,16 @@ export default function Login() {
 
       const errorCode = errorDetails.code || null;
 
+      if (errorCode === "EMAIL_NOT_VERIFIED") {
+        nav("/verify-email-pending", {
+          state: {
+            email: currentEmail,
+          },
+        });
+
+        return;
+      }
+
       const retryAfter = Math.max(0, Number(errorDetails.retry_after) || 0);
 
       if (errorCode === "RATE_LIMIT_EXCEEDED" && retryAfter > 0) {
