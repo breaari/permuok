@@ -163,10 +163,10 @@ class EmailVerificationService
 
             $insert->execute([
                 'user_id' =>
-                $userId,
+                    $userId,
 
                 'token_hash' =>
-                $tokenHash,
+                    $tokenHash,
             ]);
 
             $verificationTokenId =
@@ -210,48 +210,468 @@ class EmailVerificationService
                     'UTF-8'
                 );
 
-            $htmlBody = "
-                <div style=\"font-family:Arial,sans-serif;color:#30363d;line-height:1.6\">
-                    <h2>Verificá tu email</h2>
+            /*
+             * Plantilla diseñada en Canva.
+             * Se eliminan scripts y recursos innecesarios
+             * para mejorar compatibilidad con clientes de email.
+             */
+            $htmlBody = <<<HTML
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
-                    <p>
-                        {$safeName}, gracias por registrarte en Permuok.
-                    </p>
+<html
+    xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:v="urn:schemas-microsoft-com:vml"
+    xmlns:o="urn:schemas-microsoft-com:office:office"
+>
+<head>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    />
 
-                    <p>
-                        Para confirmar que esta dirección de correo te pertenece,
-                        verificá tu email desde el siguiente botón.
-                    </p>
+    <meta
+        http-equiv="Content-Type"
+        content="text/html; charset=UTF-8"
+    />
 
-                    <p>
-                        <a
-                            href=\"{$safeUrl}\"
-                            style=\"display:inline-block;padding:12px 20px;background:#76bc21;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold\"
-                        >
-                            Verificar mi email
-                        </a>
-                    </p>
+    <meta
+        name="format-detection"
+        content="telephone=no, date=no, address=no, email=no"
+    />
 
-                    <p>
-                        Este enlace vence en 24 horas y puede utilizarse una sola vez.
-                    </p>
+    <meta
+        name="x-apple-disable-message-reformatting"
+    />
 
-                    <p>
-                        Si no creaste una cuenta en Permuok, podés ignorar este mensaje.
-                    </p>
-                </div>
-            ";
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        table {
+            mso-table-lspace: 0;
+            mso-table-rspace: 0;
+        }
+
+        p,
+        span,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            margin: 0;
+            padding: 0;
+        }
+
+        p {
+            line-height: inherit;
+        }
+
+        a[x-apple-data-detectors] {
+            color: inherit !important;
+            text-decoration: inherit !important;
+        }
+
+        #MessageViewBody a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        img + div {
+            display: none;
+        }
+
+        @media (max-width: 599px) {
+            .email-container {
+                width: 100% !important;
+                min-width: 0 !important;
+            }
+
+            .email-content {
+                padding-left: 28px !important;
+                padding-right: 28px !important;
+            }
+
+            .email-title {
+                font-size: 20px !important;
+            }
+        }
+    </style>
+
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <w:WordDocument
+                xmlns:w="urn:schemas-microsoft-com:office:word"
+            >
+                <w:DontUseAdvancedTypographyReadingMail/>
+            </w:WordDocument>
+
+            <o:OfficeDocumentSettings>
+                <o:AllowPNG/>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+</head>
+
+<body
+    style="
+        width:100%;
+        -webkit-text-size-adjust:100%;
+        text-size-adjust:100%;
+        background-color:#f0f1f5;
+        margin:0;
+        padding:0;
+    "
+>
+    <table
+        width="100%"
+        border="0"
+        cellpadding="0"
+        cellspacing="0"
+        bgcolor="#f0f1f5"
+        role="presentation"
+        style="background-color:#f0f1f5;"
+    >
+        <tbody>
+            <tr>
+                <td
+                    align="center"
+                    style="
+                        background-color:#f0f1f5;
+                        padding:24px 12px;
+                    "
+                >
+
+                    <!--[if mso]>
+                    <table
+                        align="center"
+                        border="0"
+                        cellpadding="0"
+                        cellspacing="0"
+                        width="600"
+                    >
+                        <tbody>
+                            <tr>
+                                <td>
+                    <![endif]-->
+
+                    <table
+                        align="center"
+                        width="600"
+                        border="0"
+                        cellpadding="0"
+                        cellspacing="0"
+                        role="presentation"
+                        class="email-container"
+                        style="
+                            max-width:600px;
+                            width:600px;
+                            min-width:600px;
+                            margin:0 auto;
+                            background-color:#ffffff;
+                            border-radius:16px;
+                            overflow:hidden;
+                        "
+                    >
+                        <tbody>
+
+                            <!-- LOGO -->
+                            <tr>
+                                <td
+                                    align="center"
+                                    style="
+                                        padding:38px 24px 26px 24px;
+                                    "
+                                >
+                                    <img
+                                        src="https://bq5galnul0ejsuneypmqfsatucvdbtiujlng6snj7ao.canva-cdn.email/e889ee007df2bd5865b81eaa0d7d9445.png"
+                                        width="234"
+                                        alt="Permuok"
+                                        style="
+                                            display:block;
+                                            width:234px;
+                                            height:auto;
+                                            max-width:100%;
+                                            border:0;
+                                        "
+                                    />
+                                </td>
+                            </tr>
+
+                            <!-- HERO -->
+                            <tr>
+                                <td
+                                    align="center"
+                                    style="
+                                        padding:0 24px 16px 24px;
+                                    "
+                                >
+                                    <img
+                                        src="https://bq5galnul0ejsuneypmqfsatucvdbtiujlng6snj7ao.canva-cdn.email/597264010270a1ad652f2d4cdced9acd.png"
+                                        width="552"
+                                        alt="Confirmá tu email"
+                                        style="
+                                            display:block;
+                                            width:552px;
+                                            height:auto;
+                                            max-width:100%;
+                                            border:0;
+                                            border-radius:12px;
+                                        "
+                                    />
+                                </td>
+                            </tr>
+
+                            <!-- CONTENIDO -->
+                            <tr>
+                                <td
+                                    class="email-content"
+                                    style="
+                                        padding:26px 56px 16px 56px;
+                                        font-family:Arial, Helvetica, sans-serif;
+                                        color:#30363d;
+                                        text-align:left;
+                                    "
+                                >
+                                    <div
+                                        class="email-title"
+                                        style="
+                                            font-size:24px;
+                                            font-weight:700;
+                                            line-height:1.35;
+                                            color:#30363d;
+                                            margin-bottom:28px;
+                                        "
+                                    >
+                                        Hola {$safeName},
+                                    </div>
+
+                                    <div
+                                        style="
+                                            font-size:16px;
+                                            line-height:1.5;
+                                            color:#30363d;
+                                        "
+                                    >
+                                        Necesitamos validar esta dirección de correo para
+                                        <br />
+                                        activar tu cuenta en Permuok.
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- BOTÓN -->
+                            <tr>
+                                <td
+                                    align="center"
+                                    style="
+                                        padding:16px 24px 26px 24px;
+                                    "
+                                >
+
+                                    <!--[if mso]>
+                                    <v:roundrect
+                                        xmlns:v="urn:schemas-microsoft-com:vml"
+                                        xmlns:w="urn:schemas-microsoft-com:office:word"
+                                        href="{$safeUrl}"
+                                        style="
+                                            height:64px;
+                                            width:336px;
+                                            v-text-anchor:middle;
+                                        "
+                                        arcsize="23%"
+                                        fillcolor="#61b228"
+                                        strokecolor="#61b228"
+                                    >
+                                        <w:anchorlock/>
+
+                                        <center
+                                            style="
+                                                color:#ffffff;
+                                                font-family:Arial,sans-serif;
+                                                font-size:18px;
+                                                font-weight:700;
+                                            "
+                                        >
+                                            Verificar mi email
+                                        </center>
+                                    </v:roundrect>
+                                    <![endif]-->
+
+                                    <!--[if !mso]><!-->
+                                    <table
+                                        cellpadding="0"
+                                        cellspacing="0"
+                                        border="0"
+                                        role="presentation"
+                                        style="
+                                            width:100%;
+                                            max-width:336px;
+                                            border-collapse:separate;
+                                            border-spacing:0;
+                                        "
+                                    >
+                                        <tbody>
+                                            <tr>
+                                                <td
+                                                    bgcolor="#61b228"
+                                                    style="
+                                                        background-color:#61b228;
+                                                        border-radius:15px;
+                                                    "
+                                                >
+                                                    <a
+                                                        href="{$safeUrl}"
+                                                        target="_blank"
+                                                        rel="noopener"
+                                                        style="
+                                                            color:#ffffff;
+                                                            text-decoration:none;
+                                                            display:block;
+                                                            padding:19px 8px;
+                                                            text-align:center;
+                                                            font-family:Arial, Helvetica, sans-serif;
+                                                            font-size:18px;
+                                                            font-weight:700;
+                                                            line-height:26px;
+                                                            box-sizing:border-box;
+                                                        "
+                                                    >
+                                                        Verificar mi email
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <!--<![endif]-->
+
+                                </td>
+                            </tr>
+
+                            <!-- ACLARACIONES -->
+                            <tr>
+                                <td
+                                    class="email-content"
+                                    style="
+                                        padding:4px 56px 30px 56px;
+                                        font-family:Arial, Helvetica, sans-serif;
+                                        font-size:13px;
+                                        line-height:1.6;
+                                        color:#30363d;
+                                        text-align:left;
+                                    "
+                                >
+                                    Este enlace vence en 24 horas y puede usarse una sola vez.
+
+                                    <br />
+
+                                    <strong>
+                                        ¿No fuiste vos?
+                                    </strong>
+
+                                    Si no creaste esta cuenta, podés ignorar este mensaje.
+                                </td>
+                            </tr>
+
+                            <!-- LINK DE RESPALDO -->
+                            <tr>
+                                <td
+                                    class="email-content"
+                                    style="
+                                        padding:0 56px 30px 56px;
+                                        font-family:Arial, Helvetica, sans-serif;
+                                        font-size:11px;
+                                        line-height:1.5;
+                                        color:#64748b;
+                                        text-align:left;
+                                    "
+                                >
+                                    Si el botón no funciona, copiá y pegá este enlace en tu navegador:
+
+                                    <br />
+
+                                    <a
+                                        href="{$safeUrl}"
+                                        target="_blank"
+                                        rel="noopener"
+                                        style="
+                                            color:#3974ba;
+                                            text-decoration:underline;
+                                            word-break:break-all;
+                                        "
+                                    >
+                                        {$safeUrl}
+                                    </a>
+                                </td>
+                            </tr>
+
+                            <!-- FOOTER CANVA -->
+                            <tr>
+                                <td
+                                    align="center"
+                                    style="
+                                        padding:0;
+                                    "
+                                >
+                                    <img
+                                        src="https://bq5galnul0ejsuneypmqfsatucvdbtiujlng6snj7ao.canva-cdn.email/57e4f2ef5fc9b2d7b9f49554ec721b07.png"
+                                        width="600"
+                                        alt="¿Necesitás ayuda? info@permuok.com"
+                                        style="
+                                            display:block;
+                                            width:600px;
+                                            height:auto;
+                                            max-width:100%;
+                                            border:0;
+                                        "
+                                    />
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+
+                    <!--[if mso]>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <![endif]-->
+
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>
+HTML;
 
             $textBody =
-                "Verificá tu email en Permuok\n\n" .
+                "Confirmá tu email en Permuok\n\n" .
+                "Hola " .
+                (
+                    $recipientName !== ''
+                    ? $recipientName
+                    : ''
+                ) .
+                ",\n\n" .
+                "Necesitamos validar esta dirección de correo para activar tu cuenta en Permuok.\n\n" .
+                "Verificá tu email desde este enlace:\n" .
                 $verificationUrl .
                 "\n\n" .
-                "Este enlace vence en 24 horas y puede utilizarse una sola vez.";
+                "Este enlace vence en 24 horas y puede usarse una sola vez.\n\n" .
+                "Si no creaste esta cuenta, podés ignorar este mensaje.";
 
             EmailJobService::enqueue(
                 $email,
                 'email_verification',
-                'Verificá tu email en Permuok',
+                'Confirmá tu email en Permuok',
                 $htmlBody,
                 $textBody,
                 $userId,
@@ -338,7 +758,7 @@ class EmailVerificationService
 
             $stmt->execute([
                 'token_hash' =>
-                $tokenHash,
+                    $tokenHash,
             ]);
 
             $verificationToken =
@@ -400,7 +820,7 @@ class EmailVerificationService
 
                 $updateUser->execute([
                     'id' =>
-                    $userId,
+                        $userId,
                 ]);
 
                 if (
@@ -427,20 +847,20 @@ class EmailVerificationService
 
             $consumeTokens->execute([
                 'user_id' =>
-                $userId,
+                    $userId,
             ]);
 
             $pdo->commit();
 
             return [
                 'user_id' =>
-                $userId,
+                    $userId,
 
                 'email' =>
-                (string)$verificationToken['email'],
+                    (string)$verificationToken['email'],
 
                 'verified' =>
-                true,
+                    true,
             ];
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
@@ -496,7 +916,7 @@ class EmailVerificationService
 
         $stmt->execute([
             'email' =>
-            $email,
+                $email,
         ]);
 
         $user =
