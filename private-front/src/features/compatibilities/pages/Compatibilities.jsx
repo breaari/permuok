@@ -1,18 +1,13 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
 import {
   getCompatibilityRecommendations,
   respondToCompatibility,
 } from "../api/compatibilities.api";
-
 import CompatibilityCard from "../components/CompatibilityCard";
+import { useAuth } from "../../auth/components/AuthContext";
+import RestrictedAccessState from "../../auth/components/RestrictedAccessState";
+import { canUseNetwork } from "../../auth/utils/access";
 
 /* =========================================================
    FECHAS
@@ -23,14 +18,11 @@ function parseDate(value) {
     return null;
   }
 
-  const normalized =
-    String(value).replace(" ", "T");
+  const normalized = String(value).replace(" ", "T");
 
   const date = new Date(normalized);
 
-  return Number.isNaN(date.getTime())
-    ? null
-    : date;
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function startOfDay(date) {
@@ -46,12 +38,9 @@ function startOfWeek(date) {
 
   const day = value.getDay();
 
-  const diff =
-    day === 0 ? -6 : 1 - day;
+  const diff = day === 0 ? -6 : 1 - day;
 
-  value.setDate(
-    value.getDate() + diff,
-  );
+  value.setDate(value.getDate() + diff);
 
   return value;
 }
@@ -67,37 +56,23 @@ function getDateGroup(value) {
 
   const today = startOfDay(now);
 
-  const yesterday =
-    new Date(today);
+  const yesterday = new Date(today);
 
-  yesterday.setDate(
-    yesterday.getDate() - 1,
-  );
+  yesterday.setDate(yesterday.getDate() - 1);
 
-  const currentWeek =
-    startOfWeek(now);
+  const currentWeek = startOfWeek(now);
 
-  const previousWeek =
-    new Date(currentWeek);
+  const previousWeek = new Date(currentWeek);
 
-  previousWeek.setDate(
-    previousWeek.getDate() - 7,
-  );
+  previousWeek.setDate(previousWeek.getDate() - 7);
 
-  const itemDay =
-    startOfDay(date);
+  const itemDay = startOfDay(date);
 
-  if (
-    itemDay.getTime() ===
-    today.getTime()
-  ) {
+  if (itemDay.getTime() === today.getTime()) {
     return "Hoy";
   }
 
-  if (
-    itemDay.getTime() ===
-    yesterday.getTime()
-  ) {
+  if (itemDay.getTime() === yesterday.getTime()) {
     return "Ayer";
   }
 
@@ -105,10 +80,7 @@ function getDateGroup(value) {
     return "Esta semana";
   }
 
-  if (
-    itemDay >= previousWeek &&
-    itemDay < currentWeek
-  ) {
+  if (itemDay >= previousWeek && itemDay < currentWeek) {
     return "Semana pasada";
   }
 
@@ -116,13 +88,7 @@ function getDateGroup(value) {
 }
 
 function groupItemsByDate(items) {
-  const order = [
-    "Hoy",
-    "Ayer",
-    "Esta semana",
-    "Semana pasada",
-    "Anteriores",
-  ];
+  const order = ["Hoy", "Ayer", "Esta semana", "Semana pasada", "Anteriores"];
 
   const groups = {};
 
@@ -131,10 +97,7 @@ function groupItemsByDate(items) {
   });
 
   items.forEach((item) => {
-    const group = getDateGroup(
-      item?.detected_at ||
-        item?.calculated_at,
-    );
+    const group = getDateGroup(item?.detected_at || item?.calculated_at);
 
     groups[group].push(item);
   });
@@ -144,37 +107,25 @@ function groupItemsByDate(items) {
       label,
       items: groups[label],
     }))
-    .filter(
-      (group) =>
-        group.items.length > 0,
-    );
+    .filter((group) => group.items.length > 0);
 }
 
 /* =========================================================
    SUMMARY
 ========================================================= */
 
-function SummaryCard({
-  value,
-  label,
-  description,
-  accent = false,
-}) {
+function SummaryCard({ value, label, description, accent = false }) {
   return (
     <div
       className={`rounded-2xl border bg-white p-4 shadow-sm ${
-        accent
-          ? "border-blue-200"
-          : "border-slate-200"
+        accent ? "border-blue-200" : "border-slate-200"
       }`}
     >
       <div className="text-3xl font-black tracking-tight text-slate-900">
         {value}
       </div>
 
-      <div className="mt-1 text-sm font-bold text-slate-800">
-        {label}
-      </div>
+      <div className="mt-1 text-sm font-bold text-slate-800">{label}</div>
 
       <p className="mt-1 text-xs leading-relaxed text-slate-500">
         {description}
@@ -190,75 +141,65 @@ function SummaryCard({
 export default function Compatibilities() {
   const navigate = useNavigate();
 
-  const [items, setItems] =
-    useState([]);
+  const [items, setItems] = useState([]);
 
-  const [meta, setMeta] =
-    useState(null);
+  const [meta, setMeta] = useState(null);
 
-  const [view, setView] =
-    useState("active");
+  const [view, setView] = useState("active");
 
-  const [page, setPage] =
-    useState(1);
+  const [page, setPage] = useState(1);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
-  const [
-    reactivatingId,
-    setReactivatingId,
-  ] = useState(null);
+  const [reactivatingId, setReactivatingId] = useState(null);
 
-  const [
-    actionMessage,
-    setActionMessage,
-  ] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+
+  const { access } = useAuth();
+
+  const hasNetworkAccess = canUseNetwork(access);
 
   /* =========================================================
      LOAD
   ========================================================= */
 
-  const loadCompatibilities =
-    useCallback(async () => {
-      try {
-        setLoading(true);
-        setError("");
+  const loadCompatibilities = useCallback(async () => {
+    if (!hasNetworkAccess) {
+      setItems([]);
+      setMeta(null);
+      setError("");
+      setLoading(false);
 
-        const data =
-          await getCompatibilityRecommendations(
-            {
-              page,
-              limit: 12,
-              view,
-            },
-          );
+      return;
+    }
 
-        setItems(
-          data?.items ?? [],
-        );
+    try {
+      setLoading(true);
+      setError("");
 
-        setMeta(
-          data?.meta ?? null,
-        );
-      } catch (err) {
-        console.error(
-          "Error cargando compatibilidades:",
-          err,
-        );
+      const data = await getCompatibilityRecommendations({
+        page,
+        limit: 12,
+        view,
+      });
 
-        setError(
-          err?.response?.data?.error ||
-            err?.message ||
-            "No se pudieron cargar las compatibilidades.",
-        );
-      } finally {
-        setLoading(false);
-      }
-    }, [page, view]);
+      setItems(data?.items ?? []);
+
+      setMeta(data?.meta ?? null);
+    } catch (err) {
+      console.error("Error cargando compatibilidades:", err);
+
+      setError(
+        err?.response?.data?.error ||
+          err?.message ||
+          "No se pudieron cargar las compatibilidades.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [page, view, hasNetworkAccess]);
 
   useEffect(() => {
     loadCompatibilities();
@@ -268,19 +209,13 @@ export default function Compatibilities() {
      GROUPS
   ========================================================= */
 
-  const groups = useMemo(
-    () =>
-      groupItemsByDate(items),
-    [items],
-  );
+  const groups = useMemo(() => groupItemsByDate(items), [items]);
 
   /* =========================================================
      ACTIONS
   ========================================================= */
 
-  function changeView(
-    nextView,
-  ) {
+  function changeView(nextView) {
     if (nextView === view) {
       return;
     }
@@ -290,28 +225,18 @@ export default function Compatibilities() {
     setActionMessage("");
   }
 
-  async function handleReactivate(
-    item,
-  ) {
-    if (
-      !item?.id ||
-      reactivatingId
-    ) {
+  async function handleReactivate(item) {
+    if (!item?.id || reactivatingId) {
       return;
     }
 
     try {
-      setReactivatingId(
-        item.id,
-      );
+      setReactivatingId(item.id);
 
       setActionMessage("");
       setError("");
 
-      await respondToCompatibility(
-        item.id,
-        "pending",
-      );
+      await respondToCompatibility(item.id, "pending");
 
       await loadCompatibilities();
 
@@ -319,10 +244,7 @@ export default function Compatibilities() {
         "La compatibilidad fue reactivada y volvió a tus oportunidades activas.",
       );
     } catch (err) {
-      console.error(
-        "Error reactivando compatibilidad:",
-        err,
-      );
+      console.error("Error reactivando compatibilidad:", err);
 
       setError(
         err?.response?.data?.error ||
@@ -338,34 +260,23 @@ export default function Compatibilities() {
      DERIVED
   ========================================================= */
 
-  const total =
-    meta?.total ?? items.length;
+  const total = meta?.total ?? items.length;
 
-  const summary =
-    meta?.summary || {};
+  const summary = meta?.summary || {};
 
-  const isHistory =
-    view === "history";
+  const isHistory = view === "history";
 
-  const newCount = Number(
-    summary?.new || 0,
-  );
+  const newCount = Number(summary?.new || 0);
 
-  const todayCount = Number(
-    summary?.today || 0,
-  );
+  const todayCount = Number(summary?.today || 0);
 
-  const attentionCount =
-    Number(
-      summary?.needs_attention ||
-        0,
-    );
+  const attentionCount = Number(summary?.needs_attention || 0);
 
-  const progressCount =
-    Number(
-      summary?.in_progress ||
-        0,
-    );
+  const progressCount = Number(summary?.in_progress || 0);
+
+  if (!hasNetworkAccess) {
+    return <RestrictedAccessState access={access} section="compatibilities" />;
+  }
 
   /* =========================================================
      RENDER
@@ -389,22 +300,14 @@ export default function Compatibilities() {
             </h1>
 
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
-              Oportunidades detectadas
-              automáticamente entre tus
-              búsquedas y las
-              publicaciones disponibles
-              en PermuOK.
+              Oportunidades detectadas automáticamente entre tus búsquedas y las
+              publicaciones disponibles en PermuOK.
             </p>
           </div>
 
           <div className="shrink-0 text-sm font-medium text-slate-500">
-            {total}{" "}
-            {isHistory
-              ? "registro"
-              : "oportunidad"}
-            {total === 1
-              ? ""
-              : "es"}
+            {total} {isHistory ? "registro" : "oportunidad"}
+            {total === 1 ? "" : "es"}
           </div>
         </div>
       </div>
@@ -423,11 +326,7 @@ export default function Compatibilities() {
 
         <button
           type="button"
-          onClick={() =>
-            navigate(
-              "/compatibilities/multilateral",
-            )
-          }
+          onClick={() => navigate("/compatibilities/multilateral")}
           className="rounded-lg px-4 py-2 text-sm font-bold text-slate-500 transition hover:text-slate-900"
         >
           Multilaterales
@@ -438,45 +337,35 @@ export default function Compatibilities() {
           SUMMARY
       ====================================================== */}
 
-      {!isHistory &&
-        !loading && (
-          <div className="mb-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <SummaryCard
-              value={newCount}
-              label="Nuevas"
-              description="Todavía no revisadas."
-              accent={
-                newCount > 0
-              }
-            />
+      {!isHistory && !loading && (
+        <div className="mb-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <SummaryCard
+            value={newCount}
+            label="Nuevas"
+            description="Todavía no revisadas."
+            accent={newCount > 0}
+          />
 
-            <SummaryCard
-              value={todayCount}
-              label="Detectadas hoy"
-              description="Nuevos matches generados hoy."
-            />
+          <SummaryCard
+            value={todayCount}
+            label="Detectadas hoy"
+            description="Nuevos matches generados hoy."
+          />
 
-            <SummaryCard
-              value={
-                attentionCount
-              }
-              label="Requieren tu atención"
-              description="Esperan una decisión tuya."
-              accent={
-                attentionCount >
-                0
-              }
-            />
+          <SummaryCard
+            value={attentionCount}
+            label="Requieren tu atención"
+            description="Esperan una decisión tuya."
+            accent={attentionCount > 0}
+          />
 
-            <SummaryCard
-              value={
-                progressCount
-              }
-              label="En curso"
-              description="Con interés mutuo o conversación."
-            />
-          </div>
-        )}
+          <SummaryCard
+            value={progressCount}
+            label="En curso"
+            description="Con interés mutuo o conversación."
+          />
+        </div>
+      )}
 
       {/* =====================================================
           ACTIVE / HISTORY
@@ -485,38 +374,26 @@ export default function Compatibilities() {
       <div className="mb-6 border-b border-slate-200">
         <div className="flex gap-6">
           {[
-            [
-              "active",
-              "Activas",
-            ],
-            [
-              "history",
-              "Historial",
-            ],
-          ].map(
-            ([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() =>
-                  changeView(
-                    key,
-                  )
-                }
-                className={`relative pb-3 text-sm font-bold transition ${
-                  view === key
-                    ? "text-primary"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                {label}
+            ["active", "Activas"],
+            ["history", "Historial"],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => changeView(key)}
+              className={`relative pb-3 text-sm font-bold transition ${
+                view === key
+                  ? "text-primary"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              {label}
 
-                {view === key && (
-                  <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />
-                )}
-              </button>
-            ),
-          )}
+              {view === key && (
+                <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -542,14 +419,12 @@ export default function Compatibilities() {
 
       {loading ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          {[1, 2, 3, 4].map(
-            (item) => (
-              <div
-                key={item}
-                className="h-[430px] animate-pulse rounded-2xl border border-slate-200 bg-white"
-              />
-            ),
-          )}
+          {[1, 2, 3, 4].map((item) => (
+            <div
+              key={item}
+              className="h-[430px] animate-pulse rounded-2xl border border-slate-200 bg-white"
+            />
+          ))}
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
@@ -569,61 +444,37 @@ export default function Compatibilities() {
         </div>
       ) : (
         <div className="space-y-8">
-          {groups.map(
-            (group) => (
-              <section
-                key={
-                  group.label
-                }
-              >
-                {/* Temporal */}
+          {groups.map((group) => (
+            <section key={group.label}>
+              {/* Temporal */}
 
-                <div className="mb-3 flex items-center gap-3">
-                  <h2 className="text-xs font-black uppercase tracking-[0.15em] text-slate-500">
-                    {
-                      group.label
-                    }
-                  </h2>
+              <div className="mb-3 flex items-center gap-3">
+                <h2 className="text-xs font-black uppercase tracking-[0.15em] text-slate-500">
+                  {group.label}
+                </h2>
 
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">
-                    {
-                      group.items
-                        .length
-                    }
-                  </span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">
+                  {group.items.length}
+                </span>
 
-                  <div className="h-px flex-1 bg-slate-200" />
-                </div>
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
 
-                {/* Cards */}
+              {/* Cards */}
 
-                <div className="space-y-4">
-                  {group.items.map(
-                    (item) => (
-                      <CompatibilityCard
-                        key={
-                          item.id
-                        }
-                        item={
-                          item
-                        }
-                        view={
-                          view
-                        }
-                        onReactivate={
-                          handleReactivate
-                        }
-                        reactivating={
-                          reactivatingId ===
-                          item.id
-                        }
-                      />
-                    ),
-                  )}
-                </div>
-              </section>
-            ),
-          )}
+              <div className="space-y-4">
+                {group.items.map((item) => (
+                  <CompatibilityCard
+                    key={item.id}
+                    item={item}
+                    view={view}
+                    onReactivate={handleReactivate}
+                    reactivating={reactivatingId === item.id}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
       )}
 
@@ -631,65 +482,33 @@ export default function Compatibilities() {
           PAGINATION
       ====================================================== */}
 
-      {!loading &&
-        meta &&
-        Number(meta.pages) >
-          1 && (
-          <div className="mt-8 flex items-center justify-center gap-3">
-            <button
-              type="button"
-              disabled={
-                page <= 1
-              }
-              onClick={() =>
-                setPage(
-                  (current) =>
-                    Math.max(
-                      1,
-                      current -
-                        1,
-                    ),
-                )
-              }
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Anterior
-            </button>
+      {!loading && meta && Number(meta.pages) > 1 && (
+        <div className="mt-8 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            disabled={page <= 1}
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Anterior
+          </button>
 
-            <span className="text-sm font-medium text-slate-500">
-              Página{" "}
-              {meta.page ||
-                page}{" "}
-              de{" "}
-              {meta.pages}
-            </span>
+          <span className="text-sm font-medium text-slate-500">
+            Página {meta.page || page} de {meta.pages}
+          </span>
 
-            <button
-              type="button"
-              disabled={
-                page >=
-                Number(
-                  meta.pages,
-                )
-              }
-              onClick={() =>
-                setPage(
-                  (current) =>
-                    Math.min(
-                      Number(
-                        meta.pages,
-                      ),
-                      current +
-                        1,
-                    ),
-                )
-              }
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Siguiente
-            </button>
-          </div>
-        )}
+          <button
+            type="button"
+            disabled={page >= Number(meta.pages)}
+            onClick={() =>
+              setPage((current) => Math.min(Number(meta.pages), current + 1))
+            }
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Siguiente
+          </button>
+        </div>
+      )}
     </div>
   );
 }
