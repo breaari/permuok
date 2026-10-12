@@ -117,7 +117,7 @@ class RealEstateService
         $pdo = self::db();
 
         self::normalizeAddressMapFields($data);
-
+        self::normalizeDraftFields($data);
         $allowed = [
             'name',
             'legal_name',
@@ -136,18 +136,14 @@ class RealEstateService
             'facebook',
         ];
 
-        if (!$u['real_estate_id']) {
-            self::requireKeys($data, [
-                'name',
-                'legal_name',
-                'cuit',
-                'address',
-                'phone',
-                'email',
-                'website',
-            ]);
+  if (!self::hasAnyProfileData($data)) {
+    throw new Exception(
+        'Completá al menos un dato antes de guardar el borrador',
+        422
+    );
+}
 
-            self::validateProfilePayload($data, true);
+self::validateDraftPayload($data);
 
             $pdo->beginTransaction();
 
@@ -257,19 +253,19 @@ class RealEstateService
                 ");
 
                 $st->execute([
-                    'name' => $data['name'],
-                    'legal_name' => $data['legal_name'],
-                    'cuit' => $data['cuit'],
-                    'address' => $data['address'],
+                    'name' => $data['name'] ?? null,
+'legal_name' => $data['legal_name'] ?? null,
+'cuit' => $data['cuit'] ?? null,
+'address' => $data['address'] ?? null,
                     'address_place_id' => $data['address_place_id'] ?? null,
                     'address_lat' => $data['address_lat'] ?? null,
                     'address_lng' => $data['address_lng'] ?? null,
                     'address_locality' => $data['address_locality'] ?? null,
                     'address_province' => $data['address_province'] ?? null,
                     'address_postal_code' => $data['address_postal_code'] ?? null,
-                    'phone' => $data['phone'],
-                    'email' => $data['email'],
-                    'website' => $data['website'],
+           'phone' => $data['phone'] ?? null,
+'email' => $data['email'] ?? null,
+'website' => $data['website'] ?? null,
                     'instagram' => $data['instagram'] ?? null,
                     'facebook' => $data['facebook'] ?? null,
                     'profile_status' => RealEstateProfileStatus::DRAFT,
@@ -370,8 +366,19 @@ class RealEstateService
                 409
             );
         }
-        $merged = array_merge($current ?: [], $updates);
-        self::validateProfilePayload($merged, true);
+$merged = array_merge($current ?: [], $updates);
+
+if (
+    $currentProfileStatus ===
+    RealEstateProfileStatus::DRAFT
+) {
+    self::validateDraftPayload($merged);
+} else {
+    self::validateProfilePayload(
+        $merged,
+        true
+    );
+}
 
         $sensitiveFields = [
             'name',
@@ -1125,4 +1132,144 @@ class RealEstateService
             default => 'incomplete',
         };
     }
+
+    private static function normalizeDraftFields(
+    array &$data
+): void {
+    $nullableFields = [
+        'name',
+        'legal_name',
+        'cuit',
+        'address',
+        'phone',
+        'email',
+        'website',
+        'instagram',
+        'facebook',
+    ];
+
+    foreach ($nullableFields as $field) {
+        if (!array_key_exists($field, $data)) {
+            continue;
+        }
+
+        if ($data[$field] === null) {
+            continue;
+        }
+
+        $value = trim((string)$data[$field]);
+
+        $data[$field] =
+            $value === ''
+            ? null
+            : $value;
+    }
+}
+
+private static function hasAnyProfileData(
+    array $data
+): bool {
+    $fields = [
+        'name',
+        'legal_name',
+        'cuit',
+        'address',
+        'phone',
+        'email',
+        'website',
+        'instagram',
+        'facebook',
+    ];
+
+    foreach ($fields as $field) {
+        if (
+            isset($data[$field]) &&
+            trim((string)$data[$field]) !== ''
+        ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+private static function validateDraftPayload(
+    array $data
+): void {
+    if (
+        !empty($data['name']) &&
+        !self::validateNameText(
+            (string)$data['name']
+        )
+    ) {
+        throw new Exception(
+            'Ingresá un nombre comercial válido'
+        );
+    }
+
+    if (
+        !empty($data['legal_name']) &&
+        !self::validateNameText(
+            (string)$data['legal_name']
+        )
+    ) {
+        throw new Exception(
+            'Ingresá una razón social válida'
+        );
+    }
+
+    if (
+        !empty($data['cuit']) &&
+        !self::validateCuit(
+            (string)$data['cuit']
+        )
+    ) {
+        throw new Exception(
+            'Ingresá un CUIT válido de 11 dígitos'
+        );
+    }
+
+    if (
+        !empty($data['phone']) &&
+        !self::validatePhone(
+            (string)$data['phone']
+        )
+    ) {
+        throw new Exception(
+            'Ingresá un teléfono válido'
+        );
+    }
+
+    if (!empty($data['email'])) {
+        $email =
+            strtolower(
+                trim(
+                    (string)$data['email']
+                )
+            );
+
+        if (
+            strlen($email) > 254 ||
+            !filter_var(
+                $email,
+                FILTER_VALIDATE_EMAIL
+            )
+        ) {
+            throw new Exception(
+                'Ingresá un email válido'
+            );
+        }
+    }
+
+    if (
+        !empty($data['website']) &&
+        !self::validateWebsite(
+            (string)$data['website']
+        )
+    ) {
+        throw new Exception(
+            'Ingresá un sitio web válido'
+        );
+    }
+}
 }

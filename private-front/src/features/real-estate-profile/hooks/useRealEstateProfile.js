@@ -236,12 +236,6 @@ export function useRealEstateProfile({ loadMe }) {
       e?.preventDefault?.();
       setErr("");
 
-      const validation = getProfileValidation(profile);
-      if (!validation.ok) {
-        toast.error(validation.reason);
-        return false;
-      }
-
       try {
         const payload = buildProfilePayload(profile);
 
