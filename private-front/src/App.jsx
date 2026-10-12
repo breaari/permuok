@@ -58,6 +58,8 @@ import ResetPassword from "./features/auth/pages/ResetPassword";
 import VerifyEmail from "./features/auth/pages/VerifyEmail";
 import VerifyEmailPending from "./features/auth/pages/VerifyEmailPending";
 
+import RequireNetworkAccess from "./features/auth/components/RequireNetworkAccess";
+
 export default function App() {
   return (
     <Routes>
@@ -88,99 +90,214 @@ export default function App() {
         <Route path="app" element={<Dashboard />} />
 
         <Route path="properties" element={<Properties />} />
-        <Route path="properties/new" element={<PropertyForm />} />
-        <Route path="properties/:id/edit" element={<PropertyForm />} />
-        <Route path="properties/:id" element={<PropertyDetail />} />
+        <Route
+          path="properties/new"
+          element={
+            <RequireNetworkAccess fallback="/properties">
+              <PropertyForm />
+            </RequireNetworkAccess>
+          }
+        />
+
+        <Route
+          path="properties/:id/edit"
+          element={
+            <RequireNetworkAccess fallback="/properties">
+              <PropertyForm />
+            </RequireNetworkAccess>
+          }
+        />
+
+        <Route
+          path="properties/:id"
+          element={
+            <RequireNetworkAccess fallback="/properties">
+              <PropertyDetail />
+            </RequireNetworkAccess>
+          }
+        />
 
         <Route path="search-requests" element={<SearchRequests />} />
-        <Route path="search-requests/new" element={<SearchRequestForm />} />
+        <Route
+          path="search-requests/new"
+          element={
+            <RequireNetworkAccess fallback="/search-requests">
+              <SearchRequestForm />
+            </RequireNetworkAccess>
+          }
+        />
+
         <Route
           path="search-requests/:id/edit"
-          element={<SearchRequestForm />}
+          element={
+            <RequireNetworkAccess fallback="/search-requests">
+              <SearchRequestForm />
+            </RequireNetworkAccess>
+          }
         />
-        <Route path="search-requests/:id" element={<SearchRequestDetail />} />
+
+        <Route
+          path="search-requests/:id"
+          element={
+            <RequireNetworkAccess fallback="/search-requests">
+              <SearchRequestDetail />
+            </RequireNetworkAccess>
+          }
+        />
 
         <Route
           path="developments"
           element={
-            <RequireDevelopmentAccess mode="publish">
-              <Developments />
-            </RequireDevelopmentAccess>
+            <RequireNetworkAccess>
+              <RequireDevelopmentAccess mode="publish">
+                <Developments />
+              </RequireDevelopmentAccess>
+            </RequireNetworkAccess>
           }
         />
         <Route
           path="developments/new"
           element={
-            <RequireDevelopmentAccess mode="publish">
-              <DevelopmentForm />
-            </RequireDevelopmentAccess>
+            <RequireNetworkAccess>
+              <RequireDevelopmentAccess mode="publish">
+                <DevelopmentForm />
+              </RequireDevelopmentAccess>
+            </RequireNetworkAccess>
           }
         />
+
         <Route
           path="developments/:id/edit"
           element={
-            <RequireDevelopmentAccess mode="publish">
-              <DevelopmentForm />
-            </RequireDevelopmentAccess>
+            <RequireNetworkAccess>
+              <RequireDevelopmentAccess mode="publish">
+                <DevelopmentForm />
+              </RequireDevelopmentAccess>
+            </RequireNetworkAccess>
           }
         />
+
         <Route
           path="developments/:id"
           element={
-            <RequireDevelopmentAccess mode="publish">
-              <DevelopmentDetail />
-            </RequireDevelopmentAccess>
+            <RequireNetworkAccess>
+              <RequireDevelopmentAccess mode="publish">
+                <DevelopmentDetail />
+              </RequireDevelopmentAccess>
+            </RequireNetworkAccess>
+          }
+        />
+        <Route
+          path="explore"
+          element={
+            <RequireNetworkAccess>
+              <Explore />
+            </RequireNetworkAccess>
+          }
+        />
+        <Route
+          path="explore/properties"
+          element={
+            <RequireNetworkAccess>
+              <Explore defaultType="property" />
+            </RequireNetworkAccess>
           }
         />
 
-        <Route path="explore" element={<Explore />} />
         <Route
-          path="explore/properties"
-          element={<Explore defaultType="property" />}
+          path="explore/properties/:id"
+          element={
+            <RequireNetworkAccess>
+              <PropertyDetail />
+            </RequireNetworkAccess>
+          }
         />
-        <Route path="explore/properties/:id" element={<PropertyDetail />} />
 
         <Route
           path="explore/search-requests"
-          element={<Explore defaultType="search_request" />}
+          element={
+            <RequireNetworkAccess>
+              <Explore defaultType="search_request" />
+            </RequireNetworkAccess>
+          }
         />
+
         <Route
           path="explore/search-requests/:id"
-          element={<SearchRequestDetail />}
+          element={
+            <RequireNetworkAccess>
+              <SearchRequestDetail />
+            </RequireNetworkAccess>
+          }
         />
 
         <Route
           path="explore/developments"
           element={
-            <RequireDevelopmentAccess mode="view">
-              <Explore defaultType="development" />
-            </RequireDevelopmentAccess>
+            <RequireNetworkAccess>
+              <RequireDevelopmentAccess mode="view">
+                <Explore defaultType="development" />
+              </RequireDevelopmentAccess>
+            </RequireNetworkAccess>
           }
         />
+
         <Route
           path="explore/developments/:id"
           element={
-            <RequireDevelopmentAccess mode="view">
-              <DevelopmentDetail />
-            </RequireDevelopmentAccess>
+            <RequireNetworkAccess>
+              <RequireDevelopmentAccess mode="view">
+                <DevelopmentDetail />
+              </RequireDevelopmentAccess>
+            </RequireNetworkAccess>
           }
         />
         <Route path="compatibilities" element={<Compatibilities />} />
 
         <Route
           path="compatibilities/multilateral"
-          element={<MultilateralCompatibilities />}
+          element={
+            <RequireNetworkAccess fallback="/compatibilities">
+              <MultilateralCompatibilities />
+            </RequireNetworkAccess>
+          }
         />
 
         <Route
           path="compatibilities/multilateral/:id"
-          element={<MultilateralCompatibilityDetail />}
+          element={
+            <RequireNetworkAccess fallback="/compatibilities">
+              <MultilateralCompatibilityDetail />
+            </RequireNetworkAccess>
+          }
         />
 
-        <Route path="compatibilities/:id" element={<CompatibilityDetail />} />
+        <Route
+          path="compatibilities/:id"
+          element={
+            <RequireNetworkAccess fallback="/compatibilities">
+              <CompatibilityDetail />
+            </RequireNetworkAccess>
+          }
+        />
 
-        <Route path="conversations" element={<Inbox />} />
-        <Route path="conversations/:id" element={<ConversationDetail />} />
+        <Route
+          path="conversations"
+          element={
+            <RequireNetworkAccess>
+              <Inbox />
+            </RequireNetworkAccess>
+          }
+        />
+
+        <Route
+          path="conversations/:id"
+          element={
+            <RequireNetworkAccess>
+              <ConversationDetail />
+            </RequireNetworkAccess>
+          }
+        />
 
         <Route path="admin" element={<AdminPanel />}>
           <Route index element={<AdminDashboard />} />
