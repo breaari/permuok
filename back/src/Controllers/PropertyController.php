@@ -7,7 +7,7 @@ use App\Helpers\ResponseHelper;
 use App\Helpers\QueryParamHelper;
 use App\Services\PropertyService;
 use App\Services\MembershipGuard;
-
+use App\Services\NetworkAccessGuard;
 class PropertyController
 {
 
@@ -29,7 +29,7 @@ class PropertyController
         }
 
         $exceptionStatus =
-            (int)$e->getCode();
+            (int) $e->getCode();
 
         if (
             $exceptionStatus >= 400 &&
@@ -41,7 +41,7 @@ class PropertyController
 
         ResponseHelper::fail(
             $e->getMessage()
-                ?: 'No se pudo completar la operación.',
+            ?: 'No se pudo completar la operación.',
             $status
         );
     }
@@ -49,7 +49,7 @@ class PropertyController
     private static function failAI(
         \Throwable $e
     ): void {
-        $status = (int)$e->getCode();
+        $status = (int) $e->getCode();
 
         if (
             $status >= 400 &&
@@ -119,6 +119,11 @@ class PropertyController
             $auth =
                 AuthHelper::requireUser();
 
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+
+            );
             QueryParamHelper::rejectUnknown([
                 'status',
                 'q',
@@ -128,44 +133,44 @@ class PropertyController
 
             $filters = [
                 'status' =>
-                QueryParamHelper::enum(
-                    'status',
-                    [
-                        'draft',
-                        'published',
-                        'paused',
-                        'archived',
-                        'closed',
-                    ],
-                    ''
-                ),
+                    QueryParamHelper::enum(
+                        'status',
+                        [
+                            'draft',
+                            'published',
+                            'paused',
+                            'archived',
+                            'closed',
+                        ],
+                        ''
+                    ),
                 'q' =>
-                QueryParamHelper::optionalString(
-                    'q',
-                    150
-                ),
+                    QueryParamHelper::optionalString(
+                        'q',
+                        150
+                    ),
                 /*
-             * Se permite recibir 100 porque actualmente
-             * getMyPublishedProperties() lo solicita.
-             * PropertyService mantiene el límite efectivo en 50.
-             */
+                 * Se permite recibir 100 porque actualmente
+                 * getMyPublishedProperties() lo solicita.
+                 * PropertyService mantiene el límite efectivo en 50.
+                 */
                 'limit' =>
-                QueryParamHelper::positiveInt(
-                    'limit',
-                    5,
-                    100
-                ),
+                    QueryParamHelper::positiveInt(
+                        'limit',
+                        5,
+                        100
+                    ),
                 'page' =>
-                QueryParamHelper::positiveInt(
-                    'page',
-                    1,
-                    1000000
-                ),
+                    QueryParamHelper::positiveInt(
+                        'page',
+                        1,
+                        1000000
+                    ),
             ];
 
             $result =
                 PropertyService::listMyProperties(
-                    (int)$auth['id'],
+                    (int) $auth['id'],
                     $filters
                 );
 
@@ -181,6 +186,11 @@ class PropertyController
             $auth =
                 AuthHelper::requireUser();
 
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+
             QueryParamHelper::rejectUnknown([
                 'q',
                 'property_type',
@@ -190,41 +200,41 @@ class PropertyController
 
             $filters = [
                 'q' =>
-                QueryParamHelper::optionalString(
-                    'q',
-                    150
-                ),
+                    QueryParamHelper::optionalString(
+                        'q',
+                        150
+                    ),
                 'property_type' =>
-                QueryParamHelper::enum(
-                    'property_type',
-                    [
-                        'house',
-                        'apartment',
-                        'land',
-                        'commercial',
-                        'office',
-                        'warehouse',
-                        'other',
-                    ],
-                    ''
-                ),
+                    QueryParamHelper::enum(
+                        'property_type',
+                        [
+                            'house',
+                            'apartment',
+                            'land',
+                            'commercial',
+                            'office',
+                            'warehouse',
+                            'other',
+                        ],
+                        ''
+                    ),
                 'limit' =>
-                QueryParamHelper::positiveInt(
-                    'limit',
-                    6,
-                    50
-                ),
+                    QueryParamHelper::positiveInt(
+                        'limit',
+                        6,
+                        50
+                    ),
                 'page' =>
-                QueryParamHelper::positiveInt(
-                    'page',
-                    1,
-                    1000000
-                ),
+                    QueryParamHelper::positiveInt(
+                        'page',
+                        1,
+                        1000000
+                    ),
             ];
 
             $result =
                 PropertyService::listExploreProperties(
-                    (int)$auth['id'],
+                    (int) $auth['id'],
                     $filters
                 );
 
@@ -240,13 +250,13 @@ class PropertyController
             $auth = AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
             $data = self::readJsonBody();
 
             $result = PropertyService::createDraft(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $data
             );
 
@@ -260,9 +270,15 @@ class PropertyController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
 
-            $result = PropertyService::getDetail((int)$auth['id'], $id);
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+
+            $id = (int) ($_GET['id'] ?? 0);
+
+            $result = PropertyService::getDetail((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail(
@@ -276,9 +292,14 @@ class PropertyController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
 
-            $result = PropertyService::getExploreDetail((int)$auth['id'], $id);
+            $id = (int) ($_GET['id'] ?? 0);
+
+            $result = PropertyService::getExploreDetail((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail(
@@ -294,14 +315,14 @@ class PropertyController
             $auth = AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
-            $id = (int)($_GET['id'] ?? 0);
+            $id = (int) ($_GET['id'] ?? 0);
             $data = self::readJsonBody();
 
             $result = PropertyService::updateDraft(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $id,
                 $data
             );
@@ -318,14 +339,14 @@ class PropertyController
             $auth = AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
-            $id = (int)($_GET['id'] ?? 0);
+            $id = (int) ($_GET['id'] ?? 0);
             $data = self::readJsonBody();
 
             $result = PropertyService::replaceRequirements(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $id,
                 $data
             );
@@ -341,11 +362,11 @@ class PropertyController
         try {
             $auth = AuthHelper::requireUser();
 
-            MembershipGuard::requireActiveMembership((int)$auth['id']);
+            MembershipGuard::requireActiveMembership((int) $auth['id']);
 
-            $id = (int)($_GET['id'] ?? 0);
+            $id = (int) ($_GET['id'] ?? 0);
 
-            $result = PropertyService::publish((int)$auth['id'], $id);
+            $result = PropertyService::publish((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail($e);
@@ -356,9 +377,16 @@ class PropertyController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
 
-            $result = PropertyService::pause((int)$auth['id'], $id);
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+
+
+            $id = (int) ($_GET['id'] ?? 0);
+
+            $result = PropertyService::pause((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail($e);
@@ -369,9 +397,15 @@ class PropertyController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
 
-            $result = PropertyService::archive((int)$auth['id'], $id);
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+
+            $id = (int) ($_GET['id'] ?? 0);
+
+            $result = PropertyService::archive((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail($e);
@@ -382,7 +416,14 @@ class PropertyController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
+
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+
+
+            $id = (int) ($_GET['id'] ?? 0);
 
             $data = self::readJsonBody(true);
 
@@ -399,7 +440,7 @@ class PropertyController
             $closingType = trim($closingTypeValue);
 
             $result = PropertyService::close(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $id,
                 $closingType
             );
@@ -414,9 +455,15 @@ class PropertyController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
 
-            $result = PropertyService::delete((int)$auth['id'], $id);
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+
+            );
+            $id = (int) ($_GET['id'] ?? 0);
+
+            $result = PropertyService::delete((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail($e);
@@ -428,16 +475,20 @@ class PropertyController
         try {
             $auth =
                 AuthHelper::requireUser();
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
             $id =
-                (int)($_GET['id'] ?? 0);
+                (int) ($_GET['id'] ?? 0);
 
             $result =
                 PropertyService::requestAIAnalysis(
-                    (int)$auth['id'],
+                    (int) $auth['id'],
                     $id
                 );
 
@@ -457,11 +508,11 @@ class PropertyController
                 AuthHelper::requireUser();
 
             $id =
-                (int)($_GET['id'] ?? 0);
+                (int) ($_GET['id'] ?? 0);
 
             $result =
                 PropertyService::getAIAnalysis(
-                    (int)$auth['id'],
+                    (int) $auth['id'],
                     $id
                 );
 
@@ -479,10 +530,10 @@ class PropertyController
             $auth = AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
-            $id = (int)($_GET['id'] ?? 0);
+            $id = (int) ($_GET['id'] ?? 0);
             $data = self::readJsonBody(true);
 
             if (
@@ -498,7 +549,7 @@ class PropertyController
             $draft = $data['draft'] ?? [];
 
             $result = PropertyService::generateAITitle(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $id,
                 $draft
             );
@@ -515,10 +566,10 @@ class PropertyController
             $auth = AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
-            $id = (int)($_GET['id'] ?? 0);
+            $id = (int) ($_GET['id'] ?? 0);
             $data = self::readJsonBody(true);
 
             if (
@@ -534,7 +585,7 @@ class PropertyController
             $draft = $data['draft'] ?? [];
 
             $result = PropertyService::generateAIDescription(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $id,
                 $draft
             );

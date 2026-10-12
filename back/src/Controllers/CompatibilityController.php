@@ -10,7 +10,7 @@ use Throwable;
 use App\Services\MultilateralOperationReadService;
 use App\Services\MultilateralOperationResponseService;
 use App\Services\MembershipGuard;
-
+use App\Services\NetworkAccessGuard;
 class CompatibilityController
 {
     private static function readJsonObject(
@@ -102,54 +102,54 @@ class CompatibilityController
 
             $filters = [
                 'page' =>
-                QueryParamHelper::positiveInt(
-                    'page',
-                    1,
-                    1000000
-                ),
+                    QueryParamHelper::positiveInt(
+                        'page',
+                        1,
+                        1000000
+                    ),
                 'limit' =>
-                QueryParamHelper::positiveInt(
-                    'limit',
-                    12,
-                    50
-                ),
+                    QueryParamHelper::positiveInt(
+                        'limit',
+                        12,
+                        50
+                    ),
                 'view' =>
-                QueryParamHelper::enum(
-                    'view',
-                    [
-                        'active',
-                        'history',
-                        'all',
-                    ],
-                    'active'
-                ),
+                    QueryParamHelper::enum(
+                        'view',
+                        [
+                            'active',
+                            'history',
+                            'all',
+                        ],
+                        'active'
+                    ),
                 'match_level' =>
-                QueryParamHelper::enum(
-                    'match_level',
-                    [
-                        'low',
-                        'medium',
-                        'high',
-                        'total',
-                    ],
-                    ''
-                ),
+                    QueryParamHelper::enum(
+                        'match_level',
+                        [
+                            'low',
+                            'medium',
+                            'high',
+                            'total',
+                        ],
+                        ''
+                    ),
                 'min_score' =>
-                QueryParamHelper::optionalNumber(
-                    'min_score',
-                    0,
-                    100
-                ),
+                    QueryParamHelper::optionalNumber(
+                        'min_score',
+                        0,
+                        100
+                    ),
                 'pending' =>
-                QueryParamHelper::boolean(
-                    'pending',
-                    false
-                ),
+                    QueryParamHelper::boolean(
+                        'pending',
+                        false
+                    ),
             ];
 
             $result =
                 CompatibilityService::listRecommendations(
-                    (int)$user['id'],
+                    (int) $user['id'],
                     $filters
                 );
 
@@ -165,10 +165,13 @@ class CompatibilityController
     {
         try {
             $user = AuthHelper::requireUser();
-
+            NetworkAccessGuard::requireAccess(
+                (int) $user['id'],
+                (int) $user['role']
+            );
             $result =
                 CompatibilityService::getRecommendationDetail(
-                    (int)$user['id'],
+                    (int) $user['id'],
                     $compatibilityId
                 );
 
@@ -193,7 +196,7 @@ class CompatibilityController
                 AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$user['id']
+                (int) $user['id']
             );
             $body =
                 self::readJsonObject([
@@ -237,7 +240,7 @@ class CompatibilityController
 
             $result =
                 CompatibilityService::respond(
-                    (int)$user['id'],
+                    (int) $user['id'],
                     $compatibilityId,
                     $response
                 );
@@ -278,9 +281,9 @@ class CompatibilityController
             ];
 
             /*
-         * useful es opcional, pero si llega debe
-         * ser un booleano o 0/1 exacto.
-         */
+             * useful es opcional, pero si llega debe
+             * ser un booleano o 0/1 exacto.
+             */
             if (
                 array_key_exists(
                     'useful',
@@ -316,9 +319,9 @@ class CompatibilityController
             }
 
             /*
-         * rating es opcional, pero debe ser
-         * un entero exacto entre 1 y 5.
-         */
+             * rating es opcional, pero debe ser
+             * un entero exacto entre 1 y 5.
+             */
             if (
                 array_key_exists(
                     'rating',
@@ -346,7 +349,7 @@ class CompatibilityController
                 }
 
                 $normalized['rating'] =
-                    (int)$rating;
+                    (int) $rating;
             }
 
             if (
@@ -385,9 +388,9 @@ class CompatibilityController
             }
 
             /*
-         * Evitamos crear registros de feedback
-         * completamente vacíos.
-         */
+             * Evitamos crear registros de feedback
+             * completamente vacíos.
+             */
             if (
                 $normalized['useful'] === null &&
                 $normalized['rating'] === null &&
@@ -401,7 +404,7 @@ class CompatibilityController
 
             $result =
                 CompatibilityService::saveFeedback(
-                    (int)$user['id'],
+                    (int) $user['id'],
                     $compatibilityId,
                     $normalized
                 );
@@ -419,10 +422,13 @@ class CompatibilityController
     ): void {
         try {
             $user = AuthHelper::requireUser();
-
+            NetworkAccessGuard::requireAccess(
+                (int) $user['id'],
+                (int) $user['role']
+            );
             $result =
                 CompatibilityService::markAsSeen(
-                    (int)$user['id'],
+                    (int) $user['id'],
                     $compatibilityId
                 );
 
@@ -437,7 +443,10 @@ class CompatibilityController
         try {
             $user =
                 AuthHelper::requireUser();
-
+            NetworkAccessGuard::requireAccess(
+                (int) $user['id'],
+                (int) $user['role']
+            );
             QueryParamHelper::rejectUnknown([
                 'page',
                 'limit',
@@ -446,32 +455,32 @@ class CompatibilityController
 
             $filters = [
                 'page' =>
-                QueryParamHelper::positiveInt(
-                    'page',
-                    1,
-                    1000000
-                ),
+                    QueryParamHelper::positiveInt(
+                        'page',
+                        1,
+                        1000000
+                    ),
                 'limit' =>
-                QueryParamHelper::positiveInt(
-                    'limit',
-                    12,
-                    50
-                ),
+                    QueryParamHelper::positiveInt(
+                        'limit',
+                        12,
+                        50
+                    ),
                 'view' =>
-                QueryParamHelper::enum(
-                    'view',
-                    [
-                        'active',
-                        'history',
-                        'all',
-                    ],
-                    'active'
-                ),
+                    QueryParamHelper::enum(
+                        'view',
+                        [
+                            'active',
+                            'history',
+                            'all',
+                        ],
+                        'active'
+                    ),
             ];
 
             $result =
                 MultilateralOperationReadService::listForUser(
-                    (int)$user['id'],
+                    (int) $user['id'],
                     $filters
                 );
 
@@ -489,10 +498,13 @@ class CompatibilityController
         try {
             $user =
                 AuthHelper::requireUser();
-
+            NetworkAccessGuard::requireAccess(
+                (int) $user['id'],
+                (int) $user['role']
+            );
             $result =
                 MultilateralOperationReadService::detailForUser(
-                    (int)$user['id'],
+                    (int) $user['id'],
                     $operationId
                 );
 
@@ -517,7 +529,7 @@ class CompatibilityController
                 AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$user['id']
+                (int) $user['id']
             );
 
             $body =
@@ -561,7 +573,7 @@ class CompatibilityController
 
             $result =
                 MultilateralOperationResponseService::respond(
-                    (int)$user['id'],
+                    (int) $user['id'],
                     $operationId,
                     $response
                 );
@@ -577,12 +589,12 @@ class CompatibilityController
     private static function error(
         Throwable $e
     ): void {
-        $status = (int)$e->getCode();
+        $status = (int) $e->getCode();
 
         if ($status < 400 || $status > 499) {
             error_log(
                 '[CompatibilityController] ' .
-                    $e->getMessage()
+                $e->getMessage()
             );
 
             ResponseHelper::fail(
@@ -595,7 +607,7 @@ class CompatibilityController
 
         ResponseHelper::fail(
             $e->getMessage()
-                ?: 'No se pudo procesar la solicitud.',
+            ?: 'No se pudo procesar la solicitud.',
             $status
         );
     }

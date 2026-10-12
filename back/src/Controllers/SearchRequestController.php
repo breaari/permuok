@@ -11,7 +11,7 @@ use App\Services\AI\SearchRequestAIAnalysisService;
 use App\Services\AI\SearchRequestQualityScoreService;
 use App\Services\AI\SearchRequestAICopyService;
 use App\Services\SecurityRateLimitService;
-
+use App\Services\NetworkAccessGuard;
 class SearchRequestController
 {
 
@@ -33,7 +33,7 @@ class SearchRequestController
         }
 
         $exceptionStatus =
-            (int)$e->getCode();
+            (int) $e->getCode();
 
         if (
             $exceptionStatus >= 400 &&
@@ -45,7 +45,7 @@ class SearchRequestController
 
         ResponseHelper::fail(
             $e->getMessage()
-                ?: 'No se pudo completar la operación.',
+            ?: 'No se pudo completar la operación.',
             $status
         );
     }
@@ -53,7 +53,7 @@ class SearchRequestController
     private static function failAI(
         \Throwable $e
     ): void {
-        $status = (int)$e->getCode();
+        $status = (int) $e->getCode();
 
         if (
             $status >= 400 &&
@@ -123,6 +123,11 @@ class SearchRequestController
             $auth =
                 AuthHelper::requireUser();
 
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+
             QueryParamHelper::rejectUnknown([
                 'status',
                 'q',
@@ -132,41 +137,41 @@ class SearchRequestController
 
             $filters = [
                 'status' =>
-                QueryParamHelper::enum(
-                    'status',
-                    [
-                        'draft',
-                        'pending_review',
-                        'published',
-                        'paused',
-                        'rejected',
-                        'archived',
-                        'closed',
-                    ],
-                    ''
-                ),
+                    QueryParamHelper::enum(
+                        'status',
+                        [
+                            'draft',
+                            'pending_review',
+                            'published',
+                            'paused',
+                            'rejected',
+                            'archived',
+                            'closed',
+                        ],
+                        ''
+                    ),
                 'q' =>
-                QueryParamHelper::optionalString(
-                    'q',
-                    150
-                ),
+                    QueryParamHelper::optionalString(
+                        'q',
+                        150
+                    ),
                 'limit' =>
-                QueryParamHelper::positiveInt(
-                    'limit',
-                    20,
-                    100
-                ),
+                    QueryParamHelper::positiveInt(
+                        'limit',
+                        20,
+                        100
+                    ),
                 'page' =>
-                QueryParamHelper::positiveInt(
-                    'page',
-                    1,
-                    1000000
-                ),
+                    QueryParamHelper::positiveInt(
+                        'page',
+                        1,
+                        1000000
+                    ),
             ];
 
             $result =
                 SearchRequestService::listMySearchRequests(
-                    (int)$auth['id'],
+                    (int) $auth['id'],
                     $filters
                 );
 
@@ -182,6 +187,11 @@ class SearchRequestController
             $auth =
                 AuthHelper::requireUser();
 
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+
             QueryParamHelper::rejectUnknown([
                 'q',
                 'property_type',
@@ -191,44 +201,44 @@ class SearchRequestController
 
             $filters = [
                 'q' =>
-                QueryParamHelper::optionalString(
-                    'q',
-                    150
-                ),
+                    QueryParamHelper::optionalString(
+                        'q',
+                        150
+                    ),
                 'property_type' =>
-                QueryParamHelper::enum(
-                    'property_type',
-                    [
-                        'house',
-                        'apartment',
-                        'land',
-                        'commercial',
-                        'office',
-                        'warehouse',
-                        'country_house',
-                        'farm',
-                        'garage',
-                        'other',
-                    ],
-                    ''
-                ),
+                    QueryParamHelper::enum(
+                        'property_type',
+                        [
+                            'house',
+                            'apartment',
+                            'land',
+                            'commercial',
+                            'office',
+                            'warehouse',
+                            'country_house',
+                            'farm',
+                            'garage',
+                            'other',
+                        ],
+                        ''
+                    ),
                 'limit' =>
-                QueryParamHelper::positiveInt(
-                    'limit',
-                    20,
-                    100
-                ),
+                    QueryParamHelper::positiveInt(
+                        'limit',
+                        20,
+                        100
+                    ),
                 'page' =>
-                QueryParamHelper::positiveInt(
-                    'page',
-                    1,
-                    1000000
-                ),
+                    QueryParamHelper::positiveInt(
+                        'page',
+                        1,
+                        1000000
+                    ),
             ];
 
             $result =
                 SearchRequestService::listExploreSearchRequests(
-                    (int)$auth['id'],
+                    (int) $auth['id'],
                     $filters
                 );
 
@@ -237,20 +247,20 @@ class SearchRequestController
             self::fail($e);
         }
     }
-    
+
     public static function create(): void
     {
         try {
             $auth = AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
             $data = self::readJsonBody();
 
             $result = SearchRequestService::createDraft(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $data
             );
 
@@ -264,9 +274,13 @@ class SearchRequestController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+            $id = (int) ($_GET['id'] ?? 0);
 
-            $result = SearchRequestService::getDetail((int)$auth['id'], $id);
+            $result = SearchRequestService::getDetail((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail(
@@ -280,9 +294,13 @@ class SearchRequestController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+            $id = (int) ($_GET['id'] ?? 0);
 
-            $result = SearchRequestService::getExploreDetail((int)$auth['id'], $id);
+            $result = SearchRequestService::getExploreDetail((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail(
@@ -298,14 +316,14 @@ class SearchRequestController
             $auth = AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
-            $id = (int)($_GET['id'] ?? 0);
+            $id = (int) ($_GET['id'] ?? 0);
             $data = self::readJsonBody();
 
             $result = SearchRequestService::updateDraft(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $id,
                 $data
             );
@@ -320,11 +338,11 @@ class SearchRequestController
     {
         try {
             $auth = AuthHelper::requireUser();
-            MembershipGuard::requireActiveMembership((int)$auth['id']);
+            MembershipGuard::requireActiveMembership((int) $auth['id']);
 
-            $id = (int)($_GET['id'] ?? 0);
+            $id = (int) ($_GET['id'] ?? 0);
 
-            $result = SearchRequestService::publish((int)$auth['id'], $id);
+            $result = SearchRequestService::publish((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail($e);
@@ -335,9 +353,13 @@ class SearchRequestController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+            $id = (int) ($_GET['id'] ?? 0);
 
-            $result = SearchRequestService::pause((int)$auth['id'], $id);
+            $result = SearchRequestService::pause((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail($e);
@@ -348,9 +370,13 @@ class SearchRequestController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+            $id = (int) ($_GET['id'] ?? 0);
 
-            $result = SearchRequestService::archive((int)$auth['id'], $id);
+            $result = SearchRequestService::archive((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail($e);
@@ -361,9 +387,13 @@ class SearchRequestController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+            $id = (int) ($_GET['id'] ?? 0);
 
-            $result = SearchRequestService::delete((int)$auth['id'], $id);
+            $result = SearchRequestService::delete((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (\Throwable $e) {
             self::fail($e);
@@ -378,7 +408,7 @@ class SearchRequestController
                 AuthHelper::requireUser();
 
             $id =
-                (int)($_GET['id'] ?? 0);
+                (int) ($_GET['id'] ?? 0);
 
             if ($id <= 0) {
                 throw new \Exception(
@@ -387,23 +417,23 @@ class SearchRequestController
             }
 
             /*
-         * Verifica que la búsqueda pertenezca
-         * a la inmobiliaria del usuario.
-         */
+             * Verifica que la búsqueda pertenezca
+             * a la inmobiliaria del usuario.
+             */
             SearchRequestService::getDetail(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $id
             );
 
             /*
-         * Calcula el estado actual.
-         *
-         * Si no existe IA válida para el hash actual,
-         * devolverá waiting_ai.
-         *
-         * Si existe, devolverá el score oficial
-         * completo /100.
-         */
+             * Calcula el estado actual.
+             *
+             * Si no existe IA válida para el hash actual,
+             * devolverá waiting_ai.
+             *
+             * Si existe, devolverá el score oficial
+             * completo /100.
+             */
             $result =
                 SearchRequestQualityScoreService::getScore(
                     $id
@@ -425,11 +455,11 @@ class SearchRequestController
                 AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
             $id =
-                (int)($_GET['id'] ?? 0);
+                (int) ($_GET['id'] ?? 0);
 
             if ($id <= 0) {
                 throw new \Exception(
@@ -438,17 +468,17 @@ class SearchRequestController
             }
 
             /*
-         * Primero verificamos pertenencia.
-         * Una búsqueda ajena no consume cupo.
-         */
+             * Primero verificamos pertenencia.
+             * Una búsqueda ajena no consume cupo.
+             */
             SearchRequestService::getDetail(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $id
             );
 
             self::consumeAIAnalysisLimits(
-                (int)$auth['id'],
-                (int)$auth['real_estate_id']
+                (int) $auth['id'],
+                (int) $auth['real_estate_id']
             );
 
             $result =
@@ -470,10 +500,10 @@ class SearchRequestController
             $auth = AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
-            $id = (int)($_GET['id'] ?? 0);
+            $id = (int) ($_GET['id'] ?? 0);
 
             if ($id <= 0) {
                 throw new \Exception(
@@ -483,7 +513,7 @@ class SearchRequestController
             }
 
             SearchRequestService::getDetail(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $id
             );
 
@@ -502,14 +532,14 @@ class SearchRequestController
             $draft = $data['draft'] ?? [];
 
             self::consumeAICopyLimits(
-                (int)$auth['id'],
-                (int)$auth['real_estate_id']
+                (int) $auth['id'],
+                (int) $auth['real_estate_id']
             );
 
             $result =
                 SearchRequestAICopyService::generateTitle(
                     $id,
-                    (int)$auth['id'],
+                    (int) $auth['id'],
                     $draft
                 );
 
@@ -524,10 +554,10 @@ class SearchRequestController
             $auth = AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
-            $id = (int)($_GET['id'] ?? 0);
+            $id = (int) ($_GET['id'] ?? 0);
 
             if ($id <= 0) {
                 throw new \Exception(
@@ -537,7 +567,7 @@ class SearchRequestController
             }
 
             SearchRequestService::getDetail(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $id
             );
 
@@ -556,14 +586,14 @@ class SearchRequestController
             $draft = $data['draft'] ?? [];
 
             self::consumeAICopyLimits(
-                (int)$auth['id'],
-                (int)$auth['real_estate_id']
+                (int) $auth['id'],
+                (int) $auth['real_estate_id']
             );
 
             $result =
                 SearchRequestAICopyService::generateDescription(
                     $id,
-                    (int)$auth['id'],
+                    (int) $auth['id'],
                     $draft
                 );
 
@@ -579,14 +609,14 @@ class SearchRequestController
     ): void {
         SecurityRateLimitService::consume(
             'ai_copy_user',
-            (string)$userId,
+            (string) $userId,
             30,
             5 * 60
         );
 
         SecurityRateLimitService::consume(
             'ai_daily_real_estate',
-            (string)$realEstateId,
+            (string) $realEstateId,
             1000,
             24 * 60 * 60
         );
@@ -598,14 +628,14 @@ class SearchRequestController
     ): void {
         SecurityRateLimitService::consume(
             'ai_analysis_user',
-            (string)$userId,
+            (string) $userId,
             20,
             60 * 60
         );
 
         SecurityRateLimitService::consume(
             'ai_daily_real_estate',
-            (string)$realEstateId,
+            (string) $realEstateId,
             1000,
             24 * 60 * 60
         );
