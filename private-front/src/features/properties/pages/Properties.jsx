@@ -7,6 +7,8 @@ import PropertyDeleteModal from "../components/PropertyDeleteModal";
 import Pagination from "../../admin/components/Pagination.jsx";
 import { Icon } from "../../../ui/icons/Index";
 import { deleteProperty } from "../api/properties.api.js";
+import RestrictedAccessState from "../../auth/components/RestrictedAccessState";
+import { canUseNetwork } from "../../auth/utils/access";
 
 const STATUS_OPTIONS = [
   { key: "", label: "Todas" },
@@ -20,11 +22,12 @@ const STATUS_OPTIONS = [
 const PAGE_SIZE = 5;
 
 export default function Properties() {
-  const { user } = useAuth();
+  const { user, access } = useAuth();
   const navigate = useNavigate();
 
   const role = Number(user?.role || 0);
   const canAccess = role === 2 || role === 3;
+  const hasNetworkAccess = canUseNetwork(access);
 
   const [items, setItems] = useState([]);
   const [meta, setMeta] = useState(null);
@@ -43,11 +46,15 @@ export default function Properties() {
   const requestIdRef = useRef(0);
 
   const load = useCallback(
-    async ({
-      nextStatus = status,
-      nextQuery = q,
-      nextPage = page,
-    } = {}) => {
+    async ({ nextStatus = status, nextQuery = q, nextPage = page } = {}) => {
+      if (!hasNetworkAccess) {
+        setItems([]);
+        setMeta(null);
+        setErr("");
+        setLoading(false);
+
+        return;
+      }
       const currentRequestId = ++requestIdRef.current;
 
       setErr("");
@@ -80,7 +87,7 @@ export default function Properties() {
         }
       }
     },
-    [status, q, page]
+    [status, q, page, hasNetworkAccess],
   );
 
   useEffect(() => {
@@ -152,6 +159,10 @@ export default function Properties() {
   }, [role]);
 
   if (!canAccess) return <Navigate to="/" replace />;
+
+  if (!hasNetworkAccess) {
+    return <RestrictedAccessState access={access} section="properties" />;
+  }
 
   return (
     <>

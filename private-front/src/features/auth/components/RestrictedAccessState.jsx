@@ -9,28 +9,28 @@ const CONTENT = {
     pageTitle: "Matches IA",
 
     profile: {
-      badge: "Matches inteligentes Permuok IA",
+      badge: "Matches inteligentes",
       title: "Tus matches están a un paso",
       description:
         "Para que Permuok pueda empezar a detectar oportunidades para tu inmobiliaria, primero necesitamos verificar tu perfil.",
     },
 
     review: {
-      badge: "Matches inteligentes Permuok IA",
+      badge: "Matches inteligentes",
       title: "Tu perfil está en revisión",
       description:
         "Estamos verificando los datos de tu inmobiliaria. Cuando sea aprobado vas a poder acceder a tus matches.",
     },
 
     rejected: {
-      badge: "Matches inteligentes Permuok IA",
+      badge: "Matches inteligentes",
       title: "Necesitamos que revises tu perfil",
       description:
         "Hay algunos datos que necesitan corrección antes de habilitar tus matches.",
     },
 
     membership: {
-      badge: "Matches inteligentes Permuok IA",
+      badge: "Matches inteligentes",
       title: "Tus matches están listos para activarse",
       description:
         "Tu inmobiliaria ya fue verificada. Activá tu membresía para acceder a las oportunidades detectadas por Permuok.",
