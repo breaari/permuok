@@ -79,7 +79,7 @@ class EmailVerificationService
                 );
             }
 
-            if ((int)$user['is_active'] !== 1) {
+            if ((int) $user['is_active'] !== 1) {
                 throw new Exception(
                     'La cuenta no se encuentra habilitada.',
                     403
@@ -103,7 +103,7 @@ class EmailVerificationService
             $email =
                 strtolower(
                     trim(
-                        (string)$user['email']
+                        (string) $user['email']
                     )
                 );
 
@@ -170,11 +170,11 @@ class EmailVerificationService
             ]);
 
             $verificationTokenId =
-                (int)$pdo->lastInsertId();
+                (int) $pdo->lastInsertId();
 
             $frontendUrl =
                 rtrim(
-                    (string)(
+                    (string) (
                         $_ENV['FRONTEND_URL']
                         ?? 'https://permuok.com'
                     ),
@@ -188,7 +188,7 @@ class EmailVerificationService
 
             $recipientName =
                 trim(
-                    (string)(
+                    (string) (
                         $user['first_name']
                         ?? ''
                     )
@@ -197,8 +197,8 @@ class EmailVerificationService
             $safeName =
                 htmlspecialchars(
                     $recipientName !== ''
-                        ? $recipientName
-                        : 'Hola',
+                    ? $recipientName
+                    : 'Hola',
                     ENT_QUOTES,
                     'UTF-8'
                 );
@@ -676,8 +676,8 @@ HTML;
                 $textBody,
                 $userId,
                 $recipientName !== ''
-                    ? $recipientName
-                    : null,
+                ? $recipientName
+                : null,
                 'email_verification',
                 $verificationTokenId,
                 10,
@@ -776,7 +776,7 @@ HTML;
             if (
                 $verificationToken['used_at'] !== null ||
                 strtotime(
-                    (string)$verificationToken['expires_at']
+                    (string) $verificationToken['expires_at']
                 ) < time()
             ) {
                 $pdo->rollBack();
@@ -788,7 +788,7 @@ HTML;
             }
 
             if (
-                (int)$verificationToken['is_active']
+                (int) $verificationToken['is_active']
                 !== 1
             ) {
                 $pdo->rollBack();
@@ -800,7 +800,7 @@ HTML;
             }
 
             $userId =
-                (int)$verificationToken['user_id'];
+                (int) $verificationToken['user_id'];
 
             /*
              * Si todavía no estaba verificado,
@@ -852,12 +852,35 @@ HTML;
 
             $pdo->commit();
 
+            /*
+            |--------------------------------------------------------------------------
+            | Email de bienvenida
+            |--------------------------------------------------------------------------
+            |
+            | La verificación ya quedó confirmada en base de datos.
+            |
+            | Si por algún motivo el email de bienvenida no pudiera
+            | encolarse, no debemos revertir ni impedir la validación
+            | de la cuenta.
+            |
+            */
+            try {
+                WelcomeEmailService::enqueueForUser(
+                    $userId
+                );
+            } catch (Throwable $welcomeError) {
+                error_log(
+                    '[WELCOME EMAIL] ' .
+                    $welcomeError->getMessage()
+                );
+            }
+
             return [
                 'user_id' =>
                     $userId,
 
                 'email' =>
-                    (string)$verificationToken['email'],
+                    (string) $verificationToken['email'],
 
                 'verified' =>
                     true,
@@ -928,14 +951,14 @@ HTML;
          */
         if (
             !$user ||
-            (int)$user['is_active'] !== 1 ||
+            (int) $user['is_active'] !== 1 ||
             $user['email_verified_at'] !== null
         ) {
             return;
         }
 
         self::issueForUser(
-            (int)$user['id']
+            (int) $user['id']
         );
     }
 }
