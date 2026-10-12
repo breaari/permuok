@@ -6,6 +6,9 @@ import { CreateUserModal } from "../components/CreateUserModal.jsx";
 import { useAuth } from "../../auth/components/AuthContext.jsx";
 import { useToast } from "../../../ui/toast/ToastProvider";
 import { Navigate } from "react-router-dom";
+import RestrictedAccessState from "../../auth/components/RestrictedAccessState";
+import { canUseNetwork } from "../../auth/utils/access";
+
 function getRoleLabel(role) {
   if (Number(role) === 3) return "Agente";
   if (Number(role) === 4) return "Inversor";
@@ -13,10 +16,14 @@ function getRoleLabel(role) {
 }
 
 export default function Users() {
-  const { user } = useAuth();
+  const { user, access } = useAuth();
 
   if (Number(user?.role) !== 2) {
     return <Navigate to="/app" replace />;
+  }
+
+  if (!canUseNetwork(access)) {
+    return <RestrictedAccessState access={access} section="users" />;
   }
 
   return <UsersContent />;

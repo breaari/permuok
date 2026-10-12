@@ -106,9 +106,9 @@ const CONTENT = {
 
     profile: {
       badge: "Equipo",
-      title: "Tu equipo está a un paso",
+      title: "Sumá tu equipo a Permuok",
       description:
-        "Primero necesitamos completar y verificar los datos de tu inmobiliaria.",
+        "Completá y verificá el perfil de tu inmobiliaria para poder administrar agentes e inversores.",
     },
 
     review: {
