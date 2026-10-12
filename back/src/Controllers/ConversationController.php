@@ -843,7 +843,10 @@ class ConversationController
         try {
             $user =
                 AuthHelper::requireUser();
-
+            NetworkAccessGuard::requireAccess(
+                (int) $user['id'],
+                (int) $user['role']
+            );
             QueryParamHelper::rejectUnknown([
                 'opportunity_type',
                 'opportunity_id',

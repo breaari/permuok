@@ -90,7 +90,13 @@ class CompatibilityController
         try {
             $user =
                 AuthHelper::requireUser();
+            $user =
+                AuthHelper::requireUser();
 
+            NetworkAccessGuard::requireAccess(
+                (int) $user['id'],
+                (int) $user['role']
+            );
             QueryParamHelper::rejectUnknown([
                 'page',
                 'limit',

@@ -506,7 +506,10 @@ class PropertyController
         try {
             $auth =
                 AuthHelper::requireUser();
-
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
             $id =
                 (int) ($_GET['id'] ?? 0);
 
