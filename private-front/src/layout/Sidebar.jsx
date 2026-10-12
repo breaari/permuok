@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../features/auth/components/AuthContext";
 import LogoParaFondoAzul from "../assets/logoparafondoazul.png";
 import { Icon } from "../ui/icons/Index";
+import { getOnboardingStage } from "../features/auth/utils/access";
 
 function itemClass(isActive, highlight = false) {
   if (highlight) {
@@ -71,6 +72,11 @@ export default function Sidebar({ mobile = false, onNavigate }) {
   const isInvestor = permissions?.isInvestor ?? Number(user?.role || 0) === 4;
 
   const canPublishDevelopments = resolveDevelopmentPublishAccess(user, access);
+
+  const onboardingStage = getOnboardingStage(access);
+
+  const canSeeBilling =
+    onboardingStage === "membership_required" || onboardingStage === "active";
 
   return (
     <aside
@@ -195,13 +201,15 @@ export default function Sidebar({ mobile = false, onNavigate }) {
               Mi perfil
             </Item>
 
-            <Item
-              to="/billing"
-              icon={<Icon name="creditCard" />}
-              onClick={onNavigate}
-            >
-              Membresía
-            </Item>
+            {canSeeBilling && (
+              <Item
+                to="/billing"
+                icon={<Icon name="creditCard" />}
+                onClick={onNavigate}
+              >
+                Membresía
+              </Item>
+            )}
 
             <Item to="/users" icon={<Icon name="users" />} onClick={onNavigate}>
               Mis usuarios
