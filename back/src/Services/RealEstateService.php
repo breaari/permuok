@@ -29,7 +29,7 @@ class RealEstateService
         if (!$u) {
             throw new Exception("Usuario no encontrado");
         }
-        if ((int)$u['role'] !== 2) {
+        if ((int) $u['role'] !== 2) {
             throw new Exception("No autorizado");
         }
 
@@ -84,7 +84,7 @@ class RealEstateService
               AND r.deleted_at IS NULL
             LIMIT 1
         ");
-        $st->execute(['id' => (int)$u['real_estate_id']]);
+        $st->execute(['id' => (int) $u['real_estate_id']]);
         $re = $st->fetch();
 
         $st = $pdo->prepare("
@@ -102,7 +102,7 @@ class RealEstateService
               AND l.real_estate_id = :id
             ORDER BY (l.is_primary = 1) DESC, l.id DESC
         ");
-        $st->execute(['id' => (int)$u['real_estate_id']]);
+        $st->execute(['id' => (int) $u['real_estate_id']]);
         $licenses = $st->fetchAll();
 
         return [
@@ -136,45 +136,44 @@ class RealEstateService
             'facebook',
         ];
 
-  if (!self::hasAnyProfileData($data)) {
-    throw new Exception(
-        'Completá al menos un dato antes de guardar el borrador',
-        422
-    );
-}
+        if (!$u['real_estate_id']) {
+            if (!self::hasAnyProfileData($data)) {
+                throw new Exception(
+                    'Completá al menos un dato antes de guardar el borrador',
+                    422
+                );
+            }
 
-self::validateDraftPayload($data);
+            self::validateDraftPayload($data);
 
             $pdo->beginTransaction();
 
             try {
-
                 /*
- * Bloqueamos el usuario antes de crear
- * su primera inmobiliaria.
- */
+                 * Bloqueamos el usuario antes de crear
+                 * su primera inmobiliaria.
+                 */
                 $lockUser = $pdo->prepare("
-    SELECT
-        id,
-        role,
-        real_estate_id
-    FROM users
-    WHERE id = :id
-      AND deleted_at IS NULL
-    LIMIT 1
-    FOR UPDATE
-");
+            SELECT
+                id,
+                role,
+                real_estate_id
+            FROM users
+            WHERE id = :id
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+        ");
 
                 $lockUser->execute([
                     'id' => $userId,
                 ]);
 
-                $lockedUser =
-                    $lockUser->fetch();
+                $lockedUser = $lockUser->fetch();
 
                 if (
                     !$lockedUser ||
-                    (int)$lockedUser['role'] !== 2
+                    (int) $lockedUser['role'] !== 2
                 ) {
                     throw new Exception(
                         'No autorizado'
@@ -182,129 +181,177 @@ self::validateDraftPayload($data);
                 }
 
                 /*
- * Otra solicitud pudo haber creado
- * el perfil mientras esta esperaba.
- */
+                 * Otra solicitud pudo haber creado
+                 * el perfil mientras esta esperaba.
+                 */
                 if (
                     $lockedUser['real_estate_id']
                     !== null
                 ) {
                     $existingRealEstateId =
-                        (int)$lockedUser['real_estate_id'];
+                        (int) $lockedUser['real_estate_id'];
 
                     $pdo->commit();
 
                     return [
                         'real_estate_id' =>
-                        $existingRealEstateId,
+                            $existingRealEstateId,
 
                         'created' =>
-                        false,
+                            false,
 
                         'message' =>
-                        'El perfil ya fue creado.',
+                            'El perfil ya fue creado.',
                     ];
                 }
+
                 $st = $pdo->prepare("
-                    INSERT INTO real_estates
-                    (
-                        name,
-                        legal_name,
-                        cuit,
-                        address,
-                        address_place_id,
-                        address_lat,
-                        address_lng,
-                        address_locality,
-                        address_province,
-                        address_postal_code,
-                        phone,
-                        email,
-                        website,
-                        instagram,
-                        facebook,
-                        status,
-                        profile_status,
-                        validation_status,
-                        created_at
-                    )
-                    VALUES
-                    (
-                        :name,
-                        :legal_name,
-                        :cuit,
-                        :address,
-                        :address_place_id,
-                        :address_lat,
-                        :address_lng,
-                        :address_locality,
-                        :address_province,
-                        :address_postal_code,
-                        :phone,
-                        :email,
-                        :website,
-                        :instagram,
-                        :facebook,
-                        0,
-                        :profile_status,
-                        0,
-                        NOW()
-                    )
-                ");
+            INSERT INTO real_estates
+            (
+                name,
+                legal_name,
+                cuit,
+                address,
+                address_place_id,
+                address_lat,
+                address_lng,
+                address_locality,
+                address_province,
+                address_postal_code,
+                phone,
+                email,
+                website,
+                instagram,
+                facebook,
+                status,
+                profile_status,
+                validation_status,
+                created_at
+            )
+            VALUES
+            (
+                :name,
+                :legal_name,
+                :cuit,
+                :address,
+                :address_place_id,
+                :address_lat,
+                :address_lng,
+                :address_locality,
+                :address_province,
+                :address_postal_code,
+                :phone,
+                :email,
+                :website,
+                :instagram,
+                :facebook,
+                0,
+                :profile_status,
+                0,
+                NOW()
+            )
+        ");
 
                 $st->execute([
-                    'name' => $data['name'] ?? null,
-'legal_name' => $data['legal_name'] ?? null,
-'cuit' => $data['cuit'] ?? null,
-'address' => $data['address'] ?? null,
-                    'address_place_id' => $data['address_place_id'] ?? null,
-                    'address_lat' => $data['address_lat'] ?? null,
-                    'address_lng' => $data['address_lng'] ?? null,
-                    'address_locality' => $data['address_locality'] ?? null,
-                    'address_province' => $data['address_province'] ?? null,
-                    'address_postal_code' => $data['address_postal_code'] ?? null,
-           'phone' => $data['phone'] ?? null,
-'email' => $data['email'] ?? null,
-'website' => $data['website'] ?? null,
-                    'instagram' => $data['instagram'] ?? null,
-                    'facebook' => $data['facebook'] ?? null,
-                    'profile_status' => RealEstateProfileStatus::DRAFT,
+                    'name' =>
+                        $data['name'] ?? null,
+
+                    'legal_name' =>
+                        $data['legal_name'] ?? null,
+
+                    'cuit' =>
+                        $data['cuit'] ?? null,
+
+                    'address' =>
+                        $data['address'] ?? null,
+
+                    'address_place_id' =>
+                        $data['address_place_id'] ?? null,
+
+                    'address_lat' =>
+                        $data['address_lat'] ?? null,
+
+                    'address_lng' =>
+                        $data['address_lng'] ?? null,
+
+                    'address_locality' =>
+                        $data['address_locality'] ?? null,
+
+                    'address_province' =>
+                        $data['address_province'] ?? null,
+
+                    'address_postal_code' =>
+                        $data['address_postal_code'] ?? null,
+
+                    'phone' =>
+                        $data['phone'] ?? null,
+
+                    'email' =>
+                        $data['email'] ?? null,
+
+                    'website' =>
+                        $data['website'] ?? null,
+
+                    'instagram' =>
+                        $data['instagram'] ?? null,
+
+                    'facebook' =>
+                        $data['facebook'] ?? null,
+
+                    'profile_status' =>
+                        RealEstateProfileStatus::DRAFT,
                 ]);
 
-                $realEstateId = (int)$pdo->lastInsertId();
+                $realEstateId =
+                    (int) $pdo->lastInsertId();
 
                 $st = $pdo->prepare("
-                    UPDATE users
-                    SET real_estate_id = :re
-                    WHERE id = :uid
-                    LIMIT 1
-                ");
+            UPDATE users
+            SET real_estate_id = :re
+            WHERE id = :uid
+            LIMIT 1
+        ");
+
                 $st->execute([
-                    're' => $realEstateId,
-                    'uid' => $userId,
+                    're' =>
+                        $realEstateId,
+
+                    'uid' =>
+                        $userId,
                 ]);
 
                 $pdo->commit();
 
                 return [
-                    'real_estate_id' => $realEstateId,
-                    'created' => true,
+                    'real_estate_id' =>
+                        $realEstateId,
+
+                    'created' =>
+                        true,
                 ];
             } catch (\Throwable $e) {
                 $pdo->rollBack();
 
                 if (
-                    str_contains($e->getMessage(), 'Duplicate entry') &&
-                    str_contains($e->getMessage(), 'cuit')
+                    str_contains(
+                        $e->getMessage(),
+                        'Duplicate entry'
+                    ) &&
+                    str_contains(
+                        $e->getMessage(),
+                        'cuit'
+                    )
                 ) {
-                    throw new Exception("Ya existe una inmobiliaria registrada con ese CUIT");
+                    throw new Exception(
+                        "Ya existe una inmobiliaria registrada con ese CUIT"
+                    );
                 }
 
                 throw $e;
             }
         }
 
-        $realEstateId = (int)$u['real_estate_id'];
+        $realEstateId = (int) $u['real_estate_id'];
 
         $updates = self::pickUpdates($data, $allowed);
 
@@ -352,7 +399,7 @@ self::validateDraftPayload($data);
         }
 
         $currentProfileStatus =
-            (int)(
+            (int) (
                 $current['profile_status']
                 ?? RealEstateProfileStatus::DRAFT
             );
@@ -366,19 +413,19 @@ self::validateDraftPayload($data);
                 409
             );
         }
-$merged = array_merge($current ?: [], $updates);
+        $merged = array_merge($current ?: [], $updates);
 
-if (
-    $currentProfileStatus ===
-    RealEstateProfileStatus::DRAFT
-) {
-    self::validateDraftPayload($merged);
-} else {
-    self::validateProfilePayload(
-        $merged,
-        true
-    );
-}
+        if (
+            $currentProfileStatus ===
+            RealEstateProfileStatus::DRAFT
+        ) {
+            self::validateDraftPayload($merged);
+        } else {
+            self::validateProfilePayload(
+                $merged,
+                true
+            );
+        }
 
         $sensitiveFields = [
             'name',
@@ -463,8 +510,8 @@ if (
             throw new Exception("Primero completá el perfil de la inmobiliaria");
         }
 
-        $licenseNumber = trim((string)($data['license_number'] ?? ''));
-        $provinceId = (int)($data['province_id'] ?? 0);
+        $licenseNumber = trim((string) ($data['license_number'] ?? ''));
+        $provinceId = (int) ($data['province_id'] ?? 0);
         $rawIsPrimary =
             $data['is_primary']
             ?? false;
@@ -524,9 +571,9 @@ if (
 
         try {
             /*
-     * Serializa todas las modificaciones
-     * de matrículas de esta inmobiliaria.
-     */
+             * Serializa todas las modificaciones
+             * de matrículas de esta inmobiliaria.
+             */
             $lockRealEstate =
                 $pdo->prepare("
             SELECT
@@ -541,7 +588,7 @@ if (
 
             $lockRealEstate->execute([
                 'id' =>
-                (int)$u['real_estate_id'],
+                    (int) $u['real_estate_id'],
             ]);
 
             $current =
@@ -554,7 +601,7 @@ if (
             }
 
             $currentProfileStatus =
-                (int)(
+                (int) (
                     $current['profile_status']
                     ?? RealEstateProfileStatus::DRAFT
                 );
@@ -579,16 +626,16 @@ if (
 
             $licenseCountStmt->execute([
                 'real_estate_id' =>
-                (int)$u['real_estate_id'],
+                    (int) $u['real_estate_id'],
             ]);
 
             $licenseCount =
-                (int)$licenseCountStmt->fetchColumn();
+                (int) $licenseCountStmt->fetchColumn();
 
             /*
- * La primera matrícula siempre debe
- * convertirse en principal.
- */
+             * La primera matrícula siempre debe
+             * convertirse en principal.
+             */
             if ($licenseCount === 0) {
                 $isPrimary = 1;
             }
@@ -599,7 +646,7 @@ if (
                     SET is_primary = 0
                     WHERE real_estate_id = :re
                       AND deleted_at IS NULL
-                ")->execute(['re' => (int)$u['real_estate_id']]);
+                ")->execute(['re' => (int) $u['real_estate_id']]);
             }
 
             $st = $pdo->prepare("
@@ -621,7 +668,7 @@ if (
                 )
             ");
             $st->execute([
-                're' => (int)$u['real_estate_id'],
+                're' => (int) $u['real_estate_id'],
                 'ln' => $licenseNumber,
                 'pid' => $provinceId,
                 'prim' => $isPrimary,
@@ -641,14 +688,14 @@ if (
     ");
                 $st->execute([
                     'profile_status' => RealEstateProfileStatus::CHANGES_PENDING,
-                    'id' => (int)$u['real_estate_id'],
+                    'id' => (int) $u['real_estate_id'],
                 ]);
             }
 
             $pdo->commit();
 
             return [
-                'license_id' => (int)$pdo->lastInsertId(),
+                'license_id' => (int) $pdo->lastInsertId(),
             ];
         } catch (\Throwable $e) {
             $pdo->rollBack();
@@ -694,7 +741,7 @@ if (
           AND deleted_at IS NULL
         LIMIT 1
     ");
-        $stRe->execute(['id' => (int)$u['real_estate_id']]);
+        $stRe->execute(['id' => (int) $u['real_estate_id']]);
         $re = $stRe->fetch();
 
         if (!$re) {
@@ -712,7 +759,7 @@ if (
         ];
 
         foreach ($requiredFields as $key => $label) {
-            if (!isset($re[$key]) || trim((string)$re[$key]) === '') {
+            if (!isset($re[$key]) || trim((string) $re[$key]) === '') {
                 throw new Exception("Falta completar {$label}");
             }
         }
@@ -734,12 +781,12 @@ if (
             empty($re['address_place_id']) ||
             !is_numeric($latitude) ||
             !is_numeric($longitude) ||
-            !is_finite((float)$latitude) ||
-            !is_finite((float)$longitude) ||
-            (float)$latitude < -90 ||
-            (float)$latitude > 90 ||
-            (float)$longitude < -180 ||
-            (float)$longitude > 180
+            !is_finite((float) $latitude) ||
+            !is_finite((float) $longitude) ||
+            (float) $latitude < -90 ||
+            (float) $latitude > 90 ||
+            (float) $longitude < -180 ||
+            (float) $longitude > 180
         ) {
             throw new Exception(
                 'Seleccioná una dirección válida desde Google Maps'
@@ -753,14 +800,14 @@ if (
         WHERE real_estate_id = :id
           AND deleted_at IS NULL
     ");
-        $stLic->execute(['id' => (int)$u['real_estate_id']]);
-        $count = (int)($stLic->fetch()['c'] ?? 0);
+        $stLic->execute(['id' => (int) $u['real_estate_id']]);
+        $count = (int) ($stLic->fetch()['c'] ?? 0);
 
         if ($count <= 0) {
             throw new Exception("Tenés que cargar al menos una matrícula/licencia");
         }
 
-        $currentProfileStatus = (int)($re['profile_status'] ?? RealEstateProfileStatus::DRAFT);
+        $currentProfileStatus = (int) ($re['profile_status'] ?? RealEstateProfileStatus::DRAFT);
 
         if ($currentProfileStatus === RealEstateProfileStatus::APPROVED) {
             $st = $pdo->prepare("
@@ -777,7 +824,7 @@ if (
         ");
             $st->execute([
                 'profile_status' => RealEstateProfileStatus::CHANGES_PENDING,
-                'id' => (int)$u['real_estate_id'],
+                'id' => (int) $u['real_estate_id'],
             ]);
         } else {
             $st = $pdo->prepare("
@@ -796,7 +843,7 @@ if (
         ");
             $st->execute([
                 'profile_status' => RealEstateProfileStatus::INITIAL_REVIEW,
-                'id' => (int)$u['real_estate_id'],
+                'id' => (int) $u['real_estate_id'],
             ]);
         }
 
@@ -806,7 +853,7 @@ if (
     private static function requireKeys(array $data, array $required): void
     {
         foreach ($required as $k) {
-            if (!isset($data[$k]) || trim((string)$data[$k]) === '') {
+            if (!isset($data[$k]) || trim((string) $data[$k]) === '') {
                 throw new Exception("Falta campo requerido: {$k}");
             }
         }
@@ -837,7 +884,7 @@ if (
             $currentValue = $current[$field] ?? null;
             $newValue = $updates[$field];
 
-            if ((string)$currentValue !== (string)$newValue) {
+            if ((string) $currentValue !== (string) $newValue) {
                 return true;
             }
         }
@@ -856,7 +903,7 @@ if (
         ) {
             $data['address_place_id'] =
                 trim(
-                    (string)$data['address_place_id']
+                    (string) $data['address_place_id']
                 );
 
             if (
@@ -909,7 +956,7 @@ if (
             }
 
             $coordinate =
-                (float)$value;
+                (float) $value;
 
             if (
                 !is_finite($coordinate) ||
@@ -943,7 +990,7 @@ if (
 
             $data[$field] =
                 trim(
-                    (string)$data[$field]
+                    (string) $data[$field]
                 );
 
             if ($data[$field] === '') {
@@ -954,7 +1001,7 @@ if (
 
     private static function digitsOnly(?string $value): string
     {
-        return preg_replace('/\D+/', '', (string)$value);
+        return preg_replace('/\D+/', '', (string) $value);
     }
 
     private static function validateCuit(string $value): bool
@@ -995,26 +1042,26 @@ if (
 
     private static function validateProfilePayload(array $data, bool $requireWebsite = true): void
     {
-        if (!self::validateNameText((string)($data['name'] ?? ''))) {
+        if (!self::validateNameText((string) ($data['name'] ?? ''))) {
             throw new Exception("Ingresá un nombre comercial válido");
         }
 
-        if (!self::validateNameText((string)($data['legal_name'] ?? ''))) {
+        if (!self::validateNameText((string) ($data['legal_name'] ?? ''))) {
             throw new Exception("Ingresá una razón social válida");
         }
 
-        if (!self::validateCuit((string)($data['cuit'] ?? ''))) {
+        if (!self::validateCuit((string) ($data['cuit'] ?? ''))) {
             throw new Exception("Ingresá un CUIT válido de 11 dígitos");
         }
 
-        if (!self::validatePhone((string)($data['phone'] ?? ''))) {
+        if (!self::validatePhone((string) ($data['phone'] ?? ''))) {
             throw new Exception("Ingresá un teléfono válido");
         }
 
         $email =
             strtolower(
                 trim(
-                    (string)(
+                    (string) (
                         $data['email']
                         ?? ''
                     )
@@ -1034,7 +1081,7 @@ if (
             );
         }
 
-        if ($requireWebsite && !self::validateWebsite((string)($data['website'] ?? ''))) {
+        if ($requireWebsite && !self::validateWebsite((string) ($data['website'] ?? ''))) {
             throw new Exception("Ingresá un sitio web válido");
         }
     }
@@ -1056,20 +1103,20 @@ if (
         ];
 
         foreach ($requiredFields as $field) {
-            if (!isset($realEstate[$field]) || trim((string)$realEstate[$field]) === '') {
+            if (!isset($realEstate[$field]) || trim((string) $realEstate[$field]) === '') {
                 return false;
             }
         }
 
-        if (!self::validateCuit((string)$realEstate['cuit'])) {
+        if (!self::validateCuit((string) $realEstate['cuit'])) {
             return false;
         }
 
-        if (!self::validatePhone((string)$realEstate['phone'])) {
+        if (!self::validatePhone((string) $realEstate['phone'])) {
             return false;
         }
 
-        if (!self::validateWebsite((string)$realEstate['website'])) {
+        if (!self::validateWebsite((string) $realEstate['website'])) {
             return false;
         }
 
@@ -1096,7 +1143,7 @@ if (
     ");
         $st->execute(['id' => $realEstateId]);
 
-        return (int)($st->fetch()['c'] ?? 0) > 0;
+        return (int) ($st->fetch()['c'] ?? 0) > 0;
     }
 
     public static function resolveDraftStage(?array $realEstate): string
@@ -1106,7 +1153,7 @@ if (
         }
 
         $isComplete = self::isProfileComplete($realEstate);
-        $hasLicenses = self::hasAtLeastOneLicense((int)$realEstate['id']);
+        $hasLicenses = self::hasAtLeastOneLicense((int) $realEstate['id']);
 
         if ($isComplete && $hasLicenses) {
             return 'ready_for_review';
@@ -1121,7 +1168,7 @@ if (
             return 'not_started';
         }
 
-        $profileStatus = (int)($realEstate['profile_status'] ?? RealEstateProfileStatus::DRAFT);
+        $profileStatus = (int) ($realEstate['profile_status'] ?? RealEstateProfileStatus::DRAFT);
 
         return match ($profileStatus) {
             RealEstateProfileStatus::INITIAL_REVIEW => 'initial_review',
@@ -1134,142 +1181,142 @@ if (
     }
 
     private static function normalizeDraftFields(
-    array &$data
-): void {
-    $nullableFields = [
-        'name',
-        'legal_name',
-        'cuit',
-        'address',
-        'phone',
-        'email',
-        'website',
-        'instagram',
-        'facebook',
-    ];
+        array &$data
+    ): void {
+        $nullableFields = [
+            'name',
+            'legal_name',
+            'cuit',
+            'address',
+            'phone',
+            'email',
+            'website',
+            'instagram',
+            'facebook',
+        ];
 
-    foreach ($nullableFields as $field) {
-        if (!array_key_exists($field, $data)) {
-            continue;
+        foreach ($nullableFields as $field) {
+            if (!array_key_exists($field, $data)) {
+                continue;
+            }
+
+            if ($data[$field] === null) {
+                continue;
+            }
+
+            $value = trim((string) $data[$field]);
+
+            $data[$field] =
+                $value === ''
+                ? null
+                : $value;
         }
-
-        if ($data[$field] === null) {
-            continue;
-        }
-
-        $value = trim((string)$data[$field]);
-
-        $data[$field] =
-            $value === ''
-            ? null
-            : $value;
     }
-}
 
-private static function hasAnyProfileData(
-    array $data
-): bool {
-    $fields = [
-        'name',
-        'legal_name',
-        'cuit',
-        'address',
-        'phone',
-        'email',
-        'website',
-        'instagram',
-        'facebook',
-    ];
+    private static function hasAnyProfileData(
+        array $data
+    ): bool {
+        $fields = [
+            'name',
+            'legal_name',
+            'cuit',
+            'address',
+            'phone',
+            'email',
+            'website',
+            'instagram',
+            'facebook',
+        ];
 
-    foreach ($fields as $field) {
+        foreach ($fields as $field) {
+            if (
+                isset($data[$field]) &&
+                trim((string) $data[$field]) !== ''
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function validateDraftPayload(
+        array $data
+    ): void {
         if (
-            isset($data[$field]) &&
-            trim((string)$data[$field]) !== ''
-        ) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-private static function validateDraftPayload(
-    array $data
-): void {
-    if (
-        !empty($data['name']) &&
-        !self::validateNameText(
-            (string)$data['name']
-        )
-    ) {
-        throw new Exception(
-            'Ingresá un nombre comercial válido'
-        );
-    }
-
-    if (
-        !empty($data['legal_name']) &&
-        !self::validateNameText(
-            (string)$data['legal_name']
-        )
-    ) {
-        throw new Exception(
-            'Ingresá una razón social válida'
-        );
-    }
-
-    if (
-        !empty($data['cuit']) &&
-        !self::validateCuit(
-            (string)$data['cuit']
-        )
-    ) {
-        throw new Exception(
-            'Ingresá un CUIT válido de 11 dígitos'
-        );
-    }
-
-    if (
-        !empty($data['phone']) &&
-        !self::validatePhone(
-            (string)$data['phone']
-        )
-    ) {
-        throw new Exception(
-            'Ingresá un teléfono válido'
-        );
-    }
-
-    if (!empty($data['email'])) {
-        $email =
-            strtolower(
-                trim(
-                    (string)$data['email']
-                )
-            );
-
-        if (
-            strlen($email) > 254 ||
-            !filter_var(
-                $email,
-                FILTER_VALIDATE_EMAIL
+            !empty($data['name']) &&
+            !self::validateNameText(
+                (string) $data['name']
             )
         ) {
             throw new Exception(
-                'Ingresá un email válido'
+                'Ingresá un nombre comercial válido'
+            );
+        }
+
+        if (
+            !empty($data['legal_name']) &&
+            !self::validateNameText(
+                (string) $data['legal_name']
+            )
+        ) {
+            throw new Exception(
+                'Ingresá una razón social válida'
+            );
+        }
+
+        if (
+            !empty($data['cuit']) &&
+            !self::validateCuit(
+                (string) $data['cuit']
+            )
+        ) {
+            throw new Exception(
+                'Ingresá un CUIT válido de 11 dígitos'
+            );
+        }
+
+        if (
+            !empty($data['phone']) &&
+            !self::validatePhone(
+                (string) $data['phone']
+            )
+        ) {
+            throw new Exception(
+                'Ingresá un teléfono válido'
+            );
+        }
+
+        if (!empty($data['email'])) {
+            $email =
+                strtolower(
+                    trim(
+                        (string) $data['email']
+                    )
+                );
+
+            if (
+                strlen($email) > 254 ||
+                !filter_var(
+                    $email,
+                    FILTER_VALIDATE_EMAIL
+                )
+            ) {
+                throw new Exception(
+                    'Ingresá un email válido'
+                );
+            }
+        }
+
+        if (
+            !empty($data['website']) &&
+            !self::validateWebsite(
+                (string) $data['website']
+            )
+        ) {
+            throw new Exception(
+                'Ingresá un sitio web válido'
             );
         }
     }
-
-    if (
-        !empty($data['website']) &&
-        !self::validateWebsite(
-            (string)$data['website']
-        )
-    ) {
-        throw new Exception(
-            'Ingresá un sitio web válido'
-        );
-    }
-}
 }
