@@ -193,7 +193,7 @@ export default function RestrictedAccessState({
     rounded-[26px]
     border
     border-slate-200
-    bg-slate-50
+    bg-white
     px-6
     py-8
     sm:px-8
@@ -202,20 +202,7 @@ export default function RestrictedAccessState({
     md:py-12
   "
       >
-        {/* DETALLE VISUAL */}
-        <div
-          className="
-            pointer-events-none
-            absolute
-            -right-24
-            -top-28
-            h-72
-            w-72
-            rounded-full
-            bg-emerald-100/40
-            blur-3xl
-          "
-        />
+
 
         <div className="relative max-w-2xl">
           {/* BADGE */}
@@ -314,7 +301,7 @@ export default function RestrictedAccessState({
                   rounded-xl
                   border
                   border-slate-200
-                  bg-white
+                  bg-slate-50
                   px-5
                   py-3
                   text-sm

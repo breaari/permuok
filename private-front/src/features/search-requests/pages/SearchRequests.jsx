@@ -13,15 +13,18 @@ import {
   SearchRequestFilters,
 } from "../components";
 import { useToast } from "../../../ui/toast/ToastProvider";
+import RestrictedAccessState from "../../auth/components/RestrictedAccessState";
+import { canUseNetwork } from "../../auth/utils/access";
+
 const PAGE_SIZE = 5;
 
 export default function SearchRequests() {
-  const { user } = useAuth();
+  const { user, access } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
   const role = Number(user?.role || 0);
   const canAccess = role === 2 || role === 3;
-
+  const hasNetworkAccess = canUseNetwork(access);
   const [items, setItems] = useState([]);
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -40,6 +43,15 @@ export default function SearchRequests() {
 
   const load = useCallback(
     async ({ nextStatus = status, nextQuery = q, nextPage = page } = {}) => {
+      if (!hasNetworkAccess) {
+        setItems([]);
+        setMeta(null);
+        setErr("");
+        setLoading(false);
+
+        return;
+      }
+
       const currentRequestId = ++requestIdRef.current;
 
       setErr("");
@@ -68,7 +80,7 @@ export default function SearchRequests() {
         }
       }
     },
-    [status, q, page],
+    [status, q, page, hasNetworkAccess],
   );
 
   useEffect(() => {
@@ -141,6 +153,10 @@ export default function SearchRequests() {
   }, [role]);
 
   if (!canAccess) return <Navigate to="/" replace />;
+
+  if (!hasNetworkAccess) {
+    return <RestrictedAccessState access={access} section="searches" />;
+  }
 
   return (
     <>
