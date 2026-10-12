@@ -23,12 +23,12 @@ export function ProfileActionBar({
   const disabledStatusLabel = isReview
     ? "En revisión"
     : isActiveChangesPending
-    ? "Cambios en revisión"
-    : isActive
-    ? "Cuenta activa"
-    : isRejected
-    ? "Rechazada"
-    : "Enviar a Revisión";
+      ? "Cambios en revisión"
+      : isActive
+        ? "Cuenta activa"
+        : isRejected
+          ? "Rechazada"
+          : "Enviar a Revisión";
 
   const billingButtonLabel = isUnpaidChangesPending
     ? "Activar membresía"
@@ -43,8 +43,8 @@ export function ProfileActionBar({
               footerHint.tone === "success"
                 ? "text-emerald-600"
                 : footerHint.tone === "info"
-                ? "text-primary"
-                : "text-amber-500"
+                  ? "text-primary"
+                  : "text-amber-500"
             }
           >
             ●
@@ -73,12 +73,12 @@ export function ProfileActionBar({
           ) : showSubmitButton ? (
             <button
               type="button"
-              disabled={!canSubmit}
+              disabled={false}
               onClick={onSubmitReview}
               className={`flex-1 md:flex-none px-8 py-3 rounded-lg font-bold flex items-center justify-center gap-2 ${
                 canSubmit
                   ? "bg-primary text-white hover:bg-primary/90"
-                  : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                  : "bg-slate-200 text-slate-500 hover:bg-slate-300"
               }`}
               title={submitBlockReason || ""}
             >

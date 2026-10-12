@@ -61,7 +61,7 @@ function RealEstateProfile() {
   } = useRealEstateProfile({ loadMe });
 
   const [licenseOpen, setLicenseOpen] = useState(false);
-
+  const [showSubmitReason, setShowSubmitReason] = useState(false);
   const level = access?.level;
   const profileStatus = Number(realEstate?.profile_status ?? 0);
 
@@ -281,7 +281,7 @@ function RealEstateProfile() {
           onOpenModal={() => setLicenseOpen(true)}
         />
 
-        {!canSubmit && submitBlockReason && (
+        {showSubmitReason && !canSubmit && submitBlockReason && (
           <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             {submitBlockReason}
           </div>
@@ -311,7 +311,15 @@ function RealEstateProfile() {
           canSubmit={canSubmit}
           footerHint={footerHint}
           submitBlockReason={submitBlockReason}
-          onSubmitReview={actions.submitReview}
+          onSubmitReview={async () => {
+            if (!canSubmit) {
+              setShowSubmitReason(true);
+              return;
+            }
+
+            setShowSubmitReason(false);
+            await actions.submitReview();
+          }}
           onGoToBilling={() => nav("/billing")}
         />
       )}
