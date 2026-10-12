@@ -6,6 +6,11 @@ import SearchRequestCard from "../../search-requests/components/SearchRequestCar
 import PropertyCard from "../../properties/components/PropertyCard";
 import DevelopmentCard from "../../developments/components/DevelopmentCard";
 import { getExplore } from "../../explore/api/explore.api";
+import { useAuth } from "../../auth/components/AuthContext";
+import {
+  canUseNetwork,
+  getRestrictedAccessAction,
+} from "../../auth/utils/access";
 
 function HeroCard({
   propertiesCount = 0,
@@ -172,6 +177,12 @@ function EmptyState({ title, description }) {
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const { access } = useAuth();
+
+  const hasNetworkAccess = canUseNetwork(access);
+  const restrictedAction = getRestrictedAccessAction(access);
+
   const [segment, setSegment] = useState("all");
 
   const [properties, setProperties] = useState([]);
@@ -245,7 +256,7 @@ export default function Dashboard() {
 
   const visibleSearches = useMemo(() => {
     if (segment === "properties" || segment === "developments") return [];
-    return searches.slice(0, 4);
+    return searches.slice(0, 3);
   }, [segment, searches]);
 
   const visibleDevelopments = useMemo(() => {
@@ -255,13 +266,54 @@ export default function Dashboard() {
 
   return (
     <main className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 sm:py-8 lg:px-10">
+      {!hasNetworkAccess && (
+        <section className="mb-5 rounded-2xl border border-slate-200 bg-white px-5 py-4 sm:px-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-bold text-slate-900">
+                Estás viendo una vista previa de la red
+              </p>
+
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+                Podés conocer algunas de las oportunidades disponibles en
+                Permuok. Completá la verificación de tu inmobiliaria para
+                acceder a toda la red y empezar a operar.
+              </p>
+            </div>
+
+            {restrictedAction && (
+              <button
+                type="button"
+                onClick={() => navigate(restrictedAction.href)}
+                className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-[#76bc21] px-5 py-3 text-sm font-bold text-white transition hover:brightness-95"
+              >
+                {restrictedAction.label}
+
+                <Icon name="arrowRight" size={16} />
+              </button>
+            )}
+          </div>
+        </section>
+      )}
       <HeroCard
         propertiesCount={properties.length}
         searchesCount={searches.length}
         developmentsCount={developments.length}
-        onExploreProperties={() => navigate("/explore/properties")}
-        onExploreSearches={() => navigate("/explore/search-requests")}
-        onExploreDevelopments={() => navigate("/explore/developments")}
+        onExploreProperties={() =>
+          hasNetworkAccess
+            ? navigate("/explore/properties")
+            : navigate(restrictedAction?.href || "/my-profile")
+        }
+        onExploreSearches={() =>
+          hasNetworkAccess
+            ? navigate("/explore/search-requests")
+            : navigate(restrictedAction?.href || "/my-profile")
+        }
+        onExploreDevelopments={() =>
+          hasNetworkAccess
+            ? navigate("/explore/developments")
+            : navigate(restrictedAction?.href || "/my-profile")
+        }
       />
 
       <section className="mt-6 flex flex-col gap-4 sm:mt-8 lg:flex-row lg:items-center lg:justify-between">
@@ -295,7 +347,7 @@ export default function Dashboard() {
               <SectionHeader
                 title="Publicaciones destacadas"
                 description="Propiedades activas disponibles para explorar."
-                actionLabel="Ver publicaciones"
+                actionLabel={hasNetworkAccess ? "Ver publicaciones" : null}
                 onAction={() => navigate("/explore/properties")}
               />
 
@@ -305,8 +357,16 @@ export default function Dashboard() {
                     key={item.id}
                     item={item}
                     variant="dashboard"
-                    detailHref={`/explore/properties/${item.id}`}
-                    detailState={{ from: currentPathWithSearch }}
+                    detailHref={
+                      hasNetworkAccess
+                        ? `/explore/properties/${item.id}`
+                        : undefined
+                    }
+                    detailState={
+                      hasNetworkAccess
+                        ? { from: currentPathWithSearch }
+                        : undefined
+                    }
                   />
                 ))}
               </div>
@@ -318,7 +378,7 @@ export default function Dashboard() {
               <SectionHeader
                 title="Búsquedas activas"
                 description="Pedidos recientes publicados dentro de la red."
-                actionLabel="Ver búsquedas"
+                actionLabel={hasNetworkAccess ? "Ver búsquedas" : null}
                 onAction={() => navigate("/explore/search-requests")}
               />
 
@@ -328,10 +388,13 @@ export default function Dashboard() {
                     key={item.id}
                     item={item}
                     variant="dashboard"
-                    onView={() =>
-                      navigate(`/explore/search-requests/${item.id}`, {
-                        state: { from: currentPathWithSearch },
-                      })
+                    onView={
+                      hasNetworkAccess
+                        ? () =>
+                            navigate(`/explore/search-requests/${item.id}`, {
+                              state: { from: currentPathWithSearch },
+                            })
+                        : undefined
                     }
                   />
                 ))}
@@ -344,7 +407,7 @@ export default function Dashboard() {
               <SectionHeader
                 title="Desarrollos destacados"
                 description="Proyectos activos cargados por otras inmobiliarias."
-                actionLabel="Ver desarrollos"
+                actionLabel={hasNetworkAccess ? "Ver desarrollos" : null}
                 onAction={() => navigate("/explore/developments")}
               />
 
@@ -354,8 +417,16 @@ export default function Dashboard() {
                     key={item.id}
                     item={item}
                     variant="dashboard"
-                    detailHref={`/explore/developments/${item.id}`}
-                    detailState={{ from: currentPathWithSearch }}
+                    detailHref={
+                      hasNetworkAccess
+                        ? `/explore/developments/${item.id}`
+                        : undefined
+                    }
+                    detailState={
+                      hasNetworkAccess
+                        ? { from: currentPathWithSearch }
+                        : undefined
+                    }
                   />
                 ))}
               </div>
