@@ -13,7 +13,7 @@ use App\Services\AI\DevelopmentAIAnalysisService;
 use App\Services\AI\DevelopmentQualityScoreService;
 use App\Services\AI\DevelopmentAICopyService;
 use App\Services\SecurityRateLimitService;
-
+use App\Services\NetworkAccessGuard;
 class DevelopmentController
 {
     private static function fail(
@@ -34,7 +34,7 @@ class DevelopmentController
         }
 
         $exceptionStatus =
-            (int)$e->getCode();
+            (int) $e->getCode();
 
         if (
             $exceptionStatus >= 400 &&
@@ -46,7 +46,7 @@ class DevelopmentController
 
         ResponseHelper::fail(
             $e->getMessage()
-                ?: 'No se pudo completar la operación.',
+            ?: 'No se pudo completar la operación.',
             $status
         );
     }
@@ -55,7 +55,7 @@ class DevelopmentController
         Throwable $e
     ): void {
         $status =
-            (int)$e->getCode();
+            (int) $e->getCode();
 
         if (
             $status >= 400 &&
@@ -128,7 +128,10 @@ class DevelopmentController
         try {
             $auth =
                 AuthHelper::requireUser();
-
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
             QueryParamHelper::rejectUnknown([
                 'status',
                 'q',
@@ -138,39 +141,39 @@ class DevelopmentController
 
             $filters = [
                 'status' =>
-                QueryParamHelper::enum(
-                    'status',
-                    [
-                        'draft',
-                        'published',
-                        'paused',
-                        'archived',
-                        'closed',
-                    ],
-                    ''
-                ),
+                    QueryParamHelper::enum(
+                        'status',
+                        [
+                            'draft',
+                            'published',
+                            'paused',
+                            'archived',
+                            'closed',
+                        ],
+                        ''
+                    ),
                 'q' =>
-                QueryParamHelper::optionalString(
-                    'q',
-                    150
-                ),
+                    QueryParamHelper::optionalString(
+                        'q',
+                        150
+                    ),
                 'limit' =>
-                QueryParamHelper::positiveInt(
-                    'limit',
-                    20,
-                    100
-                ),
+                    QueryParamHelper::positiveInt(
+                        'limit',
+                        20,
+                        100
+                    ),
                 'page' =>
-                QueryParamHelper::positiveInt(
-                    'page',
-                    1,
-                    1000000
-                ),
+                    QueryParamHelper::positiveInt(
+                        'page',
+                        1,
+                        1000000
+                    ),
             ];
 
             $result =
                 DevelopmentService::listMyDevelopments(
-                    (int)$auth['id'],
+                    (int) $auth['id'],
                     $filters
                 );
 
@@ -185,7 +188,10 @@ class DevelopmentController
         try {
             $auth =
                 AuthHelper::requireUser();
-
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
             QueryParamHelper::rejectUnknown([
                 'q',
                 'development_stage',
@@ -195,40 +201,40 @@ class DevelopmentController
 
             $filters = [
                 'q' =>
-                QueryParamHelper::optionalString(
-                    'q',
-                    150
-                ),
+                    QueryParamHelper::optionalString(
+                        'q',
+                        150
+                    ),
                 'development_stage' =>
-                QueryParamHelper::enum(
-                    'development_stage',
-                    [
-                        'land',
-                        'prelaunch',
-                        'launch',
-                        'presale',
-                        'under_construction',
-                        'finished',
-                    ],
-                    ''
-                ),
+                    QueryParamHelper::enum(
+                        'development_stage',
+                        [
+                            'land',
+                            'prelaunch',
+                            'launch',
+                            'presale',
+                            'under_construction',
+                            'finished',
+                        ],
+                        ''
+                    ),
                 'limit' =>
-                QueryParamHelper::positiveInt(
-                    'limit',
-                    20,
-                    100
-                ),
+                    QueryParamHelper::positiveInt(
+                        'limit',
+                        20,
+                        100
+                    ),
                 'page' =>
-                QueryParamHelper::positiveInt(
-                    'page',
-                    1,
-                    1000000
-                ),
+                    QueryParamHelper::positiveInt(
+                        'page',
+                        1,
+                        1000000
+                    ),
             ];
 
             $result =
                 DevelopmentService::listExploreDevelopments(
-                    (int)$auth['id'],
+                    (int) $auth['id'],
                     $filters
                 );
 
@@ -245,7 +251,7 @@ class DevelopmentController
                 AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
             $data =
@@ -253,7 +259,7 @@ class DevelopmentController
 
             $result =
                 DevelopmentService::createDraft(
-                    (int)$auth['id'],
+                    (int) $auth['id'],
                     $data
                 );
 
@@ -270,9 +276,13 @@ class DevelopmentController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+            $id = (int) ($_GET['id'] ?? 0);
 
-            $result = DevelopmentService::getDetail((int)$auth['id'], $id);
+            $result = DevelopmentService::getDetail((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (Throwable $e) {
             self::fail($e);
@@ -286,11 +296,11 @@ class DevelopmentController
                 AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
             $id =
-                (int)($_GET['id'] ?? 0);
+                (int) ($_GET['id'] ?? 0);
 
             if ($id <= 0) {
                 throw new \Exception(
@@ -304,7 +314,7 @@ class DevelopmentController
 
             $result =
                 DevelopmentService::updateDraft(
-                    (int)$auth['id'],
+                    (int) $auth['id'],
                     $id,
                     $data
                 );
@@ -321,10 +331,10 @@ class DevelopmentController
     {
         try {
             $auth = AuthHelper::requireUser();
-            MembershipGuard::requireActiveMembership((int)$auth['id']);
-            $id = (int)($_GET['id'] ?? 0);
+            MembershipGuard::requireActiveMembership((int) $auth['id']);
+            $id = (int) ($_GET['id'] ?? 0);
 
-            $result = DevelopmentService::publish((int)$auth['id'], $id);
+            $result = DevelopmentService::publish((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (Throwable $e) {
             self::fail($e);
@@ -335,9 +345,13 @@ class DevelopmentController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+            $id = (int) ($_GET['id'] ?? 0);
 
-            $result = DevelopmentService::pause((int)$auth['id'], $id);
+            $result = DevelopmentService::pause((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (Throwable $e) {
             self::fail($e);
@@ -348,9 +362,13 @@ class DevelopmentController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+            $id = (int) ($_GET['id'] ?? 0);
 
-            $result = DevelopmentService::archive((int)$auth['id'], $id);
+            $result = DevelopmentService::archive((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (Throwable $e) {
             self::fail($e);
@@ -361,9 +379,13 @@ class DevelopmentController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+            $id = (int) ($_GET['id'] ?? 0);
 
-            $result = DevelopmentService::delete((int)$auth['id'], $id);
+            $result = DevelopmentService::delete((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (Throwable $e) {
             self::fail($e);
@@ -374,9 +396,13 @@ class DevelopmentController
     {
         try {
             $auth = AuthHelper::requireUser();
-            $id = (int)($_GET['id'] ?? 0);
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
+            $id = (int) ($_GET['id'] ?? 0);
 
-            $result = DevelopmentService::close((int)$auth['id'], $id);
+            $result = DevelopmentService::close((int) $auth['id'], $id);
             ResponseHelper::ok($result);
         } catch (Throwable $e) {
             self::fail($e);
@@ -388,9 +414,12 @@ class DevelopmentController
         try {
             $auth =
                 AuthHelper::requireUser();
-
+            NetworkAccessGuard::requireAccess(
+                (int) $auth['id'],
+                (int) $auth['role']
+            );
             $id =
-                (int)($_GET['id'] ?? 0);
+                (int) ($_GET['id'] ?? 0);
 
             if ($id <= 0) {
                 throw new \Exception(
@@ -399,10 +428,10 @@ class DevelopmentController
             }
 
             /*
-         * Verifica propiedad del desarrollo.
-         */
+             * Verifica propiedad del desarrollo.
+             */
             DevelopmentService::assertOwnedDevelopment(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $id
             );
             $result =
@@ -425,11 +454,11 @@ class DevelopmentController
                 AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
             $id =
-                (int)($_GET['id'] ?? 0);
+                (int) ($_GET['id'] ?? 0);
 
             if ($id <= 0) {
                 throw new \Exception(
@@ -438,17 +467,17 @@ class DevelopmentController
             }
 
             /*
-         * Primero verificamos pertenencia.
-         * Un desarrollo ajeno no consume cupo.
-         */
+             * Primero verificamos pertenencia.
+             * Un desarrollo ajeno no consume cupo.
+             */
             DevelopmentService::assertOwnedDevelopment(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $id
             );
 
             self::consumeAIAnalysisLimits(
-                (int)$auth['id'],
-                (int)$auth['real_estate_id']
+                (int) $auth['id'],
+                (int) $auth['real_estate_id']
             );
 
             $result =
@@ -471,11 +500,11 @@ class DevelopmentController
                 AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
             $id =
-                (int)($_GET['id'] ?? 0);
+                (int) ($_GET['id'] ?? 0);
 
             if ($id <= 0) {
                 throw new \Exception(
@@ -485,18 +514,18 @@ class DevelopmentController
             }
 
             /*
-         * Primero verificamos pertenencia.
-         * Un desarrollo ajeno no consume cupo.
-         */
+             * Primero verificamos pertenencia.
+             * Un desarrollo ajeno no consume cupo.
+             */
             DevelopmentService::assertOwnedDevelopment(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $id
             );
 
             /*
-         * Después validamos la solicitud.
-         * Un JSON roto tampoco consume cupo.
-         */
+             * Después validamos la solicitud.
+             * Un JSON roto tampoco consume cupo.
+             */
             $data =
                 self::readJsonBody(
                     true
@@ -520,14 +549,14 @@ class DevelopmentController
                 ?? [];
 
             self::consumeAICopyLimits(
-                (int)$auth['id'],
-                (int)$auth['real_estate_id']
+                (int) $auth['id'],
+                (int) $auth['real_estate_id']
             );
 
             $result =
                 DevelopmentAICopyService::generateTitle(
                     $id,
-                    (int)$auth['id'],
+                    (int) $auth['id'],
                     $draft
                 );
 
@@ -546,11 +575,11 @@ class DevelopmentController
                 AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int)$auth['id']
+                (int) $auth['id']
             );
 
             $id =
-                (int)($_GET['id'] ?? 0);
+                (int) ($_GET['id'] ?? 0);
 
             if ($id <= 0) {
                 throw new \Exception(
@@ -560,18 +589,18 @@ class DevelopmentController
             }
 
             /*
-         * Primero verificamos pertenencia.
-         * Un desarrollo ajeno no consume cupo.
-         */
+             * Primero verificamos pertenencia.
+             * Un desarrollo ajeno no consume cupo.
+             */
             DevelopmentService::assertOwnedDevelopment(
-                (int)$auth['id'],
+                (int) $auth['id'],
                 $id
             );
 
             /*
-         * Después validamos la solicitud.
-         * Un JSON roto tampoco consume cupo.
-         */
+             * Después validamos la solicitud.
+             * Un JSON roto tampoco consume cupo.
+             */
             $data =
                 self::readJsonBody(
                     true
@@ -595,14 +624,14 @@ class DevelopmentController
                 ?? [];
 
             self::consumeAICopyLimits(
-                (int)$auth['id'],
-                (int)$auth['real_estate_id']
+                (int) $auth['id'],
+                (int) $auth['real_estate_id']
             );
 
             $result =
                 DevelopmentAICopyService::generateDescription(
                     $id,
-                    (int)$auth['id'],
+                    (int) $auth['id'],
                     $draft
                 );
 
@@ -620,14 +649,14 @@ class DevelopmentController
     ): void {
         SecurityRateLimitService::consume(
             'ai_copy_user',
-            (string)$userId,
+            (string) $userId,
             30,
             5 * 60
         );
 
         SecurityRateLimitService::consume(
             'ai_daily_real_estate',
-            (string)$realEstateId,
+            (string) $realEstateId,
             1000,
             24 * 60 * 60
         );
@@ -639,14 +668,14 @@ class DevelopmentController
     ): void {
         SecurityRateLimitService::consume(
             'ai_analysis_user',
-            (string)$userId,
+            (string) $userId,
             20,
             60 * 60
         );
 
         SecurityRateLimitService::consume(
             'ai_daily_real_estate',
-            (string)$realEstateId,
+            (string) $realEstateId,
             1000,
             24 * 60 * 60
         );
