@@ -42,7 +42,7 @@ const CONTENT = {
 
     profile: {
       badge: "Publicaciones",
-      title: "Tus publicaciones están a un paso",
+      title: "Empezá a publicar en Permuok",
       description:
         "Completá y verificá el perfil de tu inmobiliaria para empezar a publicar propiedades.",
     },
@@ -74,7 +74,7 @@ const CONTENT = {
 
     profile: {
       badge: "Búsquedas",
-      title: "Tus búsquedas están a un paso",
+      title: "Publicá tus búsquedas y conectalas con la red",
       description:
         "Completá el perfil de tu inmobiliaria para publicar necesidades de tus clientes y conectarlas con la red.",
     },
@@ -190,23 +190,17 @@ export default function RestrictedAccessState({
       {/* BLOQUE DE ACCESO RESTRINGIDO */}
       <section
         className="
-          relative
-          overflow-hidden
-          rounded-[26px]
-          border
-          border-emerald-100
-          bg-gradient-to-br
-          from-white
-          via-white
-          to-emerald-50/70
-          px-6
-          py-8
-          shadow-sm
-          sm:px-8
-          sm:py-10
-          md:px-10
-          md:py-12
-        "
+    rounded-[26px]
+    border
+    border-slate-200
+    bg-slate-50
+    px-6
+    py-8
+    sm:px-8
+    sm:py-10
+    md:px-10
+    md:py-12
+  "
       >
         {/* DETALLE VISUAL */}
         <div
@@ -227,21 +221,21 @@ export default function RestrictedAccessState({
           {/* BADGE */}
           <div
             className="
-              inline-flex
-              items-center
-              gap-2
-              rounded-full
-              border
-              border-emerald-200
-              bg-emerald-50
-              px-3
-              py-1.5
-              text-[11px]
-              font-bold
-              uppercase
-              tracking-[0.12em]
-              text-emerald-700
-            "
+    inline-flex
+    items-center
+    gap-2
+    rounded-full
+    border
+    border-slate-200
+    bg-white
+    px-3
+    py-1.5
+    text-[11px]
+    font-bold
+    uppercase
+    tracking-[0.12em]
+    text-slate-500
+  "
           >
             <Icon
               name={section === "compatibilities" ? "sparkles" : "shieldCheck"}
