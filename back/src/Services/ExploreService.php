@@ -60,15 +60,111 @@ class ExploreService
             return null;
         }
 
-        return (int)$value;
+        return (int) $value;
     }
 
+    public static function preview(
+        int $userId
+    ): array {
+        /*
+         * El preview es deliberadamente fijo:
+         *
+         * - 3 propiedades
+         * - 3 búsquedas
+         * - 3 desarrollos
+         * - página única
+         * - sin filtros personalizados
+         *
+         * De esta manera una cuenta en onboarding
+         * puede conocer la red sin poder recorrerla.
+         */
+
+        $filters = [
+            'opportunity_type' => 'all',
+            'sort' => 'recent',
+        ];
+
+        $items = [];
+
+        $items = array_merge(
+            $items,
+            self::searchProperties(
+                $userId,
+                $filters,
+                3,
+                0
+            )
+        );
+
+        $items = array_merge(
+            $items,
+            self::searchRequests(
+                $userId,
+                $filters,
+                3,
+                0
+            )
+        );
+
+        $items = array_merge(
+            $items,
+            self::searchDevelopments(
+                $userId,
+                $filters,
+                3,
+                0
+            )
+        );
+
+        /*
+         * Conservamos el orden general por fecha,
+         * pero sin eliminar elementos después del merge.
+         *
+         * Por eso siempre pueden llegar hasta:
+         * 3 + 3 + 3 = 9 oportunidades.
+         */
+        usort(
+            $items,
+            static function (array $a, array $b): int {
+                return
+                    strtotime(
+                        $b['created_at']
+                        ?? '1970-01-01'
+                    )
+                    <=>
+                    strtotime(
+                        $a['created_at']
+                        ?? '1970-01-01'
+                    );
+            }
+        );
+
+        return [
+            'items' => $items,
+            'page' => 1,
+            'limit' => 9,
+            'total_returned' =>
+                count($items),
+
+            /*
+             * Sirve también para que en el futuro
+             * el frontend pueda saber explícitamente
+             * qué tipo de respuesta recibió.
+             */
+            'preview' => true,
+
+            'filters' => [
+                'opportunity_type' => 'all',
+                'sort' => 'recent',
+            ],
+        ];
+    }
     public static function search(int $userId, array $filters): array
     {
         $type = $filters['opportunity_type'] ?? 'all';
 
-        $page = max(1, (int)($filters['page'] ?? 1));
-        $limit = min(50, max(1, (int)($filters['limit'] ?? 12)));
+        $page = max(1, (int) ($filters['page'] ?? 1));
+        $limit = min(50, max(1, (int) ($filters['limit'] ?? 12)));
         $offset = ($page - 1) * $limit;
 
         $items = [];
@@ -148,32 +244,32 @@ class ExploreService
 
         if (self::hasValue($filters['value_min'] ?? null)) {
             $where[] = "p.price >= :property_value_min";
-            $params[':property_value_min'] = (float)$filters['value_min'];
+            $params[':property_value_min'] = (float) $filters['value_min'];
         }
 
         if (self::hasValue($filters['value_max'] ?? null)) {
             $where[] = "p.price <= :property_value_max";
-            $params[':property_value_max'] = (float)$filters['value_max'];
+            $params[':property_value_max'] = (float) $filters['value_max'];
         }
 
         if (self::hasValue($filters['bedrooms_min'] ?? null)) {
             $where[] = "p.bedrooms >= :property_bedrooms_min";
-            $params[':property_bedrooms_min'] = (int)$filters['bedrooms_min'];
+            $params[':property_bedrooms_min'] = (int) $filters['bedrooms_min'];
         }
 
         if (self::hasValue($filters['bathrooms_min'] ?? null)) {
             $where[] = "p.bathrooms >= :property_bathrooms_min";
-            $params[':property_bathrooms_min'] = (int)$filters['bathrooms_min'];
+            $params[':property_bathrooms_min'] = (int) $filters['bathrooms_min'];
         }
 
         if (self::hasValue($filters['garages_min'] ?? null)) {
             $where[] = "p.garages >= :property_garages_min";
-            $params[':property_garages_min'] = (int)$filters['garages_min'];
+            $params[':property_garages_min'] = (int) $filters['garages_min'];
         }
 
         if (self::hasValue($filters['area_min'] ?? null)) {
             $where[] = "COALESCE(p.total_area, p.covered_area, 0) >= :property_area_min";
-            $params[':property_area_min'] = (float)$filters['area_min'];
+            $params[':property_area_min'] = (float) $filters['area_min'];
         }
 
         self::applyExchangeModesForProperties($where, $filters);
@@ -246,7 +342,7 @@ class ExploreService
 
         return array_map(function ($row) {
             $coverImageId = !empty($row['cover_image_id'])
-                ? (int)$row['cover_image_id']
+                ? (int) $row['cover_image_id']
                 : null;
 
             $row['cover_image_url'] = self::imageViewUrl($coverImageId);
@@ -254,8 +350,8 @@ class ExploreService
 
             return [
                 'opportunity_type' => 'property',
-                'id' => (int)$row['id'],
-                'sort_value' => isset($row['sort_value']) ? (float)$row['sort_value'] : null,
+                'id' => (int) $row['id'],
+                'sort_value' => isset($row['sort_value']) ? (float) $row['sort_value'] : null,
                 'created_at' => $row['created_at'] ?? null,
                 'item' => $row,
             ];
@@ -298,32 +394,32 @@ class ExploreService
 
         if (self::hasValue($filters['value_min'] ?? null)) {
             $where[] = "COALESCE(sr.max_value, 0) >= :search_value_min";
-            $params[':search_value_min'] = (float)$filters['value_min'];
+            $params[':search_value_min'] = (float) $filters['value_min'];
         }
 
         if (self::hasValue($filters['value_max'] ?? null)) {
             $where[] = "COALESCE(sr.min_value, sr.max_value, 0) <= :search_value_max";
-            $params[':search_value_max'] = (float)$filters['value_max'];
+            $params[':search_value_max'] = (float) $filters['value_max'];
         }
 
         if (self::hasValue($filters['bedrooms_min'] ?? null)) {
             $where[] = "sr.min_bedrooms >= :search_bedrooms_min";
-            $params[':search_bedrooms_min'] = (int)$filters['bedrooms_min'];
+            $params[':search_bedrooms_min'] = (int) $filters['bedrooms_min'];
         }
 
         if (self::hasValue($filters['bathrooms_min'] ?? null)) {
             $where[] = "sr.min_bathrooms >= :search_bathrooms_min";
-            $params[':search_bathrooms_min'] = (int)$filters['bathrooms_min'];
+            $params[':search_bathrooms_min'] = (int) $filters['bathrooms_min'];
         }
 
         if (self::hasValue($filters['garages_min'] ?? null)) {
             $where[] = "sr.min_garages >= :search_garages_min";
-            $params[':search_garages_min'] = (int)$filters['garages_min'];
+            $params[':search_garages_min'] = (int) $filters['garages_min'];
         }
 
         if (self::hasValue($filters['area_min'] ?? null)) {
             $where[] = "COALESCE(sr.min_total_area, sr.min_covered_area, 0) >= :search_area_min";
-            $params[':search_area_min'] = (float)$filters['area_min'];
+            $params[':search_area_min'] = (float) $filters['area_min'];
         }
 
         self::applyExchangeModesForSearchRequests($where, $filters);
@@ -392,8 +488,8 @@ class ExploreService
         return array_map(function ($row) {
             return [
                 'opportunity_type' => 'search_request',
-                'id' => (int)$row['id'],
-                'sort_value' => isset($row['sort_value']) ? (float)$row['sort_value'] : null,
+                'id' => (int) $row['id'],
+                'sort_value' => isset($row['sort_value']) ? (float) $row['sort_value'] : null,
                 'created_at' => $row['created_at'] ?? null,
                 'item' => $row,
             ];
@@ -435,12 +531,12 @@ class ExploreService
 
         if (self::hasValue($filters['value_min'] ?? null)) {
             $where[] = "COALESCE(d.price_to, d.price_from, 0) >= :development_value_min";
-            $params[':development_value_min'] = (float)$filters['value_min'];
+            $params[':development_value_min'] = (float) $filters['value_min'];
         }
 
         if (self::hasValue($filters['value_max'] ?? null)) {
             $where[] = "COALESCE(d.price_from, d.price_to, 0) <= :development_value_max";
-            $params[':development_value_max'] = (float)$filters['value_max'];
+            $params[':development_value_max'] = (float) $filters['value_max'];
         }
 
         if (!empty($filters['development_stage'])) {
@@ -527,7 +623,7 @@ class ExploreService
 
         return array_map(function ($row) {
             $coverImageId = !empty($row['cover_image_id'])
-                ? (int)$row['cover_image_id']
+                ? (int) $row['cover_image_id']
                 : null;
 
             $row['cover_image_url'] = self::developmentImageViewUrl($coverImageId);
@@ -535,8 +631,8 @@ class ExploreService
 
             return [
                 'opportunity_type' => 'development',
-                'id' => (int)$row['id'],
-                'sort_value' => isset($row['sort_value']) ? (float)$row['sort_value'] : null,
+                'id' => (int) $row['id'],
+                'sort_value' => isset($row['sort_value']) ? (float) $row['sort_value'] : null,
                 'created_at' => $row['created_at'] ?? null,
                 'item' => $row,
             ];
@@ -545,10 +641,12 @@ class ExploreService
 
     private static function applyTextFilter(array &$where, array &$params, array $filters, array $columns): void
     {
-        if (empty($filters['q'])) return;
+        if (empty($filters['q']))
+            return;
 
-        $q = trim((string)$filters['q']);
-        if ($q === '') return;
+        $q = trim((string) $filters['q']);
+        if ($q === '')
+            return;
 
         $parts = [];
 
@@ -567,14 +665,15 @@ class ExploreService
             if (!empty($filters[$field])) {
                 $key = ':' . $alias . '_' . $field;
                 $where[] = "{$alias}.{$field} LIKE {$key}";
-                $params[$key] = '%' . trim((string)$filters[$field]) . '%';
+                $params[$key] = '%' . trim((string) $filters[$field]) . '%';
             }
         }
     }
 
     private static function applyCurrencyFilter(array &$where, array &$params, array $filters, string $column): void
     {
-        if (empty($filters['currency'])) return;
+        if (empty($filters['currency']))
+            return;
 
         $key = ':currency_' . substr(md5($column), 0, 8);
         $where[] = "{$column} = {$key}";
@@ -585,7 +684,8 @@ class ExploreService
     {
         $modes = self::normalizeArray($filters['exchange_modes'] ?? []);
 
-        if (!$modes) return;
+        if (!$modes)
+            return;
 
         $modeWhere = [];
 
@@ -605,7 +705,8 @@ class ExploreService
             $modeWhere[] = "pr.accepts_open_proposals = 1";
         }
 
-        if (!$modeWhere) return;
+        if (!$modeWhere)
+            return;
 
         $where[] = "EXISTS (
             SELECT 1
@@ -619,7 +720,8 @@ class ExploreService
     {
         $modes = self::normalizeArray($filters['exchange_modes'] ?? []);
 
-        if (!$modes) return;
+        if (!$modes)
+            return;
 
         $modeWhere = [];
 
@@ -636,7 +738,8 @@ class ExploreService
             $modeWhere[] = "sr.payment_mode_swap = 1";
         }
 
-        if (!$modeWhere) return;
+        if (!$modeWhere)
+            return;
 
         $where[] = "(" . implode(" OR ", $modeWhere) . ")";
     }
@@ -645,7 +748,8 @@ class ExploreService
     {
         $amenities = self::normalizeArray($filters['amenities'] ?? []);
 
-        if (!$amenities) return;
+        if (!$amenities)
+            return;
 
         $placeholders = [];
 
@@ -668,7 +772,8 @@ class ExploreService
     {
         $amenities = self::normalizeArray($filters['amenities'] ?? []);
 
-        if (!$amenities) return;
+        if (!$amenities)
+            return;
 
         $placeholders = [];
 
@@ -690,7 +795,8 @@ class ExploreService
     {
         $amenities = self::normalizeArray($filters['amenities'] ?? []);
 
-        if (!$amenities) return;
+        if (!$amenities)
+            return;
 
         $placeholders = [];
 

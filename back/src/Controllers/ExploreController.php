@@ -5,7 +5,7 @@ namespace App\Controllers;
 use App\Helpers\AuthHelper;
 use App\Helpers\ResponseHelper;
 use App\Services\ExploreService;
-
+use App\Services\NetworkAccessGuard;
 class ExploreController
 {
     private static function queryOptionalString(
@@ -121,7 +121,7 @@ class ExploreController
         }
 
         $normalized =
-            (int)$value;
+            (int) $value;
 
         if (
             $normalized < 1 ||
@@ -176,7 +176,7 @@ class ExploreController
         }
 
         $normalized =
-            (int)$value;
+            (int) $value;
 
         if (
             $normalized < 0 ||
@@ -230,7 +230,7 @@ class ExploreController
         }
 
         $normalized =
-            (float)$value;
+            (float) $value;
 
         if (
             !is_finite($normalized) ||
@@ -290,14 +290,14 @@ class ExploreController
                     array_filter(
                         array_map(
                             static fn($item) =>
-                            trim($item),
+                                trim($item),
                             explode(
                                 ',',
                                 $value
                             )
                         ),
                         static fn($item) =>
-                        $item !== ''
+                            $item !== ''
                     )
                 )
             );
@@ -335,7 +335,24 @@ class ExploreController
         try {
             $auth =
                 AuthHelper::requireUser();
+            $hasFullAccess =
+                NetworkAccessGuard::hasAccess(
+                    (int) $auth['id'],
+                    (int) $auth['role']
+                );
 
+            if (!$hasFullAccess) {
+                $result =
+                    ExploreService::preview(
+                        (int) $auth['id']
+                    );
+
+                ResponseHelper::ok(
+                    $result
+                );
+
+                return;
+            }
             $allowedQueryFields = [
                 'q',
                 'opportunity_type',
@@ -426,198 +443,198 @@ class ExploreController
 
             $filters = [
                 'q' =>
-                self::queryOptionalString(
-                    'q',
-                    150
-                ),
+                    self::queryOptionalString(
+                        'q',
+                        150
+                    ),
 
                 'opportunity_type' =>
-                self::queryEnum(
-                    'opportunity_type',
-                    [
-                        'all',
-                        'property',
-                        'search_request',
-                        'development',
-                    ],
-                    'all'
-                ),
+                    self::queryEnum(
+                        'opportunity_type',
+                        [
+                            'all',
+                            'property',
+                            'search_request',
+                            'development',
+                        ],
+                        'all'
+                    ),
 
                 'country' =>
-                self::queryOptionalString(
-                    'country',
-                    100
-                ),
+                    self::queryOptionalString(
+                        'country',
+                        100
+                    ),
 
                 'province' =>
-                self::queryOptionalString(
-                    'province',
-                    100
-                ),
+                    self::queryOptionalString(
+                        'province',
+                        100
+                    ),
 
                 'city' =>
-                self::queryOptionalString(
-                    'city',
-                    100
-                ),
+                    self::queryOptionalString(
+                        'city',
+                        100
+                    ),
 
                 'zone' =>
-                self::queryOptionalString(
-                    'zone',
-                    100
-                ),
+                    self::queryOptionalString(
+                        'zone',
+                        100
+                    ),
 
                 'place_id' =>
-                self::queryOptionalString(
-                    'place_id',
-                    255
-                ),
+                    self::queryOptionalString(
+                        'place_id',
+                        255
+                    ),
 
                 'lat' =>
-                $latitude,
+                    $latitude,
 
                 'lng' =>
-                $longitude,
+                    $longitude,
 
                 'property_type' =>
-                self::queryEnum(
-                    'property_type',
-                    [
-                        'apartment',
-                        'house',
-                        'land',
-                        'commercial',
-                        'office',
-                        'warehouse',
-                        'garage',
-                        'other',
-                    ]
-                ),
+                    self::queryEnum(
+                        'property_type',
+                        [
+                            'apartment',
+                            'house',
+                            'land',
+                            'commercial',
+                            'office',
+                            'warehouse',
+                            'garage',
+                            'other',
+                        ]
+                    ),
 
                 'currency' =>
-                self::queryEnum(
-                    'currency',
-                    [
-                        'USD',
-                        'ARS',
-                    ]
-                ),
+                    self::queryEnum(
+                        'currency',
+                        [
+                            'USD',
+                            'ARS',
+                        ]
+                    ),
 
                 'value_min' =>
-                $valueMin,
+                    $valueMin,
 
                 'value_max' =>
-                $valueMax,
+                    $valueMax,
 
                 'bedrooms_min' =>
-                self::queryOptionalInt(
-                    'bedrooms_min',
-                    1000
-                ),
+                    self::queryOptionalInt(
+                        'bedrooms_min',
+                        1000
+                    ),
 
                 'bathrooms_min' =>
-                self::queryOptionalInt(
-                    'bathrooms_min',
-                    1000
-                ),
+                    self::queryOptionalInt(
+                        'bathrooms_min',
+                        1000
+                    ),
 
                 'garages_min' =>
-                self::queryOptionalInt(
-                    'garages_min',
-                    1000
-                ),
+                    self::queryOptionalInt(
+                        'garages_min',
+                        1000
+                    ),
 
                 'area_min' =>
-                self::queryOptionalNumber(
-                    'area_min',
-                    0,
-                    1000000000
-                ),
+                    self::queryOptionalNumber(
+                        'area_min',
+                        0,
+                        1000000000
+                    ),
 
                 'exchange_modes' =>
-                self::queryCsvEnum(
-                    'exchange_modes',
-                    [
-                        'total_swap',
-                        'swap_plus_cash',
-                        'multiple_swap',
-                        'open_proposals',
-                        'cash',
-                    ],
-                    5
-                ),
+                    self::queryCsvEnum(
+                        'exchange_modes',
+                        [
+                            'total_swap',
+                            'swap_plus_cash',
+                            'multiple_swap',
+                            'open_proposals',
+                            'cash',
+                        ],
+                        5
+                    ),
 
                 'amenities' =>
-                self::queryCsvEnum(
-                    'amenities',
-                    [
-                        'balcony',
-                        'patio',
-                        'terrace',
-                        'pool',
-                        'quincho',
-                        'garden',
-                        'barbecue',
-                        'sum',
-                        'gym',
-                        'security',
-                        'doorman',
-                        'laundry',
-                        'elevator',
-                        'garage',
-                        'storage',
-                        'green_area',
-                        'cowork',
-                        'kids_area',
-                        'pet_friendly',
-                        'rooftop',
-                        'jacuzzi',
-                    ],
-                    21
-                ),
+                    self::queryCsvEnum(
+                        'amenities',
+                        [
+                            'balcony',
+                            'patio',
+                            'terrace',
+                            'pool',
+                            'quincho',
+                            'garden',
+                            'barbecue',
+                            'sum',
+                            'gym',
+                            'security',
+                            'doorman',
+                            'laundry',
+                            'elevator',
+                            'garage',
+                            'storage',
+                            'green_area',
+                            'cowork',
+                            'kids_area',
+                            'pet_friendly',
+                            'rooftop',
+                            'jacuzzi',
+                        ],
+                        21
+                    ),
 
                 'development_stage' =>
-                self::queryEnum(
-                    'development_stage',
-                    [
-                        'land',
-                        'prelaunch',
-                        'launch',
-                        'presale',
-                        'under_construction',
-                        'finished',
-                    ]
-                ),
+                    self::queryEnum(
+                        'development_stage',
+                        [
+                            'land',
+                            'prelaunch',
+                            'launch',
+                            'presale',
+                            'under_construction',
+                            'finished',
+                        ]
+                    ),
 
                 'sort' =>
-                self::queryEnum(
-                    'sort',
-                    [
-                        'recent',
-                        'value_asc',
-                        'value_desc',
-                    ],
-                    'recent'
-                ),
+                    self::queryEnum(
+                        'sort',
+                        [
+                            'recent',
+                            'value_asc',
+                            'value_desc',
+                        ],
+                        'recent'
+                    ),
 
                 'page' =>
-                self::queryPositiveInt(
-                    'page',
-                    1,
-                    1000000
-                ),
+                    self::queryPositiveInt(
+                        'page',
+                        1,
+                        1000000
+                    ),
 
                 'limit' =>
-                self::queryPositiveInt(
-                    'limit',
-                    12,
-                    50
-                ),
+                    self::queryPositiveInt(
+                        'limit',
+                        12,
+                        50
+                    ),
             ];
 
             $result =
                 ExploreService::search(
-                    (int)$auth['id'],
+                    (int) $auth['id'],
                     $filters
                 );
 
