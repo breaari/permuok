@@ -166,15 +166,6 @@ export function ProfileFormSection({
               placeholder="facebook.com/tuagencia"
             />
           </div>
-
-          <div className="mt-6">
-            <button
-              type="submit"
-              className="px-6 py-3 rounded-lg border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 transition-colors"
-            >
-              Guardar Perfil
-            </button>
-          </div>
         </fieldset>
       </form>
     </section>

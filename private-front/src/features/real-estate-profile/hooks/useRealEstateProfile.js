@@ -201,6 +201,60 @@ export function useRealEstateProfile({ loadMe }) {
   const profileOk = profileValidation.ok;
   const hasLicenses = (licenses?.length ?? 0) > 0;
 
+  const profileProgress = useMemo(() => {
+    const companyDataComplete =
+      isValidTextName(profile?.name) &&
+      isValidTextName(profile?.legal_name) &&
+      isValidCuit(profile?.cuit);
+
+    const addressComplete =
+      !!normalizeText(profile?.address) &&
+      !!normalizeText(profile?.address_place_id) &&
+      profile?.address_lat !== "" &&
+      profile?.address_lat !== null &&
+      profile?.address_lng !== "" &&
+      profile?.address_lng !== null;
+
+    const contactComplete =
+      !!normalizeText(profile?.email) &&
+      isValidPhone(profile?.phone) &&
+      isValidWebsite(profile?.website);
+
+    const licenseComplete = hasLicenses;
+
+    const steps = [
+      {
+        key: "company",
+        label: "Datos de la inmobiliaria",
+        complete: companyDataComplete,
+      },
+      {
+        key: "address",
+        label: "Dirección",
+        complete: addressComplete,
+      },
+      {
+        key: "contact",
+        label: "Datos de contacto",
+        complete: contactComplete,
+      },
+      {
+        key: "license",
+        label: "Matrícula",
+        complete: licenseComplete,
+      },
+    ];
+
+    const completed = steps.filter((step) => step.complete).length;
+
+    return {
+      steps,
+      completed,
+      total: steps.length,
+      percentage: Math.round((completed / steps.length) * 100),
+    };
+  }, [profile, hasLicenses]);
+
   const clearMessages = useCallback(() => {
     setErr("");
   }, []);
@@ -327,6 +381,7 @@ export function useRealEstateProfile({ loadMe }) {
     profileOk,
     profileValidation,
     hasLicenses,
+    profileProgress,
     actions: {
       load,
       saveProfile,

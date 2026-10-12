@@ -4,7 +4,7 @@ import { useAuth } from "../../auth/components/AuthContext.jsx";
 import { useGoogleMaps } from "../../../ui/maps/UseGoogleMaps.jsx";
 import { useRealEstateProfile } from "../hooks/useRealEstateProfile";
 import { LicenseModal } from "../components/LicenseModal.jsx";
-
+import { ProfileProgress } from "../components/ProfileProgress.jsx";
 import { ProfileBanner } from "../components/ProfileBanner.jsx";
 import { ProfileHeader } from "../components/ProfileHeader.jsx";
 import { ProfileFormSection } from "../components/ProfileFormSection.jsx";
@@ -57,6 +57,7 @@ function RealEstateProfile() {
     hasLicenses,
     actions,
     profileValidation,
+    profileProgress,
   } = useRealEstateProfile({ loadMe });
 
   const [licenseOpen, setLicenseOpen] = useState(false);
@@ -248,7 +249,7 @@ function RealEstateProfile() {
           validationNote={realEstate?.validation_note}
           approvedByEmail={realEstate?.approved_by_email}
         />
-
+        {isDraft && <ProfileProgress progress={profileProgress} />}
         {err && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
             {err}
