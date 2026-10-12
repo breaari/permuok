@@ -202,56 +202,67 @@ export function useRealEstateProfile({ loadMe }) {
   const hasLicenses = (licenses?.length ?? 0) > 0;
 
   const profileProgress = useMemo(() => {
-    const companyDataComplete =
-      isValidTextName(profile?.name) &&
-      isValidTextName(profile?.legal_name) &&
-      isValidCuit(profile?.cuit);
-
-    const addressComplete =
-      !!normalizeText(profile?.address) &&
-      !!normalizeText(profile?.address_place_id) &&
-      profile?.address_lat !== "" &&
-      profile?.address_lat !== null &&
-      profile?.address_lng !== "" &&
-      profile?.address_lng !== null;
-
-    const contactComplete =
-      !!normalizeText(profile?.email) &&
-      isValidPhone(profile?.phone) &&
-      isValidWebsite(profile?.website);
-
-    const licenseComplete = hasLicenses;
-
-    const steps = [
+    const requirements = [
       {
-        key: "company",
-        label: "Datos de la inmobiliaria",
-        complete: companyDataComplete,
+        key: "name",
+        label: "Nombre comercial",
+        complete: isValidTextName(profile?.name),
+      },
+      {
+        key: "legal_name",
+        label: "Razón social",
+        complete: isValidTextName(profile?.legal_name),
+      },
+      {
+        key: "cuit",
+        label: "CUIT",
+        complete: isValidCuit(profile?.cuit),
+      },
+      {
+        key: "email",
+        label: "Email",
+        complete: !!normalizeText(profile?.email),
       },
       {
         key: "address",
         label: "Dirección",
-        complete: addressComplete,
+        complete: !!normalizeText(profile?.address),
       },
       {
-        key: "contact",
-        label: "Datos de contacto",
-        complete: contactComplete,
+        key: "address_valid",
+        label: "Ubicación validada",
+        complete:
+          !!normalizeText(profile?.address_place_id) &&
+          profile?.address_lat !== "" &&
+          profile?.address_lat !== null &&
+          profile?.address_lng !== "" &&
+          profile?.address_lng !== null,
+      },
+      {
+        key: "phone",
+        label: "Teléfono",
+        complete: isValidPhone(profile?.phone),
+      },
+      {
+        key: "website",
+        label: "Sitio web",
+        complete: isValidWebsite(profile?.website),
       },
       {
         key: "license",
         label: "Matrícula",
-        complete: licenseComplete,
+        complete: hasLicenses,
       },
     ];
 
-    const completed = steps.filter((step) => step.complete).length;
+    const completed = requirements.filter((item) => item.complete).length;
+
+    const total = requirements.length;
 
     return {
-      steps,
       completed,
-      total: steps.length,
-      percentage: Math.round((completed / steps.length) * 100),
+      total,
+      percentage: Math.round((completed / total) * 100),
     };
   }, [profile, hasLicenses]);
 
