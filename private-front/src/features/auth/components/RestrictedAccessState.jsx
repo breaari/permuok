@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Icon } from "../../../ui/icons/Index";
@@ -8,7 +9,7 @@ const CONTENT = {
     pageTitle: "Matches IA",
 
     profile: {
-      badge: "Matches inteligentes",
+      badge: "Matches inteligentes Permuok IA",
       title: "Tus matches están a un paso",
       description:
         "Para que Permuok pueda empezar a detectar oportunidades para tu inmobiliaria, primero necesitamos verificar tu perfil.",
@@ -169,6 +170,8 @@ export default function RestrictedAccessState({
 }) {
   const navigate = useNavigate();
 
+  const [showMatchInfo, setShowMatchInfo] = useState(false);
+
   const stage = getOnboardingStage(access);
 
   const content = getContent(section, stage);
@@ -205,7 +208,7 @@ export default function RestrictedAccessState({
           md:py-12
         "
       >
-        {/* Detalle visual muy sutil */}
+        {/* DETALLE VISUAL */}
         <div
           className="
             pointer-events-none
@@ -221,7 +224,7 @@ export default function RestrictedAccessState({
         />
 
         <div className="relative max-w-2xl">
-          {/* Badge */}
+          {/* BADGE */}
           <div
             className="
               inline-flex
@@ -248,7 +251,7 @@ export default function RestrictedAccessState({
             {content.badge}
           </div>
 
-          {/* Contenido */}
+          {/* CONTENIDO */}
           <h2
             className="
               mt-5
@@ -277,32 +280,106 @@ export default function RestrictedAccessState({
             {content.description}
           </p>
 
-          {/* CTA */}
-          {action && (
-            <button
-              type="button"
-              onClick={() => navigate(action.href)}
-              className="
-                mt-7
-                inline-flex
-                items-center
-                gap-2
-                rounded-xl
-                bg-[#76bc21]
-                px-5
-                py-3
-                text-sm
-                font-bold
-                text-white
-                shadow-sm
-                transition
-                hover:brightness-95
-              "
-            >
-              {action.label}
+          {/* ACCIONES */}
+          <div className="mt-7 flex flex-wrap items-center gap-3">
+            {action && (
+              <button
+                type="button"
+                onClick={() => navigate(action.href)}
+                className="
+                  inline-flex
+                  items-center
+                  gap-2
+                  rounded-xl
+                  bg-[#76bc21]
+                  px-5
+                  py-3
+                  text-sm
+                  font-bold
+                  text-white
+                  shadow-sm
+                  transition
+                  hover:brightness-95
+                "
+              >
+                {action.label}
 
-              <Icon name="arrowRight" size={16} />
-            </button>
+                <Icon name="arrowRight" size={16} />
+              </button>
+            )}
+
+            {section === "compatibilities" && (
+              <button
+                type="button"
+                onClick={() => setShowMatchInfo((current) => !current)}
+                aria-expanded={showMatchInfo}
+                className="
+                  inline-flex
+                  items-center
+                  gap-2
+                  rounded-xl
+                  border
+                  border-slate-200
+                  bg-white
+                  px-5
+                  py-3
+                  text-sm
+                  font-semibold
+                  text-slate-600
+                  transition
+                  hover:border-slate-300
+                  hover:bg-slate-50
+                  hover:text-slate-900
+                "
+              >
+                <Icon name="info" size={16} />
+                ¿Cómo funciona el motor de match?
+                <span
+                  className={`
+                    ml-1
+                    text-xs
+                    transition-transform
+                    duration-200
+                    ${showMatchInfo ? "rotate-180" : ""}
+                  `}
+                >
+                  ↓
+                </span>
+              </button>
+            )}
+          </div>
+
+          {/* EXPLICACIÓN MOTOR DE MATCH */}
+          {section === "compatibilities" && showMatchInfo && (
+            <div
+              className="
+                  mt-5
+                  max-w-2xl
+                  rounded-2xl
+                  border
+                  border-slate-200
+                  bg-white/80
+                  px-5
+                  py-5
+                "
+            >
+              <p className="text-sm font-bold text-[#30363d]">
+                Permuok cruza automáticamente las oportunidades de la red.
+              </p>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                El motor compara tus publicaciones y búsquedas con las
+                oportunidades disponibles en Permuok para detectar posibles
+                compatibilidades.
+              </p>
+
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                Tiene en cuenta criterios como tipo de propiedad, ubicación,
+                valor, características y forma de operación. Cuando encuentra
+                una coincidencia relevante, aparece dentro de Matches IA para
+                que puedas evaluarla.
+              </p>
+            </div>
           )}
         </div>
       </section>
