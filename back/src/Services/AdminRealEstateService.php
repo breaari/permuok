@@ -770,7 +770,9 @@ class AdminRealEstateService
                     $realEstate['profile_status']
                     ?? 0
                 );
-
+            $isInitialApproval =
+                $currentProfileStatus ===
+                RealEstateProfileStatus::INITIAL_REVIEW;
             if (
                 !in_array(
                     $currentProfileStatus,
@@ -852,6 +854,37 @@ class AdminRealEstateService
             }
 
             $pdo->commit();
+
+            /*
+|--------------------------------------------------------------------------
+| Email de aprobación inicial
+|--------------------------------------------------------------------------
+|
+| Se envía únicamente cuando la inmobiliaria
+| acaba de superar su primera revisión.
+|
+| Una aprobación posterior de cambios del perfil
+| no debe volver a generar este correo.
+|
+| El estado de la inmobiliaria ya quedó confirmado
+| antes de intentar encolar el mail.
+|
+*/
+            if (
+                $action === 'approve' &&
+                $isInitialApproval
+            ) {
+                try {
+                    RealEstateApprovedEmailService::enqueueForRealEstate(
+                        $realEstateId
+                    );
+                } catch (\Throwable $emailError) {
+                    error_log(
+                        '[REAL ESTATE APPROVED EMAIL] ' .
+                            $emailError->getMessage()
+                    );
+                }
+            }
 
             return [
                 'real_estate_id' =>
