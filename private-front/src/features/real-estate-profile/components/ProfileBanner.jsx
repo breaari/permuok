@@ -22,13 +22,30 @@ export function ProfileBanner({ banner }) {
       }`}
     >
       <div className="flex gap-3">
-        <span className={`${bannerIconClasses[tone] ?? bannerIconClasses.info} mt-0.5`}>
+        <span
+          className={`${bannerIconClasses[tone] ?? bannerIconClasses.info} mt-0.5`}
+        >
           <Icon name="info" size={18} />
         </span>
 
         <div>
           <p className="text-slate-900 font-bold text-base">{banner?.title}</p>
-          <p className="text-slate-600 text-sm">{banner?.desc}</p>
+
+          {banner?.desc && (
+            <p className="mt-0.5 text-slate-600 text-sm">{banner.desc}</p>
+          )}
+
+          {banner?.detail && (
+            <p className="mt-2 text-slate-600 text-sm">
+              {banner?.detailLabel && (
+                <span className="font-bold text-slate-800">
+                  {banner.detailLabel}{" "}
+                </span>
+              )}
+
+              {banner.detail}
+            </p>
+          )}
         </div>
       </div>
 

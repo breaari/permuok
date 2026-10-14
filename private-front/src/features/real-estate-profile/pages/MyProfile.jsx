@@ -147,13 +147,12 @@ function RealEstateProfile({ accountEmail }) {
     if (isRejected) {
       return {
         tone: "warn",
-        title: "Revisión rechazada",
-        desc: realEstate?.validation_note
-          ? `Corregí la información observada y volvé a enviarlo a revisión. Motivo: ${realEstate.validation_note}`
-          : "Corregí la información observada y volvé a enviarlo a revisión.",
+        title: "Tu perfil fue rechazado",
+        desc: "Corregí la información observada y volvé a enviarlo a revisión.",
+        detailLabel: realEstate?.validation_note ? "Motivo:" : null,
+        detail: realEstate?.validation_note || null,
       };
     }
-
     if (isDraft || profileStatus === 0) {
       return {
         tone: "info",
