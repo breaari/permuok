@@ -379,13 +379,31 @@ class ConversationService
                 (int)$messageResult['message']['id']
             );
 
+            $notificationConversation =
+                self::attachOpportunityData([
+                    'opportunity_type' =>
+                    $type,
+
+                    'opportunity_id' =>
+                    $opportunityId,
+
+                    'subject' =>
+                    $subject,
+
+                    'contact_shared' =>
+                    0,
+                ]);
+
+            $notificationConversation['message_preview'] =
+                $message;
+
+            $notificationConversation['sender_label'] =
+                'Una inmobiliaria de la red';
+
             NotificationService::notifyNewConversation(
                 $ownerUserId,
                 $conversationId,
-                [
-                    'subject' =>
-                    $subject,
-                ],
+                $notificationConversation,
                 $pdo
             );
 

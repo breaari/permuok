@@ -255,8 +255,10 @@ class NotificationService
         ?PDO $pdo = null
     ): void {
         /*
-     * 1. Notificación interna.
-     */
+    |--------------------------------------------------------------------------
+    | Notificación interna
+    |--------------------------------------------------------------------------
+    */
         self::createConversationNotification(
             $userId,
             'new_conversation',
@@ -267,8 +269,10 @@ class NotificationService
         );
 
         /*
-     * 2. Destinatario del email.
-     */
+    |--------------------------------------------------------------------------
+    | Destinatario
+    |--------------------------------------------------------------------------
+    */
         $recipient =
             self::getEmailRecipient(
                 $userId
@@ -286,31 +290,165 @@ class NotificationService
         $emailSubject =
             "Nueva consulta sobre {$subjectName}";
 
-        $message =
-            'Recibiste una nueva consulta sobre una oportunidad publicada en Permuok.';
+        /*
+    |--------------------------------------------------------------------------
+    | URL directa a la conversación
+    |--------------------------------------------------------------------------
+    */
+        $frontendUrl =
+            rtrim(
+                (string)(
+                    $_ENV['FRONTEND_URL']
+                    ?? 'https://permuok.com'
+                ),
+                '/'
+            );
 
-        $appUrl = rtrim(
-            (string)(
-                $_ENV['APP_URL']
-                ?? 'https://permuok.com'
-            ),
-            '/'
-        );
+        $buttonUrl =
+            $frontendUrl .
+            '/conversations/' .
+            $conversationId;
+
+        /*
+    |--------------------------------------------------------------------------
+    | Datos dinámicos
+    |--------------------------------------------------------------------------
+    */
+        $opportunityTitle =
+            trim(
+                (string)(
+                    $conversation['opportunity_title']
+                    ?? $conversation['subject']
+                    ?? 'Oportunidad'
+                )
+            );
+
+        $opportunityLocation =
+            trim(
+                (string)(
+                    $conversation['opportunity_location']
+                    ?? ''
+                )
+            );
+
+        $opportunityType =
+            match ((string)(
+                $conversation['opportunity_type']
+                ?? ''
+            )) {
+                'property' =>
+                'Propiedad',
+
+                'search_request' =>
+                'Búsqueda',
+
+                'development' =>
+                'Desarrollo',
+
+                default =>
+                'Oportunidad',
+            };
+
+        $messagePreview =
+            trim(
+                (string)(
+                    $conversation['message_preview']
+                    ?? ''
+                )
+            );
+
+        if (
+            mb_strlen(
+                $messagePreview,
+                'UTF-8'
+            ) > 220
+        ) {
+            $messagePreview =
+                mb_substr(
+                    $messagePreview,
+                    0,
+                    217,
+                    'UTF-8'
+                ) .
+                '...';
+        }
+
+        $senderLabel =
+            trim(
+                (string)(
+                    $conversation['sender_label']
+                    ?? 'Una inmobiliaria de la red'
+                )
+            );
+
+        /*
+    |--------------------------------------------------------------------------
+    | Imagen
+    |--------------------------------------------------------------------------
+    |
+    | ConversationService devuelve una URL relativa firmada.
+    | Para email necesitamos convertirla a URL absoluta.
+    |
+    */
+        $imageUrl =
+            trim(
+                (string)(
+                    $conversation['opportunity_image_url']
+                    ?? ''
+                )
+            );
+
+        if (
+            $imageUrl !== '' &&
+            str_starts_with(
+                $imageUrl,
+                '/'
+            )
+        ) {
+            $backendUrl =
+                rtrim(
+                    (string)(
+                        $_ENV['BACKEND_URL']
+                        ?? $_ENV['APP_URL']
+                        ?? ''
+                    ),
+                    '/'
+                );
+
+            if ($backendUrl !== '') {
+                $imageUrl =
+                    $backendUrl .
+                    $imageUrl;
+            }
+        }
 
         $htmlBody =
-            self::buildEmailLayout(
-                $emailSubject,
-                $message,
-                'Ver consulta',
-                $appUrl
+            self::buildNewConversationEmail(
+                $opportunityTitle,
+                $opportunityLocation,
+                $opportunityType,
+                $imageUrl,
+                $senderLabel,
+                $messagePreview,
+                $buttonUrl
             );
 
         $textBody =
-            $emailSubject .
+            "Tenés una nueva consulta\n\n" .
+            $opportunityTitle .
+            (
+                $opportunityLocation !== ''
+                ? "\n" .
+                $opportunityLocation
+                : ''
+            ) .
             "\n\n" .
-            $message .
+            $senderLabel .
+            " escribió:\n\n" .
+            $messagePreview .
             "\n\n" .
-            $appUrl;
+            "Ver consulta:\n" .
+            $buttonUrl;
 
         EmailJobService::enqueue(
             $recipient['email'],
@@ -876,6 +1014,579 @@ class NotificationService
         ];
     }
 
+    private static function buildNewConversationEmail(
+        string $opportunityTitle,
+        string $opportunityLocation,
+        string $opportunityType,
+        string $imageUrl,
+        string $senderLabel,
+        string $messagePreview,
+        string $buttonUrl
+    ): string {
+        $safeTitle =
+            htmlspecialchars(
+                $opportunityTitle,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        $safeLocation =
+            htmlspecialchars(
+                $opportunityLocation,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        $safeType =
+            htmlspecialchars(
+                $opportunityType,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        $safeSender =
+            htmlspecialchars(
+                $senderLabel,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        $safeMessage =
+            nl2br(
+                htmlspecialchars(
+                    $messagePreview,
+                    ENT_QUOTES,
+                    'UTF-8'
+                )
+            );
+
+        $safeButtonUrl =
+            htmlspecialchars(
+                $buttonUrl,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        $safeImageUrl =
+            htmlspecialchars(
+                $imageUrl,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        /*
+    |--------------------------------------------------------------------------
+    | Card de oportunidad
+    |--------------------------------------------------------------------------
+    */
+        if ($safeImageUrl !== '') {
+            $opportunityCard = <<<HTML
+<table
+    width="100%"
+    border="0"
+    cellpadding="0"
+    cellspacing="0"
+    role="presentation"
+    style="
+        border:1px solid #e2e8f0;
+        border-radius:12px;
+        overflow:hidden;
+        border-collapse:separate;
+    "
+>
+    <tbody>
+        <tr>
+            <td
+                width="150"
+                valign="middle"
+                style="
+                    width:150px;
+                    padding:0;
+                "
+            >
+                <img
+                    src="{$safeImageUrl}"
+                    width="150"
+                    alt="{$safeTitle}"
+                    style="
+                        display:block;
+                        width:150px;
+                        height:105px;
+                        object-fit:cover;
+                        border:0;
+                    "
+                />
+            </td>
+
+            <td
+                valign="middle"
+                style="
+                    padding:18px 20px;
+                    font-family:Arial, Helvetica, sans-serif;
+                "
+            >
+                <div
+                    style="
+                        color:#0e1b10;
+                        font-size:16px;
+                        font-weight:700;
+                        line-height:1;
+                    "
+                >
+                    {$safeTitle}
+                </div>
+
+                <div
+                    style="
+                        margin-top:8px;
+                        color:#64748b;
+                        font-size:13px;
+                        line-height:1;
+                    "
+                >
+                    {$safeLocation}
+                </div>
+
+                <div
+                    style="
+                        margin-top:8px;
+                        color:#3974ba;
+                        font-size:12px;
+                        font-weight:700;
+                        line-height:1;
+                    "
+                >
+                    {$safeType}
+                </div>
+            </td>
+        </tr>
+    </tbody>
+</table>
+HTML;
+        } else {
+            $opportunityCard = <<<HTML
+<table
+    width="100%"
+    border="0"
+    cellpadding="0"
+    cellspacing="0"
+    role="presentation"
+    style="
+        border:1px solid #e2e8f0;
+        border-radius:12px;
+        border-collapse:separate;
+    "
+>
+    <tbody>
+        <tr>
+            <td
+                style="
+                    padding:20px;
+                    font-family:Arial, Helvetica, sans-serif;
+                "
+            >
+                <div
+                    style="
+                        color:#0e1b10;
+                        font-size:16px;
+                        font-weight:700;
+                        line-height:1;
+                    "
+                >
+                    {$safeTitle}
+                </div>
+
+                <div
+                    style="
+                        margin-top:8px;
+                        color:#64748b;
+                        font-size:13px;
+                        line-height:1;
+                    "
+                >
+                    {$safeLocation}
+                </div>
+
+                <div
+                    style="
+                        margin-top:8px;
+                        color:#3974ba;
+                        font-size:12px;
+                        font-weight:700;
+                        line-height:1;
+                    "
+                >
+                    {$safeType}
+                </div>
+            </td>
+        </tr>
+    </tbody>
+</table>
+HTML;
+        }
+
+        return <<<HTML
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html
+    xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:v="urn:schemas-microsoft-com:vml"
+    xmlns:o="urn:schemas-microsoft-com:office:office"
+>
+<head>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    />
+
+    <meta
+        http-equiv="Content-Type"
+        content="text/html; charset=UTF-8"
+    />
+
+    <meta
+        name="format-detection"
+        content="telephone=no, date=no, address=no, email=no"
+    />
+
+    <meta
+        name="x-apple-disable-message-reformatting"
+    />
+
+    <style>
+        body {
+            margin:0;
+            padding:0;
+        }
+
+        table {
+            mso-table-lspace:0;
+            mso-table-rspace:0;
+        }
+
+        p,
+        span,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            margin:0;
+            padding:0;
+        }
+
+        a[x-apple-data-detectors] {
+            color:inherit !important;
+            text-decoration:inherit !important;
+        }
+
+        #MessageViewBody a {
+            color:inherit;
+            text-decoration:none;
+        }
+
+        img + div {
+            display:none;
+        }
+
+        @media (max-width:599px) {
+            .email-container {
+                width:100% !important;
+                min-width:0 !important;
+            }
+
+            .email-content {
+                padding-left:24px !important;
+                padding-right:24px !important;
+            }
+        }
+    </style>
+
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:AllowPNG/>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+</head>
+
+<body
+    style="
+        width:100%;
+        margin:0;
+        padding:0;
+        background-color:#f0f1f5;
+        -webkit-text-size-adjust:100%;
+        text-size-adjust:100%;
+    "
+>
+<table
+    width="100%"
+    border="0"
+    cellpadding="0"
+    cellspacing="0"
+    bgcolor="#f0f1f5"
+    role="presentation"
+>
+<tbody>
+<tr>
+<td
+    align="center"
+    style="
+        padding:24px 12px;
+        background-color:#f0f1f5;
+    "
+>
+
+<table
+    align="center"
+    width="600"
+    border="0"
+    cellpadding="0"
+    cellspacing="0"
+    role="presentation"
+    class="email-container"
+    style="
+        width:600px;
+        min-width:600px;
+        max-width:600px;
+        margin:0 auto;
+        background:#ffffff;
+        border-radius:15px;
+        overflow:hidden;
+    "
+>
+<tbody>
+
+<!-- LOGO -->
+<tr>
+<td
+    align="center"
+    style="
+        padding:41px 24px 34px;
+    "
+>
+    <img
+        src="https://bq5galnul0ejsuneypmqfsatucvdbtiujlng6snj7ao.canva-cdn.email/1c019e1200d10d5a9c00bf196125b1c2.png"
+        width="234"
+        alt="Permuok"
+        style="
+            display:block;
+            width:234px;
+            height:auto;
+            max-width:100%;
+            border:0;
+        "
+    />
+</td>
+</tr>
+
+<!-- TÍTULO -->
+<tr>
+<td
+    class="email-content"
+    style="
+        padding:0 56px 24px;
+        color:#0e1b10;
+        font-family:Arial, Helvetica, sans-serif;
+        font-size:20px;
+        font-weight:700;
+        line-height:1;
+        text-align:left;
+    "
+>
+    Tenés una nueva consulta
+</td>
+</tr>
+
+<!-- CARD -->
+<tr>
+<td
+    class="email-content"
+    style="
+        padding:0 56px 28px;
+    "
+>
+    {$opportunityCard}
+</td>
+</tr>
+
+<!-- SENDER -->
+<tr>
+<td
+    class="email-content"
+    style="
+        padding:0 56px 12px;
+        color:#0e1b10;
+        font-family:Arial, Helvetica, sans-serif;
+        font-size:15px;
+        font-weight:700;
+        line-height:1;
+        text-align:left;
+    "
+>
+    {$safeSender} escribió:
+</td>
+</tr>
+
+<!-- MENSAJE -->
+<tr>
+<td
+    class="email-content"
+    style="
+        padding:0 56px 34px;
+    "
+>
+    <div
+        style="
+            padding:18px 20px;
+            background:#f3f4f6;
+            border-radius:10px;
+            color:#30363d;
+            font-family:Arial, Helvetica, sans-serif;
+            font-size:15px;
+            font-weight:400;
+            line-height:1;
+        "
+    >
+        {$safeMessage}
+    </div>
+</td>
+</tr>
+
+<!-- BOTÓN -->
+<tr>
+<td
+    align="center"
+    style="
+        padding:0 24px 40px;
+    "
+>
+
+<!--[if mso]>
+<v:roundrect
+    xmlns:v="urn:schemas-microsoft-com:vml"
+    xmlns:w="urn:schemas-microsoft-com:office:word"
+    href="{$safeButtonUrl}"
+    style="
+        height:64px;
+        width:336px;
+        v-text-anchor:middle;
+    "
+    arcsize="23%"
+    fillcolor="#61b228"
+    strokecolor="#61b228"
+>
+    <w:anchorlock/>
+
+    <center
+        style="
+            color:#ffffff;
+            font-family:Arial,sans-serif;
+            font-size:18px;
+            font-weight:700;
+        "
+    >
+        Ver consulta
+    </center>
+</v:roundrect>
+<![endif]-->
+
+<!--[if !mso]><!-->
+<table
+    role="presentation"
+    cellpadding="0"
+    cellspacing="0"
+    border="0"
+    width="336"
+    style="
+        width:336px;
+        max-width:100%;
+        border-collapse:separate;
+        border-spacing:0;
+    "
+>
+<tbody>
+<tr>
+<td
+    bgcolor="#61b228"
+    style="
+        background-color:#61b228;
+        border-radius:15px;
+    "
+>
+    <a
+        href="{$safeButtonUrl}"
+        target="_blank"
+        rel="noopener"
+        style="
+            color:#ffffff;
+            text-decoration:none;
+            display:block;
+            padding:19px 8px;
+            text-align:center;
+            font-family:Arial, Helvetica, sans-serif;
+            font-size:18px;
+            font-weight:700;
+            line-height:1;
+        "
+    >
+        Ver consulta
+    </a>
+</td>
+</tr>
+</tbody>
+</table>
+<!--<![endif]-->
+
+</td>
+</tr>
+
+<!-- FOOTER -->
+<tr>
+<td
+    align="center"
+    style="
+        padding:0;
+        border-radius:0 0 15px 15px;
+        overflow:hidden;
+    "
+>
+    <img
+        src="https://bq5galnul0ejsuneypmqfsatucvdbtiujlng6snj7ao.canva-cdn.email/6f5235e46c309adb2404cb6f87578e95.png"
+        width="600"
+        alt="Estamos para acompañarte"
+        style="
+            display:block;
+            width:600px;
+            height:auto;
+            max-width:100%;
+            border:0;
+            border-radius:0 0 15px 15px;
+        "
+    />
+</td>
+</tr>
+
+</tbody>
+</table>
+
+</td>
+</tr>
+</tbody>
+</table>
+
+</body>
+</html>
+HTML;
+    }
+
     private static function buildEmailLayout(
         string $title,
         string $message,
@@ -1010,5 +1721,70 @@ class NotificationService
 </body>
 </html>
 HTML;
+    }
+
+
+
+    public static function queueNewConversationTestEmail(
+        string $email
+    ): array {
+        $email =
+            strtolower(
+                trim($email)
+            );
+
+        if (
+            $email === '' ||
+            !filter_var(
+                $email,
+                FILTER_VALIDATE_EMAIL
+            )
+        ) {
+            throw new Exception(
+                'Email de prueba inválido.'
+            );
+        }
+
+        $frontendUrl =
+            rtrim(
+                (string)(
+                    $_ENV['FRONTEND_URL']
+                    ?? 'https://permuok.com'
+                ),
+                '/'
+            );
+
+        $htmlBody =
+            self::buildNewConversationEmail(
+                'Departamento 3 ambientes en Güemes',
+                'Güemes · Mar del Plata',
+                'Propiedad',
+                'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=500&q=80',
+                'Una inmobiliaria de la red',
+                'Hola, quería consultar si considerarían una propiedad de menor valor más una diferencia en efectivo para completar la operación.',
+                $frontendUrl . '/conversations/1'
+            );
+
+        $textBody =
+            "Tenés una nueva consulta\n\n" .
+            "Departamento 3 ambientes en Güemes\n" .
+            "Güemes · Mar del Plata\n\n" .
+            "Una inmobiliaria de la red escribió:\n\n" .
+            "Hola, quería consultar si considerarían una propiedad de menor valor más una diferencia en efectivo para completar la operación.\n\n" .
+            $frontendUrl .
+            '/conversations/1';
+
+        return EmailJobService::enqueue(
+            $email,
+            'new_conversation_test',
+            'Nueva consulta en Permuok',
+            $htmlBody,
+            $textBody,
+            null,
+            null,
+            'test',
+            null,
+            10
+        );
     }
 }
