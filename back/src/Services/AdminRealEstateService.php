@@ -773,6 +773,9 @@ class AdminRealEstateService
             $isInitialApproval =
                 $currentProfileStatus ===
                 RealEstateProfileStatus::INITIAL_REVIEW;
+            $isChangesApproval =
+                $currentProfileStatus ===
+                RealEstateProfileStatus::CHANGES_PENDING;
             if (
                 !in_array(
                     $currentProfileStatus,
@@ -857,32 +860,44 @@ class AdminRealEstateService
 
             /*
 |--------------------------------------------------------------------------
-| Email de aprobación inicial
+| Emails posteriores a la aprobación
 |--------------------------------------------------------------------------
 |
-| Se envía únicamente cuando la inmobiliaria
-| acaba de superar su primera revisión.
+| La operación administrativa ya quedó confirmada
+| antes de intentar encolar cualquier correo.
 |
-| Una aprobación posterior de cambios del perfil
-| no debe volver a generar este correo.
+| INITIAL_REVIEW:
+|   primera aprobación de la inmobiliaria.
 |
-| El estado de la inmobiliaria ya quedó confirmado
-| antes de intentar encolar el mail.
+| CHANGES_PENDING:
+|   aprobación de una actualización posterior.
 |
 */
-            if (
-                $action === 'approve' &&
-                $isInitialApproval
-            ) {
-                try {
-                    RealEstateApprovedEmailService::enqueueForRealEstate(
-                        $realEstateId
-                    );
-                } catch (\Throwable $emailError) {
-                    error_log(
-                        '[REAL ESTATE APPROVED EMAIL] ' .
-                            $emailError->getMessage()
-                    );
+            if ($action === 'approve') {
+                if ($isInitialApproval) {
+                    try {
+                        RealEstateApprovedEmailService::enqueueForRealEstate(
+                            $realEstateId
+                        );
+                    } catch (\Throwable $emailError) {
+                        error_log(
+                            '[REAL ESTATE APPROVED EMAIL] ' .
+                                $emailError->getMessage()
+                        );
+                    }
+                }
+
+                if ($isChangesApproval) {
+                    try {
+                        RealEstateChangesApprovedEmailService::enqueueForRealEstate(
+                            $realEstateId
+                        );
+                    } catch (\Throwable $emailError) {
+                        error_log(
+                            '[REAL ESTATE CHANGES APPROVED EMAIL] ' .
+                                $emailError->getMessage()
+                        );
+                    }
                 }
             }
 
