@@ -46,9 +46,6 @@ class AuthService
         $lastNameValue =
             $data['last_name'] ?? null;
 
-        $phoneValue =
-            $data['phone'] ?? null;
-
         /*
      * No convertimos arrays u objetos silenciosamente
      * a texto. Todos estos campos deben ser strings.
@@ -81,13 +78,6 @@ class AuthService
             ];
         }
 
-        if (!is_string($phoneValue)) {
-            return [
-                'error' =>
-                'Ingresá un teléfono válido.',
-            ];
-        }
-
         $email =
             trim($emailValue);
 
@@ -100,9 +90,6 @@ class AuthService
         $last =
             trim($lastNameValue);
 
-        $phone =
-            trim($phoneValue);
-
         if ($first === '') {
             return [
                 'error' =>
@@ -114,13 +101,6 @@ class AuthService
             return [
                 'error' =>
                 'El apellido es requerido.',
-            ];
-        }
-
-        if ($phone === '') {
-            return [
-                'error' =>
-                'El teléfono es requerido.',
             ];
         }
 
@@ -178,18 +158,6 @@ class AuthService
             return [
                 'error' =>
                 'Ingresá un apellido válido.',
-            ];
-        }
-
-        if (
-            preg_match(
-                '/^\+[1-9][0-9]{7,14}$/',
-                $phone
-            ) !== 1
-        ) {
-            return [
-                'error' =>
-                'Ingresá un teléfono válido con código de país.',
             ];
         }
 
@@ -271,28 +239,28 @@ class AuthService
 
         try {
             $stmt = $pdo->prepare("
-            INSERT INTO users (
-                role,
-                first_name,
-                last_name,
-                email,
-                email_verified_at,
-                phone,
-                password_hash,
-                is_active,
-                created_at
-            )
-            VALUES (
-                :role,
-                :first_name,
-                :last_name,
-                :email,
-                NULL,
-                :phone,
-                :password,
-                1,
-                NOW()
-            )
+        INSERT INTO users (
+    role,
+    first_name,
+    last_name,
+    email,
+    email_verified_at,
+    phone,
+    password_hash,
+    is_active,
+    created_at
+)
+VALUES (
+    :role,
+    :first_name,
+    :last_name,
+    :email,
+    NULL,
+    NULL,
+    :password,
+    1,
+    NOW()
+)
         ");
 
             $stmt->execute([
@@ -307,9 +275,6 @@ class AuthService
 
                 'email' =>
                 $emailNorm,
-
-                'phone' =>
-                $phone,
 
                 'password' =>
                 $passwordHash,

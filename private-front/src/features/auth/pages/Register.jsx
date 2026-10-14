@@ -10,9 +10,7 @@ import PasswordRequirements, {
 import AuthLayout from "../../../layout/AuthLayout.jsx";
 import Input from "../../../ui/components/Input.jsx";
 import Button from "../../../ui/components/Button";
-import PhoneField from "../../../ui/components/PhoneField";
 import { Icon } from "../../../ui/icons/Index";
-import { isValidPhoneNumber } from "react-phone-number-input";
 
 export default function Register() {
   const nav = useNavigate();
@@ -22,7 +20,6 @@ export default function Register() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -42,11 +39,6 @@ export default function Register() {
 
     if (!terms) {
       toast.error("Debés aceptar los términos para registrarte.");
-      return;
-    }
-
-    if (!phone) {
-      toast.error("Ingresá un número de teléfono.");
       return;
     }
 
@@ -74,7 +66,6 @@ export default function Register() {
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         email: normalizedEmail,
-        phone,
         password,
       });
 
@@ -129,17 +120,6 @@ export default function Register() {
           iconLeft={<Icon name="mail" className="opacity-80" />}
           required
           disabled={submitting}
-        />
-
-        <PhoneField
-          label="Teléfono"
-          value={phone}
-          onChange={setPhone}
-          defaultCountry="AR"
-          required
-          disabled={submitting}
-          helperText="Elegí tu país y escribí el número sin el 0 inicial."
-          variant="auth"
         />
 
         <Input

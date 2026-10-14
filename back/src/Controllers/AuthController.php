@@ -81,7 +81,6 @@ class AuthController
             'first_name',
             'last_name',
             'email',
-            'phone',
             'password',
         ];
 
@@ -102,7 +101,6 @@ class AuthController
             'first_name',
             'last_name',
             'email',
-            'phone',
             'password',
         ];
 
