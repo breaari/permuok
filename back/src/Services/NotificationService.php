@@ -1014,15 +1014,41 @@ class NotificationService
         ];
     }
 
-    private static function buildNewConversationEmail(
+    private static function buildConversationEmail(
+        string $heading,
         string $opportunityTitle,
         string $opportunityLocation,
         string $opportunityType,
         string $imageUrl,
         string $senderLabel,
         string $messagePreview,
-        string $buttonUrl
+        string $buttonText,
+        string $buttonUrl,
+        ?string $activityText = null
     ): string {
+
+        $safeHeading =
+            htmlspecialchars(
+                $heading,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        $safeButtonText =
+            htmlspecialchars(
+                $buttonText,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        $safeActivityText =
+            htmlspecialchars(
+                trim(
+                    (string)$activityText
+                ),
+                ENT_QUOTES,
+                'UTF-8'
+            );
         $safeTitle =
             htmlspecialchars(
                 $opportunityTitle,
@@ -1401,7 +1427,7 @@ HTML;
         text-align:left;
     "
 >
-    Tenés una nueva consulta
+   {$safeHeading}
 </td>
 </tr>
 
@@ -1485,16 +1511,7 @@ HTML;
 >
     <w:anchorlock/>
 
-    <center
-        style="
-            color:#ffffff;
-            font-family:Arial,sans-serif;
-            font-size:18px;
-            font-weight:700;
-        "
-    >
-        Ver consulta
-    </center>
+   {$safeButtonText}
 </v:roundrect>
 <![endif]-->
 

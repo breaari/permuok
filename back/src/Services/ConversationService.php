@@ -2337,11 +2337,24 @@ THEN 1
 
             $receiverIds = self::getOtherParticipantIds($conversationId, $userId);
 
+            $notificationConversation =
+                self::attachOpportunityData(
+                    self::getConversationById(
+                        $conversationId
+                    )
+                );
+
+            $notificationConversation['message_preview'] =
+                $body;
+
+            $notificationConversation['sender_user_id'] =
+                $userId;
+
             foreach ($receiverIds as $receiverId) {
                 NotificationService::notifyNewMessage(
                     (int)$receiverId,
                     $conversationId,
-                    self::getConversationById($conversationId),
+                    $notificationConversation,
                     $pdo
                 );
             }
