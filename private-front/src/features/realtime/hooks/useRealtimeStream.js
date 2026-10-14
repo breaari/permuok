@@ -83,7 +83,7 @@ export default function useRealtimeStream({
          * dejamos funcionar el polling de respaldo.
          */
         if (res.status === 409) {
-          reconnectRef.current = window.setTimeout(connect, 60000);
+          reconnectRef.current = window.setTimeout(connect, 3000);
 
           return;
         }

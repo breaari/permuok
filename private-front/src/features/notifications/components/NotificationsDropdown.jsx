@@ -191,6 +191,19 @@ export default function NotificationsDropdown({ onUnreadChange, onClose }) {
         onUnreadChange?.(nextUnread);
       }
 
+      /*
+       * Aunque la notificación no haya llegado por SSE,
+       * notificamos al resto de la aplicación al abrirla.
+       *
+       * Esto permite actualizar pantallas que ya están
+       * abiertas, como /my-profile.
+       */
+      window.dispatchEvent(
+        new CustomEvent("permuok:notification-created", {
+          detail: item,
+        }),
+      );
+
       onClose?.();
 
       if (path) {

@@ -141,6 +141,41 @@ function RealEstateProfile({ accountEmail }) {
     [realEstate],
   );
 
+  useEffect(() => {
+    const shouldWatchProfile =
+      isReview || isActiveChangesPending || isUnpaidChangesPending;
+
+    if (!shouldWatchProfile) {
+      return;
+    }
+
+    const interval = window.setInterval(async () => {
+      if (document.hidden) {
+        return;
+      }
+
+      await Promise.all([
+        actions.load({
+          preserveMessages: true,
+          silent: true,
+        }),
+        loadMe?.({
+          force: true,
+        }),
+      ]);
+    }, 15000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [
+    isReview,
+    isActiveChangesPending,
+    isUnpaidChangesPending,
+    actions.load,
+    loadMe,
+  ]);
+
   const banner = useMemo(() => {
     if (isActive) {
       return {
