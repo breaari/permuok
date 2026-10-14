@@ -42,11 +42,6 @@ export default function Register() {
       return;
     }
 
-    if (!isValidPhoneNumber(phone)) {
-      toast.error("El número de teléfono no es válido.");
-      return;
-    }
-
     if (!passwordIsValid) {
       toast.error("La contraseña no cumple todos los requisitos.");
       return;
