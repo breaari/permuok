@@ -6,8 +6,9 @@ function extractAddressComponent(components, type, short = false) {
   if (!item) return "";
 
   return (
-    (short ? item.shortText || item.short_name : item.longText || item.long_name) ||
-    ""
+    (short
+      ? item.shortText || item.short_name
+      : item.longText || item.long_name) || ""
   );
 }
 
@@ -35,6 +36,7 @@ export default function AddressField({
   const requestIdRef = useRef(0);
   const sessionTokenRef = useRef(null);
   const placesLibRef = useRef(null);
+  const suppressSearchRef = useRef(false);
 
   useEffect(() => {
     setInputValue(value || "");
@@ -80,6 +82,16 @@ export default function AddressField({
   }, [isLoaded, disabled, inputValue]);
 
   useEffect(() => {
+    if (suppressSearchRef.current) {
+      suppressSearchRef.current = false;
+
+      setSuggestions([]);
+      setOpen(false);
+      setLoading(false);
+      setActiveIndex(-1);
+
+      return;
+    }
     if (!canSearch || !placesLibRef.current) {
       setSuggestions([]);
       setOpen(false);
@@ -92,7 +104,8 @@ export default function AddressField({
 
     const timer = setTimeout(async () => {
       try {
-        const { AutocompleteSuggestion, AutocompleteSessionToken } = placesLibRef.current;
+        const { AutocompleteSuggestion, AutocompleteSessionToken } =
+          placesLibRef.current;
 
         if (!sessionTokenRef.current) {
           sessionTokenRef.current = new AutocompleteSessionToken();
@@ -132,12 +145,7 @@ export default function AddressField({
       if (!place) return;
 
       await place.fetchFields({
-        fields: [
-          "formattedAddress",
-          "location",
-          "id",
-          "addressComponents",
-        ],
+        fields: ["formattedAddress", "location", "id", "addressComponents"],
       });
 
       const components = place.addressComponents ?? [];
@@ -153,11 +161,12 @@ export default function AddressField({
           extractAddressComponent(components, "locality") ||
           extractAddressComponent(components, "administrative_area_level_2"),
         province: normalizeProvinceName(
-          extractAddressComponent(components, "administrative_area_level_1")
+          extractAddressComponent(components, "administrative_area_level_1"),
         ),
         postal_code: extractAddressComponent(components, "postal_code"),
       };
-
+      requestIdRef.current += 1;
+      suppressSearchRef.current = true;
       setInputValue(payload.address);
       setSuggestions([]);
       setOpen(false);
@@ -230,9 +239,7 @@ export default function AddressField({
           onKeyDown={handleKeyDown}
           disabled={disabled || !isLoaded}
           placeholder={
-            isLoaded
-              ? "Calle, altura, localidad..."
-              : "Cargando direcciones..."
+            isLoaded ? "Calle, altura, localidad..." : "Cargando direcciones..."
           }
           autoComplete="off"
           className="w-full pl-4 pr-10 py-3 rounded-lg border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none disabled:opacity-60"
@@ -254,8 +261,7 @@ export default function AddressField({
                 prediction?.mainText?.text ||
                 prediction?.text?.text ||
                 "Sin descripción";
-              const secondaryText =
-                prediction?.secondaryText?.text || "";
+              const secondaryText = prediction?.secondaryText?.text || "";
 
               return (
                 <button

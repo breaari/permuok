@@ -133,7 +133,7 @@ function getProfileValidation(profile) {
   };
 }
 
-function normalizeProfileFromApi(realEstate) {
+function normalizeProfileFromApi(realEstate, accountEmail = "") {
   return {
     name: realEstate?.name ?? "",
     legal_name: realEstate?.legal_name ?? "",
@@ -146,7 +146,7 @@ function normalizeProfileFromApi(realEstate) {
     address_province: realEstate?.address_province ?? "",
     address_postal_code: realEstate?.address_postal_code ?? "",
     phone: realEstate?.phone ?? "",
-    email: realEstate?.email ?? "",
+    email: realEstate?.email ?? normalizeText(accountEmail),
     website: realEstate?.website ?? "",
     instagram: realEstate?.instagram ?? "",
     facebook: realEstate?.facebook ?? "",
@@ -168,7 +168,7 @@ function buildProfilePayload(profile) {
   };
 }
 
-export function useRealEstateProfile({ loadMe }) {
+export function useRealEstateProfile({ loadMe, accountEmail = "" }) {
   const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -270,27 +270,42 @@ export function useRealEstateProfile({ loadMe }) {
     setErr("");
   }, []);
 
-  const load = useCallback(async ({ preserveMessages = false } = {}) => {
-    if (!preserveMessages) {
-      setErr("");
-    }
+  const load = useCallback(
+    async ({ preserveMessages = false, silent = false } = {}) => {
+      if (!preserveMessages) {
+        setErr("");
+      }
 
-    setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
 
-    try {
-      const res = await api.get("/real-estate/me");
-      const data = unwrap(res);
-      const realEstateData = data?.real_estate ?? null;
+      try {
+        const res = await api.get("/real-estate/me");
 
-      setRealEstate(realEstateData);
-      setProfile(normalizeProfileFromApi(realEstateData));
-      setLicenses(Array.isArray(data?.licenses) ? data.licenses : []);
-    } catch (e) {
-      setErr(getErrorMessage(e, "No se pudo cargar"));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+        const data = unwrap(res);
+
+        const realEstateData = data?.real_estate ?? null;
+
+        setRealEstate(realEstateData);
+
+        setProfile(normalizeProfileFromApi(realEstateData, accountEmail));
+
+        setLicenses(Array.isArray(data?.licenses) ? data.licenses : []);
+
+        return realEstateData;
+      } catch (e) {
+        setErr(getErrorMessage(e, "No se pudo cargar"));
+
+        return null;
+      } finally {
+        if (!silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [accountEmail],
+  );
 
   useEffect(() => {
     load();
@@ -305,7 +320,10 @@ export function useRealEstateProfile({ loadMe }) {
         const payload = buildProfilePayload(profile);
 
         await api.post("/real-estate/profile", payload);
-        await load({ preserveMessages: true });
+        await load({
+          preserveMessages: true,
+          silent: true,
+        });
         await loadMe?.({ force: true });
 
         toast.success("Perfil guardado correctamente.");

@@ -21,7 +21,9 @@ export function ProfileFormSection({
         <h2 className="text-xl font-bold">Datos de la Inmobiliaria</h2>
 
         {isLocked ? (
-          <span className="text-xs font-semibold text-slate-500">Bloqueado</span>
+          <span className="text-xs font-semibold text-slate-500">
+            Bloqueado
+          </span>
         ) : isActiveChangesPending ? (
           <span className="text-xs font-semibold text-amber-700">
             Cambios pendientes
@@ -79,7 +81,7 @@ export function ProfileFormSection({
                   ...p,
                   legal_name: v.replace(
                     /[^A-Za-zÁÉÍÓÚáéíóúÑñ0-9\s.&,'\-()/]/g,
-                    ""
+                    "",
                   ),
                 }))
               }
@@ -102,8 +104,8 @@ export function ProfileFormSection({
               label="Email de contacto"
               type="email"
               value={profile.email}
-              onChange={(v) => setProfile((p) => ({ ...p, email: v }))}
-              placeholder="info@inmobiliaria.com"
+              readOnly
+              helperText="Usamos el email verificado de tu cuenta."
             />
 
             <div className="md:col-span-2">
@@ -135,9 +137,7 @@ export function ProfileFormSection({
             <PhoneField
               label="Teléfono"
               value={profile.phone || ""}
-              onChange={(v) =>
-                setProfile((p) => ({ ...p, phone: v || "" }))
-              }
+              onChange={(v) => setProfile((p) => ({ ...p, phone: v || "" }))}
               disabled={isLocked}
               defaultCountry="AR"
               variant="profile"

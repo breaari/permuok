@@ -9,7 +9,7 @@ export function ProfileLicensesSection({
   onOpenModal,
 }) {
   const isLocked = isReview;
-  const canManageLicenses = !isLocked && hasRealEstate;
+  const canManageLicenses = !isLocked;
 
   return (
     <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -26,11 +26,13 @@ export function ProfileLicensesSection({
               </p>
             ) : isRejected ? (
               <p className="text-xs text-rose-700 mt-1">
-                Revisá y corregí tus matrículas antes de volver a enviar el perfil.
+                Revisá y corregí tus matrículas antes de volver a enviar el
+                perfil.
               </p>
             ) : isLocked ? (
               <p className="text-xs text-slate-500 mt-1">
-                No podés editar las matrículas mientras el perfil está en revisión.
+                No podés editar las matrículas mientras el perfil está en
+                revisión.
               </p>
             ) : null}
           </div>
@@ -51,11 +53,21 @@ export function ProfileLicensesSection({
       </div>
 
       {!hasRealEstate ? (
-        <div className="p-8 md:p-12 text-center">
-          <p className="text-base md:text-lg font-bold">Primero completá tu perfil</p>
-          <p className="text-slate-500 text-sm mt-1">
-            Guardá los datos de la inmobiliaria para poder cargar matrículas.
-          </p>
+        <div className="p-8 md:p-12 flex flex-col items-center justify-center text-center space-y-3">
+          <div className="size-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+            <Icon name="badge" size={28} />
+          </div>
+
+          <div className="max-w-sm">
+            <p className="text-base md:text-lg font-bold text-slate-900">
+              Agregá tu matrícula profesional
+            </p>
+
+            <p className="text-slate-500 text-sm mt-1">
+              Al agregar tu primera matrícula guardaremos automáticamente los
+              datos que completaste arriba.
+            </p>
+          </div>
         </div>
       ) : licenses.length === 0 ? (
         <div className="p-8 md:p-12 flex flex-col items-center justify-center text-center space-y-4">

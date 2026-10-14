@@ -37,10 +37,10 @@ export default function MyProfile() {
     return <MyUserProfile />;
   }
 
-  return <RealEstateProfile />;
+  return <RealEstateProfile accountEmail={user?.email || ""} />;
 }
 
-function RealEstateProfile() {
+function RealEstateProfile({ accountEmail }) {
   const { access, loadMe } = useAuth();
   const nav = useNavigate();
 
@@ -58,7 +58,10 @@ function RealEstateProfile() {
     actions,
     profileValidation,
     profileProgress,
-  } = useRealEstateProfile({ loadMe });
+  } = useRealEstateProfile({
+    loadMe,
+    accountEmail,
+  });
 
   const [licenseOpen, setLicenseOpen] = useState(false);
   const [showSubmitReason, setShowSubmitReason] = useState(false);
@@ -237,6 +240,21 @@ function RealEstateProfile() {
     return <div className="p-6 text-sm text-slate-500">Cargando...</div>;
   }
 
+  async function handleOpenLicense() {
+    if (hasRealEstate) {
+      setLicenseOpen(true);
+      return;
+    }
+
+    const saved = await actions.saveProfile();
+
+    if (!saved) {
+      return;
+    }
+
+    setLicenseOpen(true);
+  }
+
   return (
     <div className="bg-background-light min-h-[calc(100vh-64px)]">
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 md:px-6 py-8 pb-32">
@@ -278,7 +296,7 @@ function RealEstateProfile() {
             isActiveChangesPending || isUnpaidChangesPending
           }
           hasRealEstate={hasRealEstate}
-          onOpenModal={() => setLicenseOpen(true)}
+          onOpenModal={handleOpenLicense}
         />
 
         {showSubmitReason && !canSubmit && submitBlockReason && (
