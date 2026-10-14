@@ -21,7 +21,9 @@ class PasswordResetService
         string $email
     ): void {
         $email =
-            strtolower(trim($email));
+            strtolower(
+                trim($email)
+            );
 
         if (
             $email === '' ||
@@ -36,32 +38,37 @@ class PasswordResetService
             );
         }
 
-        $pdo = self::db();
+        $pdo =
+            self::db();
 
         $stmt = $pdo->prepare("
-            SELECT
-                id,
-                first_name,
-                email,
-                is_active
-            FROM users
-            WHERE email = :email
-              AND deleted_at IS NULL
-            LIMIT 1
-        ");
+        SELECT
+            id,
+            first_name,
+            last_name,
+            email,
+            is_active
+        FROM users
+        WHERE email = :email
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
 
         $stmt->execute([
-            'email' => $email,
+            'email' =>
+            $email,
         ]);
 
         $user =
-            $stmt->fetch(PDO::FETCH_ASSOC);
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            );
 
         /*
-         * La respuesta pública será siempre igual.
-         * Si el usuario no existe o está inactivo,
-         * no generamos ningún correo.
-         */
+     * La respuesta pública será siempre igual.
+     * Si el usuario no existe o está inactivo,
+     * no generamos ningún correo.
+     */
         if (
             !$user ||
             (int)$user['is_active'] !== 1
@@ -70,10 +77,15 @@ class PasswordResetService
         }
 
         $token =
-            bin2hex(random_bytes(32));
+            bin2hex(
+                random_bytes(32)
+            );
 
         $tokenHash =
-            hash('sha256', $token);
+            hash(
+                'sha256',
+                $token
+            );
 
         $frontendUrl =
             rtrim(
@@ -94,7 +106,12 @@ class PasswordResetService
                 (string)(
                     $user['first_name']
                     ?? ''
-                )
+                ) .
+                    ' ' .
+                    (string)(
+                        $user['last_name']
+                        ?? ''
+                    )
             );
 
         $safeName =
@@ -113,72 +130,444 @@ class PasswordResetService
                 'UTF-8'
             );
 
-        $htmlBody = "
-            <div style=\"font-family:Arial,sans-serif;color:#0f172a;line-height:1.6\">
-                <h2>Restablecé tu contraseña</h2>
+        /*
+    |--------------------------------------------------------------------------
+    | HTML
+    |--------------------------------------------------------------------------
+    */
+        $htmlBody = <<<HTML
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
-                <p>{$safeName}, recibimos una solicitud para cambiar la contraseña de tu cuenta de PermuOK.</p>
+<html
+    xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:v="urn:schemas-microsoft-com:vml"
+    xmlns:o="urn:schemas-microsoft-com:office:office"
+>
+<head>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    />
 
-                <p>
-                    <a
-                        href=\"{$safeUrl}\"
-                        style=\"display:inline-block;padding:12px 20px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold\"
+    <meta
+        http-equiv="Content-Type"
+        content="text/html; charset=UTF-8"
+    />
+
+    <meta
+        name="format-detection"
+        content="telephone=no, date=no, address=no, email=no"
+    />
+
+    <meta
+        name="x-apple-disable-message-reformatting"
+    />
+
+    <style>
+        body {
+            margin:0;
+            padding:0;
+        }
+
+        table {
+            mso-table-lspace:0;
+            mso-table-rspace:0;
+        }
+
+        p,
+        span,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            margin:0;
+            padding:0;
+        }
+
+        a[x-apple-data-detectors] {
+            color:inherit !important;
+            text-decoration:inherit !important;
+        }
+
+        #MessageViewBody a {
+            color:inherit;
+            text-decoration:none;
+        }
+
+        img + div {
+            display:none;
+        }
+
+        @media (max-width:599px) {
+            .email-container {
+                width:100% !important;
+                min-width:0 !important;
+            }
+
+            .email-content {
+                padding-left:28px !important;
+                padding-right:28px !important;
+            }
+
+            .email-title {
+                font-size:18px !important;
+            }
+        }
+    </style>
+
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <w:WordDocument
+                xmlns:w="urn:schemas-microsoft-com:office:word"
+            >
+                <w:DontUseAdvancedTypographyReadingMail/>
+            </w:WordDocument>
+
+            <o:OfficeDocumentSettings>
+                <o:AllowPNG/>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+</head>
+
+<body
+    style="
+        width:100%;
+        -webkit-text-size-adjust:100%;
+        text-size-adjust:100%;
+        background-color:#f0f1f5;
+        margin:0;
+        padding:0;
+    "
+>
+    <table
+        width="100%"
+        border="0"
+        cellpadding="0"
+        cellspacing="0"
+        bgcolor="#f0f1f5"
+        role="presentation"
+        style="
+            background-color:#f0f1f5;
+        "
+    >
+        <tbody>
+            <tr>
+                <td
+                    align="center"
+                    style="
+                        background-color:#f0f1f5;
+                        padding:24px 12px;
+                    "
+                >
+
+                    <!--[if mso]>
+                    <table
+                        align="center"
+                        border="0"
+                        cellpadding="0"
+                        cellspacing="0"
+                        width="600"
                     >
-                        Crear nueva contraseña
-                    </a>
-                </p>
+                        <tbody>
+                            <tr>
+                                <td>
+                    <![endif]-->
 
-                <p>Este enlace vence en 30 minutos y puede utilizarse una sola vez.</p>
+                    <table
+                        align="center"
+                        width="600"
+                        border="0"
+                        cellpadding="0"
+                        cellspacing="0"
+                        role="presentation"
+                        class="email-container"
+                        style="
+                            max-width:600px;
+                            width:600px;
+                            min-width:600px;
+                            margin:0 auto;
+                            background-color:#ffffff;
+                            border-radius:15px;
+                            overflow:hidden;
+                        "
+                    >
+                        <tbody>
 
-                <p>Si no realizaste esta solicitud, podés ignorar este mensaje.</p>
-            </div>
-        ";
+                            <!-- LOGO -->
+                            <tr>
+                                <td
+                                    align="center"
+                                    style="
+                                        padding:41px 24px 34px;
+                                    "
+                                >
+                                    <img
+                                        src="https://bq5galnul0ejsuneypmqfsatucvdbtiujlng6snj7ao.canva-cdn.email/5c81845de64595f7c957ccdbef7b99c0.png"
+                                        width="234"
+                                        alt="Permuok"
+                                        style="
+                                            display:block;
+                                            width:234px;
+                                            height:auto;
+                                            max-width:100%;
+                                            border:0;
+                                        "
+                                    />
+                                </td>
+                            </tr>
 
+                            <!-- TEXTO PRINCIPAL -->
+                            <tr>
+                                <td
+                                    class="email-content"
+                                    style="
+                                        padding:0 56px 28px;
+                                        color:#0e1b10;
+                                        font-family:Arial, Helvetica, sans-serif;
+                                        text-align:left;
+                                    "
+                                >
+                                    <div
+                                        class="email-title"
+                                        style="
+                                            font-size:20px;
+                                            font-weight:700;
+                                            line-height:1.4;
+                                            margin-bottom:20px;
+                                        "
+                                    >
+                                        Restablecé tu contraseña
+                                    </div>
+
+                                    <div
+                                        style="
+                                            font-size:16px;
+                                            line-height:1.5;
+                                        "
+                                    >
+                                        {$safeName}, recibimos una solicitud para crear una nueva contraseña para tu cuenta de Permuok.
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- BOTÓN -->
+                            <tr>
+                                <td
+                                    align="center"
+                                    style="
+                                        padding:0 24px 34px;
+                                    "
+                                >
+
+                                    <!--[if mso]>
+                                    <v:roundrect
+                                        xmlns:v="urn:schemas-microsoft-com:vml"
+                                        xmlns:w="urn:schemas-microsoft-com:office:word"
+                                        href="{$safeUrl}"
+                                        style="
+                                            height:64px;
+                                            width:336px;
+                                            v-text-anchor:middle;
+                                        "
+                                        arcsize="23%"
+                                        fillcolor="#61b228"
+                                        strokecolor="#61b228"
+                                    >
+                                        <w:anchorlock/>
+
+                                        <center
+                                            style="
+                                                color:#ffffff;
+                                                font-family:Arial,sans-serif;
+                                                font-size:18px;
+                                                font-weight:700;
+                                            "
+                                        >
+                                            Crear nueva contraseña
+                                        </center>
+                                    </v:roundrect>
+                                    <![endif]-->
+
+                                    <!--[if !mso]><!-->
+                                    <table
+                                        role="presentation"
+                                        cellpadding="0"
+                                        cellspacing="0"
+                                        border="0"
+                                        width="336"
+                                        style="
+                                            width:336px;
+                                            max-width:100%;
+                                            border-collapse:separate;
+                                            border-spacing:0;
+                                        "
+                                    >
+                                        <tbody>
+                                            <tr>
+                                                <td
+                                                    bgcolor="#61b228"
+                                                    style="
+                                                        background-color:#61b228;
+                                                        border-radius:15px;
+                                                    "
+                                                >
+                                                    <a
+                                                        href="{$safeUrl}"
+                                                        target="_blank"
+                                                        rel="noopener"
+                                                        style="
+                                                            color:#ffffff;
+                                                            text-decoration:none;
+                                                            display:block;
+                                                            padding:19px 8px;
+                                                            text-align:center;
+                                                            font-family:Arial, Helvetica, sans-serif;
+                                                            font-size:18px;
+                                                            font-weight:700;
+                                                            line-height:26px;
+                                                            box-sizing:border-box;
+                                                        "
+                                                    >
+                                                        Crear nueva contraseña
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <!--<![endif]-->
+
+                                </td>
+                            </tr>
+
+                            <!-- AVISO -->
+                            <tr>
+                                <td
+                                    class="email-content"
+                                    style="
+                                        padding:0 56px 38px;
+                                        color:#0e1b10;
+                                        font-family:Arial, Helvetica, sans-serif;
+                                        font-size:13px;
+                                        line-height:1.7;
+                                        text-align:left;
+                                    "
+                                >
+                                    Por seguridad, este enlace vence en 30 minutos y puede utilizarse una sola vez.
+                                    <br /><br />
+
+                                    Si no solicitaste este cambio, podés ignorar este correo.
+                                    <br />
+                                    Tu contraseña actual seguirá siendo la misma.
+                                </td>
+                            </tr>
+
+                            <!-- FOOTER -->
+                            <tr>
+                                <td
+                                    align="center"
+                                    style="
+                                        padding:0;
+                                        border-radius:0 0 15px 15px;
+                                        overflow:hidden;
+                                    "
+                                >
+                                    <img
+                                        src="https://bq5galnul0ejsuneypmqfsatucvdbtiujlng6snj7ao.canva-cdn.email/501d4de26b08500ce5411130a1f950d2.png"
+                                        width="600"
+                                        alt="Estamos para acompañarte"
+                                        style="
+                                            display:block;
+                                            width:600px;
+                                            height:auto;
+                                            max-width:100%;
+                                            border:0;
+                                            border-radius:0 0 15px 15px;
+                                        "
+                                    />
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+
+                    <!--[if mso]>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <![endif]-->
+
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>
+HTML;
+
+        /*
+    |--------------------------------------------------------------------------
+    | Texto plano
+    |--------------------------------------------------------------------------
+    */
         $textBody =
-            "Restablecé tu contraseña de PermuOK:\n\n" .
+            "Restablecé tu contraseña\n\n" .
+            (
+                $recipientName !== ''
+                ? $recipientName . ", "
+                : ''
+            ) .
+            "recibimos una solicitud para crear una nueva contraseña para tu cuenta de Permuok.\n\n" .
+            "Crear nueva contraseña:\n" .
             $resetUrl .
-            "\n\nEl enlace vence en 30 minutos y puede utilizarse una sola vez.";
+            "\n\n" .
+            "Por seguridad, este enlace vence en 30 minutos y puede utilizarse una sola vez.\n\n" .
+            "Si no solicitaste este cambio, podés ignorar este correo. Tu contraseña actual seguirá siendo la misma.";
 
         $pdo->beginTransaction();
 
         try {
             /*
-     * Serializamos las solicitudes de recuperación
-     * de una misma cuenta.
-     *
-     * Esto evita que dos solicitudes simultáneas
-     * puedan crear dos enlaces válidos.
-     */
+         * Serializamos las solicitudes de recuperación
+         * de una misma cuenta.
+         */
             $lockUser = $pdo->prepare("
-        SELECT id
-        FROM users
-        WHERE id = :user_id
-          AND deleted_at IS NULL
-        LIMIT 1
-        FOR UPDATE
-    ");
+            SELECT id
+            FROM users
+            WHERE id = :user_id
+              AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+        ");
 
             $lockUser->execute([
                 'user_id' =>
                 (int)$user['id'],
             ]);
 
-            if (!$lockUser->fetchColumn()) {
+            if (
+                !$lockUser->fetchColumn()
+            ) {
                 $pdo->rollBack();
 
                 return;
             }
 
             /*
-     * Invalidamos enlaces anteriores que todavía
-     * no hayan sido utilizados.
-     */
+         * Invalidamos enlaces anteriores.
+         */
             $invalidate = $pdo->prepare("
-                UPDATE password_reset_tokens
-                SET used_at = NOW()
-                WHERE user_id = :user_id
-                  AND used_at IS NULL
-            ");
+            UPDATE password_reset_tokens
+            SET used_at = NOW()
+            WHERE user_id = :user_id
+              AND used_at IS NULL
+        ");
 
             $invalidate->execute([
                 'user_id' =>
@@ -186,19 +575,20 @@ class PasswordResetService
             ]);
 
             $insert = $pdo->prepare("
-                INSERT INTO password_reset_tokens (
-                    user_id,
-                    token_hash,
-                    expires_at
-                ) VALUES (
-                    :user_id,
-                    :token_hash,
-                    DATE_ADD(
-                        NOW(),
-                        INTERVAL 30 MINUTE
-                    )
+            INSERT INTO password_reset_tokens (
+                user_id,
+                token_hash,
+                expires_at
+            )
+            VALUES (
+                :user_id,
+                :token_hash,
+                DATE_ADD(
+                    NOW(),
+                    INTERVAL 30 MINUTE
                 )
-            ");
+            )
+        ");
 
             $insert->execute([
                 'user_id' =>
@@ -214,7 +604,7 @@ class PasswordResetService
             EmailJobService::enqueue(
                 (string)$user['email'],
                 'password_reset',
-                'Restablecé tu contraseña de PermuOK',
+                'Restablecé tu contraseña',
                 $htmlBody,
                 $textBody,
                 (int)$user['id'],
@@ -229,7 +619,9 @@ class PasswordResetService
 
             $pdo->commit();
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) {
+            if (
+                $pdo->inTransaction()
+            ) {
                 $pdo->rollBack();
             }
 
