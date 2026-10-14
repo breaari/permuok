@@ -371,56 +371,76 @@ export function useRealEstateProfile({ loadMe, accountEmail = "" }) {
   );
 
   const submitReview = useCallback(async () => {
-  setErr("");
+    setErr("");
 
-  const validation = getProfileValidation(profile);
+    const validation = getProfileValidation(profile);
 
-  if (!validation.ok) {
-    toast.error(validation.reason);
-    return false;
-  }
+    if (!validation.ok) {
+      toast.error(validation.reason);
+      return false;
+    }
 
-  if (!hasLicenses) {
-    toast.error("Agregá al menos una matrícula.");
-    return false;
-  }
+    if (!hasLicenses) {
+      toast.error("Agregá al menos una matrícula.");
+      return false;
+    }
 
-  try {
-    /*
-     * Guardamos primero exactamente lo que el usuario
-     * tiene actualmente en pantalla.
-     */
-    const payload = buildProfilePayload(profile);
+    try {
+      /*
+       * Guardamos primero exactamente lo que el usuario
+       * tiene actualmente en pantalla.
+       */
+      const payload = buildProfilePayload(profile);
 
-    await api.post("/real-estate/profile", payload);
+      await api.post("/real-estate/profile", payload);
 
-    /*
-     * Recién cuando el guardado terminó correctamente
-     * enviamos el perfil a revisión.
-     */
-    await api.post("/real-estate/submit-review", {});
+      /*
+       * Recién cuando el guardado terminó correctamente
+       * enviamos el perfil a revisión.
+       */
+      await api.post("/real-estate/submit-review", {});
 
-    await load({
-      preserveMessages: true,
-      silent: true,
-    });
+      await load({
+        preserveMessages: true,
+        silent: true,
+      });
 
-    await loadMe?.({
-      force: true,
-    });
+      await loadMe?.({
+        force: true,
+      });
 
-    toast.success("Perfil enviado a revisión correctamente.");
+      toast.success("Perfil enviado a revisión correctamente.");
 
-    return true;
-  } catch (e2) {
-    const message = getErrorMessage(
-      e2,
-      "No se pudo enviar el perfil a revisión",
-    );
+      return true;
+    } catch (e2) {
+      const message = getErrorMessage(
+        e2,
+        "No se pudo enviar el perfil a revisión",
+      );
 
-    toast.error(message);
+      toast.error(message);
 
-    return false;
-  }
-}, [profile, hasLicenses, load, loadMe, toast]);
+      return false;
+    }
+  }, [profile, hasLicenses, load, loadMe, toast]);
+  return {
+    loading,
+    err,
+    setErr,
+    clearMessages,
+    realEstate,
+    profile,
+    setProfile,
+    licenses,
+    profileOk,
+    profileValidation,
+    hasLicenses,
+    profileProgress,
+    actions: {
+      load,
+      saveProfile,
+      addLicense,
+      submitReview,
+    },
+  };
 }

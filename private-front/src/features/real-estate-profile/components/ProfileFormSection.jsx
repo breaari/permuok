@@ -18,28 +18,7 @@ export function ProfileFormSection({
     <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-8">
       <div className="p-6 border-b border-slate-100 flex items-center justify-between">
         <h2 className="text-xl font-bold">Datos de la Inmobiliaria</h2>
-
-        {isLocked ? (
-          <span className="text-xs font-semibold text-slate-500">
-            Bloqueado
-          </span>
-        ) : isActiveChangesPending ? (
-          <span className="text-xs font-semibold text-amber-700">
-            Cambios pendientes
-          </span>
-        ) : isRejected ? (
-          <span className="text-xs font-semibold text-rose-700">
-            Revisión rechazada
-          </span>
-        ) : null}
       </div>
-
-      {isActiveChangesPending && (
-        <div className="mx-6 mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Guardá los cambios que necesites. Tu cuenta sigue disponible, pero las
-          modificaciones del perfil quedarán pendientes de revisión.
-        </div>
-      )}
 
       <form
         id="profileForm"

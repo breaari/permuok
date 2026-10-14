@@ -3,7 +3,6 @@ import { Icon } from "../../../ui/icons/Index";
 export function ProfileLicensesSection({
   licenses,
   isReview,
-  isActiveChangesPending,
   hasRealEstate,
   onOpenModal,
 }) {
@@ -19,11 +18,7 @@ export function ProfileLicensesSection({
               Matrículas / Licencias
             </h2>
 
-            {isActiveChangesPending ? (
-              <p className="text-xs text-amber-700 mt-1">
-                Los cambios en matrículas quedarán sujetos a revisión.
-              </p>
-            ) : isLocked ? (
+            {isLocked ? (
               <p className="text-xs text-slate-500 mt-1">
                 No podés editar las matrículas mientras el perfil está en
                 revisión.

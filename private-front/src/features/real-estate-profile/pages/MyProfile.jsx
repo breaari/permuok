@@ -330,9 +330,6 @@ function RealEstateProfile({ accountEmail }) {
         <ProfileLicensesSection
           licenses={licenses}
           isReview={isReview}
-          isActiveChangesPending={
-            isActiveChangesPending || isUnpaidChangesPending
-          }
           hasRealEstate={hasRealEstate}
           onOpenModal={handleOpenLicense}
         />
