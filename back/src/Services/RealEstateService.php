@@ -16,21 +16,36 @@ class RealEstateService
     private static function getUser(int $userId): array
     {
         $pdo = self::db();
+
         $st = $pdo->prepare("
-            SELECT id, role, real_estate_id
-            FROM users
-            WHERE id = :id
-              AND deleted_at IS NULL
-            LIMIT 1
-        ");
-        $st->execute(['id' => $userId]);
+        SELECT
+            id,
+            role,
+            real_estate_id,
+            email,
+            email_verified_at
+        FROM users
+        WHERE id = :id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+
+        $st->execute([
+            'id' => $userId,
+        ]);
+
         $u = $st->fetch();
 
         if (!$u) {
-            throw new Exception("Usuario no encontrado");
+            throw new Exception(
+                "Usuario no encontrado"
+            );
         }
-        if ((int) $u['role'] !== 2) {
-            throw new Exception("No autorizado");
+
+        if ((int)$u['role'] !== 2) {
+            throw new Exception(
+                "No autorizado"
+            );
         }
 
         return $u;
@@ -116,6 +131,53 @@ class RealEstateService
         $u = self::getUser($userId);
         $pdo = self::db();
 
+        /*
+|--------------------------------------------------------------------------
+| Email de contacto
+|--------------------------------------------------------------------------
+|
+| Durante el onboarding usamos el mismo email
+| verificado con el que se creó la cuenta.
+|
+| No permitimos modificarlo desde el payload
+| del perfil.
+|
+*/
+        $accountEmail =
+            strtolower(
+                trim(
+                    (string)(
+                        $u['email']
+                        ?? ''
+                    )
+                )
+            );
+
+        if (
+            $accountEmail === '' ||
+            !filter_var(
+                $accountEmail,
+                FILTER_VALIDATE_EMAIL
+            )
+        ) {
+            throw new Exception(
+                'El usuario no tiene un email válido',
+                422
+            );
+        }
+
+        if (
+            empty($u['email_verified_at'])
+        ) {
+            throw new Exception(
+                'Primero verificá tu email',
+                403
+            );
+        }
+
+        $data['email'] =
+            $accountEmail;
+
         self::normalizeAddressMapFields($data);
         self::normalizeDraftFields($data);
         $allowed = [
@@ -195,13 +257,13 @@ class RealEstateService
 
                     return [
                         'real_estate_id' =>
-                            $existingRealEstateId,
+                        $existingRealEstateId,
 
                         'created' =>
-                            false,
+                        false,
 
                         'message' =>
-                            'El perfil ya fue creado.',
+                        'El perfil ya fue creado.',
                     ];
                 }
 
@@ -254,52 +316,52 @@ class RealEstateService
 
                 $st->execute([
                     'name' =>
-                        $data['name'] ?? null,
+                    $data['name'] ?? null,
 
                     'legal_name' =>
-                        $data['legal_name'] ?? null,
+                    $data['legal_name'] ?? null,
 
                     'cuit' =>
-                        $data['cuit'] ?? null,
+                    $data['cuit'] ?? null,
 
                     'address' =>
-                        $data['address'] ?? null,
+                    $data['address'] ?? null,
 
                     'address_place_id' =>
-                        $data['address_place_id'] ?? null,
+                    $data['address_place_id'] ?? null,
 
                     'address_lat' =>
-                        $data['address_lat'] ?? null,
+                    $data['address_lat'] ?? null,
 
                     'address_lng' =>
-                        $data['address_lng'] ?? null,
+                    $data['address_lng'] ?? null,
 
                     'address_locality' =>
-                        $data['address_locality'] ?? null,
+                    $data['address_locality'] ?? null,
 
                     'address_province' =>
-                        $data['address_province'] ?? null,
+                    $data['address_province'] ?? null,
 
                     'address_postal_code' =>
-                        $data['address_postal_code'] ?? null,
+                    $data['address_postal_code'] ?? null,
 
                     'phone' =>
-                        $data['phone'] ?? null,
+                    $data['phone'] ?? null,
 
                     'email' =>
-                        $data['email'] ?? null,
+                    $data['email'] ?? null,
 
                     'website' =>
-                        $data['website'] ?? null,
+                    $data['website'] ?? null,
 
                     'instagram' =>
-                        $data['instagram'] ?? null,
+                    $data['instagram'] ?? null,
 
                     'facebook' =>
-                        $data['facebook'] ?? null,
+                    $data['facebook'] ?? null,
 
                     'profile_status' =>
-                        RealEstateProfileStatus::DRAFT,
+                    RealEstateProfileStatus::DRAFT,
                 ]);
 
                 $realEstateId =
@@ -314,20 +376,20 @@ class RealEstateService
 
                 $st->execute([
                     're' =>
-                        $realEstateId,
+                    $realEstateId,
 
                     'uid' =>
-                        $userId,
+                    $userId,
                 ]);
 
                 $pdo->commit();
 
                 return [
                     'real_estate_id' =>
-                        $realEstateId,
+                    $realEstateId,
 
                     'created' =>
-                        true,
+                    true,
                 ];
             } catch (\Throwable $e) {
                 $pdo->rollBack();
@@ -588,7 +650,7 @@ class RealEstateService
 
             $lockRealEstate->execute([
                 'id' =>
-                    (int) $u['real_estate_id'],
+                (int) $u['real_estate_id'],
             ]);
 
             $current =
@@ -626,7 +688,7 @@ class RealEstateService
 
             $licenseCountStmt->execute([
                 'real_estate_id' =>
-                    (int) $u['real_estate_id'],
+                (int) $u['real_estate_id'],
             ]);
 
             $licenseCount =
