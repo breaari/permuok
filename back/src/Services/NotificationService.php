@@ -254,11 +254,6 @@ class NotificationService
         array $conversation = [],
         ?PDO $pdo = null
     ): void {
-        /*
-    |--------------------------------------------------------------------------
-    | Notificación interna
-    |--------------------------------------------------------------------------
-    */
         self::createConversationNotification(
             $userId,
             'new_conversation',
@@ -268,11 +263,6 @@ class NotificationService
             $pdo
         );
 
-        /*
-    |--------------------------------------------------------------------------
-    | Destinatario
-    |--------------------------------------------------------------------------
-    */
         $recipient =
             self::getEmailRecipient(
                 $userId
@@ -290,11 +280,6 @@ class NotificationService
         $emailSubject =
             "Nueva consulta sobre {$subjectName}";
 
-        /*
-    |--------------------------------------------------------------------------
-    | URL directa a la conversación
-    |--------------------------------------------------------------------------
-    */
         $frontendUrl =
             rtrim(
                 (string)(
@@ -309,11 +294,6 @@ class NotificationService
             '/conversations/' .
             $conversationId;
 
-        /*
-    |--------------------------------------------------------------------------
-    | Datos dinámicos
-    |--------------------------------------------------------------------------
-    */
         $opportunityTitle =
             trim(
                 (string)(
@@ -381,15 +361,6 @@ class NotificationService
                 )
             );
 
-        /*
-    |--------------------------------------------------------------------------
-    | Imagen
-    |--------------------------------------------------------------------------
-    |
-    | ConversationService devuelve una URL relativa firmada.
-    | Para email necesitamos convertirla a URL absoluta.
-    |
-    */
         $imageUrl =
             trim(
                 (string)(
@@ -423,13 +394,15 @@ class NotificationService
         }
 
         $htmlBody =
-            self::buildNewConversationEmail(
+            self::buildConversationEmail(
+                'Tenés una nueva consulta',
                 $opportunityTitle,
                 $opportunityLocation,
                 $opportunityType,
                 $imageUrl,
                 $senderLabel,
                 $messagePreview,
+                'Ver consulta',
                 $buttonUrl
             );
 
@@ -465,6 +438,7 @@ class NotificationService
         );
     }
 
+
     public static function notifyNewMessage(
         int $userId,
         int $conversationId,
@@ -472,8 +446,10 @@ class NotificationService
         ?PDO $pdo = null
     ): void {
         /*
-     * 1. Conservamos la notificación interna.
-     */
+    |--------------------------------------------------------------------------
+    | Notificación interna
+    |--------------------------------------------------------------------------
+    */
         self::createConversationNotification(
             $userId,
             'new_message',
@@ -484,8 +460,10 @@ class NotificationService
         );
 
         /*
-     * 2. Resolvemos el usuario destinatario.
-     */
+    |--------------------------------------------------------------------------
+    | Destinatario
+    |--------------------------------------------------------------------------
+    */
         $recipient =
             self::getEmailRecipient(
                 $userId
@@ -503,38 +481,226 @@ class NotificationService
         $emailSubject =
             "Nuevo mensaje en {$subjectName}";
 
-        $message =
-            'Recibiste un nuevo mensaje en una conversación de Permuok.';
-
         /*
-     * De momento usamos APP_URL.
-     * Después confirmamos la ruta exacta del frontend
-     * para abrir directamente esa conversación.
-     */
-        $appUrl = rtrim(
-            (string)(
-                $_ENV['APP_URL']
-                ?? 'https://permuok.com'
-            ),
-            '/'
-        );
+    |--------------------------------------------------------------------------
+    | URL directa al chat
+    |--------------------------------------------------------------------------
+    */
+        $frontendUrl =
+            rtrim(
+                (string)(
+                    $_ENV['FRONTEND_URL']
+                    ?? 'https://permuok.com'
+                ),
+                '/'
+            );
 
         $buttonUrl =
-            $appUrl;
+            $frontendUrl .
+            '/conversations/' .
+            $conversationId;
 
+        /*
+    |--------------------------------------------------------------------------
+    | Oportunidad
+    |--------------------------------------------------------------------------
+    */
+        $opportunityTitle =
+            trim(
+                (string)(
+                    $conversation['opportunity_title']
+                    ?? $conversation['subject']
+                    ?? 'Oportunidad'
+                )
+            );
+
+        $opportunityLocation =
+            trim(
+                (string)(
+                    $conversation['opportunity_location']
+                    ?? ''
+                )
+            );
+
+        $opportunityType =
+            match ((string)(
+                $conversation['opportunity_type']
+                ?? ''
+            )) {
+                'property' =>
+                'Propiedad',
+
+                'search_request' =>
+                'Búsqueda',
+
+                'development' =>
+                'Desarrollo',
+
+                default =>
+                'Oportunidad',
+            };
+
+        /*
+    |--------------------------------------------------------------------------
+    | Mensaje
+    |--------------------------------------------------------------------------
+    */
+        $messagePreview =
+            trim(
+                (string)(
+                    $conversation['message_preview']
+                    ?? ''
+                )
+            );
+
+        if (
+            mb_strlen(
+                $messagePreview,
+                'UTF-8'
+            ) > 220
+        ) {
+            $messagePreview =
+                mb_substr(
+                    $messagePreview,
+                    0,
+                    217,
+                    'UTF-8'
+                ) .
+                '...';
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Identidad del remitente
+    |--------------------------------------------------------------------------
+    */
+        $senderLabel =
+            'Una inmobiliaria de la red';
+
+        $contactShared =
+            (int)(
+                $conversation['contact_shared']
+                ?? 0
+            ) === 1;
+
+        $senderUserId =
+            (int)(
+                $conversation['sender_user_id']
+                ?? 0
+            );
+
+        if (
+            $contactShared &&
+            $senderUserId > 0
+        ) {
+            $db =
+                $pdo
+                ?? self::db();
+
+            $stSender =
+                $db->prepare("
+                SELECT
+                    re.name
+                FROM users u
+
+                LEFT JOIN real_estates re
+                    ON re.id = u.real_estate_id
+
+                WHERE u.id = :user_id
+                  AND u.deleted_at IS NULL
+
+                LIMIT 1
+            ");
+
+            $stSender->execute([
+                'user_id' =>
+                $senderUserId,
+            ]);
+
+            $realEstateName =
+                trim(
+                    (string)(
+                        $stSender->fetchColumn()
+                        ?: ''
+                    )
+                );
+
+            if ($realEstateName !== '') {
+                $senderLabel =
+                    $realEstateName;
+            }
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Imagen
+    |--------------------------------------------------------------------------
+    */
+        $imageUrl =
+            trim(
+                (string)(
+                    $conversation['opportunity_image_url']
+                    ?? ''
+                )
+            );
+
+        if (
+            $imageUrl !== '' &&
+            str_starts_with(
+                $imageUrl,
+                '/'
+            )
+        ) {
+            $backendUrl =
+                rtrim(
+                    (string)(
+                        $_ENV['BACKEND_URL']
+                        ?? $_ENV['APP_URL']
+                        ?? ''
+                    ),
+                    '/'
+                );
+
+            if ($backendUrl !== '') {
+                $imageUrl =
+                    $backendUrl .
+                    $imageUrl;
+            }
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Email
+    |--------------------------------------------------------------------------
+    */
         $htmlBody =
-            self::buildEmailLayout(
-                $emailSubject,
-                $message,
-                'Ir a Permuok',
+            self::buildConversationEmail(
+                'Tenés un nuevo mensaje',
+                $opportunityTitle,
+                $opportunityLocation,
+                $opportunityType,
+                $imageUrl,
+                $senderLabel,
+                $messagePreview,
+                'Abrir conversación',
                 $buttonUrl
             );
 
         $textBody =
-            $emailSubject .
+            "Tenés un nuevo mensaje\n\n" .
+            $opportunityTitle .
+            (
+                $opportunityLocation !== ''
+                ? "\n" .
+                $opportunityLocation
+                : ''
+            ) .
             "\n\n" .
-            $message .
+            $senderLabel .
+            " escribió:\n\n" .
+            $messagePreview .
             "\n\n" .
+            "Abrir conversación:\n" .
             $buttonUrl;
 
         EmailJobService::enqueue(
@@ -716,11 +882,15 @@ class NotificationService
             return;
         }
 
+        $db =
+            $pdo
+            ?? self::db();
+
         /*
-     * Si ya existe conversación,
-     * la notificación apunta directamente
-     * al chat.
-     */
+    |--------------------------------------------------------------------------
+    | Notificación interna
+    |--------------------------------------------------------------------------
+    */
         if (
             $conversationId &&
             $conversationId > 0
@@ -732,7 +902,7 @@ class NotificationService
                 'Ambas inmobiliarias mostraron interés. Ya pueden comenzar a conversar.',
                 'conversation',
                 $conversationId,
-                $pdo
+                $db
             );
 
             $relatedType =
@@ -751,8 +921,9 @@ class NotificationService
                 'Ambas inmobiliarias mostraron interés en esta compatibilidad.',
                 'compatibility',
                 $compatibilityId,
-                $pdo
+                $db
             );
+
             $relatedType =
                 'compatibility';
 
@@ -764,8 +935,10 @@ class NotificationService
         }
 
         /*
-     * Email.
-     */
+    |--------------------------------------------------------------------------
+    | Destinatario
+    |--------------------------------------------------------------------------
+    */
         $recipient =
             self::getEmailRecipient(
                 $userId
@@ -775,37 +948,227 @@ class NotificationService
             return;
         }
 
+        /*
+    |--------------------------------------------------------------------------
+    | Datos de la compatibilidad
+    |--------------------------------------------------------------------------
+    */
+        $stmt =
+            $db->prepare("
+            SELECT
+                c.property_id,
+                c.search_request_id,
+
+                p.title AS property_title,
+                p.city AS property_city,
+                p.zone AS property_zone,
+                p.province AS property_province
+
+            FROM compatibilities c
+
+            LEFT JOIN properties p
+                ON p.id = c.property_id
+               AND p.deleted_at IS NULL
+
+            WHERE c.id = :id
+              AND c.deleted_at IS NULL
+
+            LIMIT 1
+        ");
+
+        $stmt->execute([
+            'id' =>
+            $compatibilityId,
+        ]);
+
+        $compatibility =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        $propertyId =
+            (int)(
+                $compatibility['property_id']
+                ?? 0
+            );
+
+        $opportunityTitle =
+            trim(
+                (string)(
+                    $compatibility['property_title']
+                    ?? 'Oportunidad compatible'
+                )
+            );
+
+        $locationParts =
+            array_filter([
+                trim(
+                    (string)(
+                        $compatibility['property_zone']
+                        ?? ''
+                    )
+                ),
+
+                trim(
+                    (string)(
+                        $compatibility['property_city']
+                        ?? ''
+                    )
+                ),
+
+                trim(
+                    (string)(
+                        $compatibility['property_province']
+                        ?? ''
+                    )
+                ),
+            ]);
+
+        $opportunityLocation =
+            implode(
+                ' · ',
+                $locationParts
+            );
+
+        $opportunityType =
+            'Compatibilidad';
+
+        /*
+    |--------------------------------------------------------------------------
+    | Imagen de la propiedad
+    |--------------------------------------------------------------------------
+    */
+        $imageUrl = '';
+
+        if ($propertyId > 0) {
+            $imageStmt =
+                $db->prepare("
+                SELECT id
+                FROM property_images
+                WHERE property_id = :property_id
+                  AND deleted_at IS NULL
+                ORDER BY
+                    is_cover DESC,
+                    sort_order ASC,
+                    id ASC
+                LIMIT 1
+            ");
+
+            $imageStmt->execute([
+                'property_id' =>
+                $propertyId,
+            ]);
+
+            $imageId =
+                (int)(
+                    $imageStmt->fetchColumn()
+                    ?: 0
+                );
+
+            if ($imageId > 0) {
+                $imageUrl =
+                    ImageUrlSignatureService::generate(
+                        'property',
+                        $imageId
+                    );
+
+                if (
+                    str_starts_with(
+                        $imageUrl,
+                        '/'
+                    )
+                ) {
+                    $backendUrl =
+                        rtrim(
+                            (string)(
+                                $_ENV['BACKEND_URL']
+                                ?? $_ENV['APP_URL']
+                                ?? ''
+                            ),
+                            '/'
+                        );
+
+                    if ($backendUrl !== '') {
+                        $imageUrl =
+                            $backendUrl .
+                            $imageUrl;
+                    }
+                }
+            }
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | URL
+    |--------------------------------------------------------------------------
+    */
+        $frontendUrl =
+            rtrim(
+                (string)(
+                    $_ENV['FRONTEND_URL']
+                    ?? 'https://permuok.com'
+                ),
+                '/'
+            );
+
+        if (
+            $conversationId &&
+            $conversationId > 0
+        ) {
+            $buttonUrl =
+                $frontendUrl .
+                '/conversations/' .
+                $conversationId;
+
+            $activityText =
+                'Ambas inmobiliarias mostraron interés en esta oportunidad. El chat ya está habilitado para que puedan comenzar a conversar.';
+        } else {
+            $buttonUrl =
+                $frontendUrl .
+                '/compatibilities/' .
+                $compatibilityId;
+
+            $activityText =
+                'Ambas inmobiliarias mostraron interés en esta oportunidad.';
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Email
+    |--------------------------------------------------------------------------
+    */
         $emailSubject =
             '¡Hay interés mutuo en una oportunidad!';
 
-        $message =
-            $conversationId &&
-            $conversationId > 0
-            ? 'Ambas inmobiliarias mostraron interés en la oportunidad. El chat ya está habilitado para que puedan comenzar a conversar.'
-            : 'Ambas inmobiliarias mostraron interés en una compatibilidad de Permuok.';
-
-        $appUrl = rtrim(
-            (string)(
-                $_ENV['APP_URL']
-                ?? 'https://permuok.com'
-            ),
-            '/'
-        );
-
         $htmlBody =
-            self::buildEmailLayout(
-                $emailSubject,
-                $message,
+            self::buildConversationEmail(
+                '¡Hay interés mutuo!',
+                $opportunityTitle,
+                $opportunityLocation,
+                $opportunityType,
+                $imageUrl,
+                '',
+                '',
                 $buttonText,
-                $appUrl
+                $buttonUrl,
+                $activityText
             );
 
         $textBody =
-            $emailSubject .
+            "¡Hay interés mutuo!\n\n" .
+            $opportunityTitle .
+            (
+                $opportunityLocation !== ''
+                ? "\n" .
+                $opportunityLocation
+                : ''
+            ) .
             "\n\n" .
-            $message .
+            $activityText .
             "\n\n" .
-            $appUrl;
+            $buttonText .
+            ":\n" .
+            $buttonUrl;
 
         EmailJobService::enqueue(
             $recipient['email'],
@@ -818,7 +1181,7 @@ class NotificationService
             $relatedType,
             $relatedId,
             9,
-            $pdo
+            $db
         );
     }
 
@@ -1604,150 +1967,16 @@ HTML;
 HTML;
     }
 
-    private static function buildEmailLayout(
-        string $title,
-        string $message,
-        string $buttonText,
-        string $buttonUrl
-    ): string {
-        $safeTitle = htmlspecialchars(
-            $title,
-            ENT_QUOTES,
-            'UTF-8'
-        );
-
-        $safeMessage = htmlspecialchars(
-            $message,
-            ENT_QUOTES,
-            'UTF-8'
-        );
-
-        $safeButtonText = htmlspecialchars(
-            $buttonText,
-            ENT_QUOTES,
-            'UTF-8'
-        );
-
-        $safeButtonUrl = htmlspecialchars(
-            $buttonUrl,
-            ENT_QUOTES,
-            'UTF-8'
-        );
-
-        return <<<HTML
-<!doctype html>
-<html lang="es">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width">
-</head>
-<body style="
-    margin:0;
-    padding:0;
-    background:#f8fafc;
-    font-family:Arial,Helvetica,sans-serif;
-    color:#0f172a;
-">
-    <table
-        width="100%"
-        cellpadding="0"
-        cellspacing="0"
-        style="padding:32px 16px;"
-    >
-        <tr>
-            <td align="center">
-                <table
-                    width="100%"
-                    cellpadding="0"
-                    cellspacing="0"
-                   style="
-    max-width:600px;
-    background:#ffffff;
-    border-radius:15px;
-    overflow:hidden;
-    border:1px solid #e2e8f0;
-"
-                >
-                    <tr>
-                        <td style="
-                            background:#0f172a;
-                            color:#ffffff;
-                            padding:24px 28px;
-                        ">
-                            <div style="
-                                font-size:22px;
-                                font-weight:700;
-                            ">
-                                Permuok
-                            </div>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td style="padding:32px 28px;">
-                            <h1 style="
-                                margin:0 0 16px;
-                                font-size:24px;
-                                line-height:1;
-                            ">
-                                {$safeTitle}
-                            </h1>
-
-                            <p style="
-                                margin:0 0 26px;
-                                font-size:16px;
-                                line-height:1;
-                                color:#475569;
-                            ">
-                                {$safeMessage}
-                            </p>
-
-                            <a
-                                href="{$safeButtonUrl}"
-                                style="
-                                    display:inline-block;
-                                    background:#0f172a;
-                                    color:#ffffff;
-                                    text-decoration:none;
-                                    font-weight:700;
-                                    padding:13px 20px;
-                                    border-radius:10px;
-                                "
-                            >
-                                {$safeButtonText}
-                            </a>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td style="
-                            border-top:1px solid #e2e8f0;
-                            padding:20px 28px;
-                            font-size:12px;
-                            line-height:1;
-                            color:#94a3b8;
-                        ">
-                            Recibís este correo porque tenés actividad
-                            en tu cuenta de Permuok.
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>
-HTML;
-    }
-
-
-
-    public static function queueNewConversationTestEmail(
-        string $email
+    public static function queueNotificationTestEmail(
+        string $email,
+        string $type =
+        'new_conversation'
     ): array {
         $email =
             strtolower(
-                trim($email)
+                trim(
+                    $email
+                )
             );
 
         if (
@@ -1771,30 +2000,132 @@ HTML;
                 '/'
             );
 
+        $opportunityTitle =
+            'Departamento 3 ambientes en Güemes';
+
+        $opportunityLocation =
+            'Güemes · Mar del Plata';
+
+        $opportunityType =
+            'Propiedad';
+
+        $imageUrl =
+            'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=500&q=80';
+
+        $senderLabel =
+            'Una inmobiliaria de la red';
+
+        $messagePreview =
+            'Hola, quería consultar si considerarían una propiedad de menor valor más una diferencia en efectivo para completar la operación.';
+
+        $activityText =
+            null;
+
+        switch ($type) {
+            case 'new_message':
+                $heading =
+                    'Tenés un nuevo mensaje';
+
+                $buttonText =
+                    'Abrir conversación';
+
+                $buttonUrl =
+                    $frontendUrl .
+                    '/conversations/1';
+
+                $subject =
+                    'Nuevo mensaje en Permuok';
+
+                break;
+
+            case 'compatibility_mutual_interest':
+                $heading =
+                    '¡Hay interés mutuo!';
+
+                $buttonText =
+                    'Abrir conversación';
+
+                $buttonUrl =
+                    $frontendUrl .
+                    '/conversations/1';
+
+                $subject =
+                    '¡Hay interés mutuo en una oportunidad!';
+
+                $senderLabel = '';
+                $messagePreview = '';
+
+                $activityText =
+                    'Ambas inmobiliarias mostraron interés en esta oportunidad. El chat ya está habilitado para que puedan comenzar a conversar.';
+
+                break;
+
+            case 'new_conversation':
+            default:
+                $heading =
+                    'Tenés una nueva consulta';
+
+                $buttonText =
+                    'Ver consulta';
+
+                $buttonUrl =
+                    $frontendUrl .
+                    '/conversations/1';
+
+                $subject =
+                    'Nueva consulta en Permuok';
+
+                break;
+        }
+
         $htmlBody =
-            self::buildNewConversationEmail(
-                'Departamento 3 ambientes en Güemes',
-                'Güemes · Mar del Plata',
-                'Propiedad',
-                'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=500&q=80',
-                'Una inmobiliaria de la red',
-                'Hola, quería consultar si considerarían una propiedad de menor valor más una diferencia en efectivo para completar la operación.',
-                $frontendUrl . '/conversations/1'
+            self::buildConversationEmail(
+                $heading,
+                $opportunityTitle,
+                $opportunityLocation,
+                $opportunityType,
+                $imageUrl,
+                $senderLabel,
+                $messagePreview,
+                $buttonText,
+                $buttonUrl,
+                $activityText
             );
 
         $textBody =
-            "Tenés una nueva consulta\n\n" .
-            "Departamento 3 ambientes en Güemes\n" .
-            "Güemes · Mar del Plata\n\n" .
-            "Una inmobiliaria de la red escribió:\n\n" .
-            "Hola, quería consultar si considerarían una propiedad de menor valor más una diferencia en efectivo para completar la operación.\n\n" .
-            $frontendUrl .
-            '/conversations/1';
+            $heading .
+            "\n\n" .
+            $opportunityTitle .
+            "\n" .
+            $opportunityLocation .
+            "\n\n";
+
+        if ($messagePreview !== '') {
+            $textBody .=
+                $senderLabel .
+                " escribió:\n\n" .
+                $messagePreview .
+                "\n\n";
+        }
+
+        if (
+            $activityText !== null
+        ) {
+            $textBody .=
+                $activityText .
+                "\n\n";
+        }
+
+        $textBody .=
+            $buttonText .
+            ":\n" .
+            $buttonUrl;
 
         return EmailJobService::enqueue(
             $email,
-            'new_conversation_test',
-            'Nueva consulta en Permuok',
+            $type .
+                '_test',
+            $subject,
             $htmlBody,
             $textBody,
             null,

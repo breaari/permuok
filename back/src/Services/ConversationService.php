@@ -2310,16 +2310,30 @@ THEN 1
         int $conversationId,
         array $input
     ): array {
-        self::assertParticipant($userId, $conversationId);
+        self::assertParticipant(
+            $userId,
+            $conversationId
+        );
 
-        $body = trim((string)($input['body'] ?? ''));
+        $body =
+            trim(
+                (string)(
+                    $input['body']
+                    ?? ''
+                )
+            );
 
         if ($body === '') {
-            throw new Exception('El mensaje no puede estar vacío.', 422);
+            throw new Exception(
+                'El mensaje no puede estar vacío.',
+                422
+            );
         }
 
         if (
-            self::textLength($body) >
+            self::textLength(
+                $body
+            ) >
             self::MAX_MESSAGE_LENGTH
         ) {
             throw new Exception(
@@ -2328,15 +2342,34 @@ THEN 1
             );
         }
 
-        $pdo = self::db();
+        $pdo =
+            self::db();
+
         $pdo->beginTransaction();
 
         try {
-            $messageResult = self::createMessage($conversationId, $userId, $body);
-            self::touchConversation($conversationId, $messageResult['message']['id']);
+            $messageResult =
+                self::createMessage(
+                    $conversationId,
+                    $userId,
+                    $body
+                );
 
-            $receiverIds = self::getOtherParticipantIds($conversationId, $userId);
+            self::touchConversation(
+                $conversationId,
+                (int)$messageResult['message']['id']
+            );
 
+            $receiverIds =
+                self::getOtherParticipantIds(
+                    $conversationId,
+                    $userId
+                );
+
+            /*
+         * Recuperamos la conversación completa
+         * con los datos de la oportunidad.
+         */
             $notificationConversation =
                 self::attachOpportunityData(
                     self::getConversationById(
@@ -2344,13 +2377,25 @@ THEN 1
                     )
                 );
 
+            /*
+         * El mail debe mostrar exactamente
+         * el mensaje que acaba de enviarse.
+         */
             $notificationConversation['message_preview'] =
                 $body;
 
+            /*
+         * Necesitamos conocer al remitente para
+         * revelar el nombre comercial únicamente
+         * si los contactos ya fueron compartidos.
+         */
             $notificationConversation['sender_user_id'] =
                 $userId;
 
-            foreach ($receiverIds as $receiverId) {
+            foreach (
+                $receiverIds
+                as $receiverId
+            ) {
                 NotificationService::notifyNewMessage(
                     (int)$receiverId,
                     $conversationId,
@@ -2363,11 +2408,13 @@ THEN 1
 
             return $messageResult;
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             throw $e;
         }
     }
-
     public static function updateStatus(
         int $userId,
         int $conversationId,
