@@ -915,12 +915,186 @@ class NotificationService
         array $conversation = [],
         ?PDO $pdo = null
     ): void {
+        /*
+    |--------------------------------------------------------------------------
+    | Notificación interna
+    |--------------------------------------------------------------------------
+    */
         self::createConversationNotification(
             $userId,
             'contact_share_accepted',
             $conversationId,
             $conversation,
             null,
+            $pdo
+        );
+
+        /*
+    |--------------------------------------------------------------------------
+    | Destinatario
+    |--------------------------------------------------------------------------
+    */
+        $recipient =
+            self::getEmailRecipient(
+                $userId
+            );
+
+        if (!$recipient) {
+            return;
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | URL
+    |--------------------------------------------------------------------------
+    */
+        $frontendUrl =
+            rtrim(
+                (string)(
+                    $_ENV['FRONTEND_URL']
+                    ?? 'https://permuok.com'
+                ),
+                '/'
+            );
+
+        $buttonUrl =
+            $frontendUrl .
+            '/conversations/' .
+            $conversationId;
+
+        /*
+    |--------------------------------------------------------------------------
+    | Oportunidad
+    |--------------------------------------------------------------------------
+    */
+        $opportunityTitle =
+            trim(
+                (string)(
+                    $conversation['opportunity_title']
+                    ?? $conversation['subject']
+                    ?? 'Oportunidad'
+                )
+            );
+
+        $opportunityLocation =
+            trim(
+                (string)(
+                    $conversation['opportunity_location']
+                    ?? ''
+                )
+            );
+
+        $opportunityType =
+            match ((string)(
+                $conversation['opportunity_type']
+                ?? ''
+            )) {
+                'property' =>
+                'Propiedad',
+
+                'search_request' =>
+                'Búsqueda',
+
+                'development' =>
+                'Desarrollo',
+
+                default =>
+                'Oportunidad',
+            };
+
+        /*
+    |--------------------------------------------------------------------------
+    | Imagen
+    |--------------------------------------------------------------------------
+    */
+        $imageUrl =
+            trim(
+                (string)(
+                    $conversation['opportunity_image_url']
+                    ?? ''
+                )
+            );
+
+        if (
+            $imageUrl !== '' &&
+            str_starts_with(
+                $imageUrl,
+                '/'
+            )
+        ) {
+            $backendUrl =
+                rtrim(
+                    (string)(
+                        $_ENV['BACKEND_URL']
+                        ?? $_ENV['APP_URL']
+                        ?? ''
+                    ),
+                    '/'
+                );
+
+            if ($backendUrl !== '') {
+                $imageUrl =
+                    $backendUrl .
+                    $imageUrl;
+            }
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Email
+    |--------------------------------------------------------------------------
+    */
+        $emailSubject =
+            'Ya pueden ver sus datos de contacto';
+
+        $activityText =
+            'Ambas partes aceptaron compartir sus datos de contacto para esta oportunidad. Ya podés ingresar a la conversación para ver la información de contacto de la otra inmobiliaria.';
+
+        $htmlBody =
+            self::buildConversationEmail(
+                'El intercambio de datos fue aceptado',
+                $opportunityTitle,
+                $opportunityLocation,
+                $opportunityType,
+                $imageUrl,
+                '',
+                '',
+                'Ver datos de contacto',
+                $buttonUrl,
+                $activityText
+            );
+
+        $textBody =
+            "El intercambio de datos fue aceptado\n\n" .
+            $opportunityTitle .
+            (
+                $opportunityLocation !== ''
+                ? "\n" .
+                $opportunityLocation
+                : ''
+            ) .
+            "\n\n" .
+            $activityText .
+            "\n\n" .
+            "Ver datos de contacto:\n" .
+            $buttonUrl;
+
+        /*
+    |--------------------------------------------------------------------------
+    | Cola
+    |--------------------------------------------------------------------------
+    */
+        EmailJobService::enqueue(
+            $recipient['email'],
+            'contact_share_accepted',
+            $emailSubject,
+            $htmlBody,
+            $textBody,
+            $userId,
+            $recipient['name'],
+            'conversation',
+            $conversationId,
+            9,
             $pdo
         );
     }
@@ -2305,7 +2479,27 @@ HTML;
                     'La otra inmobiliaria quiere habilitar el intercambio de datos de contacto para esta oportunidad. Si aceptás, ambas partes podrán ver los datos de contacto vinculados a sus perfiles.';
 
                 break;
+            case 'contact_share_accepted':
+                $heading =
+                    'El intercambio de datos fue aceptado';
 
+                $buttonText =
+                    'Ver datos de contacto';
+
+                $buttonUrl =
+                    $frontendUrl .
+                    '/conversations/1';
+
+                $subject =
+                    'Ya pueden ver sus datos de contacto';
+
+                $senderLabel = '';
+                $messagePreview = '';
+
+                $activityText =
+                    'Ambas partes aceptaron compartir sus datos de contacto para esta oportunidad. Ya podés ingresar a la conversación para ver la información de contacto de la otra inmobiliaria.';
+
+                break;
             case 'new_conversation':
             default:
                 $heading =

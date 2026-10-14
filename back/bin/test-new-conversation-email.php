@@ -40,6 +40,7 @@ $allowedTypes = [
     'new_message',
     'compatibility_mutual_interest',
     'contact_share_requested',
+    'contact_share_accepted',
 ];
 
 if ($email === '') {

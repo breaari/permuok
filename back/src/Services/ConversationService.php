@@ -2832,10 +2832,6 @@ THEN 1
         try {
             /*
          * Bloqueamos la solicitud pendiente.
-         *
-         * Si llegan dos respuestas simultáneas,
-         * la segunda espera y luego ya no encontrará
-         * la solicitud como pending.
          */
             $stmt = $pdo->prepare("
             SELECT *
@@ -2858,7 +2854,9 @@ THEN 1
             ]);
 
             $request =
-                $stmt->fetch(PDO::FETCH_ASSOC);
+                $stmt->fetch(
+                    PDO::FETCH_ASSOC
+                );
 
             if (!$request) {
                 throw new Exception(
@@ -2868,6 +2866,9 @@ THEN 1
             }
 
             if ($decision === 'accepted') {
+                /*
+             * Marcamos la solicitud como aceptada.
+             */
                 $stmt = $pdo->prepare("
                 UPDATE contact_share_requests
                 SET
@@ -2879,7 +2880,8 @@ THEN 1
             ");
 
                 $stmt->execute([
-                    ':id' => $request['id'],
+                    ':id' =>
+                    $request['id'],
                 ]);
 
                 if ($stmt->rowCount() !== 1) {
@@ -2889,6 +2891,9 @@ THEN 1
                     );
                 }
 
+                /*
+             * Habilitamos el intercambio de datos.
+             */
                 $stmt = $pdo->prepare("
                 UPDATE conversations
                 SET
@@ -2903,21 +2908,40 @@ THEN 1
                     $conversationId,
                 ]);
 
+                /*
+             * Mensaje interno.
+             */
                 $systemMessage =
                     self::createSystemMessage(
                         $conversationId,
                         'Ambas partes aceptaron compartir datos de contacto.'
                     );
 
+                /*
+             * Recuperamos la conversación ya actualizada
+             * y adjuntamos la oportunidad.
+             */
+                $notificationConversation =
+                    self::attachOpportunityData(
+                        self::getConversationById(
+                            $conversationId
+                        )
+                    );
+
+                /*
+             * Avisamos a quien había solicitado
+             * compartir los datos.
+             */
                 NotificationService::notifyContactShareAccepted(
                     (int)$request['requested_by_user_id'],
                     $conversationId,
-                    self::getConversationById(
-                        $conversationId
-                    ),
+                    $notificationConversation,
                     $pdo
                 );
             } else {
+                /*
+             * Solicitud rechazada.
+             */
                 $stmt = $pdo->prepare("
                 UPDATE contact_share_requests
                 SET
