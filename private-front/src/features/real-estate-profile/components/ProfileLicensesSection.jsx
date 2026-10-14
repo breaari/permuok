@@ -3,7 +3,6 @@ import { Icon } from "../../../ui/icons/Index";
 export function ProfileLicensesSection({
   licenses,
   isReview,
-  isRejected,
   isActiveChangesPending,
   hasRealEstate,
   onOpenModal,
@@ -23,11 +22,6 @@ export function ProfileLicensesSection({
             {isActiveChangesPending ? (
               <p className="text-xs text-amber-700 mt-1">
                 Los cambios en matrículas quedarán sujetos a revisión.
-              </p>
-            ) : isRejected ? (
-              <p className="text-xs text-rose-700 mt-1">
-                Revisá y corregí tus matrículas antes de volver a enviar el
-                perfil.
               </p>
             ) : isLocked ? (
               <p className="text-xs text-slate-500 mt-1">

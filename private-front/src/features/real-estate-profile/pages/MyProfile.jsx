@@ -149,8 +149,8 @@ function RealEstateProfile({ accountEmail }) {
         tone: "warn",
         title: "Revisión rechazada",
         desc: realEstate?.validation_note
-          ? `Motivo: ${realEstate.validation_note}`
-          : "Tu perfil fue rechazado. Revisá la información y volvé a enviarlo.",
+          ? `Corregí la información observada y volvé a enviarlo a revisión. Motivo: ${realEstate.validation_note}`
+          : "Corregí la información observada y volvé a enviarlo a revisión.",
       };
     }
 
@@ -264,7 +264,6 @@ function RealEstateProfile({ accountEmail }) {
           requestedAt={requestedAt}
           approvedAt={formatDate(realEstate?.approved_at)}
           profileStatus={profileStatus}
-          validationNote={realEstate?.validation_note}
           approvedByEmail={realEstate?.approved_by_email}
         />
         {isDraft && <ProfileProgress progress={profileProgress} />}
@@ -282,7 +281,6 @@ function RealEstateProfile({ accountEmail }) {
           isActiveChangesPending={
             isActiveChangesPending || isUnpaidChangesPending
           }
-          validationNote={realEstate?.validation_note}
           mapsLoaded={mapsLoaded}
           mapsError={mapsError}
           onSubmit={actions.saveProfile}
@@ -291,7 +289,6 @@ function RealEstateProfile({ accountEmail }) {
         <ProfileLicensesSection
           licenses={licenses}
           isReview={isReview}
-          isRejected={isRejected}
           isActiveChangesPending={
             isActiveChangesPending || isUnpaidChangesPending
           }

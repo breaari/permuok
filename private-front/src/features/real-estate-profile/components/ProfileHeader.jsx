@@ -33,7 +33,6 @@ export function ProfileHeader({
   requestedAt,
   approvedAt,
   profileStatus,
-  validationNote,
   approvedByEmail,
 }) {
   const statusLabel = getProfileStatusLabel(profileStatus);
@@ -67,11 +66,6 @@ export function ProfileHeader({
           </span>
         )}
 
-        {!!validationNote && (
-          <span className="text-rose-700">
-            <b>Motivo rechazo:</b> {validationNote}
-          </span>
-        )}
       </div>
     </div>
   );

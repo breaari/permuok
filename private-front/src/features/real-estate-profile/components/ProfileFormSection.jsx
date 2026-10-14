@@ -8,7 +8,6 @@ export function ProfileFormSection({
   isReview,
   isRejected,
   isActiveChangesPending,
-  validationNote,
   mapsLoaded,
   mapsError,
   onSubmit,
@@ -34,18 +33,6 @@ export function ProfileFormSection({
           </span>
         ) : null}
       </div>
-
-      {isRejected && (
-        <div className="mx-6 mt-6 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
-          <p className="font-bold mb-1">Tu perfil fue rechazado</p>
-          <p>Corregí la información observada y volvé a enviarlo a revisión.</p>
-          {!!validationNote && (
-            <p className="mt-2">
-              <b>Motivo:</b> {validationNote}
-            </p>
-          )}
-        </div>
-      )}
 
       {isActiveChangesPending && (
         <div className="mx-6 mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
