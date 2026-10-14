@@ -206,13 +206,13 @@ class WelcomeEmailService
 
     <style>
         body {
-            margin: 0;
-            padding: 0;
+            margin:0;
+            padding:0;
         }
 
         table {
-            mso-table-lspace: 0;
-            mso-table-rspace: 0;
+            mso-table-lspace:0;
+            mso-table-rspace:0;
         }
 
         p,
@@ -223,41 +223,41 @@ class WelcomeEmailService
         h4,
         h5,
         h6 {
-            margin: 0;
-            padding: 0;
+            margin:0;
+            padding:0;
         }
 
         p {
-            line-height: inherit;
+            line-height:inherit;
         }
 
         a[x-apple-data-detectors] {
-            color: inherit !important;
-            text-decoration: inherit !important;
+            color:inherit !important;
+            text-decoration:inherit !important;
         }
 
         #MessageViewBody a {
-            color: inherit;
-            text-decoration: none;
+            color:inherit;
+            text-decoration:none;
         }
 
         img + div {
-            display: none;
+            display:none;
         }
 
-        @media (max-width: 599px) {
+        @media (max-width:599px) {
             .email-container {
-                width: 100% !important;
-                min-width: 0 !important;
+                width:100% !important;
+                min-width:0 !important;
             }
 
             .mobile-title {
-                font-size: 23px !important;
+                font-size:23px !important;
             }
 
-            .mobile-content {
-                padding-left: 24px !important;
-                padding-right: 24px !important;
+            .mobile-copy {
+                padding-left:24px !important;
+                padding-right:24px !important;
             }
         }
     </style>
@@ -332,15 +332,15 @@ class WelcomeEmailService
                         cellspacing="0"
                         role="presentation"
                         class="email-container"
-                       style="
-    max-width:600px;
-    width:600px;
-    min-width:600px;
-    margin:0 auto;
-    background-color:#ffffff;
-    border-radius:15px;
-    overflow:hidden;
-"
+                        style="
+                            max-width:600px;
+                            width:600px;
+                            min-width:600px;
+                            margin:0 auto;
+                            background-color:#ffffff;
+                            border-radius:15px;
+                            overflow:hidden;
+                        "
                     >
                         <tbody>
 
@@ -411,7 +411,7 @@ class WelcomeEmailService
                                     style="
                                         padding:0 24px 16px;
                                         color:#0e1b10;
-                                        font-family:Manrope, Arial, Helvetica, sans-serif;
+                                        font-family:Arial, Helvetica, sans-serif;
                                         font-size:29px;
                                         font-weight:700;
                                         letter-spacing:-0.04em;
@@ -425,12 +425,12 @@ class WelcomeEmailService
                             <!-- TEXTO -->
                             <tr>
                                 <td
-                                    class="mobile-content"
+                                    class="mobile-copy"
                                     align="center"
                                     style="
                                         padding:0 48px 18px;
                                         color:#0e1b10;
-                                        font-family:Manrope, Arial, Helvetica, sans-serif;
+                                        font-family:Arial, Helvetica, sans-serif;
                                         font-size:16px;
                                         line-height:1.45;
                                     "
@@ -446,7 +446,7 @@ class WelcomeEmailService
                                 <td
                                     align="center"
                                     style="
-                                        padding:4px 24px 34px;
+                                        padding:4px 24px 26px;
                                     "
                                 >
 
@@ -512,7 +512,7 @@ class WelcomeEmailService
                                                             display:block;
                                                             padding:26px 8px;
                                                             text-align:center;
-                                                            font-family:Manrope, Arial, Helvetica, sans-serif;
+                                                            font-family:Arial, Helvetica, sans-serif;
                                                             font-size:16px;
                                                             font-weight:700;
                                                             line-height:16px;
@@ -530,67 +530,47 @@ class WelcomeEmailService
                                 </td>
                             </tr>
 
+                            <!-- TEXTO LEGAL -->
+                            <tr>
+                                <td
+                                    align="center"
+                                    style="
+                                        padding:0 24px 28px;
+                                        color:#0e1b10;
+                                        font-family:Arial, Helvetica, sans-serif;
+                                        font-size:13px;
+                                        line-height:1.6;
+                                    "
+                                >
+                                    Recibís este correo porque creaste una cuenta en Permuok.
+                                    <br />
+                                    Si no fuiste vos, podés ignorar este mensaje.
+                                </td>
+                            </tr>
+
                             <!-- FOOTER -->
                             <tr>
-                               <td
-    bgcolor="#0f172a"
-    style="
-        background-color:#0f172a;
-        padding:38px 46px;
-        font-family:Manrope, Arial, Helvetica, sans-serif;
-        text-align:left;
-        border-radius:0 0 15px 15px;
-    "
->
-                                    <div
+                                <td
+                                    align="center"
+                                    style="
+                                        padding:0;
+                                        border-radius:0 0 15px 15px;
+                                        overflow:hidden;
+                                    "
+                                >
+                                    <img
+                                        src="https://bq5galnul0ejsuneypmqfsatucvdbtiujlng6snj7ao.canva-cdn.email/93e09c8b3e4c2dede12cc2b852e37c4b.png"
+                                        width="600"
+                                        alt="Estamos para acompañarte"
                                         style="
-                                            color:#f6f5f1;
-                                            font-size:24px;
-                                            font-weight:700;
-                                            line-height:1.2;
-                                            margin-bottom:18px;
+                                            display:block;
+                                            width:600px;
+                                            height:auto;
+                                            max-width:100%;
+                                            border:0;
+                                            border-radius:0 0 15px 15px;
                                         "
-                                    >
-                                        Estamos para acompañarte.
-                                    </div>
-
-                                    <div
-                                        style="
-                                            color:#f6f5f1;
-                                            font-size:16px;
-                                            line-height:1.45;
-                                            margin-bottom:18px;
-                                        "
-                                    >
-                                        Si tenés dudas durante el registro de tu inmobiliaria,
-                                        escribinos y te acompañamos en el proceso.
-                                        <br /><br />
-
-                                        <a
-                                            href="mailto:info@permuok.com"
-                                            target="_blank"
-                                            rel="noopener"
-                                            style="
-                                                color:#ffffff;
-                                                font-weight:700;
-                                                text-decoration:underline;
-                                            "
-                                        >
-                                            info@permuok.com
-                                        </a>
-                                    </div>
-
-                                    <div
-                                        style="
-                                            color:#bfc3c8;
-                                            font-size:13px;
-                                            line-height:1.45;
-                                        "
-                                    >
-                                        Recibís este correo porque creaste una cuenta en Permuok.
-                                        <br />
-                                        Si no fuiste vos, podés ignorar este mensaje.
-                                    </div>
+                                    />
                                 </td>
                             </tr>
 
