@@ -840,13 +840,13 @@ class NotificationService
                     width="100%"
                     cellpadding="0"
                     cellspacing="0"
-                    style="
-                        max-width:600px;
-                        background:#ffffff;
-                        border-radius:18px;
-                        overflow:hidden;
-                        border:1px solid #e2e8f0;
-                    "
+                   style="
+    max-width:600px;
+    background:#ffffff;
+    border-radius:15px;
+    overflow:hidden;
+    border:1px solid #e2e8f0;
+"
                 >
                     <tr>
                         <td style="

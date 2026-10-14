@@ -7,7 +7,7 @@ use PDO;
 class WelcomeEmailService
 {
     private const EMAIL_TYPE =
-        'welcome_email_verified';
+    'welcome_email_verified';
 
     private static function db(): PDO
     {
@@ -53,7 +53,7 @@ class WelcomeEmailService
 
         $stmt->execute([
             'id' =>
-                $userId,
+            $userId,
         ]);
 
         $user =
@@ -115,10 +115,10 @@ class WelcomeEmailService
 
         $existing->execute([
             'user_id' =>
-                $userId,
+            $userId,
 
             'email_type' =>
-                self::EMAIL_TYPE,
+            self::EMAIL_TYPE,
         ]);
 
         if (
@@ -332,13 +332,15 @@ class WelcomeEmailService
                         cellspacing="0"
                         role="presentation"
                         class="email-container"
-                        style="
-                            max-width:600px;
-                            width:600px;
-                            min-width:600px;
-                            margin:0 auto;
-                            background-color:#ffffff;
-                        "
+                       style="
+    max-width:600px;
+    width:600px;
+    min-width:600px;
+    margin:0 auto;
+    background-color:#ffffff;
+    border-radius:15px;
+    overflow:hidden;
+"
                     >
                         <tbody>
 
@@ -530,15 +532,16 @@ class WelcomeEmailService
 
                             <!-- FOOTER -->
                             <tr>
-                                <td
-                                    bgcolor="#0f172a"
-                                    style="
-                                        background-color:#0f172a;
-                                        padding:38px 46px;
-                                        font-family:Manrope, Arial, Helvetica, sans-serif;
-                                        text-align:left;
-                                    "
-                                >
+                               <td
+    bgcolor="#0f172a"
+    style="
+        background-color:#0f172a;
+        padding:38px 46px;
+        font-family:Manrope, Arial, Helvetica, sans-serif;
+        text-align:left;
+        border-radius:0 0 15px 15px;
+    "
+>
                                     <div
                                         style="
                                             color:#f6f5f1;

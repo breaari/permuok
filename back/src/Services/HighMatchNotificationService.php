@@ -466,7 +466,7 @@ class HighMatchNotificationService
         max-width:600px;
         background:#ffffff;
         border:1px solid #e2e8f0;
-        border-radius:18px;
+        border-radius:15px;
         overflow:hidden;
     "
 >

@@ -163,10 +163,10 @@ class EmailVerificationService
 
             $insert->execute([
                 'user_id' =>
-                    $userId,
+                $userId,
 
                 'token_hash' =>
-                    $tokenHash,
+                $tokenHash,
             ]);
 
             $verificationTokenId =
@@ -197,8 +197,8 @@ class EmailVerificationService
             $safeName =
                 htmlspecialchars(
                     $recipientName !== ''
-                    ? $recipientName
-                    : 'Hola',
+                        ? $recipientName
+                        : 'Hola',
                     ENT_QUOTES,
                     'UTF-8'
                 );
@@ -624,12 +624,13 @@ class EmailVerificationService
                                         width="600"
                                         alt="¿Necesitás ayuda? info@permuok.com"
                                         style="
-                                            display:block;
-                                            width:600px;
-                                            height:auto;
-                                            max-width:100%;
-                                            border:0;
-                                        "
+    display:block;
+    width:600px;
+    height:auto;
+    max-width:100%;
+    border:0;
+    border-radius:0 0 15px 15px;
+"
                                     />
                                 </td>
                             </tr>
@@ -676,8 +677,8 @@ HTML;
                 $textBody,
                 $userId,
                 $recipientName !== ''
-                ? $recipientName
-                : null,
+                    ? $recipientName
+                    : null,
                 'email_verification',
                 $verificationTokenId,
                 10,
@@ -758,7 +759,7 @@ HTML;
 
             $stmt->execute([
                 'token_hash' =>
-                    $tokenHash,
+                $tokenHash,
             ]);
 
             $verificationToken =
@@ -820,7 +821,7 @@ HTML;
 
                 $updateUser->execute([
                     'id' =>
-                        $userId,
+                    $userId,
                 ]);
 
                 if (
@@ -847,7 +848,7 @@ HTML;
 
             $consumeTokens->execute([
                 'user_id' =>
-                    $userId,
+                $userId,
             ]);
 
             $pdo->commit();
@@ -871,19 +872,19 @@ HTML;
             } catch (Throwable $welcomeError) {
                 error_log(
                     '[WELCOME EMAIL] ' .
-                    $welcomeError->getMessage()
+                        $welcomeError->getMessage()
                 );
             }
 
             return [
                 'user_id' =>
-                    $userId,
+                $userId,
 
                 'email' =>
-                    (string) $verificationToken['email'],
+                (string) $verificationToken['email'],
 
                 'verified' =>
-                    true,
+                true,
             ];
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
@@ -939,7 +940,7 @@ HTML;
 
         $stmt->execute([
             'email' =>
-                $email,
+            $email,
         ]);
 
         $user =

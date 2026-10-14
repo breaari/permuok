@@ -267,13 +267,15 @@ class RealEstateChangesApprovedEmailService
                         cellspacing="0"
                         role="presentation"
                         class="email-container"
-                        style="
-                            max-width:600px;
-                            width:600px;
-                            min-width:600px;
-                            margin:0 auto;
-                            background-color:#ffffff;
-                        "
+                       style="
+    max-width:600px;
+    width:600px;
+    min-width:600px;
+    margin:0 auto;
+    background-color:#ffffff;
+    border-radius:15px;
+    overflow:hidden;
+"
                     >
                         <tbody>
 
@@ -343,17 +345,18 @@ class RealEstateChangesApprovedEmailService
                                     "
                                 >
                                     <img
-                                        src="https://bq5galnul0ejsuneypmqfsatucvdbtiujlng6snj7ao.canva-cdn.email/974650f371f097ca72ad38323b9cb26e.png"
-                                        width="600"
-                                        alt="Estamos para acompañarte"
-                                        style="
-                                            display:block;
-                                            width:600px;
-                                            height:auto;
-                                            max-width:100%;
-                                            border:0;
-                                        "
-                                    />
+    src="https://bq5galnul0ejsuneypmqfsatucvdbtiujlng6snj7ao.canva-cdn.email/974650f371f097ca72ad38323b9cb26e.png"
+    width="600"
+    alt="Estamos para acompañarte"
+    style="
+        display:block;
+        width:600px;
+        height:auto;
+        max-width:100%;
+        border:0;
+        border-radius:0 0 15px 15px;
+    "
+/>
                                 </td>
                             </tr>
 
