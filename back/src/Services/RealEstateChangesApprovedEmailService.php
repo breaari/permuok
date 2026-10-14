@@ -408,7 +408,7 @@ HTML;
             $firstName !== ''
                 ? $firstName
                 : null,
-            'real_estate_changes_approved',
+            'real_estate',
             $realEstateId,
             7
         );
