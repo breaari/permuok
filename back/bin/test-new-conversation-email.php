@@ -39,6 +39,7 @@ $allowedTypes = [
     'new_conversation',
     'new_message',
     'compatibility_mutual_interest',
+    'contact_share_requested',
 ];
 
 if ($email === '') {
@@ -47,7 +48,8 @@ if ($email === '') {
         "Tipos disponibles:\n" .
         "- new_conversation\n" .
         "- new_message\n" .
-        "- compatibility_mutual_interest\n");
+        "- compatibility_mutual_interest\n" .
+        "- contact_share_requested\n");
 }
 
 if (
@@ -61,7 +63,8 @@ if (
         "Tipos disponibles:\n" .
         "- new_conversation\n" .
         "- new_message\n" .
-        "- compatibility_mutual_interest\n");
+        "- compatibility_mutual_interest\n" .
+        "- contact_share_requested\n");
 }
 
 try {
