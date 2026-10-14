@@ -44,6 +44,25 @@ function RealEstateProfile({ accountEmail }) {
   const { access, loadMe } = useAuth();
   const nav = useNavigate();
 
+  const { isLoaded: mapsLoaded, loadError: mapsError } = useGoogleMaps();
+
+  const {
+    loading,
+    err,
+    realEstate,
+    profile,
+    setProfile,
+    licenses,
+    profileOk,
+    hasLicenses,
+    actions,
+    profileValidation,
+    profileProgress,
+  } = useRealEstateProfile({
+    loadMe,
+    accountEmail,
+  });
+
   useEffect(() => {
     async function handleProfileNotification(event) {
       const notification = event?.detail;
@@ -85,25 +104,6 @@ function RealEstateProfile({ accountEmail }) {
       );
     };
   }, [actions.load, loadMe]);
-
-  const { isLoaded: mapsLoaded, loadError: mapsError } = useGoogleMaps();
-
-  const {
-    loading,
-    err,
-    realEstate,
-    profile,
-    setProfile,
-    licenses,
-    profileOk,
-    hasLicenses,
-    actions,
-    profileValidation,
-    profileProgress,
-  } = useRealEstateProfile({
-    loadMe,
-    accountEmail,
-  });
 
   const [licenseOpen, setLicenseOpen] = useState(false);
   const [showSubmitReason, setShowSubmitReason] = useState(false);
