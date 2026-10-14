@@ -54,9 +54,18 @@ export default function Navbar({ title = "Panel", onOpenSidebar }) {
     setConversationsCount,
   } = useNavbarBadges(shouldLoadBadges ? user?.id : null);
 
-  const handleRealtimeNotification = useCallback(() => {
-    setNotificationsCount((prev) => Number(prev || 0) + 1);
-  }, [setNotificationsCount]);
+  const handleRealtimeNotification = useCallback(
+    (data) => {
+      setNotificationsCount((prev) => Number(prev || 0) + 1);
+
+      window.dispatchEvent(
+        new CustomEvent("permuok:notification-created", {
+          detail: data,
+        }),
+      );
+    },
+    [setNotificationsCount],
+  );
 
   const handleRealtimeConversationUnread = useCallback(
     (data) => {

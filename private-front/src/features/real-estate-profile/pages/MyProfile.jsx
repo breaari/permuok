@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/components/AuthContext.jsx";
 import { useGoogleMaps } from "../../../ui/maps/UseGoogleMaps.jsx";
@@ -43,6 +43,48 @@ export default function MyProfile() {
 function RealEstateProfile({ accountEmail }) {
   const { access, loadMe } = useAuth();
   const nav = useNavigate();
+
+  useEffect(() => {
+    async function handleProfileNotification(event) {
+      const notification = event?.detail;
+
+      const profileNotificationTypes = [
+        "profile_approved",
+        "profile_changes_approved",
+        "profile_review_required",
+      ];
+
+      if (!profileNotificationTypes.includes(notification?.type)) {
+        return;
+      }
+
+      /*
+       * Actualizamos tanto los datos completos del perfil
+       * como el nivel de acceso de la sesión.
+       */
+      await Promise.all([
+        actions.load({
+          preserveMessages: true,
+          silent: true,
+        }),
+        loadMe?.({
+          force: true,
+        }),
+      ]);
+    }
+
+    window.addEventListener(
+      "permuok:notification-created",
+      handleProfileNotification,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "permuok:notification-created",
+        handleProfileNotification,
+      );
+    };
+  }, [actions.load, loadMe]);
 
   const { isLoaded: mapsLoaded, loadError: mapsError } = useGoogleMaps();
 
