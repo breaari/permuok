@@ -879,6 +879,17 @@ class AdminRealEstateService
             if ($action === 'approve') {
                 if ($isInitialApproval) {
                     try {
+                        NotificationService::notifyRealEstateProfileApproved(
+                            $realEstateId
+                        );
+                    } catch (\Throwable $notificationError) {
+                        error_log(
+                            '[REAL ESTATE APPROVED NOTIFICATION] ' .
+                                $notificationError->getMessage()
+                        );
+                    }
+
+                    try {
                         RealEstateApprovedEmailService::enqueueForRealEstate(
                             $realEstateId
                         );
@@ -891,6 +902,17 @@ class AdminRealEstateService
                 }
 
                 if ($isChangesApproval) {
+                    try {
+                        NotificationService::notifyRealEstateProfileChangesApproved(
+                            $realEstateId
+                        );
+                    } catch (\Throwable $notificationError) {
+                        error_log(
+                            '[REAL ESTATE CHANGES APPROVED NOTIFICATION] ' .
+                                $notificationError->getMessage()
+                        );
+                    }
+
                     try {
                         RealEstateChangesApprovedEmailService::enqueueForRealEstate(
                             $realEstateId
@@ -905,6 +927,17 @@ class AdminRealEstateService
             }
 
             if ($action === 'reject') {
+                try {
+                    NotificationService::notifyRealEstateProfileReviewRequired(
+                        $realEstateId
+                    );
+                } catch (\Throwable $notificationError) {
+                    error_log(
+                        '[REAL ESTATE PROFILE REVIEW REQUIRED NOTIFICATION] ' .
+                            $notificationError->getMessage()
+                    );
+                }
+
                 try {
                     RealEstateProfileReviewRequiredEmailService::enqueueForRealEstate(
                         $realEstateId

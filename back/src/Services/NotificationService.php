@@ -683,6 +683,98 @@ class NotificationService
             $pdo
         );
     }
+
+    public static function notifyRealEstateProfileApproved(
+        int $realEstateId,
+        ?PDO $pdo = null
+    ): int {
+        return self::notifyRealEstateUsers(
+            $realEstateId,
+            'profile_approved',
+            'Tu perfil fue aprobado',
+            'Tu inmobiliaria fue validada. Ya podés continuar con la activación de tu membresía.',
+            $pdo
+        );
+    }
+
+    public static function notifyRealEstateProfileChangesApproved(
+        int $realEstateId,
+        ?PDO $pdo = null
+    ): int {
+        return self::notifyRealEstateUsers(
+            $realEstateId,
+            'profile_changes_approved',
+            'Los cambios de tu perfil fueron aprobados',
+            'La información actualizada de tu inmobiliaria ya quedó validada.',
+            $pdo
+        );
+    }
+
+    public static function notifyRealEstateProfileReviewRequired(
+        int $realEstateId,
+        ?PDO $pdo = null
+    ): int {
+        return self::notifyRealEstateUsers(
+            $realEstateId,
+            'profile_review_required',
+            'Tu perfil requiere revisión',
+            'Ingresá a tu perfil para consultar las observaciones y realizar los cambios necesarios.',
+            $pdo
+        );
+    }
+
+    private static function notifyRealEstateUsers(
+        int $realEstateId,
+        string $type,
+        string $title,
+        string $body,
+        ?PDO $pdo = null
+    ): int {
+        if ($realEstateId <= 0) {
+            return 0;
+        }
+
+        $pdo ??=
+            self::db();
+
+        $stmt = $pdo->prepare("
+        SELECT id
+        FROM users
+        WHERE real_estate_id = :real_estate_id
+          AND role = 2
+          AND is_active = 1
+          AND deleted_at IS NULL
+        ORDER BY id ASC
+    ");
+
+        $stmt->execute([
+            'real_estate_id' =>
+            $realEstateId,
+        ]);
+
+        $userIds =
+            $stmt->fetchAll(
+                PDO::FETCH_COLUMN
+            ) ?: [];
+
+        $created = 0;
+
+        foreach ($userIds as $userId) {
+            self::create(
+                (int)$userId,
+                $type,
+                $title,
+                $body,
+                'real_estate',
+                $realEstateId,
+                $pdo
+            );
+
+            $created++;
+        }
+
+        return $created;
+    }
     private static function buildConversationTitle(string $type, array $conversation): string
     {
         $subject = self::conversationSubject($conversation);

@@ -36,6 +36,17 @@ function getNotificationPath(item) {
     return "/compatibilities";
   }
 
+  if (item?.type === "profile_approved") {
+    return "/billing";
+  }
+
+  if (
+    item?.type === "profile_changes_approved" ||
+    item?.type === "profile_review_required"
+  ) {
+    return "/my-profile";
+  }
+
   const relatedId = Number(item?.related_id || 0);
 
   if (!relatedId) {
@@ -104,6 +115,15 @@ function getNotificationIcon(type) {
 
     case "compatibility_mutual_interest":
       return "messagesSquare";
+
+    case "profile_approved":
+      return "badgeCheck";
+
+    case "profile_changes_approved":
+      return "badgeCheck";
+
+    case "profile_review_required":
+      return "info";
     default:
       return "bell";
   }
