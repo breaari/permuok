@@ -1,0 +1,605 @@
+<?php
+
+namespace App\Services;
+
+use PDO;
+
+class RealEstateProfileReviewRequiredEmailService
+{
+    private const EMAIL_TYPE =
+    'real_estate_profile_review_required';
+
+    private static function db(): PDO
+    {
+        require_once __DIR__ . '/../../db.php';
+
+        return pdo();
+    }
+
+    public static function enqueueForRealEstate(
+        int $realEstateId
+    ): void {
+        if ($realEstateId <= 0) {
+            return;
+        }
+
+        $pdo =
+            self::db();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Usuario destinatario
+        |--------------------------------------------------------------------------
+        */
+        $stmt = $pdo->prepare("
+            SELECT
+                u.id,
+                u.first_name,
+                u.email,
+                u.email_verified_at,
+                u.is_active
+            FROM users u
+            WHERE u.real_estate_id = :real_estate_id
+              AND u.role = 2
+              AND u.deleted_at IS NULL
+            ORDER BY u.id ASC
+            LIMIT 1
+        ");
+
+        $stmt->execute([
+            'real_estate_id' =>
+            $realEstateId,
+        ]);
+
+        $user =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+        if (!$user) {
+            return;
+        }
+
+        if (
+            (int)$user['is_active']
+            !== 1
+        ) {
+            return;
+        }
+
+        if (
+            empty($user['email_verified_at'])
+        ) {
+            return;
+        }
+
+        $email =
+            strtolower(
+                trim(
+                    (string)$user['email']
+                )
+            );
+
+        if (
+            $email === '' ||
+            !filter_var(
+                $email,
+                FILTER_VALIDATE_EMAIL
+            )
+        ) {
+            return;
+        }
+
+        $userId =
+            (int)$user['id'];
+
+        $firstName =
+            trim(
+                (string)(
+                    $user['first_name']
+                    ?? ''
+                )
+            );
+
+        $safeFirstName =
+            htmlspecialchars(
+                $firstName !== ''
+                    ? $firstName
+                    : 'Hola',
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | URL del perfil
+        |--------------------------------------------------------------------------
+        */
+        $frontendUrl =
+            rtrim(
+                (string)(
+                    $_ENV['FRONTEND_URL']
+                    ?? 'https://permuok.com'
+                ),
+                '/'
+            );
+
+        $profileUrl =
+            $frontendUrl .
+            '/my-profile';
+
+        $safeProfileUrl =
+            htmlspecialchars(
+                $profileUrl,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | HTML
+        |--------------------------------------------------------------------------
+        |
+        | El motivo de la revisión NO se incluye en el correo.
+        | El usuario debe ingresar a Permuok para consultar
+        | la observación y realizar los cambios.
+        |
+        */
+        $htmlBody = <<<HTML
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html
+    xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:v="urn:schemas-microsoft-com:vml"
+    xmlns:o="urn:schemas-microsoft-com:office:office"
+>
+<head>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    />
+
+    <meta
+        http-equiv="Content-Type"
+        content="text/html; charset=UTF-8"
+    />
+
+    <meta
+        name="format-detection"
+        content="telephone=no, date=no, address=no, email=no"
+    />
+
+    <meta
+        name="x-apple-disable-message-reformatting"
+    />
+
+    <style>
+        body {
+            margin:0;
+            padding:0;
+        }
+
+        table {
+            mso-table-lspace:0;
+            mso-table-rspace:0;
+        }
+
+        p,
+        span,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            margin:0;
+            padding:0;
+        }
+
+        p {
+            line-height:inherit;
+        }
+
+        a[x-apple-data-detectors] {
+            color:inherit !important;
+            text-decoration:inherit !important;
+        }
+
+        #MessageViewBody a {
+            color:inherit;
+            text-decoration:none;
+        }
+
+        img + div {
+            display:none;
+        }
+
+        @media (max-width:599px) {
+            .email-container {
+                width:100% !important;
+                min-width:0 !important;
+            }
+
+            .email-content {
+                padding-left:28px !important;
+                padding-right:28px !important;
+            }
+
+            .email-title {
+                font-size:18px !important;
+            }
+        }
+    </style>
+
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <w:WordDocument
+                xmlns:w="urn:schemas-microsoft-com:office:word"
+            >
+                <w:DontUseAdvancedTypographyReadingMail/>
+            </w:WordDocument>
+
+            <o:OfficeDocumentSettings>
+                <o:AllowPNG/>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+</head>
+
+<body
+    style="
+        width:100%;
+        -webkit-text-size-adjust:100%;
+        text-size-adjust:100%;
+        background-color:#f0f1f5;
+        margin:0;
+        padding:0;
+    "
+>
+    <table
+        width="100%"
+        border="0"
+        cellpadding="0"
+        cellspacing="0"
+        bgcolor="#f0f1f5"
+        role="presentation"
+        style="
+            background-color:#f0f1f5;
+        "
+    >
+        <tbody>
+            <tr>
+                <td
+                    align="center"
+                    style="
+                        background-color:#f0f1f5;
+                        padding:24px 12px;
+                    "
+                >
+
+                    <!--[if mso]>
+                    <table
+                        align="center"
+                        border="0"
+                        cellpadding="0"
+                        cellspacing="0"
+                        width="600"
+                    >
+                        <tbody>
+                            <tr>
+                                <td>
+                    <![endif]-->
+
+                    <table
+                        align="center"
+                        width="600"
+                        border="0"
+                        cellpadding="0"
+                        cellspacing="0"
+                        role="presentation"
+                        class="email-container"
+                        style="
+                            max-width:600px;
+                            width:600px;
+                            min-width:600px;
+                            margin:0 auto;
+                            background-color:#ffffff;
+                            border-radius:15px;
+                            overflow:hidden;
+                        "
+                    >
+                        <tbody>
+
+                            <!-- LOGO -->
+                            <tr>
+                                <td
+                                    align="center"
+                                    style="
+                                        padding:41px 24px 34px;
+                                    "
+                                >
+                                    <img
+                                        src="https://bq5galnul0ejsuneypmqfsatucvdbtiujlng6snj7ao.canva-cdn.email/beab8b48eeaedc037826f64e90631098.png"
+                                        width="234"
+                                        alt="Permuok"
+                                        style="
+                                            display:block;
+                                            width:234px;
+                                            height:auto;
+                                            max-width:100%;
+                                            border:0;
+                                        "
+                                    />
+                                </td>
+                            </tr>
+
+                            <!-- TÍTULO -->
+                            <tr>
+                                <td
+                                    class="email-content email-title"
+                                    style="
+                                        padding:0 56px 22px;
+                                        color:#0e1b10;
+                                        font-family:Arial, Helvetica, sans-serif;
+                                        font-size:20px;
+                                        font-weight:700;
+                                        line-height:1.4;
+                                        text-align:left;
+                                    "
+                                >
+                                    Hay cambios en tu perfil que requieren revisión
+                                </td>
+                            </tr>
+
+                            <!-- SALUDO -->
+                            <tr>
+                                <td
+                                    class="email-content"
+                                    style="
+                                        padding:0 56px 18px;
+                                        color:#0e1b10;
+                                        font-family:Arial, Helvetica, sans-serif;
+                                        font-size:16px;
+                                        line-height:1.45;
+                                        text-align:left;
+                                    "
+                                >
+                                    Hola, {$safeFirstName}.
+                                </td>
+                            </tr>
+
+                            <!-- TEXTO -->
+                            <tr>
+                                <td
+                                    class="email-content"
+                                    style="
+                                        padding:0 56px 18px;
+                                        color:#0e1b10;
+                                        font-family:Arial, Helvetica, sans-serif;
+                                        font-size:16px;
+                                        line-height:1.5;
+                                        text-align:left;
+                                    "
+                                >
+                                    Revisamos la información de tu inmobiliaria y hay algunos puntos que necesitás revisar antes de continuar.
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td
+                                    class="email-content"
+                                    style="
+                                        padding:0 56px 30px;
+                                        color:#0e1b10;
+                                        font-family:Arial, Helvetica, sans-serif;
+                                        font-size:16px;
+                                        line-height:1.5;
+                                        text-align:left;
+                                    "
+                                >
+                                    Ingresá a Permuok para ver el detalle y realizar los ajustes correspondientes.
+                                </td>
+                            </tr>
+
+                            <!-- BOTÓN -->
+                            <tr>
+                                <td
+                                    align="center"
+                                    style="
+                                        padding:0 24px 36px;
+                                    "
+                                >
+
+                                    <!--[if mso]>
+                                    <v:roundrect
+                                        xmlns:v="urn:schemas-microsoft-com:vml"
+                                        xmlns:w="urn:schemas-microsoft-com:office:word"
+                                        href="{$safeProfileUrl}"
+                                        style="
+                                            height:64px;
+                                            width:336px;
+                                            v-text-anchor:middle;
+                                        "
+                                        arcsize="23%"
+                                        fillcolor="#61b228"
+                                        strokecolor="#61b228"
+                                    >
+                                        <w:anchorlock/>
+
+                                        <center
+                                            style="
+                                                color:#ffffff;
+                                                font-family:Arial,sans-serif;
+                                                font-size:18px;
+                                                font-weight:700;
+                                            "
+                                        >
+                                            Revisar mi perfil
+                                        </center>
+                                    </v:roundrect>
+                                    <![endif]-->
+
+                                    <!--[if !mso]><!-->
+                                    <table
+                                        role="presentation"
+                                        cellpadding="0"
+                                        cellspacing="0"
+                                        border="0"
+                                        width="336"
+                                        style="
+                                            width:336px;
+                                            max-width:100%;
+                                            border-collapse:separate;
+                                            border-spacing:0;
+                                        "
+                                    >
+                                        <tbody>
+                                            <tr>
+                                                <td
+                                                    bgcolor="#61b228"
+                                                    style="
+                                                        background-color:#61b228;
+                                                        border-radius:15px;
+                                                    "
+                                                >
+                                                    <a
+                                                        href="{$safeProfileUrl}"
+                                                        target="_blank"
+                                                        rel="noopener"
+                                                        style="
+                                                            color:#ffffff;
+                                                            text-decoration:none;
+                                                            display:block;
+                                                            padding:19px 8px;
+                                                            text-align:center;
+                                                            font-family:Arial, Helvetica, sans-serif;
+                                                            font-size:18px;
+                                                            font-weight:700;
+                                                            line-height:26px;
+                                                            box-sizing:border-box;
+                                                        "
+                                                    >
+                                                        Revisar mi perfil
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <!--<![endif]-->
+
+                                </td>
+                            </tr>
+
+                            <!-- ACLARACIÓN -->
+                            <tr>
+                                <td
+                                    class="email-content"
+                                    style="
+                                        padding:0 56px 38px;
+                                        color:#0e1b10;
+                                        font-family:Arial, Helvetica, sans-serif;
+                                        font-size:13px;
+                                        line-height:1.55;
+                                        text-align:left;
+                                    "
+                                >
+                                    Una vez que actualices la información, vas a poder volver a enviarla para revisión.
+                                </td>
+                            </tr>
+
+                            <!-- FOOTER -->
+                            <tr>
+                                <td
+                                    align="center"
+                                    style="
+                                        padding:0;
+                                        border-radius:0 0 15px 15px;
+                                        overflow:hidden;
+                                    "
+                                >
+                                    <img
+                                        src="https://bq5galnul0ejsuneypmqfsatucvdbtiujlng6snj7ao.canva-cdn.email/0af3fcc10d26334d70aa262d60e185aa.png"
+                                        width="600"
+                                        alt="Estamos para acompañarte"
+                                        style="
+                                            display:block;
+                                            width:600px;
+                                            height:auto;
+                                            max-width:100%;
+                                            border:0;
+                                            border-radius:0 0 15px 15px;
+                                        "
+                                    />
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+
+                    <!--[if mso]>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <![endif]-->
+
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>
+HTML;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Texto plano
+        |--------------------------------------------------------------------------
+        |
+        | Tampoco incluimos el motivo en la versión texto.
+        |
+        */
+        $textBody =
+            "Hay cambios en tu perfil que requieren revisión\n\n" .
+            (
+                $firstName !== ''
+                ? "Hola, {$firstName}.\n\n"
+                : "Hola.\n\n"
+            ) .
+            "Revisamos la información de tu inmobiliaria y hay algunos puntos que necesitás revisar antes de continuar.\n\n" .
+            "Ingresá a Permuok para ver el detalle y realizar los ajustes correspondientes.\n\n" .
+            "Revisar mi perfil:\n" .
+            $profileUrl .
+            "\n\n" .
+            "Una vez que actualices la información, vas a poder volver a enviarla para revisión.";
+
+        /*
+        |--------------------------------------------------------------------------
+        | Cola
+        |--------------------------------------------------------------------------
+        |
+        | Este correo puede enviarse más de una vez durante
+        | la vida de una inmobiliaria.
+        |
+        | No aplicamos deduplicación permanente por real_estate_id.
+        |
+        */
+        EmailJobService::enqueue(
+            $email,
+            self::EMAIL_TYPE,
+            'Hay cambios en tu perfil que requieren revisión',
+            $htmlBody,
+            $textBody,
+            $userId,
+            $firstName !== ''
+                ? $firstName
+                : null,
+            'real_estate',
+            $realEstateId,
+            8
+        );
+    }
+}

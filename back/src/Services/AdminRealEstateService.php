@@ -860,17 +860,20 @@ class AdminRealEstateService
 
             /*
 |--------------------------------------------------------------------------
-| Emails posteriores a la aprobación
+| Emails posteriores a la validación
 |--------------------------------------------------------------------------
 |
 | La operación administrativa ya quedó confirmada
 | antes de intentar encolar cualquier correo.
 |
-| INITIAL_REVIEW:
-|   primera aprobación de la inmobiliaria.
+| APPROVE:
+|   - aprobación inicial
+|   - aprobación de cambios posteriores
 |
-| CHANGES_PENDING:
-|   aprobación de una actualización posterior.
+| REJECT:
+|   - informa que el perfil requiere revisión
+|   - el motivo NO se envía por email
+|   - el detalle se consulta dentro de Permuok
 |
 */
             if ($action === 'approve') {
@@ -898,6 +901,19 @@ class AdminRealEstateService
                                 $emailError->getMessage()
                         );
                     }
+                }
+            }
+
+            if ($action === 'reject') {
+                try {
+                    RealEstateProfileReviewRequiredEmailService::enqueueForRealEstate(
+                        $realEstateId
+                    );
+                } catch (\Throwable $emailError) {
+                    error_log(
+                        '[REAL ESTATE PROFILE REVIEW REQUIRED EMAIL] ' .
+                            $emailError->getMessage()
+                    );
                 }
             }
 
