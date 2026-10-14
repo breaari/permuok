@@ -960,7 +960,7 @@ class NotificationService
                             <h1 style="
                                 margin:0 0 16px;
                                 font-size:24px;
-                                line-height:1.3;
+                                line-height:1;
                             ">
                                 {$safeTitle}
                             </h1>
@@ -968,7 +968,7 @@ class NotificationService
                             <p style="
                                 margin:0 0 26px;
                                 font-size:16px;
-                                line-height:1.6;
+                                line-height:1;
                                 color:#475569;
                             ">
                                 {$safeMessage}
@@ -996,7 +996,7 @@ class NotificationService
                             border-top:1px solid #e2e8f0;
                             padding:20px 28px;
                             font-size:12px;
-                            line-height:1.5;
+                            line-height:1;
                             color:#94a3b8;
                         ">
                             Recibís este correo porque tenés actividad

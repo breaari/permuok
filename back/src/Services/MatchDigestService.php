@@ -587,7 +587,7 @@ class MatchDigestService
     margin:0 0 26px;
     color:#475569;
     font-size:16px;
-    line-height:1.7;
+    line-height:1;
 ">
     {$safeBody}
 </p>

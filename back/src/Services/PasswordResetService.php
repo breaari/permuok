@@ -338,7 +338,7 @@ class PasswordResetService
                                         style="
                                             font-size:20px;
                                             font-weight:700;
-                                            line-height:1.4;
+                                            line-height:1;
                                             margin-bottom:20px;
                                         "
                                     >
@@ -348,7 +348,7 @@ class PasswordResetService
                                     <div
                                         style="
                                             font-size:16px;
-                                            line-height:1.5;
+                                            line-height:1;
                                         "
                                     >
                                         {$safeName}, recibimos una solicitud para crear una nueva contraseña para tu cuenta de Permuok.
@@ -454,7 +454,7 @@ class PasswordResetService
                                         color:#0e1b10;
                                         font-family:Arial, Helvetica, sans-serif;
                                         font-size:13px;
-                                        line-height:1.7;
+                                        line-height:1;
                                         text-align:left;
                                     "
                                 >
@@ -810,7 +810,7 @@ users.first_name
                     );
 
                 $htmlBody = "
-        <div style=\"font-family:Arial,sans-serif;color:#0f172a;line-height:1.6\">
+        <div style=\"font-family:Arial,sans-serif;color:#0f172a;line-height:1\">
             <h2>Tu contraseña fue actualizada</h2>
 
             <p>{$safeName}, la contraseña de tu cuenta de PermuOK se cambió correctamente.</p>

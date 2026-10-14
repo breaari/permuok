@@ -318,7 +318,7 @@ class RealEstateChangesApprovedEmailService
                                         style="
                                             font-size:20px;
                                             font-weight:700;
-                                            line-height:1.35;
+                                            line-height:1;
                                             margin-bottom:18px;
                                         "
                                     >
@@ -328,7 +328,7 @@ class RealEstateChangesApprovedEmailService
                                     <div
                                         style="
                                             font-size:16px;
-                                            line-height:1.5;
+                                            line-height:1;
                                         "
                                     >
                                         Actualizamos la información de tu inmobiliaria y todo volvió a quedar validado.

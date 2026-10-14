@@ -444,7 +444,7 @@ class EmailVerificationService
                                         style="
                                             font-size:24px;
                                             font-weight:700;
-                                            line-height:1.35;
+                                            line-height:1;
                                             color:#30363d;
                                             margin-bottom:28px;
                                         "
@@ -455,7 +455,7 @@ class EmailVerificationService
                                     <div
                                         style="
                                             font-size:16px;
-                                            line-height:1.5;
+                                            line-height:1;
                                             color:#30363d;
                                         "
                                     >
@@ -562,7 +562,7 @@ class EmailVerificationService
                                         padding:4px 56px 30px 56px;
                                         font-family:Arial, Helvetica, sans-serif;
                                         font-size:13px;
-                                        line-height:1.6;
+                                        line-height:1;
                                         color:#30363d;
                                         text-align:left;
                                     "
@@ -587,7 +587,7 @@ class EmailVerificationService
                                         padding:0 56px 30px 56px;
                                         font-family:Arial, Helvetica, sans-serif;
                                         font-size:11px;
-                                        line-height:1.5;
+                                        line-height:1;
                                         color:#64748b;
                                         text-align:left;
                                     "

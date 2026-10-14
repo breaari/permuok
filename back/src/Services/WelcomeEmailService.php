@@ -415,7 +415,7 @@ class WelcomeEmailService
                                         font-size:29px;
                                         font-weight:700;
                                         letter-spacing:-0.04em;
-                                        line-height:1.1;
+                                        line-height:1;
                                     "
                                 >
                                     Tu cuenta está casi lista.
@@ -432,7 +432,7 @@ class WelcomeEmailService
                                         color:#0e1b10;
                                         font-family:Arial, Helvetica, sans-serif;
                                         font-size:16px;
-                                        line-height:1.45;
+                                        line-height:1;
                                     "
                                 >
                                     Ahora completá los datos de tu inmobiliaria para
@@ -539,7 +539,7 @@ class WelcomeEmailService
                                         color:#0e1b10;
                                         font-family:Arial, Helvetica, sans-serif;
                                         font-size:13px;
-                                        line-height:1.6;
+                                        line-height:1;
                                     "
                                 >
                                     Recibís este correo porque creaste una cuenta en Permuok.

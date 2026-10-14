@@ -393,7 +393,7 @@ class RealEstateApprovedEmailService
                                         color:#0e1b10;
                                         font-family:Arial, Helvetica, sans-serif;
                                         font-size:16px;
-                                        line-height:1.4;
+                                        line-height:1;
                                         text-align:center;
                                     "
                                 >

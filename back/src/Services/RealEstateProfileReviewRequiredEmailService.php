@@ -346,7 +346,7 @@ class RealEstateProfileReviewRequiredEmailService
                                         font-family:Arial, Helvetica, sans-serif;
                                         font-size:20px;
                                         font-weight:700;
-                                        line-height:1.4;
+                                        line-height:1;
                                         text-align:left;
                                     "
                                 >
@@ -363,7 +363,7 @@ class RealEstateProfileReviewRequiredEmailService
                                         color:#0e1b10;
                                         font-family:Arial, Helvetica, sans-serif;
                                         font-size:16px;
-                                        line-height:1.45;
+                                        line-height:1;
                                         text-align:left;
                                     "
                                 >
@@ -380,7 +380,7 @@ class RealEstateProfileReviewRequiredEmailService
                                         color:#0e1b10;
                                         font-family:Arial, Helvetica, sans-serif;
                                         font-size:16px;
-                                        line-height:1.5;
+                                        line-height:1;
                                         text-align:left;
                                     "
                                 >
@@ -396,7 +396,7 @@ class RealEstateProfileReviewRequiredEmailService
                                         color:#0e1b10;
                                         font-family:Arial, Helvetica, sans-serif;
                                         font-size:16px;
-                                        line-height:1.5;
+                                        line-height:1;
                                         text-align:left;
                                     "
                                 >
@@ -502,7 +502,7 @@ class RealEstateProfileReviewRequiredEmailService
                                         color:#0e1b10;
                                         font-family:Arial, Helvetica, sans-serif;
                                         font-size:13px;
-                                        line-height:1.55;
+                                        line-height:1;
                                         text-align:left;
                                     "
                                 >
