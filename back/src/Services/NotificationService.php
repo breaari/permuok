@@ -724,12 +724,186 @@ class NotificationService
         array $conversation = [],
         ?PDO $pdo = null
     ): void {
+        /*
+    |--------------------------------------------------------------------------
+    | Notificación interna
+    |--------------------------------------------------------------------------
+    */
         self::createConversationNotification(
             $userId,
             'contact_share_requested',
             $conversationId,
             $conversation,
             null,
+            $pdo
+        );
+
+        /*
+    |--------------------------------------------------------------------------
+    | Destinatario
+    |--------------------------------------------------------------------------
+    */
+        $recipient =
+            self::getEmailRecipient(
+                $userId
+            );
+
+        if (!$recipient) {
+            return;
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | URL
+    |--------------------------------------------------------------------------
+    */
+        $frontendUrl =
+            rtrim(
+                (string)(
+                    $_ENV['FRONTEND_URL']
+                    ?? 'https://permuok.com'
+                ),
+                '/'
+            );
+
+        $buttonUrl =
+            $frontendUrl .
+            '/conversations/' .
+            $conversationId;
+
+        /*
+    |--------------------------------------------------------------------------
+    | Oportunidad
+    |--------------------------------------------------------------------------
+    */
+        $opportunityTitle =
+            trim(
+                (string)(
+                    $conversation['opportunity_title']
+                    ?? $conversation['subject']
+                    ?? 'Oportunidad'
+                )
+            );
+
+        $opportunityLocation =
+            trim(
+                (string)(
+                    $conversation['opportunity_location']
+                    ?? ''
+                )
+            );
+
+        $opportunityType =
+            match ((string)(
+                $conversation['opportunity_type']
+                ?? ''
+            )) {
+                'property' =>
+                'Propiedad',
+
+                'search_request' =>
+                'Búsqueda',
+
+                'development' =>
+                'Desarrollo',
+
+                default =>
+                'Oportunidad',
+            };
+
+        /*
+    |--------------------------------------------------------------------------
+    | Imagen
+    |--------------------------------------------------------------------------
+    */
+        $imageUrl =
+            trim(
+                (string)(
+                    $conversation['opportunity_image_url']
+                    ?? ''
+                )
+            );
+
+        if (
+            $imageUrl !== '' &&
+            str_starts_with(
+                $imageUrl,
+                '/'
+            )
+        ) {
+            $backendUrl =
+                rtrim(
+                    (string)(
+                        $_ENV['BACKEND_URL']
+                        ?? $_ENV['APP_URL']
+                        ?? ''
+                    ),
+                    '/'
+                );
+
+            if ($backendUrl !== '') {
+                $imageUrl =
+                    $backendUrl .
+                    $imageUrl;
+            }
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Contenido
+    |--------------------------------------------------------------------------
+    */
+        $emailSubject =
+            'Una inmobiliaria quiere compartir sus datos con vos';
+
+        $activityText =
+            'La otra inmobiliaria quiere habilitar el intercambio de datos de contacto para esta oportunidad. Si aceptás, ambas partes podrán ver los datos de contacto vinculados a sus perfiles.';
+
+        $htmlBody =
+            self::buildConversationEmail(
+                'Tenés una solicitud para compartir datos de contacto',
+                $opportunityTitle,
+                $opportunityLocation,
+                $opportunityType,
+                $imageUrl,
+                '',
+                '',
+                'Revisar solicitud',
+                $buttonUrl,
+                $activityText
+            );
+
+        $textBody =
+            "Tenés una solicitud para compartir datos de contacto\n\n" .
+            $opportunityTitle .
+            (
+                $opportunityLocation !== ''
+                ? "\n" .
+                $opportunityLocation
+                : ''
+            ) .
+            "\n\n" .
+            $activityText .
+            "\n\n" .
+            "Revisar solicitud:\n" .
+            $buttonUrl;
+
+        /*
+    |--------------------------------------------------------------------------
+    | Cola
+    |--------------------------------------------------------------------------
+    */
+        EmailJobService::enqueue(
+            $recipient['email'],
+            'contact_share_requested',
+            $emailSubject,
+            $htmlBody,
+            $textBody,
+            $userId,
+            $recipient['name'],
+            'conversation',
+            $conversationId,
+            9,
             $pdo
         );
     }
@@ -1389,7 +1563,6 @@ class NotificationService
         string $buttonUrl,
         ?string $activityText = null
     ): string {
-
         $safeHeading =
             htmlspecialchars(
                 $heading,
@@ -1397,21 +1570,6 @@ class NotificationService
                 'UTF-8'
             );
 
-        $safeButtonText =
-            htmlspecialchars(
-                $buttonText,
-                ENT_QUOTES,
-                'UTF-8'
-            );
-
-        $safeActivityText =
-            htmlspecialchars(
-                trim(
-                    (string)$activityText
-                ),
-                ENT_QUOTES,
-                'UTF-8'
-            );
         $safeTitle =
             htmlspecialchars(
                 $opportunityTitle,
@@ -1449,6 +1607,24 @@ class NotificationService
                 )
             );
 
+        $safeActivityText =
+            nl2br(
+                htmlspecialchars(
+                    trim(
+                        (string)$activityText
+                    ),
+                    ENT_QUOTES,
+                    'UTF-8'
+                )
+            );
+
+        $safeButtonText =
+            htmlspecialchars(
+                $buttonText,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
         $safeButtonUrl =
             htmlspecialchars(
                 $buttonUrl,
@@ -1483,73 +1659,73 @@ class NotificationService
         border-collapse:separate;
     "
 >
-    <tbody>
-        <tr>
-            <td
-                width="150"
-                valign="middle"
-                style="
-                    width:150px;
-                    padding:0;
-                "
-            >
-                <img
-                    src="{$safeImageUrl}"
-                    width="150"
-                    alt="{$safeTitle}"
-                    style="
-                        display:block;
-                        width:150px;
-                        height:105px;
-                        object-fit:cover;
-                        border:0;
-                    "
-                />
-            </td>
+<tbody>
+<tr>
+<td
+    width="150"
+    valign="middle"
+    style="
+        width:150px;
+        padding:0;
+    "
+>
+    <img
+        src="{$safeImageUrl}"
+        width="150"
+        alt="{$safeTitle}"
+        style="
+            display:block;
+            width:150px;
+            height:105px;
+            object-fit:cover;
+            border:0;
+        "
+    />
+</td>
 
-            <td
-                valign="middle"
-                style="
-                    padding:18px 20px;
-                    font-family:Arial, Helvetica, sans-serif;
-                "
-            >
-                <div
-                    style="
-                        color:#0e1b10;
-                        font-size:16px;
-                        font-weight:700;
-                        line-height:1;
-                    "
-                >
-                    {$safeTitle}
-                </div>
+<td
+    valign="middle"
+    style="
+        padding:18px 20px;
+        font-family:Arial, Helvetica, sans-serif;
+    "
+>
+    <div
+        style="
+            color:#0e1b10;
+            font-size:16px;
+            font-weight:700;
+            line-height:1;
+        "
+    >
+        {$safeTitle}
+    </div>
 
-                <div
-                    style="
-                        margin-top:8px;
-                        color:#64748b;
-                        font-size:13px;
-                        line-height:1;
-                    "
-                >
-                    {$safeLocation}
-                </div>
+    <div
+        style="
+            margin-top:8px;
+            color:#64748b;
+            font-size:13px;
+            line-height:1;
+        "
+    >
+        {$safeLocation}
+    </div>
 
-                <div
-                    style="
-                        margin-top:8px;
-                        color:#3974ba;
-                        font-size:12px;
-                        font-weight:700;
-                        line-height:1;
-                    "
-                >
-                    {$safeType}
-                </div>
-            </td>
-        </tr>
-    </tbody>
+    <div
+        style="
+            margin-top:8px;
+            color:#3974ba;
+            font-size:12px;
+            font-weight:700;
+            line-height:1;
+        "
+    >
+        {$safeType}
+    </div>
+</td>
+</tr>
+</tbody>
 </table>
 HTML;
         } else {
@@ -1566,51 +1742,131 @@ HTML;
         border-collapse:separate;
     "
 >
-    <tbody>
-        <tr>
-            <td
-                style="
-                    padding:20px;
-                    font-family:Arial, Helvetica, sans-serif;
-                "
-            >
-                <div
-                    style="
-                        color:#0e1b10;
-                        font-size:16px;
-                        font-weight:700;
-                        line-height:1;
-                    "
-                >
-                    {$safeTitle}
-                </div>
+<tbody>
+<tr>
+<td
+    style="
+        padding:20px;
+        font-family:Arial, Helvetica, sans-serif;
+    "
+>
+    <div
+        style="
+            color:#0e1b10;
+            font-size:16px;
+            font-weight:700;
+            line-height:1;
+        "
+    >
+        {$safeTitle}
+    </div>
 
-                <div
-                    style="
-                        margin-top:8px;
-                        color:#64748b;
-                        font-size:13px;
-                        line-height:1;
-                    "
-                >
-                    {$safeLocation}
-                </div>
+    <div
+        style="
+            margin-top:8px;
+            color:#64748b;
+            font-size:13px;
+            line-height:1;
+        "
+    >
+        {$safeLocation}
+    </div>
 
-                <div
-                    style="
-                        margin-top:8px;
-                        color:#3974ba;
-                        font-size:12px;
-                        font-weight:700;
-                        line-height:1;
-                    "
-                >
-                    {$safeType}
-                </div>
-            </td>
-        </tr>
-    </tbody>
+    <div
+        style="
+            margin-top:8px;
+            color:#3974ba;
+            font-size:12px;
+            font-weight:700;
+            line-height:1;
+        "
+    >
+        {$safeType}
+    </div>
+</td>
+</tr>
+</tbody>
 </table>
+HTML;
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Bloque de mensaje o actividad
+    |--------------------------------------------------------------------------
+    */
+        $contentBlock = '';
+
+        if (
+            trim(
+                $messagePreview
+            ) !== ''
+        ) {
+            $contentBlock = <<<HTML
+<tr>
+<td
+    class="email-content"
+    style="
+        padding:0 56px 12px;
+        color:#0e1b10;
+        font-family:Arial, Helvetica, sans-serif;
+        font-size:15px;
+        font-weight:700;
+        line-height:1;
+        text-align:left;
+    "
+>
+    {$safeSender} escribió:
+</td>
+</tr>
+
+<tr>
+<td
+    class="email-content"
+    style="
+        padding:0 56px 34px;
+    "
+>
+    <div
+        style="
+            padding:18px 20px;
+            background:#f3f4f6;
+            border-radius:10px;
+            color:#30363d;
+            font-family:Arial, Helvetica, sans-serif;
+            font-size:15px;
+            font-weight:400;
+            line-height:1;
+        "
+    >
+        {$safeMessage}
+    </div>
+</td>
+</tr>
+HTML;
+        } elseif (
+            $activityText !== null &&
+            trim(
+                $activityText
+            ) !== ''
+        ) {
+            $contentBlock = <<<HTML
+<tr>
+<td
+    class="email-content"
+    style="
+        padding:0 56px 34px;
+        color:#30363d;
+        font-family:Arial, Helvetica, sans-serif;
+        font-size:15px;
+        font-weight:400;
+        line-height:1;
+        text-align:left;
+    "
+>
+    {$safeActivityText}
+</td>
+</tr>
 HTML;
         }
 
@@ -1790,7 +2046,7 @@ HTML;
         text-align:left;
     "
 >
-   {$safeHeading}
+    {$safeHeading}
 </td>
 </tr>
 
@@ -1806,48 +2062,7 @@ HTML;
 </td>
 </tr>
 
-<!-- SENDER -->
-<tr>
-<td
-    class="email-content"
-    style="
-        padding:0 56px 12px;
-        color:#0e1b10;
-        font-family:Arial, Helvetica, sans-serif;
-        font-size:15px;
-        font-weight:700;
-        line-height:1;
-        text-align:left;
-    "
->
-    {$safeSender} escribió:
-</td>
-</tr>
-
-<!-- MENSAJE -->
-<tr>
-<td
-    class="email-content"
-    style="
-        padding:0 56px 34px;
-    "
->
-    <div
-        style="
-            padding:18px 20px;
-            background:#f3f4f6;
-            border-radius:10px;
-            color:#30363d;
-            font-family:Arial, Helvetica, sans-serif;
-            font-size:15px;
-            font-weight:400;
-            line-height:1;
-        "
-    >
-        {$safeMessage}
-    </div>
-</td>
-</tr>
+{$contentBlock}
 
 <!-- BOTÓN -->
 <tr>
@@ -1874,7 +2089,16 @@ HTML;
 >
     <w:anchorlock/>
 
-   {$safeButtonText}
+    <center
+        style="
+            color:#ffffff;
+            font-family:Arial,sans-serif;
+            font-size:18px;
+            font-weight:700;
+        "
+    >
+        {$safeButtonText}
+    </center>
 </v:roundrect>
 <![endif]-->
 
@@ -1917,7 +2141,7 @@ HTML;
             line-height:1;
         "
     >
-        Ver consulta
+        {$safeButtonText}
     </a>
 </td>
 </tr>
@@ -2060,6 +2284,28 @@ HTML;
 
                 break;
 
+            case 'contact_share_requested':
+                $heading =
+                    'Tenés una solicitud para compartir datos de contacto';
+
+                $buttonText =
+                    'Revisar solicitud';
+
+                $buttonUrl =
+                    $frontendUrl .
+                    '/conversations/1';
+
+                $subject =
+                    'Una inmobiliaria quiere compartir sus datos con vos';
+
+                $senderLabel = '';
+                $messagePreview = '';
+
+                $activityText =
+                    'La otra inmobiliaria quiere habilitar el intercambio de datos de contacto para esta oportunidad. Si aceptás, ambas partes podrán ver los datos de contacto vinculados a sus perfiles.';
+
+                break;
+
             case 'new_conversation':
             default:
                 $heading =
@@ -2109,7 +2355,8 @@ HTML;
         }
 
         if (
-            $activityText !== null
+            $activityText !== null &&
+            trim($activityText) !== ''
         ) {
             $textBody .=
                 $activityText .

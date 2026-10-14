@@ -2623,10 +2623,6 @@ THEN 1
         try {
             /*
          * Bloqueamos la conversación.
-         *
-         * Esto serializa cualquier intento simultáneo
-         * de solicitar compartir contacto sobre
-         * esta misma conversación.
          */
             $stmt = $pdo->prepare("
             SELECT *
@@ -2638,11 +2634,14 @@ THEN 1
         ");
 
             $stmt->execute([
-                ':conversation_id' => $conversationId,
+                ':conversation_id' =>
+                $conversationId,
             ]);
 
             $conversation =
-                $stmt->fetch(PDO::FETCH_ASSOC);
+                $stmt->fetch(
+                    PDO::FETCH_ASSOC
+                );
 
             if (!$conversation) {
                 throw new Exception(
@@ -2677,12 +2676,7 @@ THEN 1
                 (int)$receiverIds[0];
 
             /*
-         * Buscamos cualquier solicitud pendiente
-         * de esta conversación.
-         *
-         * No solamente la misma dirección.
-         * Así evitamos que ambas partes creen
-         * solicitudes cruzadas simultáneamente.
+         * Evitamos solicitudes pendientes duplicadas.
          */
             $stmt = $pdo->prepare("
             SELECT *
@@ -2695,21 +2689,30 @@ THEN 1
         ");
 
             $stmt->execute([
-                ':conversation_id' => $conversationId,
+                ':conversation_id' =>
+                $conversationId,
             ]);
 
             $existing =
-                $stmt->fetch(PDO::FETCH_ASSOC);
+                $stmt->fetch(
+                    PDO::FETCH_ASSOC
+                );
 
             if ($existing) {
                 $pdo->commit();
 
                 return [
-                    'request' => $existing,
-                    'already_exists' => true,
+                    'request' =>
+                    $existing,
+
+                    'already_exists' =>
+                    true,
                 ];
             }
 
+            /*
+         * Creamos la solicitud.
+         */
             $stmt = $pdo->prepare("
             INSERT INTO contact_share_requests (
                 conversation_id,
@@ -2745,6 +2748,9 @@ THEN 1
             $requestId =
                 (int)$pdo->lastInsertId();
 
+            /*
+         * Mensaje interno de sistema.
+         */
             $systemMessage =
                 self::createSystemMessage(
                     $conversationId,
@@ -2756,10 +2762,19 @@ THEN 1
                 (int)$systemMessage['id']
             );
 
+            /*
+         * Adjuntamos la información visual
+         * de la oportunidad al mail.
+         */
+            $notificationConversation =
+                self::attachOpportunityData(
+                    $conversation
+                );
+
             NotificationService::notifyContactShareRequested(
                 $requestedToUserId,
                 $conversationId,
-                $conversation,
+                $notificationConversation,
                 $pdo
             );
 
@@ -2771,7 +2786,8 @@ THEN 1
                     $requestId
                 ),
 
-                'already_exists' => false,
+                'already_exists' =>
+                false,
             ];
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
