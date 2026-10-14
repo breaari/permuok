@@ -15,9 +15,8 @@ $dotenv->load();
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(403);
-    exit(
-        "Este script solo puede ejecutarse desde CLI.\n"
-    );
+
+    exit("Este script solo puede ejecutarse desde CLI.\n");
 }
 
 $email =
@@ -28,25 +27,65 @@ $email =
         )
     );
 
-if ($email === '') {
-    exit(
-        "Uso:\n" .
-        "php bin/test-new-conversation-email.php tu@email.com\n"
+$type =
+    trim(
+        (string)(
+            $argv[2]
+            ?? 'new_conversation'
+        )
     );
+
+$allowedTypes = [
+    'new_conversation',
+    'new_message',
+    'compatibility_mutual_interest',
+];
+
+if ($email === '') {
+    exit("Uso:\n\n" .
+        "php bin/test-new-conversation-email.php EMAIL TIPO\n\n" .
+        "Tipos disponibles:\n" .
+        "- new_conversation\n" .
+        "- new_message\n" .
+        "- compatibility_mutual_interest\n");
+}
+
+if (
+    !in_array(
+        $type,
+        $allowedTypes,
+        true
+    )
+) {
+    exit("Tipo de email inválido.\n\n" .
+        "Tipos disponibles:\n" .
+        "- new_conversation\n" .
+        "- new_message\n" .
+        "- compatibility_mutual_interest\n");
 }
 
 try {
     $job =
-        NotificationService::queueNewConversationTestEmail(
-            $email
+        NotificationService::queueNotificationTestEmail(
+            $email,
+            $type
         );
 
     echo "\n";
-    echo "Email de prueba encolado.\n";
+    echo "Email de prueba encolado correctamente.\n";
+    echo "----------------------------------------\n";
     echo "Job ID: " .
         ($job['id'] ?? '—') .
         "\n";
-    echo "Destino: {$email}\n";
+
+    echo "Destino: " .
+        $email .
+        "\n";
+
+    echo "Tipo: " .
+        $type .
+        "\n";
+
     echo "\n";
 } catch (Throwable $e) {
     fwrite(
