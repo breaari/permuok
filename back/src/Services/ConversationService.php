@@ -827,7 +827,8 @@ class ConversationService
             (int)($query['page'] ?? 1)
         );
 
-        $offset = ($page - 1) * $limit;
+        $offset =
+            ($page - 1) * $limit;
 
         $showArchived =
             isset($query['archived']) &&
@@ -846,12 +847,26 @@ class ConversationService
         SELECT
             c.*,
 
-            comp.score AS compatibility_score,
-            comp.match_level AS compatibility_match_level,
-            comp.property_id AS compatibility_property_id,
-            comp.search_request_id AS compatibility_search_request_id,
-p.title AS compatibility_property_title,
-sr.title AS compatibility_search_title,
+            cp.management_status,
+
+            comp.score
+                AS compatibility_score,
+
+            comp.match_level
+                AS compatibility_match_level,
+
+            comp.property_id
+                AS compatibility_property_id,
+
+            comp.search_request_id
+                AS compatibility_search_request_id,
+
+            p.title
+                AS compatibility_property_title,
+
+            sr.title
+                AS compatibility_search_title,
+
             CASE
                 WHEN cp.role = 'owner'
                     THEN 'received'
@@ -862,7 +877,9 @@ sr.title AS compatibility_search_title,
                 ELSE 'participant'
             END AS direction,
 
-            cp.role AS participant_role,
+            cp.role
+                AS participant_role,
+
             cp.last_read_message_id,
             cp.last_read_at,
             cp.archived_at,
@@ -881,6 +898,7 @@ sr.title AS compatibility_search_title,
 
             (
                 SELECT COUNT(*)
+
                 FROM messages m
 
                 WHERE
@@ -907,13 +925,15 @@ sr.title AS compatibility_search_title,
         LEFT JOIN compatibilities comp
             ON comp.id = c.compatibility_id
            AND comp.deleted_at IS NULL
-LEFT JOIN properties p
-    ON p.id = comp.property_id
-   AND p.deleted_at IS NULL
 
-LEFT JOIN search_requests sr
-    ON sr.id = comp.search_request_id
-   AND sr.deleted_at IS NULL
+        LEFT JOIN properties p
+            ON p.id = comp.property_id
+           AND p.deleted_at IS NULL
+
+        LEFT JOIN search_requests sr
+            ON sr.id = comp.search_request_id
+           AND sr.deleted_at IS NULL
+
         LEFT JOIN messages lm
             ON lm.id = c.last_message_id
 
@@ -937,8 +957,11 @@ LEFT JOIN search_requests sr
     ");
 
         $stmt->execute([
-            ':user_id' => $userId,
-            ':user_id_unread' => $userId,
+            ':user_id' =>
+            $userId,
+
+            ':user_id_unread' =>
+            $userId,
         ]);
 
         $items =
@@ -946,11 +969,26 @@ LEFT JOIN search_requests sr
                 PDO::FETCH_ASSOC
             ) ?: [];
 
+        foreach ($items as &$item) {
+            $item['status'] =
+                $item['management_status']
+                ?? 'open';
+        }
+
+        unset($item);
+
         return [
-            'items' => $items,
-            'page' => $page,
-            'limit' => $limit,
-            'archived' => $showArchived,
+            'items' =>
+            $items,
+
+            'page' =>
+            $page,
+
+            'limit' =>
+            $limit,
+
+            'archived' =>
+            $showArchived,
         ];
     }
 
@@ -1067,14 +1105,23 @@ LEFT JOIN search_requests sr
         $pdo = self::db();
 
         $type = trim(
-            (string)($query['opportunity_type'] ?? '')
+            (string)(
+                $query['opportunity_type']
+                ?? ''
+            )
         );
 
         $opportunityId =
-            (int)($query['opportunity_id'] ?? 0);
+            (int)(
+                $query['opportunity_id']
+                ?? 0
+            );
 
         $tab = trim(
-            (string)($query['tab'] ?? '')
+            (string)(
+                $query['tab']
+                ?? ''
+            )
         );
 
         $showArchived =
@@ -1101,7 +1148,11 @@ LEFT JOIN search_requests sr
         if (
             !in_array(
                 $type,
-                ['property', 'search_request', 'development'],
+                [
+                    'property',
+                    'search_request',
+                    'development',
+                ],
                 true
             )
         ) {
@@ -1118,7 +1169,13 @@ LEFT JOIN search_requests sr
             );
         }
 
-        if (!in_array($tab, ['own', 'external'], true)) {
+        if (
+            !in_array(
+                $tab,
+                ['own', 'external'],
+                true
+            )
+        ) {
             throw new Exception(
                 'Pestaña inválida.',
                 422
@@ -1165,10 +1222,17 @@ LEFT JOIN search_requests sr
     ");
 
         $countStmt->execute([
-            ':user_id' => $userId,
-            ':role' => $role,
-            ':opportunity_type' => $type,
-            ':opportunity_id' => $opportunityId,
+            ':user_id' =>
+            $userId,
+
+            ':role' =>
+            $role,
+
+            ':opportunity_type' =>
+            $type,
+
+            ':opportunity_id' =>
+            $opportunityId,
         ]);
 
         $total =
@@ -1177,6 +1241,8 @@ LEFT JOIN search_requests sr
         $stmt = $pdo->prepare("
         SELECT
             c.*,
+
+            cp.management_status,
 
             CASE
                 WHEN cp.role = 'owner'
@@ -1188,7 +1254,8 @@ LEFT JOIN search_requests sr
                 ELSE 'participant'
             END AS direction,
 
-            cp.role AS participant_role,
+            cp.role
+                AS participant_role,
 
             cp.last_read_message_id,
             cp.last_read_at,
@@ -1264,45 +1331,80 @@ LEFT JOIN search_requests sr
     ");
 
         $stmt->execute([
-            ':user_id' => $userId,
-            ':user_id_unread' => $userId,
-            ':role' => $role,
-            ':opportunity_type' => $type,
-            ':opportunity_id' => $opportunityId,
+            ':user_id' =>
+            $userId,
+
+            ':user_id_unread' =>
+            $userId,
+
+            ':role' =>
+            $role,
+
+            ':opportunity_type' =>
+            $type,
+
+            ':opportunity_id' =>
+            $opportunityId,
         ]);
 
         $items =
-            $stmt->fetchAll(PDO::FETCH_ASSOC)
-            ?: [];
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        foreach ($items as &$item) {
+            $item['status'] =
+                $item['management_status']
+                ?? 'open';
+        }
+
+        unset($item);
 
         $totalPages =
             $total > 0
-            ? (int)ceil($total / $limit)
+            ? (int)ceil(
+                $total / $limit
+            )
             : 0;
 
         return [
-            'type' => 'group_conversations',
+            'type' =>
+            'group_conversations',
 
             'group' => [
                 'key' =>
-                $type . ':' . $opportunityId,
+                $type .
+                    ':' .
+                    $opportunityId,
 
-                'opportunity_type' => $type,
+                'opportunity_type' =>
+                $type,
 
                 'opportunity_id' =>
                 $opportunityId,
 
-                'tab' => $tab,
+                'tab' =>
+                $tab,
             ],
 
-            'items' => $items,
+            'items' =>
+            $items,
 
             'pagination' => [
-                'page' => $page,
-                'limit' => $limit,
-                'total' => $total,
-                'total_pages' => $totalPages,
-                'has_more' => $page < $totalPages,
+                'page' =>
+                $page,
+
+                'limit' =>
+                $limit,
+
+                'total' =>
+                $total,
+
+                'total_pages' =>
+                $totalPages,
+
+                'has_more' =>
+                $page < $totalPages,
             ],
         ];
     }

@@ -87,22 +87,23 @@ export default function useConversationDetail(id, navigate) {
       setError("");
 
       const res = await updateConversationStatus(id, status);
-      const updatedConversation = res?.conversation;
 
-      if (updatedConversation) {
-        setDetail((prev) => ({
-          ...prev,
-          conversation: {
-            ...(prev?.conversation || {}),
-            ...updatedConversation,
-          },
-        }));
-      }
+      const nextStatus = res?.management_status || res?.status || status;
 
-      toast.success("Estado de conversación actualizado.");
-      await loadDetail({ silent: true });
+      setDetail((prev) => ({
+        ...prev,
+        conversation: {
+          ...(prev?.conversation || {}),
+          management_status: nextStatus,
+          status: nextStatus,
+        },
+      }));
+
+      toast.success("Estado de seguimiento actualizado.");
     } catch (err) {
-      const message = err?.message || "No se pudo actualizar el estado.";
+      const message =
+        err?.message || "No se pudo actualizar el estado de seguimiento.";
+
       setError(message);
       toast.error(message);
     } finally {
@@ -138,8 +139,7 @@ export default function useConversationDetail(id, navigate) {
 
       await loadDetail({ silent: true });
     } catch (err) {
-      const message =
-        err?.message || "No se pudo desarchivar la conversación.";
+      const message = err?.message || "No se pudo desarchivar la conversación.";
       setError(message);
       toast.error(message);
     } finally {
@@ -157,8 +157,7 @@ export default function useConversationDetail(id, navigate) {
 
       await loadDetail({ silent: true });
     } catch (err) {
-      const message =
-        err?.message || "No se pudo solicitar compartir datos.";
+      const message = err?.message || "No se pudo solicitar compartir datos.";
       setError(message);
       toast.error(message);
     } finally {

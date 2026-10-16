@@ -217,7 +217,7 @@ export default function ConversationOpportunityCard({
 
         <div className="border-b border-slate-100 pb-3 last:border-b-0">
           <label className="mb-2 block text-sm font-semibold text-slate-500">
-            Estado conversación
+            Estado de seguimiento
           </label>
 
           <select
