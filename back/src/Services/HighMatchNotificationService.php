@@ -1202,265 +1202,75 @@ class HighMatchNotificationService
     private static function buildSearchCard(
         array $item
     ): string {
-        $id =
+        $pdo =
+            self::db();
+
+        $searchRequestId =
             (int)(
-                $item['search_request_id'] ?? 0
+                $item['search_request_id']
+                ?? 0
             );
 
-        $title =
-            self::safe(
-                trim(
-                    (string)(
-                        $item['search_title'] ?? ''
-                    )
-                ) ?: 'Búsqueda'
-            );
+        if ($searchRequestId > 0) {
+            $card =
+                EmailSearchRequestCardService::build(
+                    $pdo,
+                    $searchRequestId
+                );
 
-        $description =
-            self::safe(
-                trim(
-                    (string)(
-                        $item['search_description'] ?? ''
-                    )
-                ) ?: 'Sin descripción.'
-            );
-
-        $location =
-            self::safe(
-                self::joinLocation([
-                    $item['search_city'] ?? null,
-
-                    $item['search_zone'] ?? null,
-
-                    $item['search_province'] ?? null,
-                ])
-            );
-
-        if ($location === '') {
-            $location =
-                'Sin ubicación';
+            if ($card !== null) {
+                return $card;
+            }
         }
 
-        $types =
-            self::safe(
-                self::propertyTypesLabel(
-                    $item['search_property_types'] ?? null
-                )
-            );
+        return EmailSearchRequestCardService::render(
+            [
+                'id' =>
+                $item['search_request_id']
+                    ?? 0,
 
-        $payment =
-            self::safe(
-                self::paymentLabel(
-                    $item
-                )
-            );
+                'title' =>
+                $item['search_title']
+                    ?? 'Búsqueda',
 
-        $budget =
-            self::safe(
-                self::formatMoneyRange(
-                    $item
-                )
-            );
+                'description' =>
+                $item['search_description']
+                    ?? null,
 
-        return <<<HTML
-<table
-    width="100%"
-    border="0"
-    cellpadding="0"
-    cellspacing="0"
-    role="presentation"
-    style="
-        width:100%;
-        border:1px solid #e2e8f0;
-        border-radius:12px;
-        border-collapse:separate;
-        background:#ffffff;
-        overflow:hidden;
-    "
->
-<tbody>
-<tr>
+                'city' =>
+                $item['search_city']
+                    ?? null,
 
-<td
-    valign="top"
-    style="
-        width:38%;
-        padding:17px 16px;
-        font-family:Manrope, Arial, Helvetica, sans-serif;
-    "
->
-    <div
-        style="
-            color:#94a3b8;
-            font-size:9px;
-            font-weight:600;
-            line-height:1;
-        "
-    >
-        #{$id}
-    </div>
+                'zone' =>
+                $item['search_zone']
+                    ?? null,
 
-    <div
-        style="
-            margin-top:8px;
-            color:#2166c2;
-            font-size:14px;
-            font-weight:700;
-            line-height:1.05;
-            letter-spacing:-0.1px;
-        "
-    >
-        {$title}
-    </div>
+                'province' =>
+                $item['search_province']
+                    ?? null,
 
-    <div
-        style="
-            margin-top:7px;
-            color:#64748b;
-            font-size:9px;
-            font-weight:400;
-            line-height:1;
-        "
-    >
-        {$description}
-    </div>
-</td>
+                'currency' =>
+                $item['search_currency']
+                    ?? 'USD',
 
-<td
-    valign="top"
-    style="
-        width:23%;
-        padding:17px 14px;
-        border-left:1px solid #e2e8f0;
-        font-family:Manrope, Arial, Helvetica, sans-serif;
-    "
->
-    <div
-        style="
-            color:#94a3b8;
-            font-size:8px;
-            font-weight:700;
-            line-height:1;
-            text-transform:uppercase;
-            letter-spacing:0.6px;
-        "
-    >
-        Ubicación
-    </div>
+                'min_value' =>
+                $item['search_min_value']
+                    ?? null,
 
-    <div
-        style="
-            margin-top:7px;
-            color:#334155;
-            font-size:10px;
-            font-weight:600;
-            line-height:1.05;
-        "
-    >
-        {$location}
-    </div>
-</td>
+                'max_value' =>
+                $item['search_max_value']
+                    ?? null,
 
-<td
-    valign="top"
-    style="
-        width:18%;
-        padding:17px 14px;
-        border-left:1px solid #e2e8f0;
-        font-family:Manrope, Arial, Helvetica, sans-serif;
-    "
->
-    <div
-        style="
-            color:#94a3b8;
-            font-size:8px;
-            font-weight:700;
-            line-height:1;
-            text-transform:uppercase;
-            letter-spacing:0.6px;
-        "
-    >
-        Tipo buscado
-    </div>
+                'payment_mode_cash' =>
+                $item['search_payment_mode_cash'] ?? null,
 
-    <div
-        style="
-            margin-top:7px;
-            color:#334155;
-            font-size:10px;
-            font-weight:600;
-            line-height:1.05;
-        "
-    >
-        {$types}
-    </div>
+                'payment_mode_swap' =>
+                $item['search_payment_mode_swap'] ?? null,
 
-    <div
-        style="
-            margin-top:12px;
-            color:#94a3b8;
-            font-size:8px;
-            font-weight:700;
-            line-height:1;
-            text-transform:uppercase;
-            letter-spacing:0.6px;
-        "
-    >
-        Modalidad
-    </div>
-
-    <div
-        style="
-            margin-top:6px;
-            color:#334155;
-            font-size:10px;
-            font-weight:600;
-            line-height:1.05;
-        "
-    >
-        {$payment}
-    </div>
-</td>
-
-<td
-    valign="top"
-    style="
-        width:21%;
-        padding:17px 14px;
-        border-left:1px solid #e2e8f0;
-        font-family:Manrope, Arial, Helvetica, sans-serif;
-    "
->
-    <div
-        style="
-            color:#94a3b8;
-            font-size:8px;
-            font-weight:700;
-            line-height:1;
-            text-transform:uppercase;
-            letter-spacing:0.6px;
-        "
-    >
-        Rango de valor
-    </div>
-
-    <div
-        style="
-            margin-top:7px;
-            color:#2166c2;
-            font-size:11px;
-            font-weight:700;
-            line-height:1.05;
-        "
-    >
-        {$budget}
-    </div>
-</td>
-
-</tr>
-</tbody>
-</table>
-HTML;
+                'property_types' =>
+                $item['search_property_types'] ?? null,
+            ]
+        );
     }
 
     private static function buildEmail(
