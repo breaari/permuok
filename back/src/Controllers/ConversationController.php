@@ -9,6 +9,7 @@ use App\Services\ConversationService;
 use App\Services\MembershipGuard;
 use Throwable;
 use App\Services\NetworkAccessGuard;
+
 class ConversationController
 {
     public static function start(): void
@@ -135,13 +136,13 @@ class ConversationController
                     (int) $user['id'],
                     [
                         'opportunity_type' =>
-                            $opportunityType,
+                        $opportunityType,
 
                         'opportunity_id' =>
-                            (int) $opportunityId,
+                        (int) $opportunityId,
 
                         'message' =>
-                            $message,
+                        $message,
                     ]
                 );
 
@@ -170,22 +171,22 @@ class ConversationController
 
             $filters = [
                 'page' =>
-                    QueryParamHelper::positiveInt(
-                        'page',
-                        1,
-                        1000000
-                    ),
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                ),
                 'limit' =>
-                    QueryParamHelper::positiveInt(
-                        'limit',
-                        20,
-                        50
-                    ),
+                QueryParamHelper::positiveInt(
+                    'limit',
+                    20,
+                    50
+                ),
                 'archived' =>
-                    QueryParamHelper::boolean(
-                        'archived',
-                        false
-                    ),
+                QueryParamHelper::boolean(
+                    'archived',
+                    false
+                ),
             ];
 
             $result =
@@ -222,50 +223,50 @@ class ConversationController
 
             $filters = [
                 'tab' =>
-                    QueryParamHelper::enum(
-                        'tab',
-                        [
-                            'own',
-                            'external',
-                            'matches',
-                        ],
-                        'own'
-                    ),
+                QueryParamHelper::enum(
+                    'tab',
+                    [
+                        'own',
+                        'external',
+                        'matches',
+                    ],
+                    'own'
+                ),
                 'status' =>
-                    QueryParamHelper::enum(
-                        'status',
-                        [
-                            'all',
-                            'open',
-                            'negotiating',
-                            'visit_scheduled',
-                            'closed',
-                            'discarded',
-                        ],
-                        'all'
-                    ),
+                QueryParamHelper::enum(
+                    'status',
+                    [
+                        'all',
+                        'open',
+                        'negotiating',
+                        'visit_scheduled',
+                        'closed',
+                        'discarded',
+                    ],
+                    'all'
+                ),
                 'search' =>
-                    QueryParamHelper::optionalString(
-                        'search',
-                        150
-                    ),
+                QueryParamHelper::optionalString(
+                    'search',
+                    150
+                ),
                 'page' =>
-                    QueryParamHelper::positiveInt(
-                        'page',
-                        1,
-                        1000000
-                    ),
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                ),
                 'limit' =>
-                    QueryParamHelper::positiveInt(
-                        'limit',
-                        20,
-                        50
-                    ),
+                QueryParamHelper::positiveInt(
+                    'limit',
+                    20,
+                    50
+                ),
                 'archived' =>
-                    QueryParamHelper::boolean(
-                        'archived',
-                        false
-                    ),
+                QueryParamHelper::boolean(
+                    'archived',
+                    false
+                ),
             ];
 
             $result =
@@ -392,7 +393,7 @@ class ConversationController
                 AuthHelper::requireUser();
 
             MembershipGuard::requireActiveMembership(
-                (int) $user['id']
+                (int)$user['id']
             );
 
             $input =
@@ -407,13 +408,15 @@ class ConversationController
                 )
             ) {
                 throw new \Exception(
-                    'Estado de conversación inválido.',
+                    'Estado de seguimiento inválido.',
                     422
                 );
             }
 
             $status =
-                trim($input['status']);
+                trim(
+                    $input['status']
+                );
 
             if (
                 !in_array(
@@ -429,17 +432,18 @@ class ConversationController
                 )
             ) {
                 throw new \Exception(
-                    'Estado de conversación inválido.',
+                    'Estado de seguimiento inválido.',
                     422
                 );
             }
 
             $result =
                 ConversationService::updateStatus(
-                    (int) $user['id'],
+                    (int)$user['id'],
                     $conversationId,
                     [
-                        'status' => $status,
+                        'status' =>
+                        $status,
                     ]
                 );
 
@@ -576,10 +580,10 @@ class ConversationController
                     $conversationId,
                     [
                         'decision' =>
-                            $decision,
+                        $decision,
 
                         'reason' =>
-                            $reason,
+                        $reason,
                     ]
                 );
 
@@ -776,45 +780,45 @@ class ConversationController
 
             $filters = [
                 'tab' =>
-                    QueryParamHelper::enum(
-                        'tab',
-                        [
-                            'own',
-                            'external',
-                        ],
-                        'own'
-                    ),
+                QueryParamHelper::enum(
+                    'tab',
+                    [
+                        'own',
+                        'external',
+                    ],
+                    'own'
+                ),
                 'opportunity_type' =>
-                    QueryParamHelper::enum(
-                        'opportunity_type',
-                        [
-                            'property',
-                            'search_request',
-                            'development',
-                        ],
-                        ''
-                    ),
+                QueryParamHelper::enum(
+                    'opportunity_type',
+                    [
+                        'property',
+                        'search_request',
+                        'development',
+                    ],
+                    ''
+                ),
                 'opportunity_id' =>
-                    QueryParamHelper::requiredPositiveInt(
-                        'opportunity_id'
-                    ),
+                QueryParamHelper::requiredPositiveInt(
+                    'opportunity_id'
+                ),
                 'page' =>
-                    QueryParamHelper::positiveInt(
-                        'page',
-                        1,
-                        1000000
-                    ),
+                QueryParamHelper::positiveInt(
+                    'page',
+                    1,
+                    1000000
+                ),
                 'limit' =>
-                    QueryParamHelper::positiveInt(
-                        'limit',
-                        20,
-                        50
-                    ),
+                QueryParamHelper::positiveInt(
+                    'limit',
+                    20,
+                    50
+                ),
                 'archived' =>
-                    QueryParamHelper::boolean(
-                        'archived',
-                        false
-                    ),
+                QueryParamHelper::boolean(
+                    'archived',
+                    false
+                ),
             ];
 
             if ($filters['opportunity_type'] === '') {
@@ -880,10 +884,10 @@ class ConversationController
                     (int) $user['id'],
                     [
                         'opportunity_type' =>
-                            $opportunityType,
+                        $opportunityType,
 
                         'opportunity_id' =>
-                            $opportunityId,
+                        $opportunityId,
                     ]
                 );
 

@@ -59,7 +59,6 @@ function getNotificationPath(item) {
     case "contact_share_requested":
     case "contact_share_accepted":
     case "contact_share_rejected":
-    case "conversation_status_changed":
     case "compatibility_mutual_interest":
       if (item?.related_type === "conversation") {
         return `/conversations/${relatedId}`;
@@ -107,9 +106,6 @@ function getNotificationIcon(type) {
     case "contact_share_rejected":
       return "xCircle";
 
-    case "conversation_status_changed":
-      return "refreshCcw";
-
     case "compatibility_interest":
       return "search";
 
@@ -124,6 +120,7 @@ function getNotificationIcon(type) {
 
     case "profile_review_required":
       return "info";
+
     default:
       return "bell";
   }

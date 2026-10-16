@@ -1288,22 +1288,6 @@ class NotificationService
             $pdo
         );
     }
-
-    public static function notifyStatusChanged(
-        int $userId,
-        int $conversationId,
-        array $conversation = [],
-        ?PDO $pdo = null
-    ): void {
-        self::createConversationNotification(
-            $userId,
-            'conversation_status_changed',
-            $conversationId,
-            $conversation,
-            null,
-            $pdo
-        );
-    }
     public static function notifyCompatibilityInterest(
         int $userId,
         int $compatibilityId,
@@ -1798,31 +1782,58 @@ class NotificationService
 
         return $created;
     }
-    private static function buildConversationTitle(string $type, array $conversation): string
-    {
-        $subject = self::conversationSubject($conversation);
+    private static function buildConversationTitle(
+        string $type,
+        array $conversation
+    ): string {
+        $subject =
+            self::conversationSubject(
+                $conversation
+            );
 
         return match ($type) {
-            'new_conversation' => "Nueva consulta sobre {$subject}",
-            'new_message' => "Nuevo mensaje en {$subject}",
-            'contact_share_requested' => "Solicitud de contacto en {$subject}",
-            'contact_share_accepted' => "Datos compartidos en {$subject}",
-            'contact_share_rejected' => "Solicitud rechazada en {$subject}",
-            'conversation_status_changed' => "Cambio de estado en {$subject}",
-            default => "Nueva actividad en {$subject}",
+            'new_conversation' =>
+            "Nueva consulta sobre {$subject}",
+
+            'new_message' =>
+            "Nuevo mensaje en {$subject}",
+
+            'contact_share_requested' =>
+            "Solicitud de contacto en {$subject}",
+
+            'contact_share_accepted' =>
+            "Datos compartidos en {$subject}",
+
+            'contact_share_rejected' =>
+            "Solicitud rechazada en {$subject}",
+
+            default =>
+            "Nueva actividad en {$subject}",
         };
     }
 
-    private static function buildConversationBody(string $type, array $conversation): string
-    {
+    private static function buildConversationBody(
+        string $type,
+        array $conversation
+    ): string {
         return match ($type) {
-            'new_conversation' => 'Recibiste una nueva consulta sobre una oportunidad publicada.',
-            'new_message' => 'Tenés una nueva respuesta en esta conversación.',
-            'contact_share_requested' => 'La otra parte solicitó habilitar el intercambio de datos de contacto.',
-            'contact_share_accepted' => 'La otra parte aceptó compartir datos de contacto.',
-            'contact_share_rejected' => 'La otra parte rechazó compartir datos de contacto.',
-            'conversation_status_changed' => 'La conversación cambió de estado.',
-            default => 'Tenés nueva actividad pendiente.',
+            'new_conversation' =>
+            'Recibiste una nueva consulta sobre una oportunidad publicada.',
+
+            'new_message' =>
+            'Tenés una nueva respuesta en esta conversación.',
+
+            'contact_share_requested' =>
+            'La otra parte solicitó habilitar el intercambio de datos de contacto.',
+
+            'contact_share_accepted' =>
+            'La otra parte aceptó compartir datos de contacto.',
+
+            'contact_share_rejected' =>
+            'La otra parte rechazó compartir datos de contacto.',
+
+            default =>
+            'Tenés nueva actividad pendiente.',
         };
     }
 

@@ -2792,18 +2792,6 @@ THEN 1
         ];
     }
 
-    private static function conversationStatusLabel(string $status): string
-    {
-        return match ($status) {
-            'open' => 'Abierta',
-            'negotiating' => 'En negociación',
-            'visit_scheduled' => 'Visita coordinada',
-            'closed' => 'Cerrada',
-            'discarded' => 'Descartada',
-            default => $status,
-        };
-    }
-
     public static function requestContactShare(
         int $userId,
         int $conversationId
