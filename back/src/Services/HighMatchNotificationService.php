@@ -46,7 +46,7 @@ class HighMatchNotificationService
             $frontendUrl .
             '/email-icons/' .
             $name .
-            '.svg';
+            '.png';
     }
 
     public static function process(): array
