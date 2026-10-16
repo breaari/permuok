@@ -1105,12 +1105,186 @@ class NotificationService
         array $conversation = [],
         ?PDO $pdo = null
     ): void {
+        /*
+    |--------------------------------------------------------------------------
+    | Notificación interna
+    |--------------------------------------------------------------------------
+    */
         self::createConversationNotification(
             $userId,
             'contact_share_rejected',
             $conversationId,
             $conversation,
             null,
+            $pdo
+        );
+
+        /*
+    |--------------------------------------------------------------------------
+    | Destinatario
+    |--------------------------------------------------------------------------
+    */
+        $recipient =
+            self::getEmailRecipient(
+                $userId
+            );
+
+        if (!$recipient) {
+            return;
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | URL
+    |--------------------------------------------------------------------------
+    */
+        $frontendUrl =
+            rtrim(
+                (string)(
+                    $_ENV['FRONTEND_URL']
+                    ?? 'https://permuok.com'
+                ),
+                '/'
+            );
+
+        $buttonUrl =
+            $frontendUrl .
+            '/conversations/' .
+            $conversationId;
+
+        /*
+    |--------------------------------------------------------------------------
+    | Oportunidad
+    |--------------------------------------------------------------------------
+    */
+        $opportunityTitle =
+            trim(
+                (string)(
+                    $conversation['opportunity_title']
+                    ?? $conversation['subject']
+                    ?? 'Oportunidad'
+                )
+            );
+
+        $opportunityLocation =
+            trim(
+                (string)(
+                    $conversation['opportunity_location']
+                    ?? ''
+                )
+            );
+
+        $opportunityType =
+            match ((string)(
+                $conversation['opportunity_type']
+                ?? ''
+            )) {
+                'property' =>
+                'Propiedad',
+
+                'search_request' =>
+                'Búsqueda',
+
+                'development' =>
+                'Desarrollo',
+
+                default =>
+                'Oportunidad',
+            };
+
+        /*
+    |--------------------------------------------------------------------------
+    | Imagen
+    |--------------------------------------------------------------------------
+    */
+        $imageUrl =
+            trim(
+                (string)(
+                    $conversation['opportunity_image_url']
+                    ?? ''
+                )
+            );
+
+        if (
+            $imageUrl !== '' &&
+            str_starts_with(
+                $imageUrl,
+                '/'
+            )
+        ) {
+            $backendUrl =
+                rtrim(
+                    (string)(
+                        $_ENV['BACKEND_URL']
+                        ?? $_ENV['APP_URL']
+                        ?? ''
+                    ),
+                    '/'
+                );
+
+            if ($backendUrl !== '') {
+                $imageUrl =
+                    $backendUrl .
+                    $imageUrl;
+            }
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Email
+    |--------------------------------------------------------------------------
+    */
+        $emailSubject =
+            'La solicitud para compartir datos no fue aceptada';
+
+        $activityText =
+            'La otra inmobiliaria decidió no habilitar el intercambio de datos de contacto para esta oportunidad. Podés continuar conversando dentro de Permuok sin compartir información personal.';
+
+        $htmlBody =
+            self::buildConversationEmail(
+                'La solicitud para compartir datos no fue aceptada',
+                $opportunityTitle,
+                $opportunityLocation,
+                $opportunityType,
+                $imageUrl,
+                '',
+                '',
+                'Volver a la conversación',
+                $buttonUrl,
+                $activityText
+            );
+
+        $textBody =
+            "La solicitud para compartir datos no fue aceptada\n\n" .
+            $opportunityTitle .
+            (
+                $opportunityLocation !== ''
+                ? "\n" .
+                $opportunityLocation
+                : ''
+            ) .
+            "\n\n" .
+            $activityText .
+            "\n\n" .
+            "Volver a la conversación:\n" .
+            $buttonUrl;
+
+        /*
+    |--------------------------------------------------------------------------
+    | Cola
+    |--------------------------------------------------------------------------
+    */
+        EmailJobService::enqueue(
+            $recipient['email'],
+            'contact_share_rejected',
+            $emailSubject,
+            $htmlBody,
+            $textBody,
+            $userId,
+            $recipient['name'],
+            'conversation',
+            $conversationId,
+            8,
             $pdo
         );
     }
@@ -2498,6 +2672,27 @@ HTML;
 
                 $activityText =
                     'Ambas partes aceptaron compartir sus datos de contacto para esta oportunidad. Ya podés ingresar a la conversación para ver la información de contacto de la otra inmobiliaria.';
+
+                break;
+            case 'contact_share_rejected':
+                $heading =
+                    'La solicitud para compartir datos no fue aceptada';
+
+                $buttonText =
+                    'Volver a la conversación';
+
+                $buttonUrl =
+                    $frontendUrl .
+                    '/conversations/1';
+
+                $subject =
+                    'La solicitud para compartir datos no fue aceptada';
+
+                $senderLabel = '';
+                $messagePreview = '';
+
+                $activityText =
+                    'La otra inmobiliaria decidió no habilitar el intercambio de datos de contacto para esta oportunidad. Podés continuar conversando dentro de Permuok sin compartir información personal.';
 
                 break;
             case 'new_conversation':

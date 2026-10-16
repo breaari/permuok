@@ -2867,7 +2867,7 @@ THEN 1
 
             if ($decision === 'accepted') {
                 /*
-             * Marcamos la solicitud como aceptada.
+             * Aceptamos la solicitud.
              */
                 $stmt = $pdo->prepare("
                 UPDATE contact_share_requests
@@ -2892,7 +2892,7 @@ THEN 1
                 }
 
                 /*
-             * Habilitamos el intercambio de datos.
+             * Habilitamos los contactos.
              */
                 $stmt = $pdo->prepare("
                 UPDATE conversations
@@ -2908,9 +2908,6 @@ THEN 1
                     $conversationId,
                 ]);
 
-                /*
-             * Mensaje interno.
-             */
                 $systemMessage =
                     self::createSystemMessage(
                         $conversationId,
@@ -2918,8 +2915,7 @@ THEN 1
                     );
 
                 /*
-             * Recuperamos la conversación ya actualizada
-             * y adjuntamos la oportunidad.
+             * Conversación actualizada + oportunidad.
              */
                 $notificationConversation =
                     self::attachOpportunityData(
@@ -2928,10 +2924,6 @@ THEN 1
                         )
                     );
 
-                /*
-             * Avisamos a quien había solicitado
-             * compartir los datos.
-             */
                 NotificationService::notifyContactShareAccepted(
                     (int)$request['requested_by_user_id'],
                     $conversationId,
@@ -2940,7 +2932,7 @@ THEN 1
                 );
             } else {
                 /*
-             * Solicitud rechazada.
+             * Rechazamos la solicitud.
              */
                 $stmt = $pdo->prepare("
                 UPDATE contact_share_requests
@@ -2978,12 +2970,21 @@ THEN 1
                         'La solicitud para compartir datos fue rechazada.'
                     );
 
+                /*
+             * También adjuntamos la oportunidad
+             * al mail de rechazo.
+             */
+                $notificationConversation =
+                    self::attachOpportunityData(
+                        self::getConversationById(
+                            $conversationId
+                        )
+                    );
+
                 NotificationService::notifyContactShareRejected(
                     (int)$request['requested_by_user_id'],
                     $conversationId,
-                    self::getConversationById(
-                        $conversationId
-                    ),
+                    $notificationConversation,
                     $pdo
                 );
             }

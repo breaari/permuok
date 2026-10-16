@@ -41,16 +41,19 @@ $allowedTypes = [
     'compatibility_mutual_interest',
     'contact_share_requested',
     'contact_share_accepted',
+    'contact_share_rejected',
 ];
 
 if ($email === '') {
     exit("Uso:\n\n" .
         "php bin/test-new-conversation-email.php EMAIL TIPO\n\n" .
-        "Tipos disponibles:\n" .
-        "- new_conversation\n" .
-        "- new_message\n" .
-        "- compatibility_mutual_interest\n" .
-        "- contact_share_requested\n");
+"Tipos disponibles:\n" .
+"- new_conversation\n" .
+"- new_message\n" .
+"- compatibility_mutual_interest\n" .
+"- contact_share_requested\n" .
+"- contact_share_accepted\n" .
+"- contact_share_rejected\n");
 }
 
 if (
@@ -61,11 +64,13 @@ if (
     )
 ) {
     exit("Tipo de email inválido.\n\n" .
-        "Tipos disponibles:\n" .
-        "- new_conversation\n" .
-        "- new_message\n" .
-        "- compatibility_mutual_interest\n" .
-        "- contact_share_requested\n");
+"Tipos disponibles:\n" .
+"- new_conversation\n" .
+"- new_message\n" .
+"- compatibility_mutual_interest\n" .
+"- contact_share_requested\n" .
+"- contact_share_accepted\n" .
+"- contact_share_rejected\n");
 }
 
 try {
