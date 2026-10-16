@@ -1113,542 +1113,90 @@ class HighMatchNotificationService
         array $item,
         string $imageUrl
     ): string {
-        $propertyType =
-            self::safe(
-                self::propertyTypeLabel(
-                    $item['property_type'] ?? null
-                )
+        $pdo =
+            self::db();
+
+        $propertyId =
+            (int)(
+                $item['property_id']
+                ?? 0
             );
 
-        $title =
-            self::safe(
-                trim(
-                    (string)(
-                        $item['property_title'] ?? ''
-                    )
-                ) ?: 'Propiedad'
-            );
+        if ($propertyId > 0) {
+            $card =
+                EmailPropertyCardService::build(
+                    $pdo,
+                    $propertyId,
+                    $imageUrl
+                );
 
-        $location =
-            self::safe(
-                self::joinLocation([
-                    $item['property_city'] ?? null,
-
-                    $item['property_zone'] ?? null,
-
-                    $item['property_province'] ?? null,
-                ])
-            );
-
-        $area =
-            $item['property_total_area'] ??
-            $item['property_covered_area'] ??
-            null;
-
-        $areaText =
-            is_numeric($area) &&
-            (float)$area > 0
-            ? number_format(
-                (float)$area,
-                0,
-                ',',
-                '.'
-            ) . ' m²'
-            : '—';
-
-        $bedrooms =
-            self::safe(
-                $item['property_bedrooms'] ?? '—'
-            );
-
-        $bathrooms =
-            self::safe(
-                $item['property_bathrooms'] ?? '—'
-            );
-
-        $garages =
-            self::safe(
-                $item['property_garages'] ?? '—'
-            );
-
-        $exchange =
-            self::exchangeSummary(
-                $item
-            );
-
-        $exchangeEyebrow =
-            self::safe(
-                $exchange['eyebrow']
-            );
-
-        $exchangeTitle =
-            self::safe(
-                $exchange['title']
-            );
-
-        $exchangeNotes =
-            self::safe(
-                $exchange['notes']
-            );
-
-        $safeImageUrl =
-            self::safe(
-                $imageUrl
-            );
-
-        $mapPinIcon =
-            self::safe(
-                self::emailIconUrl(
-                    'map-pin'
-                )
-            );
-
-        $rulerIcon =
-            self::safe(
-                self::emailIconUrl(
-                    'ruler'
-                )
-            );
-
-        $bedIcon =
-            self::safe(
-                self::emailIconUrl(
-                    'bed'
-                )
-            );
-
-        $bathIcon =
-            self::safe(
-                self::emailIconUrl(
-                    'bath'
-                )
-            );
-
-        $carIcon =
-            self::safe(
-                self::emailIconUrl(
-                    'car'
-                )
-            );
-
-        if ($safeImageUrl !== '') {
-            $imageBlock = <<<HTML
-<td
-    width="210"
-    valign="top"
-    style="
-        width:210px;
-        padding:0;
-        background:#f1f5f9;
-    "
->
-    <img
-        src="{$safeImageUrl}"
-        width="210"
-        alt="{$title}"
-        style="
-            display:block;
-            width:210px;
-            height:230px;
-            object-fit:cover;
-            border:0;
-        "
-    />
-</td>
-HTML;
-        } else {
-            $imageBlock = <<<HTML
-<td
-    width="210"
-    valign="middle"
-    align="center"
-    style="
-        width:210px;
-        height:230px;
-        padding:0;
-        background:#f1f5f9;
-        color:#94a3b8;
-        font-family:Arial, Helvetica, sans-serif;
-        font-size:12px;
-    "
->
-    Sin imagen
-</td>
-HTML;
+            if ($card !== null) {
+                return $card;
+            }
         }
 
-        return <<<HTML
-<table
-    width="100%"
-    border="0"
-    cellpadding="0"
-    cellspacing="0"
-    role="presentation"
-    style="
-        width:100%;
-        border:1px solid #e2e8f0;
-        border-radius:12px;
-        overflow:hidden;
-        border-collapse:separate;
-        background:#ffffff;
-    "
->
-<tbody>
-<tr>
+        return EmailPropertyCardService::render(
+            [
+                'title' =>
+                $item['property_title']
+                    ?? 'Propiedad',
 
-{$imageBlock}
+                'property_type' =>
+                $item['property_type']
+                    ?? null,
 
-<td
-    valign="top"
-    style="
-        padding:20px 20px 16px;
-        font-family:Manrope, Arial, Helvetica, sans-serif;
-    "
->
-    <div
-        style="
-            color:#047857;
-            font-size:9px;
-            font-weight:700;
-            line-height:1;
-            text-transform:uppercase;
-            letter-spacing:0.8px;
-        "
-    >
-        {$propertyType}
-    </div>
+                'city' =>
+                $item['property_city']
+                    ?? null,
 
-    <div
-        style="
-            margin-top:7px;
-            color:#0f172a;
-            font-size:16px;
-            font-weight:700;
-            line-height:1.05;
-            letter-spacing:-0.2px;
-        "
-    >
-        {$title}
-    </div>
+                'zone' =>
+                $item['property_zone']
+                    ?? null,
 
-    <table
-        border="0"
-        cellpadding="0"
-        cellspacing="0"
-        role="presentation"
-        style="
-            margin-top:11px;
-        "
-    >
-    <tbody>
-    <tr>
-    <td
-        valign="middle"
-        style="
-            padding:0 6px 0 0;
-        "
-    >
-        <img
-            src="{$mapPinIcon}"
-            width="14"
-            height="14"
-            alt=""
-            style="
-                display:block;
-                width:14px;
-                height:14px;
-                border:0;
-            "
-        />
-    </td>
+                'province' =>
+                $item['property_province']
+                    ?? null,
 
-    <td
-        valign="middle"
-        style="
-            color:#64748b;
-            font-family:Manrope, Arial, Helvetica, sans-serif;
-            font-size:11px;
-            font-weight:400;
-            line-height:1;
-        "
-    >
-        {$location}
-    </td>
-    </tr>
-    </tbody>
-    </table>
+                'total_area' =>
+                $item['property_total_area']
+                    ?? null,
 
-    <table
-        width="100%"
-        border="0"
-        cellpadding="0"
-        cellspacing="0"
-        role="presentation"
-        style="
-            width:100%;
-            margin-top:14px;
-            border-top:1px solid #e2e8f0;
-            border-bottom:1px solid #e2e8f0;
-        "
-    >
-    <tbody>
-    <tr>
+                'covered_area' =>
+                $item['property_covered_area']
+                    ?? null,
 
-        <td
-            style="
-                padding:11px 10px 11px 0;
-            "
-        >
-            <table
-                border="0"
-                cellpadding="0"
-                cellspacing="0"
-                role="presentation"
-            >
-            <tbody>
-            <tr>
-            <td
-                valign="middle"
-                style="
-                    padding-right:5px;
-                "
-            >
-                <img
-                    src="{$rulerIcon}"
-                    width="14"
-                    height="14"
-                    alt=""
-                    style="
-                        display:block;
-                        width:14px;
-                        height:14px;
-                    "
-                />
-            </td>
-            <td
-                valign="middle"
-                style="
-                    color:#475569;
-                    font-family:Manrope, Arial, Helvetica, sans-serif;
-                    font-size:11px;
-                    font-weight:600;
-                    line-height:1;
-                    white-space:nowrap;
-                "
-            >
-                {$areaText}
-            </td>
-            </tr>
-            </tbody>
-            </table>
-        </td>
+                'bedrooms' =>
+                $item['property_bedrooms']
+                    ?? null,
 
-        <td
-            style="
-                padding:11px 10px;
-            "
-        >
-            <table
-                border="0"
-                cellpadding="0"
-                cellspacing="0"
-                role="presentation"
-            >
-            <tbody>
-            <tr>
-            <td
-                valign="middle"
-                style="
-                    padding-right:5px;
-                "
-            >
-                <img
-                    src="{$bedIcon}"
-                    width="14"
-                    height="14"
-                    alt=""
-                    style="
-                        display:block;
-                        width:14px;
-                        height:14px;
-                    "
-                />
-            </td>
-            <td
-                valign="middle"
-                style="
-                    color:#475569;
-                    font-family:Manrope, Arial, Helvetica, sans-serif;
-                    font-size:11px;
-                    font-weight:600;
-                    line-height:1;
-                    white-space:nowrap;
-                "
-            >
-                {$bedrooms}
-            </td>
-            </tr>
-            </tbody>
-            </table>
-        </td>
+                'bathrooms' =>
+                $item['property_bathrooms']
+                    ?? null,
 
-        <td
-            style="
-                padding:11px 10px;
-            "
-        >
-            <table
-                border="0"
-                cellpadding="0"
-                cellspacing="0"
-                role="presentation"
-            >
-            <tbody>
-            <tr>
-            <td
-                valign="middle"
-                style="
-                    padding-right:5px;
-                "
-            >
-                <img
-                    src="{$bathIcon}"
-                    width="14"
-                    height="14"
-                    alt=""
-                    style="
-                        display:block;
-                        width:14px;
-                        height:14px;
-                    "
-                />
-            </td>
-            <td
-                valign="middle"
-                style="
-                    color:#475569;
-                    font-family:Manrope, Arial, Helvetica, sans-serif;
-                    font-size:11px;
-                    font-weight:600;
-                    line-height:1;
-                    white-space:nowrap;
-                "
-            >
-                {$bathrooms}
-            </td>
-            </tr>
-            </tbody>
-            </table>
-        </td>
+                'garages' =>
+                $item['property_garages']
+                    ?? null,
 
-        <td
-            style="
-                padding:11px 0 11px 10px;
-            "
-        >
-            <table
-                border="0"
-                cellpadding="0"
-                cellspacing="0"
-                role="presentation"
-            >
-            <tbody>
-            <tr>
-            <td
-                valign="middle"
-                style="
-                    padding-right:5px;
-                "
-            >
-                <img
-                    src="{$carIcon}"
-                    width="14"
-                    height="14"
-                    alt=""
-                    style="
-                        display:block;
-                        width:14px;
-                        height:14px;
-                    "
-                />
-            </td>
-            <td
-                valign="middle"
-                style="
-                    color:#475569;
-                    font-family:Manrope, Arial, Helvetica, sans-serif;
-                    font-size:11px;
-                    font-weight:600;
-                    line-height:1;
-                    white-space:nowrap;
-                "
-            >
-                {$garages}
-            </td>
-            </tr>
-            </tbody>
-            </table>
-        </td>
+                'criteria_mode' =>
+                $item['requirement_criteria_mode'] ?? null,
 
-    </tr>
-    </tbody>
-    </table>
+                'accepts_total_swap' =>
+                $item['requirement_accepts_total_swap'] ?? null,
 
-    <div
-        style="
-            margin-top:12px;
-            padding:12px;
-            background:#f8fafc;
-            border-left:3px solid #cbd5e1;
-            border-radius:6px;
-        "
-    >
-        <div
-            style="
-                color:#64748b;
-                font-family:Manrope, Arial, Helvetica, sans-serif;
-                font-size:9px;
-                font-weight:700;
-                line-height:1;
-                text-transform:uppercase;
-                letter-spacing:0.6px;
-            "
-        >
-            {$exchangeEyebrow}
-        </div>
+                'accepts_swap_plus_cash' =>
+                $item['requirement_accepts_swap_plus_cash'] ?? null,
 
-        <div
-            style="
-                margin-top:5px;
-                color:#0f172a;
-                font-family:Manrope, Arial, Helvetica, sans-serif;
-                font-size:11px;
-                font-weight:700;
-                line-height:1;
-            "
-        >
-            {$exchangeTitle}
-        </div>
+                'accepts_cash_only' =>
+                $item['requirement_accepts_cash_only'] ?? null,
 
-        <div
-            style="
-                margin-top:5px;
-                color:#64748b;
-                font-family:Manrope, Arial, Helvetica, sans-serif;
-                font-size:9px;
-                font-style:italic;
-                font-weight:400;
-                line-height:1;
-            "
-        >
-            {$exchangeNotes}
-        </div>
-    </div>
-</td>
-</tr>
-</tbody>
-</table>
-HTML;
+                'accepts_open_proposals' =>
+                $item['requirement_accepts_open_proposals'] ?? null,
+
+                'notes' =>
+                $item['requirement_notes'] ?? null,
+            ],
+            $imageUrl
+        );
     }
 
     private static function buildSearchCard(
