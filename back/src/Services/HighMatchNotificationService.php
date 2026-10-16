@@ -14,6 +14,12 @@ class HighMatchNotificationService
     private const LOGO_URL =
     'https://bq5galnul0ejsuneypmqfsatucvdbtiujlng6snj7ao.canva-cdn.email/1c019e1200d10d5a9c00bf196125b1c2.png';
 
+    /*
+     * Banner creado en Canva para este email.
+     */
+    private const HERO_URL =
+    'https://bq5galnul0ejsuneypmqfsatucvdbtiujlng6snj7ao.canva-cdn.email/09be0302d85b5e0ca0fe6067169c4a8a.png';
+
     private const FOOTER_URL =
     'https://bq5galnul0ejsuneypmqfsatucvdbtiujlng6snj7ao.canva-cdn.email/6f5235e46c309adb2404cb6f87578e95.png';
 
@@ -22,6 +28,25 @@ class HighMatchNotificationService
         require_once __DIR__ . '/../../db.php';
 
         return pdo();
+    }
+
+    private static function emailIconUrl(
+        string $name
+    ): string {
+        $frontendUrl =
+            rtrim(
+                (string)(
+                    $_ENV['FRONTEND_URL']
+                    ?? 'https://permuok.com'
+                ),
+                '/'
+            );
+
+        return
+            $frontendUrl .
+            '/email-icons/' .
+            $name .
+            '.png';
     }
 
     public static function process(): array
@@ -41,12 +66,21 @@ class HighMatchNotificationService
                         id,
                         entity_id,
                         payload_json
+
                     FROM match_events
+
                     WHERE event_type = 'direct_new'
+
                       AND entity_type = 'compatibility'
+
                       AND immediate_processed_at IS NULL
-                    ORDER BY occurred_at ASC, id ASC
+
+                    ORDER BY
+                        occurred_at ASC,
+                        id ASC
+
                     LIMIT " . self::BATCH_SIZE . "
+
                     FOR UPDATE
                 ");
 
@@ -59,6 +93,7 @@ class HighMatchNotificationService
 
                 if ($events === []) {
                     $pdo->commit();
+
                     break;
                 }
 
@@ -93,11 +128,6 @@ class HighMatchNotificationService
                             ?? 0
                         );
 
-                    /*
-                     * Todos los eventos quedan marcados
-                     * como procesados aunque no alcancen
-                     * el umbral de alerta inmediata.
-                     */
                     if (
                         $score >=
                         self::MIN_SCORE_TO_ALERT
@@ -119,10 +149,16 @@ class HighMatchNotificationService
                     $stDone =
                         $pdo->prepare("
                             UPDATE match_events
+
                             SET
-                                immediate_processed_at = NOW()
+                                immediate_processed_at =
+                                    NOW()
+
                             WHERE id = :id
-                              AND immediate_processed_at IS NULL
+
+                              AND immediate_processed_at
+                                  IS NULL
+
                             LIMIT 1
                         ");
 
@@ -182,6 +218,9 @@ class HighMatchNotificationService
                     p.title
                         AS property_title,
 
+                    p.property_type
+                        AS property_type,
+
                     p.city
                         AS property_city,
 
@@ -194,20 +233,110 @@ class HighMatchNotificationService
                     p.country
                         AS property_country,
 
+                    p.price
+                        AS property_price,
+
+                    p.currency
+                        AS property_currency,
+
+                    p.total_area
+                        AS property_total_area,
+
+                    p.covered_area
+                        AS property_covered_area,
+
+                    p.bedrooms
+                        AS property_bedrooms,
+
+                    p.bathrooms
+                        AS property_bathrooms,
+
+                    p.garages
+                        AS property_garages,
+
+                    pr.criteria_mode
+                        AS requirement_criteria_mode,
+
+                    pr.accepts_total_swap
+                        AS requirement_accepts_total_swap,
+
+                    pr.accepts_swap_plus_cash
+                        AS requirement_accepts_swap_plus_cash,
+
+                    pr.accepts_cash_only
+                        AS requirement_accepts_cash_only,
+
+                    pr.accepts_open_proposals
+                        AS requirement_accepts_open_proposals,
+
+                    pr.notes
+                        AS requirement_notes,
+
                     sr.title
-                        AS search_title
+                        AS search_title,
+
+                    sr.description
+                        AS search_description,
+
+                    sr.city
+                        AS search_city,
+
+                    sr.zone
+                        AS search_zone,
+
+                    sr.province
+                        AS search_province,
+
+                    sr.currency
+                        AS search_currency,
+
+                    sr.min_value
+                        AS search_min_value,
+
+                    sr.max_value
+                        AS search_max_value,
+
+                    sr.payment_mode_cash
+                        AS search_payment_mode_cash,
+
+                    sr.payment_mode_swap
+                        AS search_payment_mode_swap,
+
+                    (
+                        SELECT
+                            GROUP_CONCAT(
+                                srpt.property_type
+                                ORDER BY srpt.property_type
+                                SEPARATOR ','
+                            )
+
+                        FROM search_request_property_types srpt
+
+                        WHERE srpt.search_request_id =
+                            sr.id
+                    )
+                        AS search_property_types
 
                 FROM compatibilities c
 
                 LEFT JOIN properties p
                     ON p.id = c.property_id
+
                    AND p.deleted_at IS NULL
 
+                LEFT JOIN property_requirements pr
+                    ON pr.property_id = p.id
+
+                   AND pr.deleted_at IS NULL
+
                 LEFT JOIN search_requests sr
-                    ON sr.id = c.search_request_id
+                    ON sr.id =
+                        c.search_request_id
+
                    AND sr.deleted_at IS NULL
 
                 WHERE c.id = :id
+
                   AND c.deleted_at IS NULL
 
                 LIMIT 1
@@ -329,36 +458,6 @@ class HighMatchNotificationService
             ];
         }
 
-        $propertyTitle =
-            trim(
-                (string)(
-                    $compatibility['property_title'] ?? ''
-                )
-            );
-
-        if ($propertyTitle === '') {
-            $propertyTitle =
-                'Oportunidad inmobiliaria';
-        }
-
-        $searchTitle =
-            trim(
-                (string)(
-                    $compatibility['search_title'] ?? ''
-                )
-            );
-
-        $location =
-            self::joinLocation([
-                $compatibility['property_zone'] ?? null,
-
-                $compatibility['property_city'] ?? null,
-
-                $compatibility['property_province'] ?? null,
-
-                $compatibility['property_country'] ?? null,
-            ]);
-
         $propertyId =
             (int)(
                 $compatibility['property_id'] ?? 0
@@ -383,9 +482,6 @@ class HighMatchNotificationService
             $frontendUrl .
             '/compatibilities/' .
             $compatibilityId;
-
-        $heading =
-            'Encontramos una oportunidad con alto potencial';
 
         $emailSubject =
             'Encontramos una oportunidad con alta compatibilidad';
@@ -418,13 +514,6 @@ class HighMatchNotificationService
                 continue;
             }
 
-            /*
-             * source_real_estate_id:
-             * inmobiliaria dueña de la búsqueda.
-             *
-             * target_real_estate_id:
-             * inmobiliaria dueña de la propiedad.
-             */
             $isSearchOwner =
                 $userRealEstateId > 0 &&
                 $userRealEstateId ===
@@ -436,57 +525,27 @@ class HighMatchNotificationService
                 $targetRealEstateId;
 
             if ($isSearchOwner) {
-                $description =
-                    'Detectamos una alta compatibilidad entre esta propiedad y tu búsqueda en la red.';
+                $descriptionMode =
+                    'search';
 
                 $notificationBody =
                     "Encontramos una propiedad con {$scoreText}% de compatibilidad con tu búsqueda.";
-
-                $propertyLabel =
-                    'Propiedad compatible';
-
-                $searchLabel =
-                    'Tu búsqueda';
-
-                $descriptionMode =
-                    'search';
             } elseif ($isPropertyOwner) {
-                $description =
-                    'Detectamos una alta compatibilidad entre tu propiedad y una búsqueda de la red.';
+                $descriptionMode =
+                    'property';
 
                 $notificationBody =
                     "Encontramos una búsqueda con {$scoreText}% de compatibilidad con tu propiedad.";
-
-                $propertyLabel =
-                    'Tu propiedad';
-
-                $searchLabel =
-                    'Búsqueda compatible';
-
-                $descriptionMode =
-                    'property';
             } else {
-                /*
-                 * Fallback defensivo.
-                 */
-                $description =
-                    'Detectamos una alta compatibilidad entre esta propiedad y una búsqueda de la red.';
+                $descriptionMode =
+                    'generic';
 
                 $notificationBody =
                     "Detectamos una compatibilidad de {$scoreText}% en una oportunidad de la red.";
-
-                $propertyLabel =
-                    'Propiedad';
-
-                $searchLabel =
-                    'Búsqueda compatible';
-
-                $descriptionMode =
-                    'generic';
             }
 
             /*
-             * Notificación interna personalizada.
+             * Notificación interna.
              */
             $stNotification =
                 $pdo->prepare("
@@ -513,7 +572,7 @@ class HighMatchNotificationService
                 $userId,
 
                 'title' =>
-                $heading,
+                'Encontramos una oportunidad con alto potencial',
 
                 'body' =>
                 $notificationBody,
@@ -555,54 +614,22 @@ class HighMatchNotificationService
                         )
                 );
 
-            /*
-             * El HTML se genera por usuario porque
-             * el mensaje cambia según de qué lado
-             * de la compatibilidad se encuentre.
-             */
             $htmlBody =
                 self::buildEmail(
-                    $heading,
-                    $propertyTitle,
-                    $location,
-                    $searchTitle,
+                    $compatibility,
                     $score,
                     $imageUrl,
                     $buttonUrl,
-                    $description,
-                    $propertyLabel,
-                    $searchLabel,
                     $descriptionMode
                 );
 
             $textBody =
-                $heading .
-                "\n\n" .
-                $scoreText .
-                "% de compatibilidad\n\n" .
-                $description .
-                "\n\n" .
-                $propertyLabel .
-                ":\n" .
-                $propertyTitle;
-
-            if ($location !== '') {
-                $textBody .=
-                    "\n" .
-                    $location;
-            }
-
-            if ($searchTitle !== '') {
-                $textBody .=
-                    "\n\n" .
-                    $searchLabel .
-                    ":\n" .
-                    $searchTitle;
-            }
-
-            $textBody .=
-                "\n\nVer compatibilidad:\n" .
-                $buttonUrl;
+                self::buildTextBody(
+                    $compatibility,
+                    $score,
+                    $buttonUrl,
+                    $descriptionMode
+                );
 
             EmailJobService::enqueue(
                 $email,
@@ -644,7 +671,8 @@ class HighMatchNotificationService
 
                 FROM property_images
 
-                WHERE property_id = :property_id
+                WHERE property_id =
+                    :property_id
 
                   AND deleted_at IS NULL
 
@@ -671,10 +699,6 @@ class HighMatchNotificationService
             return '';
         }
 
-        /*
-         * La firma puede durar como máximo
-         * 24 horas según ImageUrlSignatureService.
-         */
         $path =
             ImageUrlSignatureService::generate(
                 'property',
@@ -734,6 +758,317 @@ class HighMatchNotificationService
             );
     }
 
+    private static function propertyTypeLabel(
+        ?string $value
+    ): string {
+        return match (trim(
+            (string)$value
+        )) {
+            'house' =>
+            'Casa',
+
+            'apartment' =>
+            'Departamento',
+
+            'land' =>
+            'Lote',
+
+            'commercial' =>
+            'Local',
+
+            'office' =>
+            'Oficina',
+
+            'warehouse' =>
+            'Depósito',
+
+            'country_house' =>
+            'Casa quinta',
+
+            'ph' =>
+            'PH',
+
+            'garage' =>
+            'Cochera',
+
+            'hotel' =>
+            'Hotel',
+
+            'development' =>
+            'Desarrollo',
+
+            default =>
+            trim(
+                (string)$value
+            ) !== ''
+                ? ucfirst(
+                    trim(
+                        (string)$value
+                    )
+                )
+                : 'Propiedad',
+        };
+    }
+
+    private static function propertyTypesLabel(
+        ?string $value
+    ): string {
+        $types =
+            array_filter(
+                array_map(
+                    'trim',
+                    explode(
+                        ',',
+                        (string)$value
+                    )
+                )
+            );
+
+        if ($types === []) {
+            return 'Sin tipo definido';
+        }
+
+        return implode(
+            ', ',
+            array_map(
+                static fn(string $type): string =>
+                self::propertyTypeLabel(
+                    $type
+                ),
+                $types
+            )
+        );
+    }
+
+    private static function formatMoney(
+        mixed $value,
+        ?string $currency = 'USD'
+    ): string {
+        if (
+            $value === null ||
+            $value === '' ||
+            !is_numeric($value) ||
+            (float)$value <= 0
+        ) {
+            return '—';
+        }
+
+        $currency =
+            strtoupper(
+                trim(
+                    (string)$currency
+                )
+            );
+
+        if ($currency === '') {
+            $currency = 'USD';
+        }
+
+        $amount =
+            number_format(
+                (float)$value,
+                0,
+                ',',
+                '.'
+            );
+
+        return
+            $currency .
+            ' ' .
+            $amount;
+    }
+
+    private static function formatMoneyRange(
+        array $item
+    ): string {
+        $currency =
+            trim(
+                (string)(
+                    $item['search_currency'] ?? 'USD'
+                )
+            );
+
+        $min =
+            $item['search_min_value'] ?? null;
+
+        $max =
+            $item['search_max_value'] ?? null;
+
+        $hasMin =
+            is_numeric($min) &&
+            (float)$min > 0;
+
+        $hasMax =
+            is_numeric($max) &&
+            (float)$max > 0;
+
+        if ($hasMin && $hasMax) {
+            return
+                self::formatMoney(
+                    $min,
+                    $currency
+                ) .
+                ' - ' .
+                self::formatMoney(
+                    $max,
+                    $currency
+                );
+        }
+
+        if ($hasMin) {
+            return
+                'Desde ' .
+                self::formatMoney(
+                    $min,
+                    $currency
+                );
+        }
+
+        if ($hasMax) {
+            return
+                'Hasta ' .
+                self::formatMoney(
+                    $max,
+                    $currency
+                );
+        }
+
+        return 'Sin referencia';
+    }
+
+    private static function paymentLabel(
+        array $item
+    ): string {
+        $cash =
+            self::isTrue(
+                $item['search_payment_mode_cash'] ?? false
+            );
+
+        $swap =
+            self::isTrue(
+                $item['search_payment_mode_swap'] ?? false
+            );
+
+        if ($cash && $swap) {
+            return 'Dinero + permuta';
+        }
+
+        if ($cash) {
+            return 'Solo dinero';
+        }
+
+        if ($swap) {
+            return 'Solo permuta';
+        }
+
+        return 'Sin modalidad definida';
+    }
+
+    private static function isTrue(
+        mixed $value
+    ): bool {
+        return
+            $value === true ||
+            $value === 1 ||
+            $value === '1';
+    }
+
+    private static function exchangeSummary(
+        array $item
+    ): array {
+        $mode =
+            trim(
+                (string)(
+                    $item['requirement_criteria_mode'] ?? ''
+                )
+            );
+
+        $acceptsTotalSwap =
+            self::isTrue(
+                $item['requirement_accepts_total_swap'] ?? false
+            );
+
+        $acceptsSwapPlusCash =
+            self::isTrue(
+                $item['requirement_accepts_swap_plus_cash'] ?? false
+            );
+
+        $acceptsCashOnly =
+            self::isTrue(
+                $item['requirement_accepts_cash_only'] ?? false
+            );
+
+        $acceptsOpenProposals =
+            self::isTrue(
+                $item['requirement_accepts_open_proposals'] ?? false
+            );
+
+        $eyebrow =
+            'Condiciones de permuta';
+
+        $title =
+            'Sin especificar';
+
+        if ($mode === 'criteria') {
+            $eyebrow =
+                'Busco con criterios';
+        } elseif (
+            $acceptsOpenProposals
+        ) {
+            $eyebrow =
+                'Escucho propuestas';
+        }
+
+        if ($acceptsCashOnly) {
+            $title =
+                'Solo efectivo';
+        } elseif (
+            $acceptsSwapPlusCash &&
+            $acceptsTotalSwap
+        ) {
+            $title =
+                'Permuta total o parcial';
+        } elseif (
+            $acceptsSwapPlusCash
+        ) {
+            $title =
+                'Permuta + diferencia';
+        } elseif (
+            $acceptsTotalSwap
+        ) {
+            $title =
+                'Permuta total';
+        } elseif (
+            $acceptsOpenProposals
+        ) {
+            $title =
+                'Abierto a propuestas';
+        }
+
+        $notes =
+            trim(
+                (string)(
+                    $item['requirement_notes'] ?? ''
+                )
+            );
+
+        if ($notes === '') {
+            $notes =
+                'Sin observaciones cargadas.';
+        }
+
+        return [
+            'eyebrow' =>
+            $eyebrow,
+
+            'title' =>
+            $title,
+
+            'notes' =>
+            $notes,
+        ];
+    }
+
     private static function joinLocation(
         array $parts
     ): string {
@@ -759,80 +1094,834 @@ class HighMatchNotificationService
         }
 
         return implode(
-            ' · ',
+            ', ',
             $clean
         );
     }
 
-    private static function buildEmail(
-        string $heading,
-        string $propertyTitle,
-        string $location,
-        string $searchTitle,
-        float $score,
-        string $imageUrl,
-        string $buttonUrl,
-        string $description,
-        string $propertyLabel,
-        string $searchLabel,
-        string $descriptionMode
+    private static function safe(
+        mixed $value
     ): string {
-        $safeHeading =
-            htmlspecialchars(
-                $heading,
-                ENT_QUOTES,
-                'UTF-8'
+        return htmlspecialchars(
+            (string)$value,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+    }
+
+    private static function buildPropertyCard(
+        array $item,
+        string $imageUrl
+    ): string {
+        $propertyType =
+            self::safe(
+                self::propertyTypeLabel(
+                    $item['property_type'] ?? null
+                )
             );
 
-        $safePropertyTitle =
-            htmlspecialchars(
-                $propertyTitle,
-                ENT_QUOTES,
-                'UTF-8'
+        $title =
+            self::safe(
+                trim(
+                    (string)(
+                        $item['property_title'] ?? ''
+                    )
+                ) ?: 'Propiedad'
             );
 
-        $safeLocation =
-            htmlspecialchars(
-                $location,
-                ENT_QUOTES,
-                'UTF-8'
+        $location =
+            self::safe(
+                self::joinLocation([
+                    $item['property_city'] ?? null,
+
+                    $item['property_zone'] ?? null,
+
+                    $item['property_province'] ?? null,
+                ])
             );
 
-        $safeSearchTitle =
-            htmlspecialchars(
-                $searchTitle,
-                ENT_QUOTES,
-                'UTF-8'
+        $area =
+            $item['property_total_area'] ??
+            $item['property_covered_area'] ??
+            null;
+
+        $areaText =
+            is_numeric($area) &&
+            (float)$area > 0
+            ? number_format(
+                (float)$area,
+                0,
+                ',',
+                '.'
+            ) . ' m²'
+            : '—';
+
+        $bedrooms =
+            self::safe(
+                $item['property_bedrooms'] ?? '—'
             );
 
-        $safePropertyLabel =
-            htmlspecialchars(
-                $propertyLabel,
-                ENT_QUOTES,
-                'UTF-8'
+        $bathrooms =
+            self::safe(
+                $item['property_bathrooms'] ?? '—'
             );
 
-        $safeSearchLabel =
-            htmlspecialchars(
-                $searchLabel,
-                ENT_QUOTES,
-                'UTF-8'
+        $garages =
+            self::safe(
+                $item['property_garages'] ?? '—'
+            );
+
+        $exchange =
+            self::exchangeSummary(
+                $item
+            );
+
+        $exchangeEyebrow =
+            self::safe(
+                $exchange['eyebrow']
+            );
+
+        $exchangeTitle =
+            self::safe(
+                $exchange['title']
+            );
+
+        $exchangeNotes =
+            self::safe(
+                $exchange['notes']
             );
 
         $safeImageUrl =
-            htmlspecialchars(
-                $imageUrl,
-                ENT_QUOTES,
-                'UTF-8'
+            self::safe(
+                $imageUrl
             );
 
-        $safeButtonUrl =
-            htmlspecialchars(
-                $buttonUrl,
-                ENT_QUOTES,
-                'UTF-8'
+        $mapPinIcon =
+            self::safe(
+                self::emailIconUrl(
+                    'map-pin'
+                )
             );
 
+        $rulerIcon =
+            self::safe(
+                self::emailIconUrl(
+                    'ruler'
+                )
+            );
+
+        $bedIcon =
+            self::safe(
+                self::emailIconUrl(
+                    'bed'
+                )
+            );
+
+        $bathIcon =
+            self::safe(
+                self::emailIconUrl(
+                    'bath'
+                )
+            );
+
+        $carIcon =
+            self::safe(
+                self::emailIconUrl(
+                    'car'
+                )
+            );
+
+        if ($safeImageUrl !== '') {
+            $imageBlock = <<<HTML
+<td
+    width="210"
+    valign="top"
+    style="
+        width:210px;
+        padding:0;
+        background:#f1f5f9;
+    "
+>
+    <img
+        src="{$safeImageUrl}"
+        width="210"
+        alt="{$title}"
+        style="
+            display:block;
+            width:210px;
+            height:230px;
+            object-fit:cover;
+            border:0;
+        "
+    />
+</td>
+HTML;
+        } else {
+            $imageBlock = <<<HTML
+<td
+    width="210"
+    valign="middle"
+    align="center"
+    style="
+        width:210px;
+        height:230px;
+        padding:0;
+        background:#f1f5f9;
+        color:#94a3b8;
+        font-family:Arial, Helvetica, sans-serif;
+        font-size:12px;
+    "
+>
+    Sin imagen
+</td>
+HTML;
+        }
+
+        return <<<HTML
+<table
+    width="100%"
+    border="0"
+    cellpadding="0"
+    cellspacing="0"
+    role="presentation"
+    style="
+        width:100%;
+        border:1px solid #e2e8f0;
+        border-radius:12px;
+        overflow:hidden;
+        border-collapse:separate;
+        background:#ffffff;
+    "
+>
+<tbody>
+<tr>
+
+{$imageBlock}
+
+<td
+    valign="top"
+    style="
+        padding:20px 20px 16px;
+        font-family:Manrope, Arial, Helvetica, sans-serif;
+    "
+>
+    <div
+        style="
+            color:#047857;
+            font-size:9px;
+            font-weight:700;
+            line-height:1;
+            text-transform:uppercase;
+            letter-spacing:0.8px;
+        "
+    >
+        {$propertyType}
+    </div>
+
+    <div
+        style="
+            margin-top:7px;
+            color:#0f172a;
+            font-size:16px;
+            font-weight:700;
+            line-height:1.05;
+            letter-spacing:-0.2px;
+        "
+    >
+        {$title}
+    </div>
+
+    <table
+        border="0"
+        cellpadding="0"
+        cellspacing="0"
+        role="presentation"
+        style="
+            margin-top:11px;
+        "
+    >
+    <tbody>
+    <tr>
+    <td
+        valign="middle"
+        style="
+            padding:0 6px 0 0;
+        "
+    >
+        <img
+            src="{$mapPinIcon}"
+            width="14"
+            height="14"
+            alt=""
+            style="
+                display:block;
+                width:14px;
+                height:14px;
+                border:0;
+            "
+        />
+    </td>
+
+    <td
+        valign="middle"
+        style="
+            color:#64748b;
+            font-family:Manrope, Arial, Helvetica, sans-serif;
+            font-size:11px;
+            font-weight:400;
+            line-height:1;
+        "
+    >
+        {$location}
+    </td>
+    </tr>
+    </tbody>
+    </table>
+
+    <table
+        width="100%"
+        border="0"
+        cellpadding="0"
+        cellspacing="0"
+        role="presentation"
+        style="
+            width:100%;
+            margin-top:14px;
+            border-top:1px solid #e2e8f0;
+            border-bottom:1px solid #e2e8f0;
+        "
+    >
+    <tbody>
+    <tr>
+
+        <td
+            style="
+                padding:11px 10px 11px 0;
+            "
+        >
+            <table
+                border="0"
+                cellpadding="0"
+                cellspacing="0"
+                role="presentation"
+            >
+            <tbody>
+            <tr>
+            <td
+                valign="middle"
+                style="
+                    padding-right:5px;
+                "
+            >
+                <img
+                    src="{$rulerIcon}"
+                    width="14"
+                    height="14"
+                    alt=""
+                    style="
+                        display:block;
+                        width:14px;
+                        height:14px;
+                    "
+                />
+            </td>
+            <td
+                valign="middle"
+                style="
+                    color:#475569;
+                    font-family:Manrope, Arial, Helvetica, sans-serif;
+                    font-size:11px;
+                    font-weight:600;
+                    line-height:1;
+                    white-space:nowrap;
+                "
+            >
+                {$areaText}
+            </td>
+            </tr>
+            </tbody>
+            </table>
+        </td>
+
+        <td
+            style="
+                padding:11px 10px;
+            "
+        >
+            <table
+                border="0"
+                cellpadding="0"
+                cellspacing="0"
+                role="presentation"
+            >
+            <tbody>
+            <tr>
+            <td
+                valign="middle"
+                style="
+                    padding-right:5px;
+                "
+            >
+                <img
+                    src="{$bedIcon}"
+                    width="14"
+                    height="14"
+                    alt=""
+                    style="
+                        display:block;
+                        width:14px;
+                        height:14px;
+                    "
+                />
+            </td>
+            <td
+                valign="middle"
+                style="
+                    color:#475569;
+                    font-family:Manrope, Arial, Helvetica, sans-serif;
+                    font-size:11px;
+                    font-weight:600;
+                    line-height:1;
+                    white-space:nowrap;
+                "
+            >
+                {$bedrooms}
+            </td>
+            </tr>
+            </tbody>
+            </table>
+        </td>
+
+        <td
+            style="
+                padding:11px 10px;
+            "
+        >
+            <table
+                border="0"
+                cellpadding="0"
+                cellspacing="0"
+                role="presentation"
+            >
+            <tbody>
+            <tr>
+            <td
+                valign="middle"
+                style="
+                    padding-right:5px;
+                "
+            >
+                <img
+                    src="{$bathIcon}"
+                    width="14"
+                    height="14"
+                    alt=""
+                    style="
+                        display:block;
+                        width:14px;
+                        height:14px;
+                    "
+                />
+            </td>
+            <td
+                valign="middle"
+                style="
+                    color:#475569;
+                    font-family:Manrope, Arial, Helvetica, sans-serif;
+                    font-size:11px;
+                    font-weight:600;
+                    line-height:1;
+                    white-space:nowrap;
+                "
+            >
+                {$bathrooms}
+            </td>
+            </tr>
+            </tbody>
+            </table>
+        </td>
+
+        <td
+            style="
+                padding:11px 0 11px 10px;
+            "
+        >
+            <table
+                border="0"
+                cellpadding="0"
+                cellspacing="0"
+                role="presentation"
+            >
+            <tbody>
+            <tr>
+            <td
+                valign="middle"
+                style="
+                    padding-right:5px;
+                "
+            >
+                <img
+                    src="{$carIcon}"
+                    width="14"
+                    height="14"
+                    alt=""
+                    style="
+                        display:block;
+                        width:14px;
+                        height:14px;
+                    "
+                />
+            </td>
+            <td
+                valign="middle"
+                style="
+                    color:#475569;
+                    font-family:Manrope, Arial, Helvetica, sans-serif;
+                    font-size:11px;
+                    font-weight:600;
+                    line-height:1;
+                    white-space:nowrap;
+                "
+            >
+                {$garages}
+            </td>
+            </tr>
+            </tbody>
+            </table>
+        </td>
+
+    </tr>
+    </tbody>
+    </table>
+
+    <div
+        style="
+            margin-top:12px;
+            padding:12px;
+            background:#f8fafc;
+            border-left:3px solid #cbd5e1;
+            border-radius:6px;
+        "
+    >
+        <div
+            style="
+                color:#64748b;
+                font-family:Manrope, Arial, Helvetica, sans-serif;
+                font-size:9px;
+                font-weight:700;
+                line-height:1;
+                text-transform:uppercase;
+                letter-spacing:0.6px;
+            "
+        >
+            {$exchangeEyebrow}
+        </div>
+
+        <div
+            style="
+                margin-top:5px;
+                color:#0f172a;
+                font-family:Manrope, Arial, Helvetica, sans-serif;
+                font-size:11px;
+                font-weight:700;
+                line-height:1;
+            "
+        >
+            {$exchangeTitle}
+        </div>
+
+        <div
+            style="
+                margin-top:5px;
+                color:#64748b;
+                font-family:Manrope, Arial, Helvetica, sans-serif;
+                font-size:9px;
+                font-style:italic;
+                font-weight:400;
+                line-height:1;
+            "
+        >
+            {$exchangeNotes}
+        </div>
+    </div>
+</td>
+</tr>
+</tbody>
+</table>
+HTML;
+    }
+
+    private static function buildSearchCard(
+        array $item
+    ): string {
+        $id =
+            (int)(
+                $item['search_request_id'] ?? 0
+            );
+
+        $title =
+            self::safe(
+                trim(
+                    (string)(
+                        $item['search_title'] ?? ''
+                    )
+                ) ?: 'Búsqueda'
+            );
+
+        $description =
+            self::safe(
+                trim(
+                    (string)(
+                        $item['search_description'] ?? ''
+                    )
+                ) ?: 'Sin descripción.'
+            );
+
+        $location =
+            self::safe(
+                self::joinLocation([
+                    $item['search_city'] ?? null,
+
+                    $item['search_zone'] ?? null,
+
+                    $item['search_province'] ?? null,
+                ])
+            );
+
+        if ($location === '') {
+            $location =
+                'Sin ubicación';
+        }
+
+        $types =
+            self::safe(
+                self::propertyTypesLabel(
+                    $item['search_property_types'] ?? null
+                )
+            );
+
+        $payment =
+            self::safe(
+                self::paymentLabel(
+                    $item
+                )
+            );
+
+        $budget =
+            self::safe(
+                self::formatMoneyRange(
+                    $item
+                )
+            );
+
+        return <<<HTML
+<table
+    width="100%"
+    border="0"
+    cellpadding="0"
+    cellspacing="0"
+    role="presentation"
+    style="
+        width:100%;
+        border:1px solid #e2e8f0;
+        border-radius:12px;
+        border-collapse:separate;
+        background:#ffffff;
+        overflow:hidden;
+    "
+>
+<tbody>
+<tr>
+
+<td
+    valign="top"
+    style="
+        width:38%;
+        padding:17px 16px;
+        font-family:Manrope, Arial, Helvetica, sans-serif;
+    "
+>
+    <div
+        style="
+            color:#94a3b8;
+            font-size:9px;
+            font-weight:600;
+            line-height:1;
+        "
+    >
+        #{$id}
+    </div>
+
+    <div
+        style="
+            margin-top:8px;
+            color:#2166c2;
+            font-size:14px;
+            font-weight:700;
+            line-height:1.05;
+            letter-spacing:-0.1px;
+        "
+    >
+        {$title}
+    </div>
+
+    <div
+        style="
+            margin-top:7px;
+            color:#64748b;
+            font-size:9px;
+            font-weight:400;
+            line-height:1;
+        "
+    >
+        {$description}
+    </div>
+</td>
+
+<td
+    valign="top"
+    style="
+        width:23%;
+        padding:17px 14px;
+        border-left:1px solid #e2e8f0;
+        font-family:Manrope, Arial, Helvetica, sans-serif;
+    "
+>
+    <div
+        style="
+            color:#94a3b8;
+            font-size:8px;
+            font-weight:700;
+            line-height:1;
+            text-transform:uppercase;
+            letter-spacing:0.6px;
+        "
+    >
+        Ubicación
+    </div>
+
+    <div
+        style="
+            margin-top:7px;
+            color:#334155;
+            font-size:10px;
+            font-weight:600;
+            line-height:1.05;
+        "
+    >
+        {$location}
+    </div>
+</td>
+
+<td
+    valign="top"
+    style="
+        width:18%;
+        padding:17px 14px;
+        border-left:1px solid #e2e8f0;
+        font-family:Manrope, Arial, Helvetica, sans-serif;
+    "
+>
+    <div
+        style="
+            color:#94a3b8;
+            font-size:8px;
+            font-weight:700;
+            line-height:1;
+            text-transform:uppercase;
+            letter-spacing:0.6px;
+        "
+    >
+        Tipo buscado
+    </div>
+
+    <div
+        style="
+            margin-top:7px;
+            color:#334155;
+            font-size:10px;
+            font-weight:600;
+            line-height:1.05;
+        "
+    >
+        {$types}
+    </div>
+
+    <div
+        style="
+            margin-top:12px;
+            color:#94a3b8;
+            font-size:8px;
+            font-weight:700;
+            line-height:1;
+            text-transform:uppercase;
+            letter-spacing:0.6px;
+        "
+    >
+        Modalidad
+    </div>
+
+    <div
+        style="
+            margin-top:6px;
+            color:#334155;
+            font-size:10px;
+            font-weight:600;
+            line-height:1.05;
+        "
+    >
+        {$payment}
+    </div>
+</td>
+
+<td
+    valign="top"
+    style="
+        width:21%;
+        padding:17px 14px;
+        border-left:1px solid #e2e8f0;
+        font-family:Manrope, Arial, Helvetica, sans-serif;
+    "
+>
+    <div
+        style="
+            color:#94a3b8;
+            font-size:8px;
+            font-weight:700;
+            line-height:1;
+            text-transform:uppercase;
+            letter-spacing:0.6px;
+        "
+    >
+        Rango de valor
+    </div>
+
+    <div
+        style="
+            margin-top:7px;
+            color:#2166c2;
+            font-size:11px;
+            font-weight:700;
+            line-height:1.05;
+        "
+    >
+        {$budget}
+    </div>
+</td>
+
+</tr>
+</tbody>
+</table>
+HTML;
+    }
+
+    private static function buildEmail(
+        array $item,
+        float $score,
+        string $imageUrl,
+        string $buttonUrl,
+        string $descriptionMode
+    ): string {
         $safeScore =
             number_format(
                 $score,
@@ -841,238 +1930,43 @@ class HighMatchNotificationService
                 '.'
             );
 
-        /*
-         * Personalizamos la frase y resaltamos
-         * visualmente el contenido propio.
-         */
+        $safeButtonUrl =
+            self::safe(
+                $buttonUrl
+            );
+
+        $propertyCard =
+            self::buildPropertyCard(
+                $item,
+                $imageUrl
+            );
+
+        $searchCard =
+            self::buildSearchCard(
+                $item
+            );
+
         if ($descriptionMode === 'search') {
             $descriptionHtml =
-                'Detectamos una alta compatibilidad entre esta propiedad y <strong>tu búsqueda</strong> en la red.';
-        } elseif ($descriptionMode === 'property') {
+                'Detectamos una alta compatibilidad entre esta propiedad<br />y <strong>tu búsqueda</strong> en la red.';
+        } elseif (
+            $descriptionMode === 'property'
+        ) {
             $descriptionHtml =
-                'Detectamos una alta compatibilidad entre <strong>tu propiedad</strong> y una búsqueda de la red.';
+                'Detectamos una alta compatibilidad entre <strong>tu propiedad</strong><br />y esta búsqueda de la red.';
         } else {
             $descriptionHtml =
-                htmlspecialchars(
-                    $description,
-                    ENT_QUOTES,
-                    'UTF-8'
-                );
+                'Detectamos una alta compatibilidad entre esta propiedad<br />y esta búsqueda de la red.';
         }
 
         $logoUrl =
             self::LOGO_URL;
 
+        $heroUrl =
+            self::HERO_URL;
+
         $footerUrl =
             self::FOOTER_URL;
-
-        if ($safeLocation !== '') {
-            $locationBlock = <<<HTML
-<div
-    style="
-        margin-top:8px;
-        color:#64748b;
-        font-size:13px;
-        line-height:1;
-    "
->
-    {$safeLocation}
-</div>
-HTML;
-        } else {
-            $locationBlock = '';
-        }
-
-        if ($safeImageUrl !== '') {
-            $propertyCard = <<<HTML
-<table
-    width="100%"
-    border="0"
-    cellpadding="0"
-    cellspacing="0"
-    role="presentation"
-    style="
-        border:1px solid #e2e8f0;
-        border-radius:12px;
-        overflow:hidden;
-        border-collapse:separate;
-    "
->
-<tbody>
-<tr>
-<td
-    width="150"
-    valign="middle"
-    style="
-        width:150px;
-        padding:0;
-    "
->
-    <img
-        src="{$safeImageUrl}"
-        width="150"
-        alt="{$safePropertyTitle}"
-        style="
-            display:block;
-            width:150px;
-            height:105px;
-            object-fit:cover;
-            border:0;
-        "
-    />
-</td>
-
-<td
-    valign="middle"
-    style="
-        padding:18px 20px;
-        font-family:Arial, Helvetica, sans-serif;
-    "
->
-    <div
-        style="
-            color:#3974ba;
-            font-size:11px;
-            font-weight:700;
-            line-height:1;
-            text-transform:uppercase;
-        "
-    >
-        {$safePropertyLabel}
-    </div>
-
-    <div
-        style="
-            margin-top:9px;
-            color:#0e1b10;
-            font-size:16px;
-            font-weight:700;
-            line-height:1;
-        "
-    >
-        {$safePropertyTitle}
-    </div>
-
-    {$locationBlock}
-</td>
-</tr>
-</tbody>
-</table>
-HTML;
-        } else {
-            $propertyCard = <<<HTML
-<table
-    width="100%"
-    border="0"
-    cellpadding="0"
-    cellspacing="0"
-    role="presentation"
-    style="
-        border:1px solid #e2e8f0;
-        border-radius:12px;
-        border-collapse:separate;
-    "
->
-<tbody>
-<tr>
-<td
-    style="
-        padding:20px;
-        font-family:Arial, Helvetica, sans-serif;
-    "
->
-    <div
-        style="
-            color:#3974ba;
-            font-size:11px;
-            font-weight:700;
-            line-height:1;
-            text-transform:uppercase;
-        "
-    >
-        {$safePropertyLabel}
-    </div>
-
-    <div
-        style="
-            margin-top:9px;
-            color:#0e1b10;
-            font-size:16px;
-            font-weight:700;
-            line-height:1;
-        "
-    >
-        {$safePropertyTitle}
-    </div>
-
-    {$locationBlock}
-</td>
-</tr>
-</tbody>
-</table>
-HTML;
-        }
-
-        if ($safeSearchTitle !== '') {
-            $searchBlock = <<<HTML
-<tr>
-<td
-    class="email-content"
-    style="
-        padding:0 56px 30px;
-    "
->
-    <table
-        width="100%"
-        border="0"
-        cellpadding="0"
-        cellspacing="0"
-        role="presentation"
-        style="
-            background:#f3f4f6;
-            border-radius:10px;
-        "
-    >
-    <tbody>
-    <tr>
-    <td
-        style="
-            padding:18px 20px;
-            font-family:Arial, Helvetica, sans-serif;
-        "
-    >
-        <div
-            style="
-                color:#64748b;
-                font-size:12px;
-                font-weight:700;
-                line-height:1;
-            "
-        >
-            {$safeSearchLabel}
-        </div>
-
-        <div
-            style="
-                margin-top:8px;
-                color:#30363d;
-                font-size:15px;
-                font-weight:700;
-                line-height:1;
-            "
-        >
-            {$safeSearchTitle}
-        </div>
-    </td>
-    </tr>
-    </tbody>
-    </table>
-</td>
-</tr>
-HTML;
-        } else {
-            $searchBlock = '';
-        }
 
         return <<<HTML
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
@@ -1152,7 +2046,7 @@ HTML;
             }
 
             .match-score {
-                font-size:46px !important;
+                font-size:58px !important;
             }
         }
     </style>
@@ -1192,8 +2086,8 @@ HTML;
 <td
     align="center"
     style="
-        padding:24px 12px;
         background-color:#f0f1f5;
+        padding:24px 12px;
     "
 >
 
@@ -1222,7 +2116,7 @@ HTML;
 <td
     align="center"
     style="
-        padding:41px 24px 34px;
+        padding:24px 24px 16px;
     "
 >
     <img
@@ -1240,21 +2134,28 @@ HTML;
 </td>
 </tr>
 
-<!-- TÍTULO -->
+<!-- HERO CANVA -->
 <tr>
 <td
     class="email-content"
+    align="center"
     style="
-        padding:0 56px 22px;
-        color:#0e1b10;
-        font-family:Arial, Helvetica, sans-serif;
-        font-size:20px;
-        font-weight:700;
-        line-height:1;
-        text-align:left;
+        padding:0 24px 16px;
     "
 >
-    {$safeHeading}
+    <img
+        src="{$heroUrl}"
+        width="552"
+        alt="Encontramos una oportunidad con alto potencial"
+        style="
+            display:block;
+            width:552px;
+            height:auto;
+            max-width:100%;
+            border:0;
+            border-radius:12px;
+        "
+    />
 </td>
 </tr>
 
@@ -1262,108 +2163,110 @@ HTML;
 <tr>
 <td
     class="email-content"
+    align="center"
     style="
-        padding:0 56px 28px;
+        padding:28px 24px 10px;
+        font-family:Arial, Helvetica, sans-serif;
     "
 >
-    <table
-        width="100%"
-        border="0"
-        cellpadding="0"
-        cellspacing="0"
-        role="presentation"
+    <div
+        class="match-score"
         style="
-            background:#f3f8ed;
-            border:1px solid #d9eac8;
-            border-radius:12px;
+            color:#61b228;
+            font-size:66px;
+            font-weight:700;
+            line-height:1;
         "
     >
-    <tbody>
-    <tr>
-    <td
-        align="center"
+        {$safeScore}%
+    </div>
+
+    <div
         style="
-            padding:28px 20px 26px;
-            font-family:Arial, Helvetica, sans-serif;
+            margin-top:4px;
+            color:#0f172a;
+            font-size:26px;
+            font-weight:400;
+            line-height:1;
         "
     >
-        <div
-            class="match-score"
-            style="
-                color:#61b228;
-                font-size:56px;
-                font-weight:800;
-                line-height:1;
-                letter-spacing:-2px;
-            "
-        >
-            {$safeScore}%
-        </div>
-
-        <div
-            style="
-                margin-top:9px;
-                color:#30363d;
-                font-size:15px;
-                font-weight:700;
-                line-height:1;
-            "
-        >
-            de compatibilidad
-        </div>
-
-        <div
-            style="
-                margin-top:10px;
-                color:#64748b;
-                font-size:12px;
-                font-weight:400;
-                line-height:1;
-            "
-        >
-            Match de alto potencial detectado por Permuok
-        </div>
-    </td>
-    </tr>
-    </tbody>
-    </table>
+        de compatibilidad
+    </div>
 </td>
 </tr>
 
-<!-- PROPIEDAD -->
+<!-- ESPACIO SCORE / PROPERTY -->
+<tr>
+<td
+    height="24"
+    style="
+        height:24px;
+        font-size:0;
+        line-height:0;
+    "
+>
+    &nbsp;
+</td>
+</tr>
+
+<!-- PROPERTY CARD -->
 <tr>
 <td
     class="email-content"
     style="
-        padding:0 56px 26px;
+        padding:0 24px 16px;
     "
 >
     {$propertyCard}
 </td>
 </tr>
 
-<!-- DESCRIPCIÓN -->
+<!-- DESCRIPTION -->
 <tr>
 <td
     class="email-content"
+    align="center"
     style="
-        padding:0 56px 26px;
+        padding:24px 24px 28px;
         color:#30363d;
         font-family:Arial, Helvetica, sans-serif;
-        font-size:15px;
+        font-size:20px;
         font-weight:400;
         line-height:1;
-        text-align:left;
+        text-align:center;
     "
 >
     {$descriptionHtml}
 </td>
 </tr>
 
-<!-- BÚSQUEDA -->
-{$searchBlock}
+<!-- SEARCH CARD -->
+<tr>
+<td
+    class="email-content"
+    style="
+        padding:0 24px 16px;
+    "
+>
+    {$searchCard}
+</td>
+</tr>
 
-<!-- BOTÓN -->
+<!-- SPACER -->
+<tr>
+<td
+    height="20"
+    style="
+        height:20px;
+        font-size:0;
+        line-height:0;
+    "
+>
+    &nbsp;
+</td>
+</tr>
+
+<!-- BUTTON -->
 <tr>
 <td
     align="center"
@@ -1484,10 +2387,63 @@ HTML;
 </tr>
 </tbody>
 </table>
-
 </body>
 </html>
 HTML;
+    }
+
+    private static function buildTextBody(
+        array $item,
+        float $score,
+        string $buttonUrl,
+        string $descriptionMode
+    ): string {
+        $scoreText =
+            number_format(
+                $score,
+                0,
+                ',',
+                '.'
+            );
+
+        $propertyTitle =
+            trim(
+                (string)(
+                    $item['property_title'] ?? ''
+                )
+            );
+
+        $searchTitle =
+            trim(
+                (string)(
+                    $item['search_title'] ?? ''
+                )
+            );
+
+        if ($descriptionMode === 'search') {
+            $description =
+                'Detectamos una alta compatibilidad entre esta propiedad y tu búsqueda en la red.';
+        } elseif (
+            $descriptionMode === 'property'
+        ) {
+            $description =
+                'Detectamos una alta compatibilidad entre tu propiedad y esta búsqueda de la red.';
+        } else {
+            $description =
+                'Detectamos una alta compatibilidad entre esta propiedad y esta búsqueda de la red.';
+        }
+
+        return
+            "Encontramos una oportunidad con alto potencial\n\n" .
+            "{$scoreText}% de compatibilidad\n\n" .
+            $propertyTitle .
+            "\n\n" .
+            $description .
+            "\n\n" .
+            $searchTitle .
+            "\n\n" .
+            "Ver compatibilidad:\n" .
+            $buttonUrl;
     }
 
     public static function queueTestEmail(
@@ -1544,81 +2500,119 @@ HTML;
                 '/'
             );
 
-        $heading =
-            'Encontramos una oportunidad con alto potencial';
+        /*
+         * Datos simulados con la misma estructura
+         * utilizada por el email productivo.
+         */
+        $item = [
+            'property_title' =>
+            'Departamento 4 ambientes reciclado en Centro',
 
-        $propertyTitle =
-            'Departamento 3 ambientes en Güemes';
+            'property_type' =>
+            'apartment',
 
-        $location =
-            'Güemes · Mar del Plata';
+            'property_city' =>
+            'Mar del Plata',
 
-        $searchTitle =
-            'Departamento de 2 o 3 ambientes con posibilidad de permuta';
+            'property_zone' =>
+            'Centro',
 
-        $score =
-            94.0;
+            'property_province' =>
+            'Buenos Aires',
+
+            'property_total_area' =>
+            100,
+
+            'property_bedrooms' =>
+            3,
+
+            'property_bathrooms' =>
+            2,
+
+            'property_garages' =>
+            1,
+
+            'requirement_criteria_mode' =>
+            '',
+
+            'requirement_accepts_total_swap' =>
+            1,
+
+            'requirement_accepts_swap_plus_cash' =>
+            0,
+
+            'requirement_accepts_cash_only' =>
+            0,
+
+            'requirement_accepts_open_proposals' =>
+            0,
+
+            'requirement_notes' =>
+            'Acepta casa mayor valor',
+
+            'search_request_id' =>
+            12,
+
+            'search_title' =>
+            'Busco depto en MDP - TEST MULTIBIEN',
+
+            'search_description' =>
+            'Depto en zona centro',
+
+            'search_city' =>
+            'Mar del Plata',
+
+            'search_zone' =>
+            'General Pueyrredón',
+
+            'search_province' =>
+            'Buenos Aires',
+
+            'search_currency' =>
+            'USD',
+
+            'search_min_value' =>
+            null,
+
+            'search_max_value' =>
+            null,
+
+            'search_payment_mode_cash' =>
+            1,
+
+            'search_payment_mode_swap' =>
+            1,
+
+            'search_property_types' =>
+            'apartment',
+        ];
 
         $imageUrl =
-            'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=500&q=80';
+            'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=900&q=85';
 
         $buttonUrl =
             $frontendUrl .
             '/compatibilities/1';
 
-        if ($mode === 'search') {
-            $description =
-                'Detectamos una alta compatibilidad entre esta propiedad y tu búsqueda en la red.';
-
-            $propertyLabel =
-                'Propiedad compatible';
-
-            $searchLabel =
-                'Tu búsqueda';
-        } else {
-            $description =
-                'Detectamos una alta compatibilidad entre tu propiedad y una búsqueda de la red.';
-
-            $propertyLabel =
-                'Tu propiedad';
-
-            $searchLabel =
-                'Búsqueda compatible';
-        }
+        $score =
+            94.0;
 
         $htmlBody =
             self::buildEmail(
-                $heading,
-                $propertyTitle,
-                $location,
-                $searchTitle,
+                $item,
                 $score,
                 $imageUrl,
                 $buttonUrl,
-                $description,
-                $propertyLabel,
-                $searchLabel,
                 $mode
             );
 
         $textBody =
-            $heading .
-            "\n\n" .
-            "94% de compatibilidad\n\n" .
-            $description .
-            "\n\n" .
-            $propertyLabel .
-            ":\n" .
-            $propertyTitle .
-            "\n" .
-            $location .
-            "\n\n" .
-            $searchLabel .
-            ":\n" .
-            $searchTitle .
-            "\n\n" .
-            "Ver compatibilidad:\n" .
-            $buttonUrl;
+            self::buildTextBody(
+                $item,
+                $score,
+                $buttonUrl,
+                $mode
+            );
 
         return EmailJobService::enqueue(
             $email,

@@ -16,9 +16,7 @@ $dotenv->load();
 if (PHP_SAPI !== 'cli') {
     http_response_code(403);
 
-    exit(
-        "Este script solo puede ejecutarse desde CLI.\n"
-    );
+    exit("Este script solo puede ejecutarse desde CLI.\n");
 }
 
 $email =
@@ -29,17 +27,47 @@ $email =
         )
     );
 
-if ($email === '') {
-    exit(
-        "Uso:\n\n" .
-        "php bin/test-high-match-email.php EMAIL\n"
+$mode =
+    strtolower(
+        trim(
+            (string)(
+                $argv[2]
+                ?? 'search'
+            )
+        )
     );
+
+$allowedModes = [
+    'search',
+    'property',
+];
+
+if ($email === '') {
+    exit("Uso:\n\n" .
+        "php bin/test-high-match-email.php EMAIL MODO\n\n" .
+        "Modos disponibles:\n" .
+        "- search\n" .
+        "- property\n");
+}
+
+if (
+    !in_array(
+        $mode,
+        $allowedModes,
+        true
+    )
+) {
+    exit("Modo inválido.\n\n" .
+        "Modos disponibles:\n" .
+        "- search\n" .
+        "- property\n");
 }
 
 try {
     $job =
         HighMatchNotificationService::queueTestEmail(
-            $email
+            $email,
+            $mode
         );
 
     echo "\n";
@@ -52,6 +80,10 @@ try {
 
     echo "Destino: " .
         $email .
+        "\n";
+
+    echo "Modo: " .
+        $mode .
         "\n";
 
     echo "Tipo: high_match_test\n";
