@@ -311,11 +311,22 @@ class NotificationService
                 )
             );
 
+        $opportunityEntityType =
+            trim(
+                (string)(
+                    $conversation['opportunity_type']
+                    ?? ''
+                )
+            );
+
+        $opportunityId =
+            (int)(
+                $conversation['opportunity_id']
+                ?? 0
+            );
+
         $opportunityType =
-            match ((string)(
-                $conversation['opportunity_type']
-                ?? ''
-            )) {
+            match ($opportunityEntityType) {
                 'property' =>
                 'Propiedad',
 
@@ -403,7 +414,11 @@ class NotificationService
                 $senderLabel,
                 $messagePreview,
                 'Ver consulta',
-                $buttonUrl
+                $buttonUrl,
+                null,
+                $opportunityEntityType,
+                $opportunityId,
+                $pdo
             );
 
         $textBody =
@@ -437,19 +452,12 @@ class NotificationService
             $pdo
         );
     }
-
-
     public static function notifyNewMessage(
         int $userId,
         int $conversationId,
         array $conversation = [],
         ?PDO $pdo = null
     ): void {
-        /*
-    |--------------------------------------------------------------------------
-    | Notificación interna
-    |--------------------------------------------------------------------------
-    */
         self::createConversationNotification(
             $userId,
             'new_message',
@@ -459,11 +467,6 @@ class NotificationService
             $pdo
         );
 
-        /*
-    |--------------------------------------------------------------------------
-    | Destinatario
-    |--------------------------------------------------------------------------
-    */
         $recipient =
             self::getEmailRecipient(
                 $userId
@@ -481,11 +484,6 @@ class NotificationService
         $emailSubject =
             "Nuevo mensaje en {$subjectName}";
 
-        /*
-    |--------------------------------------------------------------------------
-    | URL directa al chat
-    |--------------------------------------------------------------------------
-    */
         $frontendUrl =
             rtrim(
                 (string)(
@@ -500,11 +498,6 @@ class NotificationService
             '/conversations/' .
             $conversationId;
 
-        /*
-    |--------------------------------------------------------------------------
-    | Oportunidad
-    |--------------------------------------------------------------------------
-    */
         $opportunityTitle =
             trim(
                 (string)(
@@ -522,11 +515,22 @@ class NotificationService
                 )
             );
 
+        $opportunityEntityType =
+            trim(
+                (string)(
+                    $conversation['opportunity_type']
+                    ?? ''
+                )
+            );
+
+        $opportunityId =
+            (int)(
+                $conversation['opportunity_id']
+                ?? 0
+            );
+
         $opportunityType =
-            match ((string)(
-                $conversation['opportunity_type']
-                ?? ''
-            )) {
+            match ($opportunityEntityType) {
                 'property' =>
                 'Propiedad',
 
@@ -540,11 +544,6 @@ class NotificationService
                 'Oportunidad',
             };
 
-        /*
-    |--------------------------------------------------------------------------
-    | Mensaje
-    |--------------------------------------------------------------------------
-    */
         $messagePreview =
             trim(
                 (string)(
@@ -569,11 +568,6 @@ class NotificationService
                 '...';
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | Identidad del remitente
-    |--------------------------------------------------------------------------
-    */
         $senderLabel =
             'Una inmobiliaria de la red';
 
@@ -601,6 +595,7 @@ class NotificationService
                 $db->prepare("
                 SELECT
                     re.name
+
                 FROM users u
 
                 LEFT JOIN real_estates re
@@ -631,11 +626,6 @@ class NotificationService
             }
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | Imagen
-    |--------------------------------------------------------------------------
-    */
         $imageUrl =
             trim(
                 (string)(
@@ -668,11 +658,6 @@ class NotificationService
             }
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | Email
-    |--------------------------------------------------------------------------
-    */
         $htmlBody =
             self::buildConversationEmail(
                 'Tenés un nuevo mensaje',
@@ -683,7 +668,11 @@ class NotificationService
                 $senderLabel,
                 $messagePreview,
                 'Abrir conversación',
-                $buttonUrl
+                $buttonUrl,
+                null,
+                $opportunityEntityType,
+                $opportunityId,
+                $pdo
             );
 
         $textBody =
@@ -717,18 +706,12 @@ class NotificationService
             $pdo
         );
     }
-
     public static function notifyContactShareRequested(
         int $userId,
         int $conversationId,
         array $conversation = [],
         ?PDO $pdo = null
     ): void {
-        /*
-    |--------------------------------------------------------------------------
-    | Notificación interna
-    |--------------------------------------------------------------------------
-    */
         self::createConversationNotification(
             $userId,
             'contact_share_requested',
@@ -738,11 +721,6 @@ class NotificationService
             $pdo
         );
 
-        /*
-    |--------------------------------------------------------------------------
-    | Destinatario
-    |--------------------------------------------------------------------------
-    */
         $recipient =
             self::getEmailRecipient(
                 $userId
@@ -752,11 +730,6 @@ class NotificationService
             return;
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | URL
-    |--------------------------------------------------------------------------
-    */
         $frontendUrl =
             rtrim(
                 (string)(
@@ -771,11 +744,6 @@ class NotificationService
             '/conversations/' .
             $conversationId;
 
-        /*
-    |--------------------------------------------------------------------------
-    | Oportunidad
-    |--------------------------------------------------------------------------
-    */
         $opportunityTitle =
             trim(
                 (string)(
@@ -793,11 +761,22 @@ class NotificationService
                 )
             );
 
+        $opportunityEntityType =
+            trim(
+                (string)(
+                    $conversation['opportunity_type']
+                    ?? ''
+                )
+            );
+
+        $opportunityId =
+            (int)(
+                $conversation['opportunity_id']
+                ?? 0
+            );
+
         $opportunityType =
-            match ((string)(
-                $conversation['opportunity_type']
-                ?? ''
-            )) {
+            match ($opportunityEntityType) {
                 'property' =>
                 'Propiedad',
 
@@ -811,11 +790,6 @@ class NotificationService
                 'Oportunidad',
             };
 
-        /*
-    |--------------------------------------------------------------------------
-    | Imagen
-    |--------------------------------------------------------------------------
-    */
         $imageUrl =
             trim(
                 (string)(
@@ -848,11 +822,6 @@ class NotificationService
             }
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | Contenido
-    |--------------------------------------------------------------------------
-    */
         $emailSubject =
             'Una inmobiliaria quiere compartir sus datos con vos';
 
@@ -870,7 +839,10 @@ class NotificationService
                 '',
                 'Revisar solicitud',
                 $buttonUrl,
-                $activityText
+                $activityText,
+                $opportunityEntityType,
+                $opportunityId,
+                $pdo
             );
 
         $textBody =
@@ -888,11 +860,6 @@ class NotificationService
             "Revisar solicitud:\n" .
             $buttonUrl;
 
-        /*
-    |--------------------------------------------------------------------------
-    | Cola
-    |--------------------------------------------------------------------------
-    */
         EmailJobService::enqueue(
             $recipient['email'],
             'contact_share_requested',
@@ -907,19 +874,12 @@ class NotificationService
             $pdo
         );
     }
-
-
     public static function notifyContactShareAccepted(
         int $userId,
         int $conversationId,
         array $conversation = [],
         ?PDO $pdo = null
     ): void {
-        /*
-    |--------------------------------------------------------------------------
-    | Notificación interna
-    |--------------------------------------------------------------------------
-    */
         self::createConversationNotification(
             $userId,
             'contact_share_accepted',
@@ -929,11 +889,6 @@ class NotificationService
             $pdo
         );
 
-        /*
-    |--------------------------------------------------------------------------
-    | Destinatario
-    |--------------------------------------------------------------------------
-    */
         $recipient =
             self::getEmailRecipient(
                 $userId
@@ -943,11 +898,6 @@ class NotificationService
             return;
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | URL
-    |--------------------------------------------------------------------------
-    */
         $frontendUrl =
             rtrim(
                 (string)(
@@ -962,11 +912,6 @@ class NotificationService
             '/conversations/' .
             $conversationId;
 
-        /*
-    |--------------------------------------------------------------------------
-    | Oportunidad
-    |--------------------------------------------------------------------------
-    */
         $opportunityTitle =
             trim(
                 (string)(
@@ -984,11 +929,22 @@ class NotificationService
                 )
             );
 
+        $opportunityEntityType =
+            trim(
+                (string)(
+                    $conversation['opportunity_type']
+                    ?? ''
+                )
+            );
+
+        $opportunityId =
+            (int)(
+                $conversation['opportunity_id']
+                ?? 0
+            );
+
         $opportunityType =
-            match ((string)(
-                $conversation['opportunity_type']
-                ?? ''
-            )) {
+            match ($opportunityEntityType) {
                 'property' =>
                 'Propiedad',
 
@@ -1002,11 +958,6 @@ class NotificationService
                 'Oportunidad',
             };
 
-        /*
-    |--------------------------------------------------------------------------
-    | Imagen
-    |--------------------------------------------------------------------------
-    */
         $imageUrl =
             trim(
                 (string)(
@@ -1039,11 +990,6 @@ class NotificationService
             }
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | Email
-    |--------------------------------------------------------------------------
-    */
         $emailSubject =
             'Ya pueden ver sus datos de contacto';
 
@@ -1061,7 +1007,10 @@ class NotificationService
                 '',
                 'Ver datos de contacto',
                 $buttonUrl,
-                $activityText
+                $activityText,
+                $opportunityEntityType,
+                $opportunityId,
+                $pdo
             );
 
         $textBody =
@@ -1079,11 +1028,6 @@ class NotificationService
             "Ver datos de contacto:\n" .
             $buttonUrl;
 
-        /*
-    |--------------------------------------------------------------------------
-    | Cola
-    |--------------------------------------------------------------------------
-    */
         EmailJobService::enqueue(
             $recipient['email'],
             'contact_share_accepted',
@@ -1098,18 +1042,12 @@ class NotificationService
             $pdo
         );
     }
-
     public static function notifyContactShareRejected(
         int $userId,
         int $conversationId,
         array $conversation = [],
         ?PDO $pdo = null
     ): void {
-        /*
-    |--------------------------------------------------------------------------
-    | Notificación interna
-    |--------------------------------------------------------------------------
-    */
         self::createConversationNotification(
             $userId,
             'contact_share_rejected',
@@ -1119,11 +1057,6 @@ class NotificationService
             $pdo
         );
 
-        /*
-    |--------------------------------------------------------------------------
-    | Destinatario
-    |--------------------------------------------------------------------------
-    */
         $recipient =
             self::getEmailRecipient(
                 $userId
@@ -1133,11 +1066,6 @@ class NotificationService
             return;
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | URL
-    |--------------------------------------------------------------------------
-    */
         $frontendUrl =
             rtrim(
                 (string)(
@@ -1152,11 +1080,6 @@ class NotificationService
             '/conversations/' .
             $conversationId;
 
-        /*
-    |--------------------------------------------------------------------------
-    | Oportunidad
-    |--------------------------------------------------------------------------
-    */
         $opportunityTitle =
             trim(
                 (string)(
@@ -1174,11 +1097,22 @@ class NotificationService
                 )
             );
 
+        $opportunityEntityType =
+            trim(
+                (string)(
+                    $conversation['opportunity_type']
+                    ?? ''
+                )
+            );
+
+        $opportunityId =
+            (int)(
+                $conversation['opportunity_id']
+                ?? 0
+            );
+
         $opportunityType =
-            match ((string)(
-                $conversation['opportunity_type']
-                ?? ''
-            )) {
+            match ($opportunityEntityType) {
                 'property' =>
                 'Propiedad',
 
@@ -1192,11 +1126,6 @@ class NotificationService
                 'Oportunidad',
             };
 
-        /*
-    |--------------------------------------------------------------------------
-    | Imagen
-    |--------------------------------------------------------------------------
-    */
         $imageUrl =
             trim(
                 (string)(
@@ -1229,11 +1158,6 @@ class NotificationService
             }
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | Email
-    |--------------------------------------------------------------------------
-    */
         $emailSubject =
             'La solicitud para compartir datos no fue aceptada';
 
@@ -1251,7 +1175,10 @@ class NotificationService
                 '',
                 'Volver a la conversación',
                 $buttonUrl,
-                $activityText
+                $activityText,
+                $opportunityEntityType,
+                $opportunityId,
+                $pdo
             );
 
         $textBody =
@@ -1269,11 +1196,6 @@ class NotificationService
             "Volver a la conversación:\n" .
             $buttonUrl;
 
-        /*
-    |--------------------------------------------------------------------------
-    | Cola
-    |--------------------------------------------------------------------------
-    */
         EmailJobService::enqueue(
             $recipient['email'],
             'contact_share_rejected',
@@ -1392,11 +1314,6 @@ class NotificationService
             $pdo
             ?? self::db();
 
-        /*
-    |--------------------------------------------------------------------------
-    | Notificación interna
-    |--------------------------------------------------------------------------
-    */
         if (
             $conversationId &&
             $conversationId > 0
@@ -1440,11 +1357,6 @@ class NotificationService
                 'Ver oportunidad';
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | Destinatario
-    |--------------------------------------------------------------------------
-    */
         $recipient =
             self::getEmailRecipient(
                 $userId
@@ -1454,11 +1366,6 @@ class NotificationService
             return;
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | Datos de la compatibilidad
-    |--------------------------------------------------------------------------
-    */
         $stmt =
             $db->prepare("
             SELECT
@@ -1537,26 +1444,27 @@ class NotificationService
             );
 
         $opportunityType =
-            'Compatibilidad';
+            'Propiedad';
 
-        /*
-    |--------------------------------------------------------------------------
-    | Imagen de la propiedad
-    |--------------------------------------------------------------------------
-    */
         $imageUrl = '';
 
         if ($propertyId > 0) {
             $imageStmt =
                 $db->prepare("
                 SELECT id
+
                 FROM property_images
-                WHERE property_id = :property_id
+
+                WHERE property_id =
+                    :property_id
+
                   AND deleted_at IS NULL
+
                 ORDER BY
                     is_cover DESC,
                     sort_order ASC,
                     id ASC
+
                 LIMIT 1
             ");
 
@@ -1603,11 +1511,6 @@ class NotificationService
             }
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | URL
-    |--------------------------------------------------------------------------
-    */
         $frontendUrl =
             rtrim(
                 (string)(
@@ -1638,11 +1541,6 @@ class NotificationService
                 'Ambas inmobiliarias mostraron interés en esta oportunidad.';
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | Email
-    |--------------------------------------------------------------------------
-    */
         $emailSubject =
             '¡Hay interés mutuo en una oportunidad!';
 
@@ -1657,7 +1555,10 @@ class NotificationService
                 '',
                 $buttonText,
                 $buttonUrl,
-                $activityText
+                $activityText,
+                'property',
+                $propertyId,
+                $db
             );
 
         $textBody =
@@ -1910,6 +1811,229 @@ class NotificationService
         ];
     }
 
+    private static function buildOpportunityEmailCard(
+        string $entityType,
+        int $entityId,
+        string $fallbackTitle,
+        string $fallbackLocation,
+        string $fallbackType,
+        string $imageUrl,
+        ?PDO $pdo = null
+    ): string {
+        $db =
+            $pdo
+            ?? self::db();
+
+        if (
+            $entityType === 'property' &&
+            $entityId > 0
+        ) {
+            $card =
+                EmailPropertyCardService::build(
+                    $db,
+                    $entityId,
+                    $imageUrl
+                );
+
+            if ($card !== null) {
+                return $card;
+            }
+        }
+
+        if (
+            $entityType === 'search_request' &&
+            $entityId > 0
+        ) {
+            $card =
+                EmailSearchRequestCardService::build(
+                    $db,
+                    $entityId
+                );
+
+            if ($card !== null) {
+                return $card;
+            }
+        }
+
+        $safeTitle =
+            htmlspecialchars(
+                $fallbackTitle,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        $safeLocation =
+            htmlspecialchars(
+                $fallbackLocation,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        $safeType =
+            htmlspecialchars(
+                $fallbackType,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        $safeImageUrl =
+            htmlspecialchars(
+                $imageUrl,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+        if ($safeImageUrl !== '') {
+            return <<<HTML
+<table
+    width="100%"
+    border="0"
+    cellpadding="0"
+    cellspacing="0"
+    role="presentation"
+    style="
+        width:100%;
+        border:1px solid #e2e8f0;
+        border-radius:12px;
+        overflow:hidden;
+        border-collapse:separate;
+        background:#ffffff;
+    "
+>
+<tbody>
+<tr>
+<td
+    width="150"
+    valign="middle"
+    style="
+        width:150px;
+        padding:0;
+    "
+>
+    <img
+        src="{$safeImageUrl}"
+        width="150"
+        alt="{$safeTitle}"
+        style="
+            display:block;
+            width:150px;
+            height:105px;
+            object-fit:cover;
+            border:0;
+        "
+    />
+</td>
+
+<td
+    valign="middle"
+    style="
+        padding:18px 20px;
+        font-family:Manrope, Arial, Helvetica, sans-serif;
+    "
+>
+    <div
+        style="
+            color:#0e1b10;
+            font-size:16px;
+            font-weight:700;
+            line-height:1;
+        "
+    >
+        {$safeTitle}
+    </div>
+
+    <div
+        style="
+            margin-top:8px;
+            color:#64748b;
+            font-size:13px;
+            line-height:1;
+        "
+    >
+        {$safeLocation}
+    </div>
+
+    <div
+        style="
+            margin-top:8px;
+            color:#3974ba;
+            font-size:12px;
+            font-weight:700;
+            line-height:1;
+        "
+    >
+        {$safeType}
+    </div>
+</td>
+</tr>
+</tbody>
+</table>
+HTML;
+        }
+
+        return <<<HTML
+<table
+    width="100%"
+    border="0"
+    cellpadding="0"
+    cellspacing="0"
+    role="presentation"
+    style="
+        width:100%;
+        border:1px solid #e2e8f0;
+        border-radius:12px;
+        border-collapse:separate;
+        background:#ffffff;
+    "
+>
+<tbody>
+<tr>
+<td
+    style="
+        padding:20px;
+        font-family:Manrope, Arial, Helvetica, sans-serif;
+    "
+>
+    <div
+        style="
+            color:#0e1b10;
+            font-size:16px;
+            font-weight:700;
+            line-height:1;
+        "
+    >
+        {$safeTitle}
+    </div>
+
+    <div
+        style="
+            margin-top:8px;
+            color:#64748b;
+            font-size:13px;
+            line-height:1;
+        "
+    >
+        {$safeLocation}
+    </div>
+
+    <div
+        style="
+            margin-top:8px;
+            color:#3974ba;
+            font-size:12px;
+            font-weight:700;
+            line-height:1;
+        "
+    >
+        {$safeType}
+    </div>
+</td>
+</tr>
+</tbody>
+</table>
+HTML;
+    }
+
     private static function buildConversationEmail(
         string $heading,
         string $opportunityTitle,
@@ -1920,32 +2044,14 @@ class NotificationService
         string $messagePreview,
         string $buttonText,
         string $buttonUrl,
-        ?string $activityText = null
+        ?string $activityText = null,
+        string $opportunityEntityType = '',
+        int $opportunityId = 0,
+        ?PDO $pdo = null
     ): string {
         $safeHeading =
             htmlspecialchars(
                 $heading,
-                ENT_QUOTES,
-                'UTF-8'
-            );
-
-        $safeTitle =
-            htmlspecialchars(
-                $opportunityTitle,
-                ENT_QUOTES,
-                'UTF-8'
-            );
-
-        $safeLocation =
-            htmlspecialchars(
-                $opportunityLocation,
-                ENT_QUOTES,
-                'UTF-8'
-            );
-
-        $safeType =
-            htmlspecialchars(
-                $opportunityType,
                 ENT_QUOTES,
                 'UTF-8'
             );
@@ -1991,169 +2097,17 @@ class NotificationService
                 'UTF-8'
             );
 
-        $safeImageUrl =
-            htmlspecialchars(
+        $opportunityCard =
+            self::buildOpportunityEmailCard(
+                $opportunityEntityType,
+                $opportunityId,
+                $opportunityTitle,
+                $opportunityLocation,
+                $opportunityType,
                 $imageUrl,
-                ENT_QUOTES,
-                'UTF-8'
+                $pdo
             );
 
-        /*
-    |--------------------------------------------------------------------------
-    | Card de oportunidad
-    |--------------------------------------------------------------------------
-    */
-        if ($safeImageUrl !== '') {
-            $opportunityCard = <<<HTML
-<table
-    width="100%"
-    border="0"
-    cellpadding="0"
-    cellspacing="0"
-    role="presentation"
-    style="
-        border:1px solid #e2e8f0;
-        border-radius:12px;
-        overflow:hidden;
-        border-collapse:separate;
-    "
->
-<tbody>
-<tr>
-<td
-    width="150"
-    valign="middle"
-    style="
-        width:150px;
-        padding:0;
-    "
->
-    <img
-        src="{$safeImageUrl}"
-        width="150"
-        alt="{$safeTitle}"
-        style="
-            display:block;
-            width:150px;
-            height:105px;
-            object-fit:cover;
-            border:0;
-        "
-    />
-</td>
-
-<td
-    valign="middle"
-    style="
-        padding:18px 20px;
-        font-family:Arial, Helvetica, sans-serif;
-    "
->
-    <div
-        style="
-            color:#0e1b10;
-            font-size:16px;
-            font-weight:700;
-            line-height:1;
-        "
-    >
-        {$safeTitle}
-    </div>
-
-    <div
-        style="
-            margin-top:8px;
-            color:#64748b;
-            font-size:13px;
-            line-height:1;
-        "
-    >
-        {$safeLocation}
-    </div>
-
-    <div
-        style="
-            margin-top:8px;
-            color:#3974ba;
-            font-size:12px;
-            font-weight:700;
-            line-height:1;
-        "
-    >
-        {$safeType}
-    </div>
-</td>
-</tr>
-</tbody>
-</table>
-HTML;
-        } else {
-            $opportunityCard = <<<HTML
-<table
-    width="100%"
-    border="0"
-    cellpadding="0"
-    cellspacing="0"
-    role="presentation"
-    style="
-        border:1px solid #e2e8f0;
-        border-radius:12px;
-        border-collapse:separate;
-    "
->
-<tbody>
-<tr>
-<td
-    style="
-        padding:20px;
-        font-family:Arial, Helvetica, sans-serif;
-    "
->
-    <div
-        style="
-            color:#0e1b10;
-            font-size:16px;
-            font-weight:700;
-            line-height:1;
-        "
-    >
-        {$safeTitle}
-    </div>
-
-    <div
-        style="
-            margin-top:8px;
-            color:#64748b;
-            font-size:13px;
-            line-height:1;
-        "
-    >
-        {$safeLocation}
-    </div>
-
-    <div
-        style="
-            margin-top:8px;
-            color:#3974ba;
-            font-size:12px;
-            font-weight:700;
-            line-height:1;
-        "
-    >
-        {$safeType}
-    </div>
-</td>
-</tr>
-</tbody>
-</table>
-HTML;
-        }
-
-        /*
-    |--------------------------------------------------------------------------
-    | Bloque de mensaje o actividad
-    |--------------------------------------------------------------------------
-    */
         $contentBlock = '';
 
         if (
@@ -2168,7 +2122,7 @@ HTML;
     style="
         padding:0 56px 12px;
         color:#0e1b10;
-        font-family:Arial, Helvetica, sans-serif;
+        font-family:Manrope, Arial, Helvetica, sans-serif;
         font-size:15px;
         font-weight:700;
         line-height:1;
@@ -2192,7 +2146,7 @@ HTML;
             background:#f3f4f6;
             border-radius:10px;
             color:#30363d;
-            font-family:Arial, Helvetica, sans-serif;
+            font-family:Manrope, Arial, Helvetica, sans-serif;
             font-size:15px;
             font-weight:400;
             line-height:1;
@@ -2216,7 +2170,7 @@ HTML;
     style="
         padding:0 56px 34px;
         color:#30363d;
-        font-family:Arial, Helvetica, sans-serif;
+        font-family:Manrope, Arial, Helvetica, sans-serif;
         font-size:15px;
         font-weight:400;
         line-height:1;
@@ -2330,6 +2284,7 @@ HTML;
         text-size-adjust:100%;
     "
 >
+
 <table
     width="100%"
     border="0"
@@ -2368,7 +2323,6 @@ HTML;
 >
 <tbody>
 
-<!-- LOGO -->
 <tr>
 <td
     align="center"
@@ -2391,14 +2345,13 @@ HTML;
 </td>
 </tr>
 
-<!-- TÍTULO -->
 <tr>
 <td
     class="email-content"
     style="
         padding:0 56px 24px;
         color:#0e1b10;
-        font-family:Arial, Helvetica, sans-serif;
+        font-family:Manrope, Arial, Helvetica, sans-serif;
         font-size:20px;
         font-weight:700;
         line-height:1;
@@ -2409,7 +2362,6 @@ HTML;
 </td>
 </tr>
 
-<!-- CARD -->
 <tr>
 <td
     class="email-content"
@@ -2423,7 +2375,6 @@ HTML;
 
 {$contentBlock}
 
-<!-- BOTÓN -->
 <tr>
 <td
     align="center"
@@ -2511,7 +2462,6 @@ HTML;
 </td>
 </tr>
 
-<!-- FOOTER -->
 <tr>
 <td
     align="center"
