@@ -2502,8 +2502,8 @@ HTML;
 
     public static function queueNotificationTestEmail(
         string $email,
-        string $type =
-        'new_conversation'
+        string $type = 'new_conversation',
+        string $opportunityEntityType = 'property'
     ): array {
         $email =
             strtolower(
@@ -2524,6 +2524,31 @@ HTML;
             );
         }
 
+        $type =
+            trim(
+                $type
+            );
+
+        $opportunityEntityType =
+            trim(
+                $opportunityEntityType
+            );
+
+        if (
+            !in_array(
+                $opportunityEntityType,
+                [
+                    'property',
+                    'search_request',
+                ],
+                true
+            )
+        ) {
+            throw new Exception(
+                'El tipo de oportunidad debe ser property o search_request.'
+            );
+        }
+
         $frontendUrl =
             rtrim(
                 (string)(
@@ -2533,17 +2558,163 @@ HTML;
                 '/'
             );
 
-        $opportunityTitle =
-            'Departamento 3 ambientes en Güemes';
+        $db =
+            self::db();
 
-        $opportunityLocation =
-            'Güemes · Mar del Plata';
+        /*
+     * Para los tests usamos registros reales
+     * de la base para probar exactamente
+     * las cards compartidas.
+     */
+        if ($opportunityEntityType === 'property') {
+            $stmt =
+                $db->query("
+                SELECT
+                    id,
+                    title,
+                    city,
+                    zone,
+                    province
 
-        $opportunityType =
-            'Propiedad';
+                FROM properties
 
-        $imageUrl =
-            'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=500&q=80';
+                WHERE deleted_at IS NULL
+
+                ORDER BY id DESC
+
+                LIMIT 1
+            ");
+
+            $item =
+                $stmt->fetch(
+                    PDO::FETCH_ASSOC
+                );
+
+            if (!$item) {
+                throw new Exception(
+                    'No hay propiedades disponibles para generar el email de prueba.'
+                );
+            }
+
+            $opportunityId =
+                (int)$item['id'];
+
+            $opportunityTitle =
+                trim(
+                    (string)(
+                        $item['title']
+                        ?? 'Propiedad'
+                    )
+                );
+
+            $opportunityLocation =
+                implode(
+                    ' · ',
+                    array_values(
+                        array_filter([
+                            trim(
+                                (string)(
+                                    $item['zone']
+                                    ?? ''
+                                )
+                            ),
+
+                            trim(
+                                (string)(
+                                    $item['city']
+                                    ?? ''
+                                )
+                            ),
+
+                            trim(
+                                (string)(
+                                    $item['province']
+                                    ?? ''
+                                )
+                            ),
+                        ])
+                    )
+                );
+
+            $opportunityType =
+                'Propiedad';
+
+            $imageUrl = '';
+        } else {
+            $stmt =
+                $db->query("
+                SELECT
+                    id,
+                    title,
+                    city,
+                    zone,
+                    province
+
+                FROM search_requests
+
+                WHERE deleted_at IS NULL
+
+                ORDER BY id DESC
+
+                LIMIT 1
+            ");
+
+            $item =
+                $stmt->fetch(
+                    PDO::FETCH_ASSOC
+                );
+
+            if (!$item) {
+                throw new Exception(
+                    'No hay búsquedas disponibles para generar el email de prueba.'
+                );
+            }
+
+            $opportunityId =
+                (int)$item['id'];
+
+            $opportunityTitle =
+                trim(
+                    (string)(
+                        $item['title']
+                        ?? 'Búsqueda'
+                    )
+                );
+
+            $opportunityLocation =
+                implode(
+                    ' · ',
+                    array_values(
+                        array_filter([
+                            trim(
+                                (string)(
+                                    $item['zone']
+                                    ?? ''
+                                )
+                            ),
+
+                            trim(
+                                (string)(
+                                    $item['city']
+                                    ?? ''
+                                )
+                            ),
+
+                            trim(
+                                (string)(
+                                    $item['province']
+                                    ?? ''
+                                )
+                            ),
+                        ])
+                    )
+                );
+
+            $opportunityType =
+                'Búsqueda';
+
+            $imageUrl = '';
+        }
 
         $senderLabel =
             'Una inmobiliaria de la red';
@@ -2586,6 +2757,7 @@ HTML;
                     '¡Hay interés mutuo en una oportunidad!';
 
                 $senderLabel = '';
+
                 $messagePreview = '';
 
                 $activityText =
@@ -2608,12 +2780,14 @@ HTML;
                     'Una inmobiliaria quiere compartir sus datos con vos';
 
                 $senderLabel = '';
+
                 $messagePreview = '';
 
                 $activityText =
                     'La otra inmobiliaria quiere habilitar el intercambio de datos de contacto para esta oportunidad. Si aceptás, ambas partes podrán ver los datos de contacto vinculados a sus perfiles.';
 
                 break;
+
             case 'contact_share_accepted':
                 $heading =
                     'El intercambio de datos fue aceptado';
@@ -2629,12 +2803,14 @@ HTML;
                     'Ya pueden ver sus datos de contacto';
 
                 $senderLabel = '';
+
                 $messagePreview = '';
 
                 $activityText =
                     'Ambas partes aceptaron compartir sus datos de contacto para esta oportunidad. Ya podés ingresar a la conversación para ver la información de contacto de la otra inmobiliaria.';
 
                 break;
+
             case 'contact_share_rejected':
                 $heading =
                     'La solicitud para compartir datos no fue aceptada';
@@ -2650,12 +2826,14 @@ HTML;
                     'La solicitud para compartir datos no fue aceptada';
 
                 $senderLabel = '';
+
                 $messagePreview = '';
 
                 $activityText =
                     'La otra inmobiliaria decidió no habilitar el intercambio de datos de contacto para esta oportunidad. Podés continuar conversando dentro de Permuok sin compartir información personal.';
 
                 break;
+
             case 'new_conversation':
             default:
                 $heading =
@@ -2685,7 +2863,10 @@ HTML;
                 $messagePreview,
                 $buttonText,
                 $buttonUrl,
-                $activityText
+                $activityText,
+                $opportunityEntityType,
+                $opportunityId,
+                $db
             );
 
         $textBody =
@@ -2706,7 +2887,9 @@ HTML;
 
         if (
             $activityText !== null &&
-            trim($activityText) !== ''
+            trim(
+                $activityText
+            ) !== ''
         ) {
             $textBody .=
                 $activityText .
@@ -2721,6 +2904,8 @@ HTML;
         return EmailJobService::enqueue(
             $email,
             $type .
+                '_' .
+                $opportunityEntityType .
                 '_test',
             $subject,
             $htmlBody,

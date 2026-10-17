@@ -35,6 +35,14 @@ $type =
         )
     );
 
+$opportunityEntityType =
+    trim(
+        (string)(
+            $argv[3]
+            ?? 'property'
+        )
+    );
+
 $allowedTypes = [
     'new_conversation',
     'new_message',
@@ -44,16 +52,24 @@ $allowedTypes = [
     'contact_share_rejected',
 ];
 
+$allowedOpportunityTypes = [
+    'property',
+    'search_request',
+];
+
 if ($email === '') {
     exit("Uso:\n\n" .
-        "php bin/test-new-conversation-email.php EMAIL TIPO\n\n" .
-"Tipos disponibles:\n" .
-"- new_conversation\n" .
-"- new_message\n" .
-"- compatibility_mutual_interest\n" .
-"- contact_share_requested\n" .
-"- contact_share_accepted\n" .
-"- contact_share_rejected\n");
+        "php bin/test-new-conversation-email.php EMAIL TIPO OPORTUNIDAD\n\n" .
+        "Tipos de email:\n" .
+        "- new_conversation\n" .
+        "- new_message\n" .
+        "- compatibility_mutual_interest\n" .
+        "- contact_share_requested\n" .
+        "- contact_share_accepted\n" .
+        "- contact_share_rejected\n\n" .
+        "Tipos de oportunidad:\n" .
+        "- property\n" .
+        "- search_request\n");
 }
 
 if (
@@ -63,26 +79,34 @@ if (
         true
     )
 ) {
-    exit("Tipo de email inválido.\n\n" .
-"Tipos disponibles:\n" .
-"- new_conversation\n" .
-"- new_message\n" .
-"- compatibility_mutual_interest\n" .
-"- contact_share_requested\n" .
-"- contact_share_accepted\n" .
-"- contact_share_rejected\n");
+    exit("Tipo de email inválido.\n");
+}
+
+if (
+    !in_array(
+        $opportunityEntityType,
+        $allowedOpportunityTypes,
+        true
+    )
+) {
+    exit("Tipo de oportunidad inválido.\n\n" .
+        "Usá:\n" .
+        "- property\n" .
+        "- search_request\n");
 }
 
 try {
     $job =
         NotificationService::queueNotificationTestEmail(
             $email,
-            $type
+            $type,
+            $opportunityEntityType
         );
 
     echo "\n";
     echo "Email de prueba encolado correctamente.\n";
     echo "----------------------------------------\n";
+
     echo "Job ID: " .
         ($job['id'] ?? '—') .
         "\n";
@@ -93,6 +117,10 @@ try {
 
     echo "Tipo: " .
         $type .
+        "\n";
+
+    echo "Oportunidad: " .
+        $opportunityEntityType .
         "\n";
 
     echo "\n";
