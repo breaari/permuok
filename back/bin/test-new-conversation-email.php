@@ -55,6 +55,7 @@ $allowedTypes = [
 $allowedOpportunityTypes = [
     'property',
     'search_request',
+    'development',
 ];
 
 if ($email === '') {
@@ -69,7 +70,8 @@ if ($email === '') {
         "- contact_share_rejected\n\n" .
         "Tipos de oportunidad:\n" .
         "- property\n" .
-        "- search_request\n");
+        "- search_request\n" .
+        "- development\n");
 }
 
 if (
@@ -92,7 +94,8 @@ if (
     exit("Tipo de oportunidad inválido.\n\n" .
         "Usá:\n" .
         "- property\n" .
-        "- search_request\n");
+        "- search_request\n" .
+        "- development\n");
 }
 
 try {

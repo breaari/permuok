@@ -1855,6 +1855,22 @@ class NotificationService
             }
         }
 
+        if (
+            $entityType === 'development' &&
+            $entityId > 0
+        ) {
+            $card =
+                EmailDevelopmentCardService::build(
+                    $db,
+                    $entityId,
+                    $imageUrl
+                );
+
+            if ($card !== null) {
+                return $card;
+            }
+        }
+
         $safeTitle =
             htmlspecialchars(
                 $fallbackTitle,
@@ -1902,6 +1918,7 @@ class NotificationService
 >
 <tbody>
 <tr>
+
 <td
     width="150"
     valign="middle"
@@ -1965,6 +1982,7 @@ class NotificationService
         {$safeType}
     </div>
 </td>
+
 </tr>
 </tbody>
 </table>
@@ -1988,6 +2006,7 @@ HTML;
 >
 <tbody>
 <tr>
+
 <td
     style="
         padding:20px;
@@ -2028,6 +2047,7 @@ HTML;
         {$safeType}
     </div>
 </td>
+
 </tr>
 </tbody>
 </table>
@@ -2540,12 +2560,13 @@ HTML;
                 [
                     'property',
                     'search_request',
+                    'development',
                 ],
                 true
             )
         ) {
             throw new Exception(
-                'El tipo de oportunidad debe ser property o search_request.'
+                'El tipo de oportunidad debe ser property, search_request o development.'
             );
         }
 
@@ -2561,12 +2582,9 @@ HTML;
         $db =
             self::db();
 
-        /*
-     * Para los tests usamos registros reales
-     * de la base para probar exactamente
-     * las cards compartidas.
-     */
-        if ($opportunityEntityType === 'property') {
+        if (
+            $opportunityEntityType === 'property'
+        ) {
             $stmt =
                 $db->query("
                 SELECT
@@ -2640,7 +2658,10 @@ HTML;
                 'Propiedad';
 
             $imageUrl = '';
-        } else {
+        } elseif (
+            $opportunityEntityType ===
+            'search_request'
+        ) {
             $stmt =
                 $db->query("
                 SELECT
@@ -2712,6 +2733,80 @@ HTML;
 
             $opportunityType =
                 'Búsqueda';
+
+            $imageUrl = '';
+        } else {
+            $stmt =
+                $db->query("
+                SELECT
+                    id,
+                    title,
+                    city,
+                    zone,
+                    province
+
+                FROM developments
+
+                WHERE deleted_at IS NULL
+
+                ORDER BY id DESC
+
+                LIMIT 1
+            ");
+
+            $item =
+                $stmt->fetch(
+                    PDO::FETCH_ASSOC
+                );
+
+            if (!$item) {
+                throw new Exception(
+                    'No hay desarrollos disponibles para generar el email de prueba.'
+                );
+            }
+
+            $opportunityId =
+                (int)$item['id'];
+
+            $opportunityTitle =
+                trim(
+                    (string)(
+                        $item['title']
+                        ?? 'Desarrollo'
+                    )
+                );
+
+            $opportunityLocation =
+                implode(
+                    ' · ',
+                    array_values(
+                        array_filter([
+                            trim(
+                                (string)(
+                                    $item['zone']
+                                    ?? ''
+                                )
+                            ),
+
+                            trim(
+                                (string)(
+                                    $item['city']
+                                    ?? ''
+                                )
+                            ),
+
+                            trim(
+                                (string)(
+                                    $item['province']
+                                    ?? ''
+                                )
+                            ),
+                        ])
+                    )
+                );
+
+            $opportunityType =
+                'Desarrollo';
 
             $imageUrl = '';
         }
